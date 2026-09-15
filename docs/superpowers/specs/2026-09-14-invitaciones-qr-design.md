@@ -136,9 +136,10 @@ auth_token (
 )
 
 session (
-  id, person_id FK, token_hash,
+  id, person_id FK, token_hash, user_agent,
   expires_at, last_seen_at, created_at, revoked_at
 )
+-- Sin UNIQUE en person_id: una fila por dispositivo, todas válidas a la vez.
 ```
 
 Índices: `entry_log (house_id, entered_at)`, `entry_log (invitation_id)`,
@@ -234,6 +235,16 @@ Reglas de implementación, todas obligatorias:
 Sesión: cookie `httpOnly` + `Secure` + `SameSite=Lax`, 6 a 12 meses, renovada en
 cada uso, revocable desde el admin.
 
+**Varios dispositivos a la vez.** Una fila de `session` por dispositivo, todas
+válidas en paralelo: loguearse en la computadora no cierra la sesión del celular.
+Para el segundo dispositivo se pide otro link, y ahí el **código de 6 dígitos** es
+el camino corto: el mail llega al celular pero el login es en la computadora, así
+que se tipea el código en vez de reenviarse el link a uno mismo. Con Google
+vinculado, un tap por dispositivo y listo.
+`session.user_agent` se guarda desde el día uno para poder mostrar más adelante
+una lista de sesiones activas con botón de cerrar. La columna ahora, la pantalla
+cuando haga falta.
+
 **No hay contraseñas de vecino.** El reset por mail haría que el mail siga siendo
 la raíz de confianza, así que la contraseña sumaría un subsistema entero
 (hashing, reset, verificación, políticas, pantallas) sin subir el piso de
@@ -261,11 +272,18 @@ No se puede crear por UI (huevo y gallina). Sale de
 /              Invitaciones vigentes + botón grande "Nueva invitación"
 /nueva         Un solo formulario. Cuatro chips de tipo que cambian qué
                campos se ven, no cuatro formularios distintos.
-/historial     Todas sus invitaciones pasadas, con si el invitado entró o no,
+/historial     Invitaciones pasadas de la casa, con si el invitado entró o no,
                cuándo, y cuántas veces. Botón "Volver a invitar" que precarga
                el formulario con los mismos datos.
 /i/<token>     Página pública: QR, nombre, casa, vigencia.
 ```
+
+**El alcance es la casa, no la persona.** Una casa puede tener varios vecinos
+(`house_member`), cada uno con su login. Todos ven las invitaciones de la casa,
+con "creada por" visible y un filtro *Solo las mías*. Si la mujer invitó a
+alguien para el sábado, el marido tiene que enterarse: de lo contrario la app le
+resuelve el WhatsApp con la guardia pero le deja el WhatsApp con la familia. El
+guardia autoriza contra la casa, así que la casa es la unidad correcta.
 
 Al guardar aparece el QR y un botón **Compartir** que usa la Web Share API
 nativa: abre WhatsApp con el link y el texto ya armados. Sin librería, sin
