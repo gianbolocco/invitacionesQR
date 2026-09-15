@@ -250,3 +250,84 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
 
   return res.rows as unknown as AgendaRow[]
 }
+
+export type AuditRow = {
+  id: string
+  guestName: string
+  guestDoc: string | null
+  plate: string | null
+  kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
+  eventName: string | null      // si es alguien anotado a un evento
+  unitLabel: string
+  inviterName: string
+  validFrom: string
+  validTo: string
+  createdAt: Date
+  status: 'entro' | 'esperando' | 'vencida' | 'anulada'
+  enteredAt: Date | null
+  enteredCount: number
+  guardName: string | null
+}
+
+/**
+ * Auditoría a nivel invitación: quién entró y quién NO.
+ *
+ * Es distinta de la bitácora, que lista ingresos: acá cada fila es una
+ * invitación, incluidas las que nadie usó. "No entró nadie" es justamente el
+ * dato que la bitácora no puede mostrar.
+ *
+ * Los anotados a un evento salen como filas propias, con el evento en su
+ * columna: para auditar querés una fila por persona.
+ */
+export async function auditInvitations(
+  neighborhoodId: string,
+  f: { from?: string; to?: string; unitId?: string },
+): Promise<AuditRow[]> {
+  const hoy = todayInBuenosAires()
+
+  const res = await db.execute(sql`
+    with uso as (
+      select e.invitation_id,
+             count(*)::int as veces,
+             max(e.entered_at) as ultima,
+             max(g.name) as guardia
+      from entry_log e
+      left join person g on g.id = e.guard_id
+      group by e.invitation_id
+    )
+    select
+      i.id,
+      i.guest_name                as "guestName",
+      i.guest_doc                 as "guestDoc",
+      i.plate,
+      i.kind,
+      padre.guest_name            as "eventName",
+      u.label                     as "unitLabel",
+      p.name                      as "inviterName",
+      i.valid_from                as "validFrom",
+      i.valid_to                  as "validTo",
+      i.created_at                as "createdAt",
+      case
+        when i.revoked_at is not null then 'anulada'
+        when coalesce(uso.veces, 0) > 0 then 'entro'
+        when i.valid_to < ${hoy}::date then 'vencida'
+        else 'esperando'
+      end                         as status,
+      uso.ultima                  as "enteredAt",
+      coalesce(uso.veces, 0)      as "enteredCount",
+      uso.guardia                 as "guardName"
+    from invitation i
+    join unit u on u.id = i.unit_id
+    join person p on p.id = i.created_by
+    left join invitation padre on padre.id = i.parent_id
+    left join uso on uso.invitation_id = i.id
+    where u.neighborhood_id = ${neighborhoodId}
+      and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
+      and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
+      and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+    order by i.valid_from desc, lower(i.guest_name)
+    limit 2000
+  `)
+
+  return res.rows as unknown as AuditRow[]
+}

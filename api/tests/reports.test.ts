@@ -98,16 +98,21 @@ describe('reportes', () => {
     const res = await request(app).get('/reports/entries.csv').set('Cookie', cookie)
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toMatch(/text\/csv/)
-    expect(res.text.split('\n')[0]).toBe('fecha,hora,invitado,documento,patente,unidad,guardia')
+    // BOM + sep=; para que Excel en español lo abra de doble clic con los
+    // acentos bien y las columnas separadas.
+    expect(res.text.charCodeAt(0)).toBe(0xfeff)
+    const [primera, encabezado] = res.text.split('\r\n')
+    expect(primera).toBe('﻿sep=;')
+    expect(encabezado).toBe('Fecha;Hora;Invitado;Documento;Patente;Unidad;Guardia')
     expect(res.text).toContain('Juan Pérez')
   })
 
-  it('el CSV escapa las comas del nombre', async () => {
+  it('el CSV escapa el separador si aparece en el nombre', async () => {
     const { cookie, inv, admin } = await scenario()
-    await registerEntry(inv.id, admin.id, { guestName: 'Pérez, Juan' })
+    await registerEntry(inv.id, admin.id, { guestName: 'Pérez; Juan' })
 
     const res = await request(app).get('/reports/entries.csv').set('Cookie', cookie)
-    expect(res.text).toContain('"Pérez, Juan"')
+    expect(res.text).toContain('"Pérez; Juan"')
   })
 
   it('un vecino no puede ver los reportes', async () => {

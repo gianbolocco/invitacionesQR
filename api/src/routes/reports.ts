@@ -6,6 +6,7 @@ import {
   dashboardKpis, entriesByDay, entriesByHour, invitationsByPerson, activityByGuard, entriesLog,
 } from '../services/reports.js'
 import { TZ } from '../lib/dates.js'
+import { toExcelCsv } from '../lib/csv.js'
 
 export const reportRoutes = Router()
 reportRoutes.use(requireAuth, requireRole('admin'))
@@ -29,12 +30,6 @@ reportRoutes.get('/entries', async (req, res) => {
   res.json(await entriesLog(req.person!.neighborhoodId, filterSchema.parse(req.query)))
 })
 
-/** Escapa un valor para CSV: comillas dobles duplicadas y campo entre comillas. */
-function csv(value: unknown): string {
-  const s = value == null ? '' : String(value)
-  return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s
-}
-
 reportRoutes.get('/entries.csv', async (req, res) => {
   const rows = await entriesLog(req.person!.neighborhoodId, filterSchema.parse(req.query))
   const fmt = new Intl.DateTimeFormat('es-AR', {
@@ -42,11 +37,13 @@ reportRoutes.get('/entries.csv', async (req, res) => {
     hour: '2-digit', minute: '2-digit', hour12: false,
   })
 
-  const lines = ['fecha,hora,invitado,documento,patente,unidad,guardia']
-  for (const r of rows) {
-    const [fecha, hora] = fmt.format(new Date(r.enteredAt)).split(', ')
-    lines.push([fecha, hora, r.guestName, r.guestDoc, r.plate, r.unitLabel, r.guardName].map(csv).join(','))
-  }
+  const csv = toExcelCsv(
+    ['Fecha', 'Hora', 'Invitado', 'Documento', 'Patente', 'Unidad', 'Guardia'],
+    rows.map((r) => {
+      const [fecha, hora] = fmt.format(new Date(r.enteredAt)).split(', ')
+      return [fecha, hora, r.guestName, r.guestDoc, r.plate, r.unitLabel, r.guardName]
+    }),
+  )
 
-  res.type('text/csv').attachment('ingresos.csv').send(lines.join('\n'))
+  res.type('text/csv; charset=utf-8').attachment('ingresos.csv').send(csv)
 })
