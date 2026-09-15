@@ -8,10 +8,14 @@ import { Shell } from '@/components/shell'
 import { Button, Eyebrow, Filete } from '@/components/ui'
 import { QrShare } from '@/components/qr-share'
 
+type Anotado = { id: string; guestName: string; guestDoc: string | null; revokedAt: string | null }
+
 export default function HomePage() {
   const me = useMe()
   const [invitaciones, setInvitaciones] = useState<Invitation[] | null>(null)
   const [verQr, setVerQr] = useState<Invitation | null>(null)
+  const [verAnotados, setVerAnotados] = useState<Invitation | null>(null)
+  const [anotados, setAnotados] = useState<Anotado[] | null>(null)
 
   const cargar = useCallback(() => {
     api<Invitation[]>('/invitations').then(setInvitaciones).catch(() => setInvitaciones([]))
@@ -26,13 +30,58 @@ export default function HomePage() {
     cargar()
   }
 
+  useEffect(() => {
+    if (!verAnotados) return
+    api<Anotado[]>(`/invitations/${verAnotados.id}/guests`)
+      .then(setAnotados)
+      .catch(() => setAnotados([]))
+  }, [verAnotados])
+
   if (!me) return <main className="p-6 text-ink-soft">Cargando…</main>
 
   const vigentes = (invitaciones ?? []).filter(estaVigente)
 
   return (
     <Shell me={me}>
-      {verQr ? (
+      {verAnotados ? (
+        <div className="mx-auto flex max-w-sm flex-col gap-5">
+          <button onClick={() => { setVerAnotados(null); setAnotados(null) }}
+            className="self-start text-sm text-alamo underline underline-offset-4">
+            ← Volver
+          </button>
+          <div>
+            <Eyebrow>Anotados</Eyebrow>
+            <h1 className="display text-2xl">{verAnotados.guestName}</h1>
+            <p className="text-ink-soft tabular">
+              {anotados?.length ?? 0} de {verAnotados.capacity} lugares
+            </p>
+          </div>
+
+          {anotados === null && <p className="text-ink-soft">Cargando…</p>}
+          {anotados?.length === 0 && (
+            <Filete className="bg-white px-5 py-8 text-center">
+              <p className="text-ink-soft">
+                Todavía no se anotó nadie.<br />
+                Compartí el link y cada uno carga su nombre.
+              </p>
+            </Filete>
+          )}
+
+          <ul className="flex flex-col gap-2">
+            {anotados?.map((a) => (
+              <li key={a.id}>
+                <Filete className={`bg-white px-4 py-3 ${a.revokedAt ? 'opacity-50' : ''}`}>
+                  <p className="font-semibold">{a.guestName}</p>
+                  <p className="text-sm text-ink-soft tabular">
+                    {a.guestDoc ?? 'Sin documento'}
+                    {a.revokedAt && ' · anulado'}
+                  </p>
+                </Filete>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : verQr ? (
         <div className="mx-auto flex max-w-sm flex-col gap-6">
           <button onClick={() => setVerQr(null)} className="self-start text-sm text-alamo
             underline underline-offset-4">
@@ -76,6 +125,12 @@ export default function HomePage() {
                       {inv.capacity > 1 && ` · ${inv.usedCount} de ${inv.capacity} entraron`}
                       {me.units.length > 1 && ` · ${inv.unitLabel}`}
                     </p>
+                    {inv.kind === 'evento' && (
+                      <button onClick={() => setVerAnotados(inv)}
+                        className="mt-0.5 text-sm text-alamo underline underline-offset-4">
+                        Ver quién se anotó
+                      </button>
+                    )}
                     {inv.createdBy !== me.id && (
                       <p className="text-sm text-ink-soft">Creada por {inv.creatorName}</p>
                     )}

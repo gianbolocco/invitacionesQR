@@ -106,3 +106,43 @@ describe('padrón', () => {
     expect(lista.body.some((p: { email: string }) => p.email === 'ajeno@example.com')).toBe(false)
   })
 })
+
+describe('datos del barrio', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('el admin carga la dirección y el link de mapas', async () => {
+    const { cookie } = await loginAs('admin')
+    const res = await request(app).patch('/admin/neighborhood').set('Cookie', cookie).send({
+      address: 'Ruta 8 km 62, Pilar',
+      mapUrl: 'https://maps.google.com/?q=alamo+alto',
+    })
+    expect(res.status).toBe(200)
+    expect(res.body.address).toBe('Ruta 8 km 62, Pilar')
+
+    const get = await request(app).get('/admin/neighborhood').set('Cookie', cookie)
+    expect(get.body.mapUrl).toContain('maps.google.com')
+  })
+
+  it('un campo vacío se guarda como nulo, no como string vacío', async () => {
+    const { cookie } = await loginAs('admin')
+    await request(app).patch('/admin/neighborhood').set('Cookie', cookie)
+      .send({ address: 'Algo' }).expect(200)
+    const res = await request(app).patch('/admin/neighborhood').set('Cookie', cookie)
+      .send({ address: '' })
+    expect(res.body.address).toBeNull()
+  })
+
+  it('rechaza un mapUrl que no es una URL', async () => {
+    const { cookie } = await loginAs('admin')
+    const res = await request(app).patch('/admin/neighborhood').set('Cookie', cookie)
+      .send({ mapUrl: 'javascript:alert(1)' })
+    expect(res.status).toBe(400)
+  })
+
+  it('un vecino no puede editar el barrio', async () => {
+    const { cookie } = await loginAs('resident')
+    const res = await request(app).patch('/admin/neighborhood').set('Cookie', cookie)
+      .send({ address: 'Me lo invento' })
+    expect(res.status).toBe(403)
+  })
+})

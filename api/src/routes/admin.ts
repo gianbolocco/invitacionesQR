@@ -6,6 +6,7 @@ import { createUnit, listUnits } from '../services/units.js'
 import {
   createPerson, listPeople, disablePerson, resendInvite, setGuardPassword,
 } from '../services/people.js'
+import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
 
 export const adminRoutes = Router()
 adminRoutes.use(requireAuth, requireRole('admin'))
@@ -53,4 +54,19 @@ adminRoutes.post('/people/:id/password', async (req, res) => {
   const { password } = z.object({ password: z.string().min(10) }).parse(req.body)
   await setGuardPassword(req.params.id, password, req.person!.id, req.person!.neighborhoodId)
   res.json({ ok: true })
+})
+
+adminRoutes.get('/neighborhood', async (req, res) => {
+  res.json(await getNeighborhood(req.person!.neighborhoodId))
+})
+
+adminRoutes.patch('/neighborhood', async (req, res) => {
+  const body = z.object({
+    name: z.string().min(1).optional(),
+    address: z.string().max(200).optional(),
+    // Un link, no una API de mapas. Se valida que sea http(s) y nada más.
+    mapUrl: z.union([z.string().url().startsWith('http'), z.literal('')]).optional(),
+  }).parse(req.body)
+
+  res.json(await updateNeighborhood(req.person!.neighborhoodId, req.person!.id, body))
 })

@@ -14,6 +14,7 @@ const ADMIN_NAV = [
   { href: '/admin/unidades', label: 'Unidades' },
   { href: '/admin/usuarios', label: 'Usuarios' },
   { href: '/admin/guardias', label: 'Guardias' },
+  { href: '/admin/barrio', label: 'Barrio' },
   { href: '/admin/bitacora', label: 'Bitácora' },
 ]
 
