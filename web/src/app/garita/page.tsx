@@ -4,6 +4,7 @@ import { Html5Qrcode } from 'html5-qrcode'
 import { api } from '@/lib/api'
 import { useMe, logout } from '@/lib/session'
 import { KIND_LABEL, type Invitation } from '@/lib/invitations'
+import { Agenda } from '@/components/agenda'
 
 type Check = { ok: true } | { ok: false; reason: string }
 
@@ -269,21 +270,27 @@ export default function GaritaPage() {
             </div>
           </form>
 
-          <ul className="flex flex-col gap-2">
-            {hits.map((h) => (
-              <li key={h.id}>
-                <button onClick={() => abrir(h.id)}
-                  className="min-h-16 w-full rounded border border-current/20 px-4 text-left text-lg">
-                  <span className="font-semibold">{h.guestName}</span>
-                  <span className="opacity-70 tabular"> · {h.unitLabel}{h.plate && ` · ${h.plate}`}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          {hits.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {hits.map((h) => (
+                <li key={h.id}>
+                  <button onClick={() => abrir(h.id)}
+                    className="min-h-16 w-full rounded border border-current/20 px-4 text-left text-lg">
+                    <span className="font-semibold">{h.guestName}</span>
+                    <span className="opacity-70 tabular"> · {h.unitLabel}{h.plate && ` · ${h.plate}`}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
 
           {hits.length === 0 && query && (
             <p className="opacity-70">Sin resultados. Probá con el apellido o la unidad.</p>
           )}
+
+          {/* En reposo el panel muestra la agenda: es la pregunta que el guardia
+              tiene a las 21, no una pantalla en blanco. */}
+          {hits.length === 0 && !query && <Agenda oscuro={oscuro} onAbrir={abrir} />}
         </section>
       </div>
     </main>

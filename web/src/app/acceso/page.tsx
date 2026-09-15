@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
+import { homeFor, type Me } from '@/lib/session'
 import { Button, Field, ErrorNote, Wordmark } from '@/components/ui'
 
 function Acceso() {
@@ -31,7 +32,8 @@ function Acceso() {
     setBusy(true)
     try {
       await api('/auth/invite', { method: 'POST', body: JSON.stringify({ token, password }) })
-      router.push('/')
+      const yo = await api<Me>('/auth/me')
+      router.push(homeFor(yo.role))
     } catch {
       setError('Este link ya se usó o venció. Pedile a la administración que te lo reenvíe.')
       setBusy(false)

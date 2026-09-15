@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api, ApiError, apiBase } from '@/lib/api'
+import { homeFor, type Me } from '@/lib/session'
 import { Button, Field, ErrorNote, Wordmark } from '@/components/ui'
 
 const ERROR_GOOGLE: Record<string, string> = {
@@ -39,7 +40,8 @@ function Login() {
     setError(null)
     try {
       await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })
-      router.push('/')
+      const yo = await api<Me>('/auth/me')
+      router.push(homeFor(yo.role))
     } catch (err) {
       setError(err instanceof ApiError && err.status === 429
         ? 'Demasiados intentos. Esperá 15 minutos o restablecé tu contraseña.'

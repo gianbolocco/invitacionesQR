@@ -2,7 +2,10 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireRole } from '../middleware/requireRole.js'
-import { checkByToken, checkById, registerEntry, searchGuests, listGuards } from '../services/entries.js'
+import {
+  checkByToken, checkById, registerEntry, searchGuests, listGuards, agendaForDay,
+} from '../services/entries.js'
+import { todayInBuenosAires } from '../lib/dates.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
@@ -35,4 +38,13 @@ gateRoutes.post('/entries', async (req, res) => {
   }).parse(req.body)
 
   res.status(201).json(await registerEntry(body.invitationId, body.guardId ?? null, body))
+})
+
+/** La agenda del día: quién está habilitado a entrar. */
+gateRoutes.get('/agenda', async (req, res) => {
+  const { date } = z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  }).parse(req.query)
+
+  res.json(await agendaForDay(req.person!.neighborhoodId, date ?? todayInBuenosAires()))
 })

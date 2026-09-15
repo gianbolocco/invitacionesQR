@@ -187,3 +187,66 @@ export async function listGuards(neighborhoodId: string) {
     ))
     .orderBy(people.name)
 }
+
+export type AgendaRow = {
+  id: string
+  guestName: string
+  guestDoc: string | null
+  plate: string | null
+  kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
+  unitLabel: string
+  inviterName: string
+  capacity: number
+  joinedCount: number      // anotados, solo para eventos
+  enteredCount: number     // ingresos de la familia
+  lastEntryAt: Date | null
+}
+
+/**
+ * Quiénes están habilitados a entrar un día dado.
+ *
+ * Aplica las mismas reglas que canEnter salvo el cupo: una invitación con el
+ * cupo agotado igual aparece, marcada como "ya entró". El guardia necesita ver
+ * quién vino, no solo quién falta.
+ *
+ * Los anotados a un evento NO salen como filas sueltas: un cumpleaños de 30
+ * taparía las tres visitas que importan. El evento va como una fila con su
+ * cupo, y se despliega aparte.
+ */
+export async function agendaForDay(neighborhoodId: string, day: string): Promise<AgendaRow[]> {
+  // 0 = domingo, igual que weekdayInBuenosAires y que la columna weekdays.
+  const dow = new Date(`${day}T12:00:00Z`).getUTCDay()
+
+  const res = await db.execute(sql`
+    select
+      i.id,
+      i.guest_name        as "guestName",
+      i.guest_doc         as "guestDoc",
+      i.plate,
+      i.kind,
+      u.label             as "unitLabel",
+      p.name              as "inviterName",
+      i.capacity,
+      (select count(*) from invitation h
+        where h.parent_id = i.id and h.revoked_at is null)::int as "joinedCount",
+      (select count(*) from entry_log e
+        where e.invitation_id = i.id
+           or e.invitation_id in (select h.id from invitation h where h.parent_id = i.id))::int
+        as "enteredCount",
+      (select max(e.entered_at) from entry_log e
+        where e.invitation_id = i.id
+           or e.invitation_id in (select h.id from invitation h where h.parent_id = i.id))
+        as "lastEntryAt"
+    from invitation i
+    join unit u on u.id = i.unit_id
+    join person p on p.id = i.created_by
+    where u.neighborhood_id = ${neighborhoodId}
+      and i.parent_id is null            -- los anotados se ven dentro de su evento
+      and i.revoked_at is null
+      and ${day}::date between i.valid_from and i.valid_to
+      and (i.weekdays is null or ${dow} = any(i.weekdays))
+    order by i.kind = 'evento' desc, lower(i.guest_name)
+  `)
+
+  return res.rows as unknown as AgendaRow[]
+}

@@ -1,8 +1,9 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
-import { useMe } from '@/lib/session'
+import { useMe, homeFor } from '@/lib/session'
 import { KIND_LABEL, estaVigente, vigencia, type Invitation } from '@/lib/invitations'
 import { Shell } from '@/components/shell'
 import { Button, Eyebrow, Filete } from '@/components/ui'
@@ -12,6 +13,7 @@ type Anotado = { id: string; guestName: string; guestDoc: string | null; revoked
 
 export default function HomePage() {
   const me = useMe()
+  const router = useRouter()
   const [invitaciones, setInvitaciones] = useState<Invitation[] | null>(null)
   const [verQr, setVerQr] = useState<Invitation | null>(null)
   const [verAnotados, setVerAnotados] = useState<Invitation | null>(null)
@@ -20,6 +22,11 @@ export default function HomePage() {
   const cargar = useCallback(() => {
     api<Invitation[]>('/invitations').then(setInvitaciones).catch(() => setInvitaciones([]))
   }, [])
+
+  // Una cuenta de garita no tiene nada que hacer en la home del vecino.
+  useEffect(() => {
+    if (me && me.role === 'guard') router.replace(homeFor(me.role))
+  }, [me, router])
 
   useEffect(() => { if (me) cargar() }, [me, cargar])
 
