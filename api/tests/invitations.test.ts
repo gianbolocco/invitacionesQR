@@ -4,6 +4,7 @@ import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
 import { neighborhoods, units, people, unitMembers } from '../src/db/schema.js'
 import { hashPassword } from '../src/lib/crypto.js'
+import { sql } from 'drizzle-orm'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
 
@@ -125,5 +126,37 @@ describe('invitaciones', () => {
       validFrom: '2026-09-20', validTo: '2026-09-10', capacity: 1,
     })
     expect(res.status).toBe(400)
+  })
+})
+
+describe('revocar un evento', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('anular el evento anula también a los anotados', async () => {
+    const { cookie, unitId } = await resident('martin@example.com', 'Lote 142')
+    const hoy = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date())
+
+    const evento = await request(app).post('/invitations').set('Cookie', cookie).send({
+      unitId, kind: 'evento', guestName: 'Cumple de Sofi',
+      validFrom: hoy, validTo: hoy, capacity: 10,
+    })
+
+    // Dos invitados se anotan desde el link público.
+    const a = await request(app).post(`/invitations/public/${evento.body.token}/join`)
+      .send({ guestName: 'Martina' })
+    const b = await request(app).post(`/invitations/public/${evento.body.token}/join`)
+      .send({ guestName: 'Nicolás' })
+
+    await request(app).post(`/invitations/${evento.body.id}/revoke`).set('Cookie', cookie).expect(200)
+
+    // Sin la cascada, cada anotado seguiría entrando con su propio QR.
+    for (const token of [a.body.token, b.body.token]) {
+      const { rows } = await db.execute(
+        sql`select revoked_at from invitation where token = ${token}`,
+      )
+      expect(rows[0].revoked_at).not.toBeNull()
+    }
   })
 })
