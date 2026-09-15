@@ -86,7 +86,16 @@ export async function registerEntry(
   })
 }
 
-/** Invitaciones todavía vigentes que matchean nombre, etiqueta de UF o patente. */
+/**
+ * Invitaciones todavía vigentes que matchean nombre, etiqueta de UF o patente.
+ *
+ * La comparación pasa por `unaccent`: con un auto esperando en la barrera nadie
+ * escribe "Pérez" con tilde, y el vecino sí la escribió al cargar la invitación.
+ *
+ * ponytail: unaccent() no es IMMUTABLE, así que esto no usa índice y hace scan.
+ * Con las invitaciones vigentes de un barrio son decenas de filas. Si alguna vez
+ * duele: wrapper IMMUTABLE + índice GIN con pg_trgm.
+ */
 export async function searchGuests(neighborhoodId: string, query: string) {
   const q = `%${query.trim()}%`
   const hoy = todayInBuenosAires()
@@ -105,7 +114,11 @@ export async function searchGuests(neighborhoodId: string, query: string) {
     .where(and(
       eq(units.neighborhoodId, neighborhoodId),
       gte(invitations.validTo, hoy),
-      or(ilike(invitations.guestName, q), ilike(units.label, q), ilike(invitations.plate, q)),
+      or(
+        sql`unaccent(${invitations.guestName}) ilike unaccent(${q})`,
+        sql`unaccent(${units.label}) ilike unaccent(${q})`,
+        ilike(invitations.plate, q),
+      ),
     ))
     .orderBy(desc(invitations.createdAt))
     .limit(20)

@@ -148,6 +148,13 @@ describe('garita', () => {
     expect(porUnidad.body).toHaveLength(1)
   })
 
+  it('encuentra "Perez" sin tilde: en la barrera nadie escribe acentos', async () => {
+    const { cookie } = await scenario()
+    const res = await request(app).get('/gate/search?q=perez').set('Cookie', cookie)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].guestName).toBe('Juan Pérez')
+  })
+
   it('la búsqueda y el QR caen en el mismo resultado', async () => {
     const { cookie, inv } = await scenario()
     const hit = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie)
