@@ -24,5 +24,15 @@ services:
     depends_on:
       db: { condition: service_healthy }
 
+  web:
+    build:
+      context: ./web
+      args:
+        # El navegador del vecino llama a la API desde AFUERA de Docker, así que
+        # esta URL es la pública, no el hostname del servicio.
+        NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:8080}
+    ports: ['3000:3000']
+    depends_on: [api]
+
 volumes:
   dbdata:
