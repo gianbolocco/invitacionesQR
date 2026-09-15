@@ -4,6 +4,7 @@ import cors from 'cors'
 import { ZodError } from 'zod'
 import { pool } from './db/index.js'
 import { errorHandler } from './lib/errors.js'
+import { authRoutes } from './routes/auth.js'
 
 export function buildApp() {
   const app = express()
@@ -15,6 +16,8 @@ export function buildApp() {
     await pool.query('select 1')
     res.json({ ok: true, db: true })
   })
+
+  app.use('/auth', authRoutes)
 
   // Los errores de zod se traducen a 400 antes del handler genérico.
   app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {

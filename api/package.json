@@ -8,10 +8,10 @@
   },
   "scripts": {
     "test": "vitest run",
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
     "build": "tsc",
     "migrate": "drizzle-kit migrate",
-    "seed:admin": "tsx src/seed-admin.ts"
+    "seed:admin": "tsx --env-file-if-exists=.env src/seed-admin.ts"
   },
   "keywords": [],
   "author": "",
