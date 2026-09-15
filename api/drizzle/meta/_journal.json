@@ -15,6 +15,13 @@
       "when": 1789435301154,
       "tag": "0001_unaccent",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789514120925,
+      "tag": "0002_eventos",
+      "breakpoints": true
     }
   ]
 }

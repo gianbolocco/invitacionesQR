@@ -6,7 +6,7 @@ import { db, pool } from '../src/db/index.js'
 import { neighborhoods, units, people, unitMembers, invitations, entryLogs } from '../src/db/schema.js'
 import { hashPassword, randomToken } from '../src/lib/crypto.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
-import { registerEntry } from '../src/services/entries.js'
+import { registerEntry, checkByToken } from '../src/services/entries.js'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
 
@@ -161,5 +161,107 @@ describe('garita', () => {
     const porId = await request(app).get(`/gate/invitation/${hit.body[0].id}`).set('Cookie', cookie)
     const porToken = await request(app).get(`/gate/check/${inv.token}`).set('Cookie', cookie)
     expect(porId.body.invitation).toEqual(porToken.body.invitation)
+  })
+})
+
+describe('eventos con anotados', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  /** Un evento con `capacity` y N hijas anotadas. */
+  async function evento(capacity: number, anotados: string[]) {
+    const [n] = await db.insert(neighborhoods).values({ name: 'Álamo Alto' }).returning()
+    const [u] = await db.insert(units).values({ neighborhoodId: n.id, label: 'Lote 142' }).returning()
+    const [vecino] = await db.insert(people).values({
+      neighborhoodId: n.id, email: 'martin@example.com', name: 'Martín',
+      role: 'resident', status: 'active',
+    }).returning()
+    await db.insert(unitMembers).values({ unitId: u.id, personId: vecino.id })
+
+    const [padre] = await db.insert(invitations).values({
+      unitId: u.id, createdBy: vecino.id, kind: 'evento', guestName: 'Cumple de Sofi',
+      validFrom: hoy, validTo: hoy, capacity, token: randomToken(16),
+    }).returning()
+
+    const hijas = []
+    for (const nombre of anotados) {
+      const [h] = await db.insert(invitations).values({
+        unitId: u.id, createdBy: vecino.id, parentId: padre.id, kind: 'evento',
+        guestName: nombre, validFrom: hoy, validTo: hoy, capacity: 1, token: randomToken(16),
+      }).returning()
+      hijas.push(h)
+    }
+    return { padre, hijas }
+  }
+
+  it('el cupo es del evento: dos entran y la tercera no', async () => {
+    const { hijas } = await evento(2, ['Martina', 'Nicolás', 'Sofía'])
+    await registerEntry(hijas[0].id, null, { guestName: 'Martina' })
+    await registerEntry(hijas[1].id, null, { guestName: 'Nicolás' })
+    await expect(registerEntry(hijas[2].id, null, { guestName: 'Sofía' }))
+      .rejects.toThrow(/no_capacity/)
+  })
+
+  it('un ingreso directo contra el evento también descuenta del cupo', async () => {
+    const { padre, hijas } = await evento(2, ['Martina', 'Nicolás'])
+    // La tía que no se anotó: el guardia la registra contra el QR del evento.
+    await registerEntry(padre.id, null, { guestName: 'Tía Ana' })
+    await registerEntry(hijas[0].id, null, { guestName: 'Martina' })
+    await expect(registerEntry(hijas[1].id, null, { guestName: 'Nicolás' }))
+      .rejects.toThrow(/no_capacity/)
+  })
+
+  it('un anotado no puede entrar dos veces aunque sobre cupo', async () => {
+    const { hijas } = await evento(10, ['Martina'])
+    await registerEntry(hijas[0].id, null, { guestName: 'Martina' })
+    await expect(registerEntry(hijas[0].id, null, { guestName: 'Martina' }))
+      .rejects.toThrow(/no_capacity/)
+  })
+
+  it('el check de una hija muestra el uso del evento entero', async () => {
+    const { padre, hijas } = await evento(10, ['Martina', 'Nicolás'])
+    await registerEntry(padre.id, null, { guestName: 'Tía Ana' })
+    await registerEntry(hijas[0].id, null, { guestName: 'Martina' })
+
+    const r = await checkByToken(hijas[1].token)
+    expect(r.check).toEqual({ ok: true })
+    expect(r.usedCount).toBe(2)
+    expect(r.invitation.guestName).toBe('Nicolás')
+  })
+
+  /**
+   * El cupo compartido lo serializa la fila del EVENTO, no la de la hija.
+   * Bloqueamos el padre con FOR KEY SHARE desde afuera: si registerEntry pide
+   * FOR UPDATE sobre la raíz, se queda esperando. Si lo pidiera sobre la hija,
+   * pasaría de largo — el INSERT solo toma FOR KEY SHARE sobre la hija, no
+   * sobre el padre.
+   */
+  it('registerEntry sobre una hija toma el lock del EVENTO', async () => {
+    const { padre, hijas } = await evento(10, ['Martina'])
+    const bloqueador = await pool.connect()
+
+    try {
+      await bloqueador.query('begin')
+      await bloqueador.query('select * from invitation where id = $1 for key share', [padre.id])
+
+      const registro = registerEntry(hijas[0].id, null, { guestName: 'Martina' })
+      const carrera = await Promise.race([
+        registro.then(() => 'no_se_bloqueo').catch(() => 'no_se_bloqueo'),
+        new Promise((r) => setTimeout(() => r('bloqueado'), 400)),
+      ])
+      expect(carrera).toBe('bloqueado')
+
+      await bloqueador.query('rollback')
+      expect((await registro).guestName).toBe('Martina')
+    } finally {
+      bloqueador.release()
+    }
+  })
+
+  it('una hija revocada no entra aunque al evento le sobre cupo', async () => {
+    const { hijas } = await evento(10, ['Martina'])
+    await db.update(invitations).set({ revokedAt: new Date() })
+      .where(eq(invitations.id, hijas[0].id))
+    await expect(registerEntry(hijas[0].id, null, { guestName: 'Martina' }))
+      .rejects.toThrow(/revoked/)
   })
 })

@@ -5,6 +5,9 @@ import { canEnter, type EntryCheck } from '../authz.js'
 import { todayInBuenosAires } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 
+/** db o una transacción: las queries de lectura sirven para las dos. */
+type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
+
 async function loadForCheck(where: SQL) {
   const [row] = await db.select({
     id: invitations.id,
@@ -17,26 +20,65 @@ async function loadForCheck(where: SQL) {
     weekdays: invitations.weekdays,
     capacity: invitations.capacity,
     revokedAt: invitations.revokedAt,
+    parentId: invitations.parentId,
     unitId: invitations.unitId,
     unitLabel: units.label,
   }).from(invitations).innerJoin(units, eq(units.id, invitations.unitId)).where(where).limit(1)
   return row ?? null
 }
 
-async function usageOf(invitationId: string) {
-  const [row] = await db.select({
+/** La raíz del evento: el padre si es un anotado, o la propia invitación. */
+function rootIdOf(inv: { id: string; parentId: string | null }): string {
+  return inv.parentId ?? inv.id
+}
+
+/**
+ * Uso de la FAMILIA: ingresos contra la raíz más los de todas sus hijas.
+ * El cupo de un evento es del evento, no de cada anotado, y el QR compartido del
+ * evento sigue vivo para el que no se anotó: los dos caminos descuentan igual.
+ */
+async function familyUsage(rootId: string, tx: Executor = db) {
+  const [row] = await tx.select({
     used: sql<number>`count(*)::int`,
     last: sql<Date | null>`max(${entryLogs.enteredAt})`,
-  }).from(entryLogs).where(eq(entryLogs.invitationId, invitationId))
+  })
+    .from(entryLogs)
+    .innerJoin(invitations, eq(invitations.id, entryLogs.invitationId))
+    .where(or(eq(invitations.id, rootId), eq(invitations.parentId, rootId)))
   return { usedCount: row?.used ?? 0, lastEntryAt: row?.last ?? null }
+}
+
+async function ownUsage(invitationId: string, tx: Executor = db) {
+  const [row] = await tx.select({ used: sql<number>`count(*)::int` })
+    .from(entryLogs).where(eq(entryLogs.invitationId, invitationId))
+  return row?.used ?? 0
 }
 
 type LoadedInvitation = NonNullable<Awaited<ReturnType<typeof loadForCheck>>>
 
 async function buildCheck(invitation: LoadedInvitation) {
-  const { usedCount, lastEntryAt } = await usageOf(invitation.id)
-  const check: EntryCheck = canEnter(invitation, new Date(), usedCount)
+  const rootId = rootIdOf(invitation)
+  const { usedCount, lastEntryAt } = await familyUsage(rootId)
+
+  // Un anotado compara contra la capacidad del EVENTO, no contra la suya.
+  const capacity = invitation.parentId
+    ? (await capacityOf(rootId)) ?? invitation.capacity
+    : invitation.capacity
+
+  let check: EntryCheck = canEnter({ ...invitation, capacity }, new Date(), usedCount)
+
+  // Y además no puede entrar dos veces, aunque al evento le sobre cupo.
+  if (check.ok && invitation.parentId && (await ownUsage(invitation.id)) >= 1) {
+    check = { ok: false, reason: 'no_capacity' }
+  }
+
   return { invitation, check, usedCount, lastEntryAt }
+}
+
+async function capacityOf(id: string, tx: Executor = db): Promise<number | null> {
+  const [row] = await tx.select({ capacity: invitations.capacity })
+    .from(invitations).where(eq(invitations.id, id)).limit(1)
+  return row?.capacity ?? null
 }
 
 export async function checkByToken(token: string) {
@@ -53,8 +95,10 @@ export async function checkById(id: string) {
 
 /**
  * Registra el ingreso revalidando el cupo DENTRO de la transacción.
- * El SELECT ... FOR UPDATE sobre la invitación serializa a dos guardias
- * escaneando el mismo QR al mismo tiempo: sin eso, ambos leerían used=0.
+ *
+ * El FOR UPDATE va sobre la RAÍZ del evento, no sobre la invitación escaneada:
+ * es la fila que comparten todos los anotados, y por lo tanto la que serializa
+ * el cupo. Bloquear la hija dejaría entrar al 31 de un evento de 30.
  */
 export async function registerEntry(
   invitationId: string,
@@ -62,19 +106,29 @@ export async function registerEntry(
   data: { guestName: string; guestDoc?: string; plate?: string; note?: string },
 ) {
   return db.transaction(async (tx) => {
-    const [inv] = await tx.select().from(invitations)
-      .where(eq(invitations.id, invitationId)).for('update').limit(1)
-    if (!inv) throw new AppError(404, 'not_found')
+    const [target] = await tx.select().from(invitations)
+      .where(eq(invitations.id, invitationId)).limit(1)
+    if (!target) throw new AppError(404, 'not_found')
 
-    const [{ used }] = await tx.select({ used: sql<number>`count(*)::int` })
-      .from(entryLogs).where(eq(entryLogs.invitationId, invitationId))
+    const rootId = rootIdOf(target)
+    const [root] = await tx.select().from(invitations)
+      .where(eq(invitations.id, rootId)).for('update').limit(1)
+    if (!root) throw new AppError(404, 'not_found')
 
-    const check = canEnter(inv, new Date(), used)
+    const { usedCount } = await familyUsage(rootId, tx)
+
+    // La ventana y la revocación se miran en la invitación escaneada; el cupo,
+    // en el evento. Una hija revocada no entra aunque al evento le sobre lugar.
+    const check = canEnter({ ...target, capacity: root.capacity }, new Date(), usedCount)
     if (!check.ok) throw new AppError(409, check.reason)
+
+    if (target.parentId && (await ownUsage(target.id, tx)) >= 1) {
+      throw new AppError(409, 'no_capacity')
+    }
 
     const [entry] = await tx.insert(entryLogs).values({
       invitationId,
-      unitId: inv.unitId,
+      unitId: target.unitId,
       guardId,
       guestName: data.guestName.trim(),
       guestDoc: data.guestDoc?.trim() || null,

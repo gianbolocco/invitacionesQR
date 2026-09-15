@@ -6,6 +6,10 @@ import { sql } from 'drizzle-orm'
 export const neighborhoods = pgTable('neighborhood', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
+  // "Cómo llegar" en la página del invitado. Un link de mapas que carga el
+  // admin: sin API de mapas, sin clave, sin embeber nada.
+  address: text('address'),
+  mapUrl: text('map_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -41,6 +45,9 @@ export const invitations = pgTable('invitation', {
   id: uuid('id').primaryKey().defaultRandom(),
   unitId: uuid('unit_id').notNull().references(() => units.id),
   createdBy: uuid('created_by').notNull().references(() => people.id),
+  // NULL salvo que sea un anotado a un evento. La hija es una invitación normal
+  // con su propio token: la garita no distingue.
+  parentId: uuid('parent_id'),
   kind: text('kind').notNull(),
   guestName: text('guest_name').notNull(),
   guestDoc: text('guest_doc'),
@@ -56,6 +63,7 @@ export const invitations = pgTable('invitation', {
   uniqueIndex('invitation_token_uq').on(t.token),
   index('invitation_unit_idx').on(t.unitId, t.validTo),
   index('invitation_creator_idx').on(t.createdBy, t.createdAt),
+  index('invitation_parent_idx').on(t.parentId),
   check('invitation_kind_ck', sql`${t.kind} in ('visita','frecuente','evento','proveedor')`),
   check('invitation_window_ck', sql`${t.validTo} >= ${t.validFrom}`),
   check('invitation_capacity_ck', sql`${t.capacity} >= 1`),
