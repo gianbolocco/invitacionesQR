@@ -22,9 +22,9 @@ una bitácora de ingresos.
 - QR compartible por WhatsApp, con búsqueda manual como camino alternativo.
 - Pantalla de garita: escaneo, búsqueda, autorización y registro de ingreso con
   DNI y patente.
-- Padrón gestionado por un admin (casas, vecinos, guardias). Sin registro abierto.
+- Padrón gestionado por un admin (UF, vecinos, guardias). Sin registro abierto.
 - Bitácora de ingresos, auditoría de acciones administrativas y dashboard.
-- Historial de invitaciones por vecino y por casa.
+- Historial de invitaciones por vecino y por UF.
 
 ### Fuera de la v1
 
@@ -52,7 +52,7 @@ instalar una app para eso no agrega nada. El guardia escanea QR desde el
 navegador con `getUserMedia`. Sin app stores, sin releases, sin versiones viejas.
 
 **Postgres, no Mongo.** Casi toda consulta útil es un join (quién invitó a quién,
-ingresos por casa, frecuentes de una casa). El cupo de evento necesita una
+ingresos por UF, frecuentes de una UF). El cupo de evento necesita una
 transacción real para no pasarse con dos guardias escaneando a la vez. Las FKs y
 los `CHECK` evitan escribir esas validaciones a mano en cada endpoint.
 
@@ -83,7 +83,7 @@ neighborhood (
   id, name, created_at
 )
 
-house (
+unit (
   id, neighborhood_id FK, label,
   UNIQUE (neighborhood_id, label)
 )
@@ -99,13 +99,13 @@ person (
   UNIQUE (neighborhood_id, email)
 )
 
-house_member (
-  house_id FK, person_id FK,
-  PRIMARY KEY (house_id, person_id)
+unit_member (
+  unit_id FK, person_id FK,
+  PRIMARY KEY (unit_id, person_id)
 )
 
 invitation (
-  id, house_id FK, created_by FK -> person,
+  id, unit_id FK, created_by FK -> person,
   kind TEXT CHECK (kind IN ('visita','frecuente','evento','proveedor')),
   guest_name, guest_doc, plate,
   valid_from DATE, valid_to DATE,
@@ -119,7 +119,7 @@ invitation (
 )
 
 entry_log (
-  id, invitation_id FK, house_id FK, guard_id FK -> person,
+  id, invitation_id FK, unit_id FK, guard_id FK -> person,
   entered_at, guest_name, guest_doc, plate, note
 )
 
@@ -142,8 +142,8 @@ session (
 -- Sin UNIQUE en person_id: una fila por dispositivo, todas válidas a la vez.
 ```
 
-Índices: `entry_log (house_id, entered_at)`, `entry_log (invitation_id)`,
-`invitation (house_id, valid_to)`, `invitation (token)` único,
+Índices: `entry_log (unit_id, entered_at)`, `entry_log (invitation_id)`,
+`invitation (unit_id, valid_to)`, `invitation (token)` único,
 `invitation (created_by, created_at)`, `audit_log (neighborhood_id, at)`,
 `session (token_hash)` único.
 
@@ -272,18 +272,29 @@ No se puede crear por UI (huevo y gallina). Sale de
 /              Invitaciones vigentes + botón grande "Nueva invitación"
 /nueva         Un solo formulario. Cuatro chips de tipo que cambian qué
                campos se ven, no cuatro formularios distintos.
-/historial     Invitaciones pasadas de la casa, con si el invitado entró o no,
+/historial     Invitaciones pasadas de la UF, con si el invitado entró o no,
                cuándo, y cuántas veces. Botón "Volver a invitar" que precarga
                el formulario con los mismos datos.
-/i/<token>     Página pública: QR, nombre, casa, vigencia.
+/i/<token>     Página pública: QR, nombre, UF, vigencia.
 ```
 
-**El alcance es la casa, no la persona.** Una casa puede tener varios vecinos
-(`house_member`), cada uno con su login. Todos ven las invitaciones de la casa,
-con "creada por" visible y un filtro *Solo las mías*. Si la mujer invitó a
-alguien para el sábado, el marido tiene que enterarse: de lo contrario la app le
-resuelve el WhatsApp con la guardia pero le deja el WhatsApp con la familia. El
-guardia autoriza contra la casa, así que la casa es la unidad correcta.
+**El alcance es la UF, no la persona.** Una UF puede tener varios vecinos
+(`unit_member`), cada uno con su login. Todos ven las invitaciones de la UF, con
+"creada por" visible y un filtro *Solo las mías*. Si la mujer invitó a alguien
+para el sábado, el marido tiene que enterarse: de lo contrario la app le resuelve
+el WhatsApp con la guardia pero le deja el WhatsApp con la familia. El guardia
+autoriza contra la UF, así que la UF es la unidad correcta.
+
+Como `unit_member` es N:M, una persona puede pertenecer a más de una UF (dos
+lotes, o la propia y la de los padres). En el formulario: con una sola UF no se
+muestra nada; con dos o más aparece un selector. Sin tablas nuevas.
+
+Si un vecino se muda o se da de baja, las invitaciones y la bitácora **quedan con
+la UF**: el historial de ingresos pertenece a la unidad, no a quien lo tipeó.
+`created_by` conserva la trazabilidad de quién generó cada invitación.
+
+`unit.label` guarda el string completo que use el barrio ("Lote 142", "UF 7B"),
+sin prefijo configurable ni lógica de formato.
 
 Al guardar aparece el QR y un botón **Compartir** que usa la Web Share API
 nativa: abre WhatsApp con el link y el texto ya armados. Sin librería, sin
@@ -295,11 +306,11 @@ barrera, con un auto esperando, es el peor lugar para tipear datos.
 ### Garita (pantalla horizontal, una sola vista)
 
 Cámara escaneando permanentemente a la izquierda, buscador a la derecha
-(apellido, casa o patente). **El QR y la búsqueda manual caen en el mismo
+(apellido, UF o patente). **El QR y la búsqueda manual caen en el mismo
 resultado**, así que el camino alternativo no es un segundo flujo: es el mismo
 sin el paso del escaneo.
 
-El resultado ocupa media pantalla: verde o rojo, nombre, casa, tipo, vigencia.
+El resultado ocupa media pantalla: verde o rojo, nombre, UF, tipo, vigencia.
 Si es evento, "12 de 30 ingresaron". Abajo, **Registrar ingreso**, con DNI y
 patente precargados y editables.
 
@@ -309,12 +320,12 @@ Escaneo: `BarcodeDetector` nativo donde exista, `html5-qrcode` como respaldo.
 
 ```
 /admin              Dashboard (sección 10)
-/admin/casas        ABM de casas
-/admin/usuarios     Alta (mail + nombre + casa + rol) → dispara el mail
+/admin/unidades     ABM de UF
+/admin/usuarios     Alta (mail + nombre + UF + rol) → dispara el mail
                     Estados: invitado · activo · deshabilitado
-                    Acciones: reenviar invitación, deshabilitar, cambiar de casa
+                    Acciones: reenviar invitación, deshabilitar, cambiar de UF
 /admin/guardias     Cuentas de garita, alta y reseteo de clave
-/admin/bitacora     Ingresos filtrables por fecha, casa y guardia + export CSV
+/admin/bitacora     Ingresos filtrables por fecha, UF y guardia + export CSV
 /admin/invitaciones Historial global filtrable + export CSV
 ```
 
@@ -331,7 +342,7 @@ también la puede mandar a un tercero. Lo que se hace es acotar el daño.
 | El guardia ve el nombre esperado | El QR no abre la barrera: autoriza a una persona. Se pide DNI y se compara. |
 | Revocar | Un tap desde la app del vecino, efecto inmediato. |
 | Token de 16 bytes aleatorios | No se adivina. Igual va rate limit en el endpoint de validación. |
-| Bitácora contra la casa | Todo ingreso tiene dueño identificable. |
+| Bitácora contra la UF | Todo ingreso tiene dueño identificable. |
 
 **No se usa JWT firmado para el QR.** Hay que consultar la base igual (revocación,
 cupo, registro del ingreso), así que la firma no ahorra el viaje: solo agrega
@@ -343,7 +354,7 @@ claves que rotar y tokens más largos que no entran cómodos en un QR.
 
 `audit_log` es una tabla genérica, no un historial por entidad. Un helper
 `audit(actor, action, entity, meta)` llamado desde los services. Acciones:
-`person.created`, `person.disabled`, `person.reinvited`, `house.created`,
+`person.created`, `person.disabled`, `person.reinvited`, `unit.created`,
 `invitation.revoked`, `guard.password_reset`, `session.revoked`.
 
 **`audit_log` y `entry_log` no se mezclan.** `entry_log` es dominio: tiene DNI,
@@ -354,14 +365,14 @@ con la mitad de las columnas en `NULL`.
 ### Dashboard (`/admin`)
 
 - **KPIs**: ingresos hoy / semana / mes · invitaciones vigentes · vecinos
-  habilitados vs. vecinos que entraron en los últimos 30 días · **casas sin
+  habilitados vs. vecinos que entraron en los últimos 30 días · **UF sin
   ningún vecino registrado** (el agujero del padrón).
 - **Ingresos por día** (últimos 30) e **ingresos por hora del día**, este último
   para dimensionar turnos de guardia con datos.
-- **Invitaciones generadas por usuario y por casa**, con ranking y evolución.
+- **Invitaciones generadas por usuario y por UF**, con ranking y evolución.
 - **Tablas**: últimos ingresos · últimas altas y bajas · actividad por guardia
   (ingresos registrados por turno).
-- Todo filtrable por fecha y casa, todo exportable a CSV.
+- Todo filtrable por fecha y UF, todo exportable a CSV.
 
 `last_login_at` en `person` existe porque "usuario activo" tiene dos
 significados y los dos importan: habilitado (`status = active`) y que realmente
