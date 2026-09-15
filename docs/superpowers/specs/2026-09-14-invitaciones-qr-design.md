@@ -29,8 +29,6 @@ una bitácora de ingresos.
 ### Fuera de la v1
 
 - Registro de egreso. Nadie escanea al salir; la data queda mintiendo.
-- Lista nominal de invitados en eventos. Se carga cupo y el guardia anota el
-  nombre real al ingresar.
 - Notificación push al vecino cuando llega su invitado.
 - Lectura automática de patentes / hardware en la barrera.
 - Multi-barrio operativo (el modelo lo soporta, la UI no lo expone).
@@ -80,7 +78,10 @@ implementación, sin inyección de dependencias, sin patrón repositorio.
 
 ```sql
 neighborhood (
-  id, name, created_at
+  id, name,
+  address,       -- texto, para "cómo llegar"
+  map_url,       -- link de Google Maps que carga el admin. Sin API ni clave.
+  created_at
 )
 
 unit (
@@ -106,6 +107,7 @@ unit_member (
 
 invitation (
   id, unit_id FK, created_by FK -> person,
+  parent_id FK -> invitation,  -- NULL salvo que sea un anotado a un evento
   kind TEXT CHECK (kind IN ('visita','frecuente','evento','proveedor')),
   guest_name, guest_doc, plate,
   valid_from DATE, valid_to DATE,
@@ -144,8 +146,10 @@ session (
 
 Índices: `entry_log (unit_id, entered_at)`, `entry_log (invitation_id)`,
 `invitation (unit_id, valid_to)`, `invitation (token)` único,
-`invitation (created_by, created_at)`, `audit_log (neighborhood_id, at)`,
-`session (token_hash)` único.
+`invitation (created_by, created_at)`, `invitation (parent_id)`,
+`audit_log (neighborhood_id, at)`, `session (token_hash)` único.
+Único parcial `invitation (parent_id, lower(guest_doc))` donde ambos no son
+nulos: deduplica anotaciones al mismo evento con el mismo documento.
 
 ### Sesiones en tabla, no JWT
 
@@ -170,8 +174,43 @@ ramifica la lógica de autorización**.
 |---|---|
 | Visita puntual | `valid_from = valid_to = hoy`, `capacity = 1` |
 | Frecuente | `valid_to` lejano, `weekdays` seteado, `capacity` alto |
-| Evento | `capacity = N`, N filas en `entry_log` contra la misma invitación |
+| Evento | `capacity = N`; cada anotado es una invitación **hija** (`parent_id`) |
 | Proveedor | igual a puntual, con `plate` cargada |
+
+### Eventos: anotación con QR propio (decidido 2026-09-15)
+
+El link de un evento no es un QR: es una **puerta de anotación**. Cada invitado
+pone su nombre y documento y se lleva su propia invitación hija, con su propio
+token y su propio QR.
+
+```
+invitation  "Cumple de Sofi"  kind=evento  capacity=30   ← link al grupo
+     │
+     ├── invitation  "Martina Gómez"  parent_id=…  capacity=1   ← su QR
+     └── invitation  "Nicolás Paz"    parent_id=…  capacity=1
+```
+
+**La garita no cambia:** escanea una invitación normal y lee el nombre real.
+
+**Motivo.** La estructura anterior sí registraba una fila por persona, pero el
+nombre lo tipeaba el guardia, y un cumpleaños de 30 a las 23:30 con autos en cola
+llena la bitácora de "invitado" y "amiga de sofi". La auditoría existía en el
+esquema y se degradaba en la operación.
+
+**El QR del evento sigue sirviendo como red.** Quien no se anotó llega igual: el
+guardia busca el evento y registra el ingreso a mano, como antes. Los dos caminos
+descuentan del mismo cupo — la auditoría no se paga con gente varada en la barrera.
+
+**Cupo por familia.** El cupo se cuenta sobre el evento completo: ingresos
+directos contra el padre **más** ingresos de todas las hijas. `canEnter` recibe
+ese total y la capacidad del padre; la hija además no puede entrar dos veces.
+
+**Sin anotaciones duplicadas.** El navegador del invitado recuerda su hija (vuelve
+a abrir el link y ve su QR, no el formulario), y el servidor deduplica por
+documento dentro del mismo evento: mismo documento devuelve la hija existente en
+vez de crear otra y quemar un lugar.
+
+**Revocar el evento revoca las hijas** en cascada.
 
 ### Bajas
 
@@ -186,6 +225,11 @@ Es la única pieza no trivial del sistema. Función pura:
 ```ts
 function canEnter(inv: Invitation, now: Date, usedCount: number): EntryCheck
 ```
+
+`usedCount` es el uso **de la familia**: para una invitación suelta, sus propios
+ingresos; para una hija de evento, los ingresos del evento entero (padre más
+todas las hijas) comparados contra la capacidad del padre. Una hija además no
+puede entrar dos veces, porque su propia capacidad es 1.
 
 Devuelve autorizado, o el motivo del rechazo:
 
@@ -296,7 +340,7 @@ No se puede crear por UI (huevo y gallina). Sale de
                cuándo, y cuántas veces. Botón "Volver a invitar" que precarga
                el formulario con los mismos datos.
 /perfil        Cambiar contraseña, vincular o desvincular Google.
-/i/<token>     Página pública: QR, nombre, UF, vigencia.
+/i/<token>     Página pública del invitado (ver abajo).
 ```
 
 **El alcance es la UF, no la persona.** Una UF puede tener varios vecinos
@@ -323,6 +367,40 @@ integración con la API de Meta. El invitado recibe un link común.
 
 DNI y patente los precarga el vecino (opcionales). El guardia solo corrige: la
 barrera, con un auto esperando, es el peor lugar para tipear datos.
+
+### La página pública del invitado, `/i/<token>` (ampliada 2026-09-15)
+
+Sin sesión. Muestra siempre **quién invita** (nombre del padrón, nunca el mail),
+**la unidad** y **cómo llegar** (dirección y link de mapas que el admin carga una
+vez en `neighborhood`; sin API de mapas ni clave: abre la app del invitado).
+
+Mostrar quién invita es una apertura deliberada: antes la página exponía lo
+mínimo. Un link reenviado deja saber quién vive en esa unidad. Se acepta porque
+el invitado necesita saber de parte de quién viene el acceso.
+
+Según el tipo de invitación:
+
+| Tipo | Qué ve el invitado |
+|---|---|
+| Visita, frecuente, proveedor | Su QR + formulario para cargar **documento y patente** |
+| Evento (padre) | Formulario para **anotarse** (nombre + documento) → su propio QR |
+| Hija de evento | Su QR, con su nombre |
+
+**El formulario de documento no bloquea nada.** El QR de una visita existe desde
+que el vecino la crea; el formulario solo enriquece. Si el invitado no completa,
+todo funciona como antes y el guardia tipea. Se acepta `guestDoc` y `plate`, nunca
+nombre, fechas ni cupo, y **solo si están vacíos**: un link reenviado no puede
+pisar lo que cargó el vecino.
+
+El documento es **texto libre con formato sugerido**: a un barrio llega gente con
+pasaporte o documento extranjero, y validar 8 dígitos dejaría al uruguayo sin
+poder cargar nada.
+
+El invitado puede corregir **hasta su primer ingreso**. Después la invitación se
+congela: `entry_log` ya guardó su propia copia y el histórico no se reescribe.
+
+**El documento es autodeclarado, no verificado.** Ahorra tipeo en la barrera, no
+reemplaza que el guardia mire el documento físico.
 
 ### Garita (pantalla horizontal, una sola vista)
 
@@ -449,5 +527,4 @@ Sin fixtures, sin mocks, sin un test por endpoint. El resto es CRUD.
   ingresos con más de N meses, dejando el resto del registro para estadísticas.
   Decisión postergada a pedido del dueño del proyecto.
 - Notificación al vecino cuando llega su invitado (push o mail).
-- Lista nominal de invitados en eventos.
 - Exposición de multi-barrio en la UI.
