@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+/*
+  Sistema de Álamo Alto.
+  La identidad viene del cartel de entrada: verde de chapa vial, doble filete
+  blanco, etiquetas en caja alta espaciada.
+  El veredicto de la garita NO usa los colores de marca: se separa por
+  luminancia, que sobrevive al daltonismo y a las pantallas malas.
+*/
+@theme {
+  --color-alamo: #1e6b47;
+  --color-alamo-deep: #0d3d28;
+  --color-alamo-line: #f2f0e8;
+
+  --color-pass-field: #eaf5ec;
+  --color-pass-ink: #0d3d28;
+  --color-deny-field: #7a1420;
+  --color-deny-ink: #fff1f0;
+
+  --color-ink: #16211c;
+  --color-ink-soft: #55635c;
+  --color-surface: #fbfaf6;
+  --color-surface-sunk: #f1efe7;
+
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  /* 17px de base: el vecino lee esto en la calle, de paso. */
+  font-size: 106.25%;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+  Jerarquía por ancho, no por segunda familia: el eje wdth de Archivo.
+  "PASA" a 72px en wdth 125 es inconfundible a dos metros, y no cuesta
+  una carga de fuente extra en la PC de la garita.
+*/
+.display {
+  font-variation-settings: 'wdth' 125;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Horas, DNI y patentes en columnas que no bailan. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* "B A R R I O  C E R R A D O": así se nombra el barrio a sí mismo. */
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
+/* El doble filete del cartel, convertido en el marco del sistema. */
+.filete {
+  border: 1px solid color-mix(in srgb, var(--color-alamo) 22%, transparent);
+  border-radius: 4px;
+  padding: 3px;
+  background: white;
+}
+.filete > * {
+  border: 1px solid color-mix(in srgb, var(--color-alamo) 14%, transparent);
+  border-radius: 2px;
+}
+
+/* El foco tiene que verse siempre: la garita se opera con teclado. */
+:focus-visible {
+  outline: 3px solid var(--color-alamo);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
