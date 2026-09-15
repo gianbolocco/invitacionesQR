@@ -10,9 +10,8 @@ import { MOTIVO, hora, type Resultado } from '@/lib/gate'
  * Tres canales, ninguno de los cuales es el color: la palabra, el ícono y la
  * luminancia del campo. Funciona en escala de grises y con daltonismo.
  */
-export function Verdict({ resultado, guardId, onSalir }: {
+export function Verdict({ resultado, onSalir }: {
   resultado: Resultado
-  guardId: string
   onSalir: () => void
 }) {
   const { invitation: inv, check } = resultado
@@ -38,7 +37,6 @@ export function Verdict({ resultado, guardId, onSalir }: {
       method: 'POST',
       body: JSON.stringify({
         invitationId: inv.id,
-        guardId: guardId || null,
         guestName: inv.guestName,
         guestDoc: doc || undefined,
         plate: plate || undefined,

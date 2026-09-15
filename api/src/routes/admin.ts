@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/requireAuth.js'
 import { requireRole } from '../middleware/requireRole.js'
 import { createUnit, listUnits } from '../services/units.js'
 import {
-  createPerson, listPeople, disablePerson, resendInvite, setGuardPassword,
+  createPerson, listPeople, disablePerson, enablePerson, resendInvite, setGuardPassword,
 } from '../services/people.js'
 import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
 
@@ -69,4 +69,9 @@ adminRoutes.patch('/neighborhood', async (req, res) => {
   }).parse(req.body)
 
   res.json(await updateNeighborhood(req.person!.neighborhoodId, req.person!.id, body))
+})
+
+adminRoutes.post('/people/:id/enable', async (req, res) => {
+  await enablePerson(req.params.id, req.person!.id, req.person!.neighborhoodId)
+  res.json({ ok: true })
 })

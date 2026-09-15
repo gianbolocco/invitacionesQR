@@ -39,6 +39,12 @@ export default function UsuariosPage() {
     setAviso(`Reenviamos la invitación a ${p.email}.`)
   }
 
+  async function reactivar(p: Person) {
+    await api(`/admin/people/${p.id}/enable`, { method: 'POST' })
+    setAviso(`${p.name} vuelve a tener acceso.`)
+    cargar()
+  }
+
   async function deshabilitar(p: Person) {
     if (!confirm(`¿Deshabilitar a ${p.name}? No va a poder entrar ni crear invitaciones.`)) return
     await api(`/admin/people/${p.id}/disable`, { method: 'POST' })
@@ -52,7 +58,7 @@ export default function UsuariosPage() {
   return (
     <Shell me={me}>
       <div className="flex flex-col gap-6">
-        <h1 className="display text-2xl">Usuarios</h1>
+        <h1 className="display text-2xl">Vecinos</h1>
 
         <Filete className="bg-white p-5">
           <Eyebrow>Dar de alta un vecino</Eyebrow>
@@ -112,7 +118,10 @@ export default function UsuariosPage() {
                     <Button variant="quiet" onClick={() => reenviar(p)}>Reenviar</Button>
                   )}
                   {p.status !== 'disabled' && p.id !== me.id && (
-                    <Button variant="quiet" onClick={() => deshabilitar(p)}>Deshabilitar</Button>
+                    <Button variant="quiet" onClick={() => deshabilitar(p)}>Dar de baja</Button>
+                  )}
+                  {p.status === 'disabled' && (
+                    <Button variant="quiet" onClick={() => reactivar(p)}>Reactivar</Button>
                   )}
                 </div>
               </Filete>

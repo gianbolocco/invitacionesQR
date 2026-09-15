@@ -146,3 +146,39 @@ describe('datos del barrio', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('reactivar una baja', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('el admin puede volver atrás una baja por error', async () => {
+    const { cookie } = await loginAs('admin')
+    const alta = await request(app).post('/admin/people').set('Cookie', cookie)
+      .send({ email: 'martin@example.com', name: 'Martín', role: 'resident', unitIds: [] })
+
+    await request(app).post(`/admin/people/${alta.body.id}/disable`).set('Cookie', cookie).expect(200)
+    await request(app).post(`/admin/people/${alta.body.id}/enable`).set('Cookie', cookie).expect(200)
+
+    const lista = await request(app).get('/admin/people').set('Cookie', cookie)
+    const martin = lista.body.find((p: { email: string }) => p.email === 'martin@example.com')
+    // Nunca creó contraseña, así que vuelve a "invitado", no a "activo".
+    expect(martin.status).toBe('invited')
+  })
+
+  it('quien ya tenía contraseña vuelve a activo y puede entrar', async () => {
+    const { cookie } = await loginAs('admin')
+    const alta = await request(app).post('/admin/people').set('Cookie', cookie)
+      .send({ email: 'garita2@example.com', name: 'Carlos', role: 'guard', unitIds: [] })
+    await request(app).post(`/admin/people/${alta.body.id}/password`).set('Cookie', cookie)
+      .send({ password: 'clave-de-garita' }).expect(200)
+
+    await request(app).post(`/admin/people/${alta.body.id}/disable`).set('Cookie', cookie).expect(200)
+    const bloqueado = await request(app).post('/auth/login')
+      .send({ email: 'garita2@example.com', password: 'clave-de-garita' })
+    expect(bloqueado.status).toBe(401)
+
+    await request(app).post(`/admin/people/${alta.body.id}/enable`).set('Cookie', cookie).expect(200)
+    const login = await request(app).post('/auth/login')
+      .send({ email: 'garita2@example.com', password: 'clave-de-garita' })
+    expect(login.status).toBe(200)
+  })
+})

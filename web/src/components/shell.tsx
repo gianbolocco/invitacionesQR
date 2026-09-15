@@ -12,7 +12,7 @@ const RESIDENT_NAV = [
 const ADMIN_NAV = [
   { href: '/admin', label: 'Tablero' },
   { href: '/admin/unidades', label: 'Unidades' },
-  { href: '/admin/usuarios', label: 'Usuarios' },
+  { href: '/admin/usuarios', label: 'Vecinos' },
   { href: '/admin/guardias', label: 'Guardias' },
   { href: '/admin/barrio', label: 'Barrio' },
   { href: '/admin/bitacora', label: 'Bitácora' },

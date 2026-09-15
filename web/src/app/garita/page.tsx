@@ -3,9 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { useMe } from '@/lib/session'
-import {
-  esDeNoche, guardiaDeTurno, setGuardiaDeTurno, porId, type Hit, type Resultado,
-} from '@/lib/gate'
+import { esDeNoche, porId, type Hit, type Resultado } from '@/lib/gate'
 import { GaritaShell } from '@/components/garita-shell'
 import { Agenda } from '@/components/agenda'
 import { Verdict } from '@/components/verdict'
@@ -13,24 +11,17 @@ import { Verdict } from '@/components/verdict'
 export default function GaritaHome() {
   const me = useMe()
   const [oscuro, setOscuro] = useState(false)
-  const [guards, setGuards] = useState<{ id: string; name: string }[]>([])
-  const [guardId, setGuardId] = useState('')
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<Hit[] | null>(null)
   const [resultado, setResultado] = useState<Resultado | null>(null)
 
-  // El horario y localStorage no existen en el render del servidor.
+  // El horario no existe en el render del servidor: leerlo ahí daría mismatch.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOscuro(esDeNoche())
-    setGuardId(guardiaDeTurno())
     const t = setInterval(() => setOscuro(esDeNoche()), 600_000)
     return () => clearInterval(t)
   }, [])
-
-  useEffect(() => {
-    if (me) api<typeof guards>('/gate/guards').then(setGuards).catch(() => {})
-  }, [me])
 
   const abrir = useCallback(async (id: string) => {
     const r = await porId(id).catch(() => null)
@@ -56,13 +47,13 @@ export default function GaritaHome() {
   }
 
   if (resultado) {
-    return <Verdict resultado={resultado} guardId={guardId} onSalir={volver} />
+    return <Verdict resultado={resultado} onSalir={volver} />
   }
 
   const borde = oscuro ? 'border-white/20' : 'border-ink/12'
 
   return (
-    <GaritaShell oscuro={oscuro} onTema={() => setOscuro((v) => !v)}>
+    <GaritaShell oscuro={oscuro} onTema={() => setOscuro((v) => !v)} guardName={me.name}>
       <div className="flex flex-col gap-6">
         {/* El botón es lo primero y lo más grande: es la acción del turno. */}
         <Link href="/garita/escanear"
@@ -103,16 +94,6 @@ export default function GaritaHome() {
         )}
 
         {hits === null && <Agenda oscuro={oscuro} onAbrir={abrir} />}
-
-        <label className="flex flex-col gap-1 border-t border-current/15 pt-5 text-sm font-semibold">
-          Guardia de turno
-          <select value={guardId}
-            onChange={(e) => { setGuardId(e.target.value); setGuardiaDeTurno(e.target.value) }}
-            className={`min-h-12 rounded border ${borde} bg-white px-3 text-ink`}>
-            <option value="">Sin asignar</option>
-            {guards.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </label>
       </div>
     </GaritaShell>
   )

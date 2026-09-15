@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { Shell } from '@/components/shell'
-import { ESTADO, useAdminData, type Person } from '@/lib/admin'
+import { ESTADO, fecha, useAdminData, type Person } from '@/lib/admin'
 import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
 
 export default function GuardiasPage() {
@@ -35,11 +35,11 @@ export default function GuardiasPage() {
       await api(`/admin/people/${creado.id}/password`, {
         method: 'POST', body: JSON.stringify({ password }),
       })
-      setAviso(`Cuenta de garita "${name}" lista. Anotá la contraseña: no se puede volver a ver.`)
+      setAviso(`${name} ya puede entrar. Anotá la contraseña: no se puede volver a ver.`)
       setName(''); setEmail(''); setPassword('')
       cargar()
     } catch {
-      setError('No se pudo crear la cuenta. Puede que ese mail ya esté en el padrón.')
+      setError('No se pudo crear. Puede que ese mail ya esté en el padrón.')
     }
   }
 
@@ -49,9 +49,22 @@ export default function GuardiasPage() {
     await api(`/admin/people/${reseteando.id}/password`, {
       method: 'POST', body: JSON.stringify({ password: nuevaClave }),
     })
-    setAviso(`Contraseña de "${reseteando.name}" cambiada.`)
+    setAviso(`Contraseña de ${reseteando.name} cambiada.`)
     setReseteando(null)
     setNuevaClave('')
+    cargar()
+  }
+
+  async function reactivar(g: Person) {
+    await api(`/admin/people/${g.id}/enable`, { method: 'POST' })
+    setAviso(`${g.name} vuelve a poder entrar.`)
+    cargar()
+  }
+
+  async function deshabilitar(g: Person) {
+    if (!confirm(`¿Dar de baja a ${g.name}? No va a poder entrar a la garita.`)) return
+    await api(`/admin/people/${g.id}/disable`, { method: 'POST' })
+    cargar()
   }
 
   if (!me) return <main className="p-6 text-ink-soft">Cargando…</main>
@@ -64,41 +77,64 @@ export default function GuardiasPage() {
         <div>
           <h1 className="display text-2xl">Guardias</h1>
           <p className="mt-1 text-ink-soft">
-            La cuenta identifica a la garita, no al guardia. Quién registró cada ingreso sale del
-            selector de turno en la pantalla.
+            Cada guardia entra con su propio usuario. Los ingresos que registra quedan a su
+            nombre, así que la contraseña no se comparte entre turnos.
           </p>
         </div>
 
         <Filete className="bg-white p-5">
-          <Eyebrow>Nueva cuenta de garita</Eyebrow>
+          <Eyebrow>Dar de alta un guardia</Eyebrow>
           <form onSubmit={alta} className="mt-4 flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Nombre" required value={name} placeholder="Garita principal"
+              <Field label="Nombre y apellido" required value={name} placeholder="Carlos Ruiz"
                 onChange={(e) => setName(e.target.value)} />
-              <Field label="Mail" type="email" required value={email}
-                hint="Solo identifica la cuenta. No recibe mails."
+              <Field label="Usuario (mail)" type="email" required value={email}
+                placeholder="carlos@alamoalto.com"
+                hint="Identifica la cuenta. No hace falta que reciba mails."
                 onChange={(e) => setEmail(e.target.value)} />
               <Field label="Contraseña" type="password" required value={password}
-                hint="Mínimo 10 caracteres. La setea el admin."
+                hint="Mínimo 10 caracteres. Se la das vos en mano."
                 onChange={(e) => setPassword(e.target.value)} />
             </div>
             {error && <ErrorNote>{error}</ErrorNote>}
             {aviso && <p role="status" className="text-sm text-alamo">{aviso}</p>}
-            <Button type="submit" className="self-start">Crear cuenta</Button>
+            <Button type="submit" className="self-start">Dar de alta</Button>
           </form>
         </Filete>
+
+        {people === null && <p className="text-ink-soft">Cargando…</p>}
+        {people !== null && guardias.length === 0 && (
+          <Filete className="bg-white px-5 py-8 text-center">
+            <p className="text-ink-soft">
+              Todavía no hay guardias cargados.<br />
+              Sin al menos uno, nadie puede escanear en la barrera.
+            </p>
+          </Filete>
+        )}
 
         <ul className="flex flex-col gap-2">
           {guardias.map((g) => (
             <li key={g.id}>
-              <Filete className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3">
-                <div>
+              <Filete className={`flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3
+                ${g.status === 'disabled' ? 'opacity-50' : ''}`}>
+                <div className="min-w-0">
                   <p className="font-semibold">{g.name}</p>
-                  <p className="text-sm text-ink-soft">{g.email} · {ESTADO[g.status]}</p>
+                  <p className="truncate text-sm text-ink-soft">{g.email}</p>
+                  <p className="text-sm text-ink-soft tabular">
+                    {ESTADO[g.status]}
+                    {g.lastLoginAt ? ` · último ingreso ${fecha(g.lastLoginAt)}` : ' · nunca entró'}
+                  </p>
                 </div>
-                <Button variant="quiet" onClick={() => { setReseteando(g); setNuevaClave('') }}>
-                  Cambiar contraseña
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="quiet" onClick={() => { setReseteando(g); setNuevaClave('') }}>
+                    Cambiar contraseña
+                  </Button>
+                  {g.status !== 'disabled' ? (
+                    <Button variant="quiet" onClick={() => deshabilitar(g)}>Dar de baja</Button>
+                  ) : (
+                    <Button variant="quiet" onClick={() => reactivar(g)}>Reactivar</Button>
+                  )}
+                </div>
               </Filete>
               {reseteando?.id === g.id && (
                 <form onSubmit={resetear} className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -114,9 +150,6 @@ export default function GuardiasPage() {
               )}
             </li>
           ))}
-          {guardias.length === 0 && people !== null && (
-            <p className="text-ink-soft">Todavía no hay cuentas de garita.</p>
-          )}
         </ul>
       </div>
     </Shell>

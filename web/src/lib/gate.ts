@@ -47,19 +47,3 @@ export function esDeNoche(): boolean {
   }).format(new Date()))
   return h >= 19 || h < 7
 }
-
-export function guardiaDeTurno(): string {
-  try {
-    return localStorage.getItem('guardiaDeTurno') ?? ''
-  } catch {
-    return ''
-  }
-}
-
-export function setGuardiaDeTurno(id: string) {
-  try {
-    localStorage.setItem('guardiaDeTurno', id)
-  } catch {
-    // Sin localStorage el selector arranca vacío en cada turno. No es grave.
-  }
-}

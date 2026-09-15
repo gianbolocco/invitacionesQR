@@ -265,3 +265,32 @@ describe('eventos con anotados', () => {
       .rejects.toThrow(/revoked/)
   })
 })
+
+describe('quién dio el ingreso', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('queda registrado el guardia logueado, no lo que mande el cliente', async () => {
+    const { cookie, inv, guardia } = await scenario()
+
+    // El body trae un guardId falso a propósito: tiene que ignorarse.
+    await request(app).post('/gate/entries').set('Cookie', cookie).send({
+      invitationId: inv.id,
+      guardId: '00000000-0000-0000-0000-000000000000',
+      guestName: 'Juan Pérez',
+    }).expect(201)
+
+    const [fila] = await db.select().from(entryLogs).where(eq(entryLogs.invitationId, inv.id))
+    expect(fila.guardId).toBe(guardia.id)
+  })
+
+  it('la auditoría muestra el nombre de ese guardia', async () => {
+    const { cookie, inv } = await scenario()
+    await request(app).post('/gate/entries').set('Cookie', cookie)
+      .send({ invitationId: inv.id, guestName: 'Juan Pérez' }).expect(201)
+
+    const res = await request(app).get('/gate/audit').set('Cookie', cookie)
+    const fila = res.body.find((r: { guestName: string }) => r.guestName === 'Juan Pérez')
+    expect(fila.guardName).toBe('Garita')
+    expect(fila.status).toBe('entro')
+  })
+})

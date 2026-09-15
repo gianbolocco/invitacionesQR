@@ -13,9 +13,10 @@ const NAV = [
  * garita puede ir en modo oscuro y no tiene wordmark grande: la pantalla es
  * para trabajar, no para presentar la marca.
  */
-export function GaritaShell({ oscuro, onTema, children }: {
+export function GaritaShell({ oscuro, onTema, guardName, children }: {
   oscuro: boolean
   onTema: () => void
+  guardName: string
   children: React.ReactNode
 }) {
   const path = usePathname()
@@ -24,12 +25,18 @@ export function GaritaShell({ oscuro, onTema, children }: {
     <div className={`min-h-dvh overflow-x-hidden ${oscuro ? 'bg-alamo-deep text-alamo-line' : 'bg-surface text-ink'}`}>
       <header className={`border-b ${oscuro ? 'border-white/15' : 'border-ink/12'}`}>
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-          <p className="eyebrow" style={{ color: 'inherit', opacity: 0.7 }}>Garita · Álamo Alto</p>
+          {/* Quién está de turno se AFIRMA, no se elige: cada ingreso queda a
+              nombre de quien está logueado. Mostrarlo acá es lo que hace visible
+              una sesión que quedó abierta del turno anterior. */}
+          <div className="min-w-0">
+            <p className="eyebrow" style={{ color: 'inherit', opacity: 0.7 }}>Garita · Álamo Alto</p>
+            <p className="truncate font-semibold">{guardName}</p>
+          </div>
           <div className="flex items-center gap-4 text-sm">
             <button onClick={onTema} className="underline underline-offset-4">
               {oscuro ? 'Modo claro' : 'Modo oscuro'}
             </button>
-            <button onClick={logout} className="underline underline-offset-4">Salir</button>
+            <button onClick={logout} className="underline underline-offset-4">Cambiar de guardia</button>
           </div>
         </div>
         <nav className="mx-auto flex max-w-3xl gap-1 px-2">

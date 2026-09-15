@@ -178,15 +178,6 @@ export async function searchGuests(neighborhoodId: string, query: string) {
     .limit(20)
 }
 
-export async function listGuards(neighborhoodId: string) {
-  return db.select({ id: people.id, name: people.name }).from(people)
-    .where(and(
-      eq(people.neighborhoodId, neighborhoodId),
-      eq(people.role, 'guard'),
-      eq(people.status, 'active'),
-    ))
-    .orderBy(people.name)
-}
 
 export type AgendaRow = {
   id: string

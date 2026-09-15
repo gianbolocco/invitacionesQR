@@ -114,3 +114,14 @@ export async function setGuardPassword(
   await db.update(people).set({ status: 'active' }).where(eq(people.id, personId))
   await audit(actorId, neighborhoodId, 'guard.password_reset', 'person', personId)
 }
+
+export async function enablePerson(personId: string, actorId: string, neighborhoodId: string): Promise<void> {
+  const [person] = await db.select().from(people).where(eq(people.id, personId)).limit(1)
+  if (!person) throw new AppError(404, 'not_found')
+
+  // Vuelve a 'invited' si nunca llegó a entrar: sin contraseña ni Google no
+  // podría loguear, y 'active' mentiría sobre el estado de la cuenta.
+  const status = person.passwordHash || person.googleSub ? 'active' : 'invited'
+  await db.update(people).set({ status }).where(eq(people.id, personId))
+  await audit(actorId, neighborhoodId, 'person.enabled', 'person', personId, { status })
+}

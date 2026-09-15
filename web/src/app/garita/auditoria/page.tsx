@@ -75,7 +75,7 @@ export default function AuditoriaPage() {
   const conteo = (s: AuditRow['status']) => todas.filter((r) => r.status === s).length
 
   return (
-    <GaritaShell oscuro={oscuro} onTema={() => setOscuro((v) => !v)}>
+    <GaritaShell oscuro={oscuro} onTema={() => setOscuro((v) => !v)} guardName={me.name}>
       <div className="flex flex-col gap-5">
         <h1 className="display text-2xl">Auditoría</h1>
 

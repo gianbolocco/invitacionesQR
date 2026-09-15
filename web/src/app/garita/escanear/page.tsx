@@ -3,20 +3,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useMe } from '@/lib/session'
-import { guardiaDeTurno, porToken, type Resultado } from '@/lib/gate'
+import { porToken, type Resultado } from '@/lib/gate'
 import { Verdict } from '@/components/verdict'
 
 export default function EscanearPage() {
   const me = useMe()
   const router = useRouter()
   const [resultado, setResultado] = useState<Resultado | null>(null)
-  const [guardId, setGuardId] = useState('')
   const [estado, setEstado] = useState<'abriendo' | 'listo' | 'sin_camara'>('abriendo')
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setGuardId(guardiaDeTurno())
-  }, [])
 
   useEffect(() => {
     if (!me || resultado) return
@@ -49,7 +43,7 @@ export default function EscanearPage() {
 
   if (resultado) {
     // Tras registrar, vuelve a escanear: el guardia sigue en la barrera.
-    return <Verdict resultado={resultado} guardId={guardId} onSalir={() => setResultado(null)} />
+    return <Verdict resultado={resultado} onSalir={() => setResultado(null)} />
   }
 
   return (

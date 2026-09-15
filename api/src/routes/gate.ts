@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
-  checkByToken, checkById, registerEntry, searchGuests, listGuards, agendaForDay,
+  checkByToken, checkById, registerEntry, searchGuests, agendaForDay,
   auditInvitations,
 } from '../services/entries.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
@@ -25,21 +25,18 @@ gateRoutes.get('/search', async (req, res) => {
   res.json(await searchGuests(req.person!.neighborhoodId, q))
 })
 
-gateRoutes.get('/guards', async (req, res) => {
-  res.json(await listGuards(req.person!.neighborhoodId))
-})
-
 gateRoutes.post('/entries', async (req, res) => {
   const body = z.object({
     invitationId: z.string().uuid(),
-    guardId: z.string().uuid().nullable().optional(),
     guestName: z.string().min(1),
     guestDoc: z.string().optional(),
     plate: z.string().optional(),
     note: z.string().optional(),
   }).parse(req.body)
 
-  res.status(201).json(await registerEntry(body.invitationId, body.guardId ?? null, body))
+  // El guardia sale de la sesión, no del body: un dato de auditoría no puede
+  // depender de lo que mande el cliente ni de que alguien elija bien.
+  res.status(201).json(await registerEntry(body.invitationId, req.person!.id, body))
 })
 
 /** La agenda del día: quién está habilitado a entrar. */
