@@ -92,7 +92,7 @@ person (
   id, neighborhood_id FK, email, name,
   role TEXT CHECK (role IN ('resident','guard','admin')),
   status TEXT CHECK (status IN ('invited','active','disabled')),
-  password_hash,   -- NULL salvo guardias
+  password_hash,   -- NULL si solo usa Google
   google_sub,      -- NULL hasta que vincule Google
   last_login_at,
   created_at,
@@ -131,7 +131,7 @@ audit_log (
 )
 
 auth_token (
-  id, person_id FK, token_hash, purpose,  -- login | invite
+  id, person_id FK, token_hash, purpose,  -- invite | reset
   expires_at, used_at, created_at
 )
 
@@ -206,26 +206,51 @@ llamado a la garita — que es justo lo que la app viene a eliminar.
 
 ## 7. Autenticación
 
-### Vecinos: magic link + Google. Sin contraseña.
+### Vecinos: el magic link es el alta; después, contraseña o Google
 
 No hay registro abierto. El admin da de alta a la persona y eso dispara el mail.
 
-1. El admin crea la persona (`status = invited`) → mail con magic link.
-2. El vecino abre el link → página con botón → **POST** con el token.
-3. La API valida, marca el token usado, crea la sesión y setea la cookie.
-   `status` pasa a `active`, se registra `last_login_at`.
-4. Desde su perfil puede vincular Google para entrar con un tap.
+**Alta, una sola vez:**
 
-Reglas de implementación, todas obligatorias:
+1. El admin crea la persona (`status = invited`) → mail con magic link (7 días).
+2. El vecino abre el link → página con botón → **POST** con el token.
+3. La API valida el token y lo marca usado → pantalla **"Creá tu contraseña"**,
+   con un botón **Continuar con Google** como alternativa.
+4. Elige uno de los dos → se crea la sesión, `status` pasa a `active`, se
+   registra `last_login_at`.
+
+Si entra por Google, `password_hash` queda `NULL` y puede crear una contraseña
+más tarde desde su perfil.
+
+**Login, siempre después:** mail + contraseña, o Google. Sin ir al mail.
+
+**Olvidé mi contraseña:** el mismo `auth_token` con `purpose = 'reset'`, 15
+minutos, consumido por POST como el resto.
+
+**El magic link no desaparece: es el alta y el camino de recuperación.** El costo
+de esta decisión es tener tres caminos de entrada (link, contraseña, Google) en
+vez de uno; se paga a cambio de que el segundo dispositivo no exija un viaje al
+mail. Decisión explícita del dueño del proyecto.
+
+Reglas de contraseña:
+
+- **argon2**, mínimo 10 caracteres, **sin reglas de composición**. Exigir
+  mayúscula y símbolo produce `Barrio2026!` y nada más.
+- Rate limit de 5 intentos por mail cada 15 minutos.
+- La cuenta de garita usa esta misma implementación; lo único que no tiene es
+  autogestión de reset, porque no tiene mail.
+
+Reglas del magic link, todas obligatorias:
 
 - Token de 32 bytes aleatorios, **guardado hasheado** (SHA-256) en `auth_token`.
-- Un solo uso. Expira en **15 minutos** para login, **7 días** para invitación
-  de alta (el vecino puede tardar días en ver el mail).
+- Un solo uso. Expira en **7 días** para el alta (el vecino puede tardar días en
+  ver el mail) y en **15 minutos** para el reset de contraseña.
 - **Se consume por POST, no por GET.** Los escáneres de links de los clientes de
   mail hacen GET a todo lo que llega y consumirían el token antes que el usuario.
   El link abre una página con un botón; el botón hace el POST.
-- El mail incluye además un **código de 6 dígitos** equivalente, para quien abre
-  el mail en el celular y está logueando en otra pantalla.
+- **Sin código de 6 dígitos.** Existía para resolver el login cruzado entre
+  dispositivos; con contraseña ese problema desaparece y el código pasa a ser
+  código muerto.
 - Rate limit por mail y por IP. La respuesta es siempre "te mandamos un mail",
   exista o no la cuenta.
 - Vinculación de Google **solo por mail verificado** (Google lo entrega
@@ -237,24 +262,19 @@ cada uso, revocable desde el admin.
 
 **Varios dispositivos a la vez.** Una fila de `session` por dispositivo, todas
 válidas en paralelo: loguearse en la computadora no cierra la sesión del celular.
-Para el segundo dispositivo se pide otro link, y ahí el **código de 6 dígitos** es
-el camino corto: el mail llega al celular pero el login es en la computadora, así
-que se tipea el código en vez de reenviarse el link a uno mismo. Con Google
-vinculado, un tap por dispositivo y listo.
+En el segundo dispositivo se entra con mail y contraseña o con Google, **sin
+ningún viaje al mail**. Este es el motivo por el que la contraseña existe.
+
 `session.user_agent` se guarda desde el día uno para poder mostrar más adelante
 una lista de sesiones activas con botón de cerrar. La columna ahora, la pantalla
 cuando haga falta.
 
-**No hay contraseñas de vecino.** El reset por mail haría que el mail siga siendo
-la raíz de confianza, así que la contraseña sumaría un subsistema entero
-(hashing, reset, verificación, políticas, pantallas) sin subir el piso de
-seguridad.
-
-### Guardias: usuario y contraseña
+### Garita
 
 La garita es una PC compartida con turnos rotativos y sin mail personal por
-guardia. Ahí el magic link estorba. La clave la setea el admin, con hash argon2 y
-sin autogestión ni reset por mail: si se olvida, el admin la resetea.
+guardia, así que no tiene alta por magic link ni reset autogestionado: la clave
+la setea y la resetea el admin. Fuera de eso usa exactamente la misma
+implementación de contraseñas que el resto — no es un caso especial en el código.
 
 El `guard_id` de cada ingreso sale de un selector de "guardia de turno"
 persistente en la pantalla, no de la cuenta compartida.
@@ -275,6 +295,7 @@ No se puede crear por UI (huevo y gallina). Sale de
 /historial     Invitaciones pasadas de la UF, con si el invitado entró o no,
                cuándo, y cuántas veces. Botón "Volver a invitar" que precarga
                el formulario con los mismos datos.
+/perfil        Cambiar contraseña, vincular o desvincular Google.
 /i/<token>     Página pública: QR, nombre, UF, vigencia.
 ```
 
