@@ -1,0 +1,28 @@
+name: invitaciones
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: invitaciones
+      POSTGRES_PASSWORD: invitaciones
+      POSTGRES_DB: invitaciones
+    ports: ['5432:5432']
+    volumes: ['dbdata:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U invitaciones']
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: postgres://invitaciones:invitaciones@db:5432/invitaciones
+      WEB_ORIGIN: http://localhost:3000
+      PORT: 8080
+    ports: ['8080:8080']
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  dbdata:
