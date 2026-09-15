@@ -8,6 +8,7 @@ import { authRoutes } from './routes/auth.js'
 import { adminRoutes } from './routes/admin.js'
 import { invitationRoutes } from './routes/invitations.js'
 import { gateRoutes } from './routes/gate.js'
+import { reportRoutes } from './routes/reports.js'
 
 export function buildApp() {
   const app = express()
@@ -24,6 +25,7 @@ export function buildApp() {
   app.use('/admin', adminRoutes)
   app.use('/invitations', invitationRoutes)
   app.use('/gate', gateRoutes)
+  app.use('/reports', reportRoutes)
 
   // Los errores de zod se traducen a 400 antes del handler genérico.
   app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
