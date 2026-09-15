@@ -5,6 +5,7 @@ import { ZodError } from 'zod'
 import { pool } from './db/index.js'
 import { errorHandler } from './lib/errors.js'
 import { authRoutes } from './routes/auth.js'
+import { googleRoutes } from './routes/google.js'
 import { adminRoutes } from './routes/admin.js'
 import { invitationRoutes } from './routes/invitations.js'
 import { gateRoutes } from './routes/gate.js'
@@ -22,6 +23,7 @@ export function buildApp() {
   })
 
   app.use('/auth', authRoutes)
+  app.use('/auth', googleRoutes)
   app.use('/admin', adminRoutes)
   app.use('/invitations', invitationRoutes)
   app.use('/gate', gateRoutes)

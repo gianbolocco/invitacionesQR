@@ -4,7 +4,7 @@ import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { Shell } from '@/components/shell'
 import { fechaHora, type Unit } from '@/lib/admin'
-import { Button, Filete, Eyebrow } from '@/components/ui'
+import { Filete, Eyebrow } from '@/components/ui'
 
 type Entrada = {
   id: string

@@ -54,7 +54,10 @@ export default function GaritaPage() {
   const buscadorRef = useRef<HTMLInputElement>(null)
   const registrarRef = useRef<HTMLButtonElement>(null)
 
+  // El horario y localStorage no existen en el render del servidor: leerlos
+  // durante el render daría mismatch de hidratación. Va en efecto a propósito.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOscuro(esDeNoche())
     const t = setInterval(() => setOscuro(esDeNoche()), 600_000)
     return () => clearInterval(t)
@@ -63,6 +66,7 @@ export default function GaritaPage() {
   useEffect(() => {
     if (!me) return
     api<typeof guards>('/gate/guards').then(setGuards).catch(() => {})
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGuardId(localStorage.getItem('guardiaDeTurno') ?? '')
   }, [me])
 

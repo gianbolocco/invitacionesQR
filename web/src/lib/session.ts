@@ -28,5 +28,7 @@ export function useMe() {
 
 export async function logout() {
   await api('/auth/logout', { method: 'POST' }).catch(() => {})
+  // Recarga dura a propósito: tira todo el estado en memoria después del logout.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.href = '/login'
 }

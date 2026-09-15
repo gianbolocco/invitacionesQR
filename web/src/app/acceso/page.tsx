@@ -8,7 +8,7 @@ function Acceso() {
   const router = useRouter()
   const token = useSearchParams().get('t') ?? ''
   const [name, setName] = useState<string | null>(null)
-  const [invalid, setInvalid] = useState(false)
+  const [fallo, setFallo] = useState(false)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -16,10 +16,10 @@ function Acceso() {
   // GET: solo mira el token. Si el escáner de links del cliente de mail pasa
   // por acá, no consume nada y la invitación sigue sirviendo.
   useEffect(() => {
-    if (!token) { setInvalid(true); return }
-    api<{ name: string }>(`/auth/invite/${token}`)
+    if (!token) return
+        api<{ name: string }>(`/auth/invite/${token}`)
       .then((r) => setName(r.name))
-      .catch(() => setInvalid(true))
+      .catch(() => setFallo(true))
   }, [token])
 
   async function submit(e: React.FormEvent) {
@@ -37,6 +37,9 @@ function Acceso() {
       setBusy(false)
     }
   }
+
+  // Se deriva en render: el token está en la URL antes del primer pintado.
+  const invalid = !token || fallo
 
   if (invalid) {
     return (

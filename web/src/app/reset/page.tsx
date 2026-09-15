@@ -8,17 +8,17 @@ function Reset() {
   const router = useRouter()
   const token = useSearchParams().get('t') ?? ''
   const [name, setName] = useState<string | null>(null)
-  const [invalid, setInvalid] = useState(false)
+  const [fallo, setFallo] = useState(false)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   // Igual que en /acceso: el GET mira, el POST consume.
   useEffect(() => {
-    if (!token) { setInvalid(true); return }
-    api<{ name: string }>(`/auth/reset/${token}`)
+    if (!token) return
+        api<{ name: string }>(`/auth/reset/${token}`)
       .then((r) => setName(r.name))
-      .catch(() => setInvalid(true))
+      .catch(() => setFallo(true))
   }, [token])
 
   async function submit(e: React.FormEvent) {
@@ -36,6 +36,9 @@ function Reset() {
       setBusy(false)
     }
   }
+
+  // Se deriva en render: el token está en la URL antes del primer pintado.
+  const invalid = !token || fallo
 
   if (invalid) {
     return (
