@@ -184,7 +184,7 @@ ni loguear, pero su historial sigue siendo legible.
 Es la única pieza no trivial del sistema. Función pura:
 
 ```ts
-function puedeEntrar(inv: Invitation, ahora: Date, usos: number): Resultado
+function canEnter(inv: Invitation, now: Date, usedCount: number): EntryCheck
 ```
 
 Devuelve autorizado, o el motivo del rechazo:
@@ -432,7 +432,7 @@ la cámara y la garita no escanea.
 
 ## 12. Testing
 
-- **`puedeEntrar()` con tests de tabla**: ventana, día de semana, cupo agotado,
+- **`canEnter()` con tests de tabla**: ventana, día de semana, cupo agotado,
   revocada, vencida, todavía no vigente. Si esa función está bien, la app está
   bien.
 - **Un test de concurrencia del cupo**: dos registros simultáneos contra una
