@@ -203,3 +203,60 @@ describe('agenda del día', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('los ingresos se cuentan del día que se mira, no de siempre', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('una frecuente que entró hoy no figura adentro mañana', async () => {
+    const ctx = await base()
+    const frec = await invitacion(ctx, {
+      guestName: 'Mucama', kind: 'frecuente', capacity: 999,
+      validFrom: hoy, validTo: masDias(7),
+    })
+    await registerEntry(frec.id, null, { guestName: 'Mucama' })
+
+    const deHoy = await request(app).get(`/gate/agenda?date=${hoy}`).set('Cookie', ctx.cookie)
+    expect(deHoy.body[0]).toMatchObject({ enteredCount: 1 })
+    expect(deHoy.body[0].lastEntryAt).not.toBeNull()
+
+    const deManana = await request(app).get(`/gate/agenda?date=${masDias(1)}`).set('Cookie', ctx.cookie)
+    expect(deManana.body[0]).toMatchObject({ guestName: 'Mucama', enteredCount: 0 })
+    expect(deManana.body[0].lastEntryAt).toBeNull()
+  })
+
+  it('mirar ayer no muestra el ingreso de hoy', async () => {
+    const ctx = await base()
+    const frec = await invitacion(ctx, {
+      guestName: 'Jardinero', kind: 'frecuente', capacity: 999,
+      validFrom: masDias(-7), validTo: masDias(7),
+    })
+    await registerEntry(frec.id, null, { guestName: 'Jardinero' })
+
+    const ayer = await request(app).get(`/gate/agenda?date=${masDias(-1)}`).set('Cookie', ctx.cookie)
+    expect(ayer.body[0]).toMatchObject({ guestName: 'Jardinero', enteredCount: 0 })
+  })
+
+  it('un evento cuenta los ingresos de sus anotados de ESE día', async () => {
+    const ctx = await base()
+    const evento = await invitacion(ctx, {
+      guestName: 'Asado', kind: 'evento', capacity: 10,
+      validFrom: hoy, validTo: masDias(1),
+    })
+    const [hija] = await db.insert(invitations).values({
+      unitId: ctx.unitId, createdBy: ctx.vecinoId, parentId: evento.id, kind: 'evento',
+      guestName: 'Martina', validFrom: hoy, validTo: masDias(1),
+      capacity: 1, token: randomToken(16),
+    }).returning()
+    await registerEntry(hija.id, null, { guestName: 'Martina' })
+
+    const paraguasDe = async (fecha: string) => {
+      const res = await request(app).get(`/gate/agenda?date=${fecha}`).set('Cookie', ctx.cookie)
+      return res.body.find((r: { id: string }) => r.id === evento.id)
+    }
+
+    expect(await paraguasDe(hoy)).toMatchObject({ enteredCount: 1 })
+    expect(await paraguasDe(masDias(1))).toMatchObject({ enteredCount: 0 })
+    // Los anotados se cuentan igual los dos días: anotarse no es entrar.
+    expect((await paraguasDe(masDias(1))).joinedCount).toBe(1)
+  })
+})

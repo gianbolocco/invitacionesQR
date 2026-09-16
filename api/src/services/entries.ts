@@ -2,7 +2,7 @@ import { and, desc, eq, gte, ilike, or, sql, type SQL } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { invitations, entryLogs, units, people } from '../db/schema.js'
 import { canEnter, type EntryCheck } from '../authz.js'
-import { todayInBuenosAires } from '../lib/dates.js'
+import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
@@ -259,6 +259,17 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
   // 0 = domingo, igual que weekdayInBuenosAires y que la columna weekdays.
   const dow = new Date(`${day}T12:00:00Z`).getUTCDay()
 
+  /*
+   * Los ingresos se cuentan del día que se está mirando, no de toda la vida de
+   * la invitación. Sin esto, una frecuente que entró el lunes figuraba "adentro"
+   * el martes y el miércoles, y la agenda de ayer mostraba el ingreso de hoy.
+   *
+   * El corte del día va en hora de Buenos Aires y no en UTC: entre las 21 y la
+   * medianoche acá ya es el día siguiente en UTC, que es justo el horario en que
+   * más gente entra a un evento.
+   */
+  const eseDia = sql`(e.entered_at at time zone ${TZ})::date = ${day}::date`
+
   const res = await db.execute(sql`
     select
       i.id,
@@ -274,12 +285,14 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       (select count(*) from invitation h
         where h.parent_id = i.id and h.revoked_at is null)::int as "joinedCount",
       (select count(*) from entry_log e
-        where e.invitation_id = i.id
-           or e.invitation_id in (select h.id from invitation h where h.parent_id = i.id))::int
+        where ${eseDia}
+          and (e.invitation_id = i.id
+            or e.invitation_id in (select h.id from invitation h where h.parent_id = i.id)))::int
         as "enteredCount",
       (select max(e.entered_at) from entry_log e
-        where e.invitation_id = i.id
-           or e.invitation_id in (select h.id from invitation h where h.parent_id = i.id))
+        where ${eseDia}
+          and (e.invitation_id = i.id
+            or e.invitation_id in (select h.id from invitation h where h.parent_id = i.id)))
         as "lastEntryAt"
     from invitation i
     join unit u on u.id = i.unit_id

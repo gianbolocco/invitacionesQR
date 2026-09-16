@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useMe, homeFor } from '@/lib/session'
-import { KIND_LABEL, estaVigente, vigencia, type Invitation } from '@/lib/invitations'
+import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
 import { Shell } from '@/components/shell'
 import { Eyebrow, Filete, Vacio } from '@/components/ui'
 import { SkeletonTarjetas, Cargando, Confirmar } from '@/components/feedback'
@@ -86,7 +86,7 @@ export default function HomePage() {
 
   if (!me) return <main className="p-6 text-ink-soft">Cargando…</main>
 
-  const vigentes = (invitaciones ?? []).filter(estaVigente)
+  const vigentes = invitaciones ?? []
   const mostrandoLista = !verQr && !verAnotados
 
   return (

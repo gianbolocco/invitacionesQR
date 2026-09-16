@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { invitations, entryLogs, people, units, unitMembers, neighborhoods } from '../db/schema.js'
 import { randomToken } from '../lib/crypto.js'
@@ -47,7 +47,16 @@ export async function createInvitation(input: CreateInvitationInput) {
 }
 
 /**
- * Invitaciones de las UF indicadas, con cuántas veces se usó cada una.
+ * Las invitaciones VIGENTES de las UF indicadas, con cuántas veces se usó cada
+ * una. Es lo que muestra la home del vecino; el pasado vive en el historial.
+ *
+ * El filtro está acá y no en el navegador porque antes esto devolvía todas las
+ * invitaciones que la unidad tuvo en su vida —50 filas y 23 KB para mostrar 12,
+ * en una base de unas semanas— y solo empeora con el tiempo.
+ *
+ * "Vigente" es: no anulada, todavía dentro de la ventana, y con cupo libre. El
+ * día de la semana NO entra: una frecuente de lunes y miércoles sigue siendo
+ * una invitación vigente un martes.
  *
  * Excluye a los anotados a un evento: son invitaciones hijas y aparecían en la
  * lista del vecino como si cada uno fuera un evento propio de cupo 1. Se ven
@@ -55,6 +64,7 @@ export async function createInvitation(input: CreateInvitationInput) {
  */
 export async function listForUnits(unitIds: string[]) {
   if (!unitIds.length) return []
+  const hoy = todayInBuenosAires()
   return db.select({
     id: invitations.id,
     kind: invitations.kind,
@@ -84,8 +94,15 @@ export async function listForUnits(unitIds: string[]) {
     .innerJoin(people, eq(people.id, invitations.createdBy))
     .innerJoin(units, eq(units.id, invitations.unitId))
     .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
-    .where(and(inArray(invitations.unitId, unitIds), isNull(invitations.parentId)))
+    .where(and(
+      inArray(invitations.unitId, unitIds),
+      isNull(invitations.parentId),
+      isNull(invitations.revokedAt),
+      gte(invitations.validTo, hoy),
+    ))
     .groupBy(invitations.id, people.name, units.label)
+    // El cupo se mide sobre el count de ingresos, así que va en HAVING.
+    .having(sql`count(${entryLogs.id}) < ${invitations.capacity}`)
     .orderBy(desc(invitations.createdAt))
 }
 
@@ -481,15 +498,29 @@ export async function editInvitation(
     return actualizada
   }
 
-  const [{ usados }] = await db.select({ usados: sql<number>`count(*)::int` })
-    .from(entryLogs).where(eq(entryLogs.invitationId, id))
+  /*
+   * El piso del cupo es lo YA COMPROMETIDO, y en un evento eso no son solo los
+   * ingresos: cada anotado tiene su código en la mano. Contando solo ingresos se
+   * podía bajar un evento de 5 a 1 con tres anotados, y los otros dos se
+   * enteraban parados en la barrera, con el QR abierto y rebotados por cupo.
+   *
+   * Un anotado anulado no cuenta: ya liberó su lugar, igual que en spotsLeft.
+   */
+  const [{ comprometido }] = await db.select({
+    comprometido: sql<number>`
+      (select count(*) from entry_log e where e.invitation_id = ${id})
+      + (select count(*) from invitation h
+           where h.parent_id = ${id} and h.revoked_at is null)`,
+  }).from(invitations).where(eq(invitations.id, id))
 
   const validFrom = input.validFrom ?? inv.validFrom
   const validTo = input.validTo ?? inv.validTo
   if (validTo < validFrom) throw new AppError(400, 'ventana_invertida')
 
   const capacity = input.capacity ?? inv.capacity
-  if (capacity < Math.max(1, usados)) throw new AppError(409, 'cupo_menor_al_usado')
+  if (capacity < Math.max(1, Number(comprometido))) {
+    throw new AppError(409, 'cupo_menor_al_usado')
+  }
 
   const [actualizada] = await db.update(invitations).set({
     ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),

@@ -52,7 +52,3 @@ export function vigencia(inv: Invitation): string {
   const dias = inv.weekdays?.length ? ` · ${inv.weekdays.map((d) => DIAS[d]).join(' ')}` : ''
   return `${fechaCorta(inv.validFrom)} a ${fechaCorta(inv.validTo)}${dias}`
 }
-
-export function estaVigente(inv: Invitation): boolean {
-  return !inv.revokedAt && inv.validTo >= hoyISO() && inv.usedCount < inv.capacity
-}
