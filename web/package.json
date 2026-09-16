@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check": "node src/lib/nav.check.ts"
   },
   "dependencies": {
     "html5-qrcode": "^2.3.8",

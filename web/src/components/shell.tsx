@@ -4,16 +4,21 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { logout, type Me } from '@/lib/session'
 import { useTema } from '@/lib/theme'
+import { NAV, TOPE_BARRA, esActivo, seccionDe, type ItemNav } from '@/lib/nav'
 import { TemaToggle, Wordmark } from './ui'
 
 /**
  * Íconos propios en vez de caracteres sueltos: un rombo y un reloj tipográficos
  * no dicen nada. Un QR y una flecha que vuelve sobre un reloj sí.
  */
+const trazo = {
+  viewBox: '0 0 24 24', 'aria-hidden': true, className: 'size-6', fill: 'none',
+  stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round',
+} as const
+
 function IconoInvitaciones() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden className="size-6" fill="none"
-      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg {...trazo}>
       <rect x="3" y="3" width="7" height="7" rx="1" />
       <rect x="14" y="3" width="7" height="7" rx="1" />
       <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -24,8 +29,7 @@ function IconoInvitaciones() {
 
 function IconoHistorial() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden className="size-6" fill="none"
-      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg {...trazo}>
       <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
       <path d="M3 4v4h4" />
       <path d="M12 7v5l3 2" />
@@ -33,32 +37,46 @@ function IconoHistorial() {
   )
 }
 
-const RESIDENT_NAV = [
-  { href: '/', label: 'Invitaciones', Icono: IconoInvitaciones },
-  { href: '/historial', label: 'Historial', Icono: IconoHistorial },
-]
-
-const ADMIN_NAV = [
-  { href: '/admin', label: 'Tablero' },
-  { href: '/admin/unidades', label: 'Unidades' },
-  { href: '/admin/usuarios', label: 'Vecinos' },
-  { href: '/admin/guardias', label: 'Guardias' },
-  { href: '/admin/barrio', label: 'Barrio' },
-  { href: '/garita/auditoria', label: 'Auditoría' },
-]
-
-function esActivo(href: string, path: string): boolean {
-  return href === '/' ? path === '/' : path.startsWith(href)
+function IconoHoy() {
+  return (
+    <svg {...trazo}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  )
 }
 
-/**
- * El admin tiene seis destinos: en mobile eran una tira que scrolleaba de
- * costado, lo peor de los dos mundos — ni se ven todos ni se lee ninguno.
- * Acá un desplegable sí se gana el toque extra.
- */
-function MenuAdmin({ path }: { path: string }) {
+/** La mira del escáner: las cuatro esquinas, que es lo que el guardia ve. */
+function IconoEscanear() {
+  return (
+    <svg {...trazo}>
+      <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+      <path d="M8 12h8" />
+    </svg>
+  )
+}
+
+function IconoAuditoria() {
+  return (
+    <svg {...trazo}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18M9 9v11" />
+    </svg>
+  )
+}
+
+const ICONOS: Record<NonNullable<ItemNav['icono']>, () => React.ReactNode> = {
+  invitaciones: IconoInvitaciones,
+  historial: IconoHistorial,
+  hoy: IconoHoy,
+  escanear: IconoEscanear,
+  auditoria: IconoAuditoria,
+}
+
+/** El desplegable para los menús largos: en mobile una tira de seis no se lee. */
+function MenuDesplegable({ items, path }: { items: ItemNav[]; path: string }) {
   const [abierto, setAbierto] = useState(false)
-  const actual = ADMIN_NAV.find((i) => esActivo(i.href, path))
+  const actual = items.find((i) => esActivo(i.href, path))
 
   useEffect(() => {
     if (!abierto) return
@@ -83,7 +101,7 @@ function MenuAdmin({ path }: { path: string }) {
             className="fixed inset-0 z-10 cursor-default bg-ink/20" />
           <nav className="surgir absolute inset-x-0 top-full z-20 border-b border-line
             bg-card shadow-lg">
-            {ADMIN_NAV.map((item) => (
+            {items.map((item) => (
               // Se cierra al elegir: si no, queda abierto sobre la pantalla nueva.
               <Link key={item.href} href={item.href} onClick={() => setAbierto(false)}
                 aria-current={esActivo(item.href, path) ? 'page' : undefined}
@@ -103,22 +121,23 @@ function MenuAdmin({ path }: { path: string }) {
 }
 
 /**
- * El vecino tiene dos destinos. Un desplegable para dos ítems agrega un toque
- * para llegar a todo; abajo quedan siempre visibles y en la zona del pulgar.
+ * Pocos destinos: abajo, siempre visibles y en la zona del pulgar. Un
+ * desplegable para dos o tres ítems agrega un toque para llegar a todo.
  */
-function BarraInferior({ path }: { path: string }) {
+function BarraInferior({ items, path }: { items: ItemNav[]; path: string }) {
   return (
     <nav aria-label="Secciones"
       className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-card sm:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      {RESIDENT_NAV.map(({ href, label, Icono }) => {
+      {items.map(({ href, label, icono }) => {
         const activo = esActivo(href, path)
+        const Icono = icono ? ICONOS[icono] : null
         return (
           <Link key={href} href={href}
             aria-current={activo ? 'page' : undefined}
             className={`flex min-h-16 flex-1 flex-col items-center justify-center gap-1
               text-xs font-semibold transition-colors ${activo ? 'text-alamo' : 'text-ink-soft'}`}>
-            <Icono />
+            {Icono && <Icono />}
             {label}
           </Link>
         )
@@ -147,11 +166,23 @@ export function Shell({ me, accion, atras, children }: {
 }) {
   const path = usePathname()
   const [tema, setTema] = useTema()
-  const esAdmin = path.startsWith('/admin')
-  const nav = esAdmin ? ADMIN_NAV : RESIDENT_NAV
+  const seccion = seccionDe(path, me.role)
+  const nav = NAV[seccion]
+  const enBarra = nav.length <= TOPE_BARRA
+
+  /*
+   * Quién está de turno se AFIRMA, no se elige: cada ingreso queda a nombre de
+   * quien está logueado, y mostrarlo acá es lo que hace visible una sesión que
+   * quedó abierta del turno anterior.
+   */
+  const subtitulo = seccion === 'garita'
+    ? me.name
+    : seccion === 'admin'
+      ? 'Administración'
+      : me.units[0]?.label ?? 'Vecino'
 
   return (
-    <div className={`min-h-dvh ${esAdmin ? '' : 'con-barra-inferior sm:pb-0'} ${accion ? 'con-accion' : ''}`}>
+    <div className={`min-h-dvh ${enBarra ? 'con-barra-inferior sm:pb-0' : ''} ${accion ? 'con-accion' : ''}`}>
       <header className="sticky top-0 z-20 border-b border-alamo/15 bg-card">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5">
           {atras ? (
@@ -164,10 +195,18 @@ export function Shell({ me, accion, atras, children }: {
               {atras.label ?? 'Volver'}
             </button>
           ) : (
-            <Wordmark subtitle={me.units[0]?.label ?? me.role} />
+            <Wordmark subtitle={subtitulo} />
           )}
 
           <div className="flex shrink-0 items-center gap-2">
+            {/* El admin entra y sale de su sección desde cualquier pantalla. */}
+            {me.role === 'admin' && seccion !== 'admin' && (
+              <Link href="/admin"
+                className="rounded-full border border-alamo/30 px-3 py-1.5 text-xs
+                  font-semibold text-alamo">
+                Admin
+              </Link>
+            )}
             <TemaToggle tema={tema} onTema={setTema} />
             <button onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión"
               className="flex size-11 items-center justify-center rounded text-ink-soft">
@@ -180,7 +219,7 @@ export function Shell({ me, accion, atras, children }: {
           </div>
         </div>
 
-        {/* En pantalla ancha, las solapas de siempre para los dos roles. */}
+        {/* En pantalla ancha, las solapas de siempre para los tres roles. */}
         <nav className="mx-auto hidden max-w-5xl gap-1 px-3 sm:flex">
           {nav.map((item) => (
             <Link key={item.href} href={item.href}
@@ -194,34 +233,23 @@ export function Shell({ me, accion, atras, children }: {
               {item.label}
             </Link>
           ))}
-          {me.role === 'admin' && !esAdmin && (
-            <Link href="/admin" className="whitespace-nowrap border-b-2 border-transparent px-3
-              py-2.5 text-sm font-semibold text-ink-soft hover:text-ink">
-              Administración
-            </Link>
-          )}
         </nav>
 
-        {esAdmin && <MenuAdmin path={path} />}
+        {!enBarra && <MenuDesplegable items={nav} path={path} />}
       </header>
 
       <main className="surgir mx-auto max-w-5xl px-5 py-6">{children}</main>
 
       {accion && (
-        <div className="fixed inset-x-0 bottom-16 z-30 border-t border-line bg-surface/95
-          px-4 py-3 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-5 sm:pb-8 sm:pt-0"
+        <div className={`fixed inset-x-0 z-30 border-t border-line bg-surface/95 px-4 py-3
+          backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-5 sm:pb-8 sm:pt-0
+          ${enBarra ? 'bottom-16' : 'bottom-0'}`}
           style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="mx-auto max-w-5xl">{accion}</div>
         </div>
       )}
 
-      {!esAdmin && <BarraInferior path={path} />}
-      {!esAdmin && me.role === 'admin' && (
-        <Link href="/admin" className="fixed right-4 top-3 z-40 rounded-full border
-          border-alamo/30 bg-card px-3 py-1.5 text-xs font-semibold text-alamo sm:hidden">
-          Admin
-        </Link>
-      )}
+      {enBarra && <BarraInferior items={nav} path={path} />}
     </div>
   )
 }

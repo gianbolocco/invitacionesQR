@@ -1,11 +1,11 @@
 'use client'
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { hora } from '@/lib/gate'
 import { hoyISO } from '@/lib/invitations'
-import { GaritaShell } from '@/components/garita-shell'
-import { Eyebrow } from '@/components/ui'
+import { Shell } from '@/components/shell'
+import { Tabla, type Columna } from '@/components/ui'
 import { SkeletonFilas, Cargando } from '@/components/feedback'
 
 type AuditRow = {
@@ -120,8 +120,50 @@ export default function AuditoriaPage() {
     ? counts.entro + counts.esperando + counts.vencida + counts.anulada
     : 0
 
+  // El invitado va primero: es el título de la tarjeta en mobile.
+  const COLUMNAS: Columna<AuditRow>[] = [
+    {
+      key: 'invitado', label: 'Invitado',
+      celda: (r) => (
+        <>
+          <span className="font-semibold">{r.guestName}</span>
+          {r.eventName && <span className="block text-xs opacity-70">en {r.eventName}</span>}
+        </>
+      ),
+    },
+    { key: 'doc', label: 'Documento', celda: (r) => <span className="tabular">{r.guestDoc ?? '—'}</span> },
+    { key: 'unidad', label: 'Unidad', celda: (r) => <span className="tabular">{r.unitLabel}</span> },
+    { key: 'invito', label: 'Invitó', celda: (r) => r.inviterName },
+    {
+      key: 'fecha', label: 'Fecha',
+      celda: (r) => (
+        <span className="tabular">
+          {r.validFrom === r.validTo
+            ? fechaCorta(r.validFrom)
+            : `${fechaCorta(r.validFrom)}–${fechaCorta(r.validTo)}`}
+        </span>
+      ),
+    },
+    {
+      key: 'estado', label: 'Estado',
+      celda: (r) => (
+        <span className={`font-semibold ${ESTADO[r.status].clase}`}>{ESTADO[r.status].label}</span>
+      ),
+    },
+    {
+      key: 'ingreso', label: 'Ingreso',
+      celda: (r) => r.enteredCount === 0 ? <span className="tabular">—</span> : (
+        <button onClick={() => desplegar(r.id)} aria-expanded={abierta === r.id}
+          className="tabular underline underline-offset-4">
+          {hora(r.enteredAt!)}{r.enteredCount > 1 && ` ×${r.enteredCount}`}
+        </button>
+      ),
+    },
+    { key: 'guardia', label: 'Guardia', celda: (r) => r.guardName ?? '—' },
+  ]
+
   return (
-    <GaritaShell guardName={me.name}>
+    <Shell me={me}>
       <div className="flex flex-col gap-5">
         <h1 className="display text-2xl">Auditoría</h1>
 
@@ -167,74 +209,26 @@ export default function AuditoriaPage() {
         )}
 
         {lista.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[46rem] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-line">
-                  {['Invitado', 'Documento', 'Unidad', 'Invitó', 'Fecha', 'Estado', 'Ingreso', 'Guardia']
-                    .map((h) => <th key={h} className="py-2 pr-4"><Eyebrow>{h}</Eyebrow></th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {lista.map((r) => (
-                  <Fragment key={r.id}>
-                    <tr className="border-b border-current/10">
-                      <td className="py-2.5 pr-4">
-                        <span className="font-semibold">{r.guestName}</span>
-                        {r.eventName && (
-                          <span className="block text-xs opacity-70">en {r.eventName}</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 pr-4 tabular">{r.guestDoc ?? '—'}</td>
-                      <td className="py-2.5 pr-4 tabular">{r.unitLabel}</td>
-                      <td className="py-2.5 pr-4">{r.inviterName}</td>
-                      <td className="py-2.5 pr-4 tabular">
-                        {r.validFrom === r.validTo
-                          ? fechaCorta(r.validFrom)
-                          : `${fechaCorta(r.validFrom)}–${fechaCorta(r.validTo)}`}
-                      </td>
-                      <td className={`py-2.5 pr-4 font-semibold ${ESTADO[r.status].clase}`}>
-                        {ESTADO[r.status].label}
-                      </td>
-                      <td className="py-2.5 pr-4 tabular">
-                        {r.enteredCount === 0 ? '—' : (
-                          <button onClick={() => desplegar(r.id)}
-                            aria-expanded={abierta === r.id}
-                            className="underline underline-offset-4">
-                            {hora(r.enteredAt!)}
-                            {r.enteredCount > 1 && ` ×${r.enteredCount}`}
-                          </button>
-                        )}
-                      </td>
-                      <td className="py-2.5 pr-4">{r.guardName ?? '—'}</td>
-                    </tr>
-
-                    {/* Lo que antes vivía en la bitácora: cada movimiento con su
-                        hora y su guardia, desplegable desde la fila que lo resume. */}
-                    {abierta === r.id && (
-                      <tr className="border-b border-current/10">
-                        <td colSpan={8} className="bg-current/5 px-4 py-3">
-                          {movimientos === null && <Cargando><SkeletonFilas cantidad={2} columnas={4} /></Cargando>}
-                          {movimientos?.length === 0 && <p className="opacity-70">Sin movimientos.</p>}
-                          <ul className="flex flex-col gap-1">
-                            {movimientos?.map((m) => (
-                              <li key={m.id} className="tabular">
-                                {fechaCorta(m.enteredAt.slice(0, 10))} {hora(m.enteredAt)}
-                                {' · '}<span className="font-semibold">{m.guestName}</span>
-                                {m.guestDoc && ` · ${m.guestDoc}`}
-                                {m.plate && ` · ${m.plate}`}
-                                {' · lo dejó pasar '}{m.guardName ?? '(sin registrar)'}
-                              </li>
-                            ))}
-                          </ul>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Tabla columnas={COLUMNAS} filas={lista} claveDe={(r) => r.id}
+            detalle={(r) => abierta !== r.id ? null : (
+              // Lo que antes vivía en la bitácora: cada movimiento con su hora
+              // y su guardia, desplegable desde la fila que lo resume.
+              <>
+                {movimientos === null && <Cargando><SkeletonFilas cantidad={2} columnas={4} /></Cargando>}
+                {movimientos?.length === 0 && <p className="opacity-70">Sin movimientos.</p>}
+                <ul className="flex flex-col gap-1">
+                  {movimientos?.map((m) => (
+                    <li key={m.id} className="tabular">
+                      {fechaCorta(m.enteredAt.slice(0, 10))} {hora(m.enteredAt)}
+                      {' · '}<span className="font-semibold">{m.guestName}</span>
+                      {m.guestDoc && ` · ${m.guestDoc}`}
+                      {m.plate && ` · ${m.plate}`}
+                      {' · lo dejó pasar '}{m.guardName ?? '(sin registrar)'}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )} />
         )}
 
         {total > PAGE_SIZE && (
@@ -260,6 +254,6 @@ export default function AuditoriaPage() {
           </nav>
         )}
       </div>
-    </GaritaShell>
+    </Shell>
   )
 }

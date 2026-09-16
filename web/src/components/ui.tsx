@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, Ref } from 'react'
 
 /** El doble filete del cartel de entrada. Envuelve paneles y tarjetas. */
@@ -123,5 +124,92 @@ export function Wordmark({ subtitle = 'Barrio cerrado' }: { subtitle?: string })
       </span>
       <span className="eyebrow">{subtitle}</span>
     </div>
+  )
+}
+
+export type Columna<T> = {
+  key: string
+  label: string
+  celda: (fila: T) => ReactNode
+}
+
+/**
+ * Una tabla arriba de `sm`, tarjetas abajo.
+ *
+ * La auditoría tiene ocho columnas: en un teléfono eso era una tabla de 46rem
+ * adentro de un scroll horizontal, o sea leer de a dos columnas por vez y
+ * perder de vista de quién era la fila. En mobile cada fila pasa a ser una
+ * tarjeta con la primera columna de título y el resto como etiqueta y valor.
+ *
+ * Los datos y el marcado se escriben UNA vez, en `columnas`. Duplicar el JSX
+ * para cada tamaño es cómo estas dos vistas se van separando con el tiempo.
+ */
+export function Tabla<T>({ columnas, filas, claveDe, detalle }: {
+  columnas: Columna<T>[]
+  filas: T[]
+  claveDe: (fila: T) => string
+  /**
+   * Se despliega debajo de la fila. El estado de qué fila está abierta lo
+   * maneja la pantalla, no la tabla: devolver null es "esta va cerrada".
+   */
+  detalle?: (fila: T) => ReactNode
+}) {
+  const [titulo, ...resto] = columnas
+
+  return (
+    <>
+      <table className="hidden w-full border-collapse text-left text-sm sm:table">
+        <thead>
+          <tr className="border-b border-line">
+            {columnas.map((c) => (
+              <th key={c.key} className="py-2 pr-4"><Eyebrow>{c.label}</Eyebrow></th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => {
+            const abierto = detalle?.(f)
+            return (
+              <Fragment key={claveDe(f)}>
+                <tr className="border-b border-current/10">
+                  {columnas.map((c) => (
+                    <td key={c.key} className="py-2.5 pr-4 align-top">{c.celda(f)}</td>
+                  ))}
+                </tr>
+                {abierto && (
+                  <tr className="border-b border-current/10">
+                    <td colSpan={columnas.length} className="bg-current/5 px-4 py-3">{abierto}</td>
+                  </tr>
+                )}
+              </Fragment>
+            )
+          })}
+        </tbody>
+      </table>
+
+      <ul className="flex flex-col gap-3 sm:hidden">
+        {filas.map((f) => {
+          const abierto = detalle?.(f)
+          return (
+            <li key={claveDe(f)}>
+              <Filete className="bg-card px-4 py-3">
+                <div className="font-semibold">{titulo.celda(f)}</div>
+                <dl className="mt-2 flex flex-col gap-1">
+                  {resto.map((c) => (
+                    <div key={c.key} className="flex items-baseline justify-between gap-4">
+                      <dt className="eyebrow shrink-0">{c.label}</dt>
+                      <dd className="text-right text-sm">{c.celda(f)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {abierto && (
+                  <div className="mt-3 border-t border-line pt-3 text-sm">{abierto}</div>
+                )}
+              </Filete>
+            </li>
+          )
+        })}
+      </ul>
+    </>
   )
 }

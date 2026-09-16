@@ -48,11 +48,20 @@ export default function EscanearPage() {
 
   return (
     <main className="flex min-h-dvh flex-col overflow-x-hidden bg-alamo-deep text-alamo-line">
-      <header className="flex items-center justify-between gap-4 px-4 py-3">
-        <p className="eyebrow" style={{ color: 'inherit', opacity: 0.7 }}>Escanear</p>
-        <button onClick={salir} className="min-h-11 text-sm underline underline-offset-4">
-          Salir
+      {/* La misma barra de volver que el resto de la app, arriba a la
+          izquierda. El Shell no entra acá: la cámara va a pantalla completa y
+          una barra inferior encima del visor le come el encuadre al guardia. */}
+      <header className="flex items-center justify-between gap-4 px-4 py-3"
+        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))' }}>
+        <button onClick={salir}
+          className="-ml-2 flex min-h-11 items-center gap-1.5 rounded px-2 font-semibold">
+          <svg viewBox="0 0 24 24" aria-hidden className="size-5" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+          Garita
         </button>
+        <p className="eyebrow" style={{ color: 'inherit', opacity: 0.7 }}>Escanear</p>
       </header>
 
       {/* La cámara ocupa el espacio disponible, no un cuadrado fijo: en un

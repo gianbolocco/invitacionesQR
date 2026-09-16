@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { api } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { porId, type Hit, type Resultado } from '@/lib/gate'
-import { GaritaShell } from '@/components/garita-shell'
+import { Shell } from '@/components/shell'
 import { Agenda } from '@/components/agenda'
 import { Verdict } from '@/components/verdict'
 
@@ -44,7 +44,7 @@ export default function GaritaHome() {
 
 
   return (
-    <GaritaShell guardName={me.name}>
+    <Shell me={me}>
       <div className="flex flex-col gap-6">
         {/* El botón es lo primero y lo más grande: es la acción del turno. */}
         <Link href="/garita/escanear"
@@ -86,6 +86,6 @@ export default function GaritaHome() {
 
         {hits === null && <Agenda onAbrir={abrir} />}
       </div>
-    </GaritaShell>
+    </Shell>
   )
 }
