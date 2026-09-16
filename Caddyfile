@@ -1,0 +1,16 @@
+# Un solo dominio para todo: la app en la raíz y la API bajo /api.
+#
+# Que compartan origen no es casualidad. La cookie de sesión es SameSite=Lax:
+# desde el mismo sitio viaja sin problema, y así no hace falta ni un subdominio
+# aparte ni aflojar el CORS.
+{$DOMINIO} {
+	encode zstd gzip
+
+	handle_path /api/* {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

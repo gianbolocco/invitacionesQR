@@ -6,6 +6,14 @@ import { randomToken, sha256 } from '../lib/crypto.js'
 
 const SESSION_DAYS = 180
 
+/**
+ * Cada cuánto se refresca `lastSeenAt`. Antes se escribía en CADA request
+ * autenticado: un UPDATE sobre la misma fila por cada pantalla que abre cada
+ * vecino, para un dato que solo se usa para saber si una sesión quedó viva de
+ * un turno anterior. Con cinco minutos ese dato sigue sirviendo igual.
+ */
+const LAST_SEEN_MINUTES = 5
+
 export type AuthedPerson = {
   id: string
   neighborhoodId: string
@@ -25,7 +33,8 @@ export async function resolveSession(token: string): Promise<AuthedPerson | null
   const [row] = await db
     .select({
       id: people.id, neighborhoodId: people.neighborhoodId, name: people.name,
-      email: people.email, role: people.role, status: people.status, sessionId: sessions.id,
+      email: people.email, role: people.role, status: people.status,
+      sessionId: sessions.id, lastSeenAt: sessions.lastSeenAt,
     })
     .from(sessions)
     .innerJoin(people, eq(people.id, sessions.personId))
@@ -38,7 +47,10 @@ export async function resolveSession(token: string): Promise<AuthedPerson | null
 
   if (!row || row.status !== 'active') return null
 
-  await db.update(sessions).set({ lastSeenAt: new Date() }).where(eq(sessions.id, row.sessionId))
+  const desdeElUltimo = Date.now() - row.lastSeenAt.getTime()
+  if (desdeElUltimo > LAST_SEEN_MINUTES * 60_000) {
+    await db.update(sessions).set({ lastSeenAt: new Date() }).where(eq(sessions.id, row.sessionId))
+  }
 
   return {
     id: row.id, neighborhoodId: row.neighborhoodId, name: row.name,
@@ -48,6 +60,21 @@ export async function resolveSession(token: string): Promise<AuthedPerson | null
 
 export async function revokeSession(token: string): Promise<void> {
   await db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.tokenHash, sha256(token)))
+}
+
+/**
+ * Cierra todas las sesiones abiertas de una persona. Lo llama el cambio de
+ * contraseña: si no, resetear la clave del celular robado no echaba a nadie —
+ * la sesión del ladrón dura 180 días y sigue viva.
+ *
+ * Devuelve cuántas cerró, para que quien llame pueda decirlo.
+ */
+export async function revokeAllSessions(personId: string): Promise<number> {
+  const cerradas = await db.update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(sessions.personId, personId), isNull(sessions.revokedAt)))
+    .returning({ id: sessions.id })
+  return cerradas.length
 }
 
 export function setSessionCookie(res: Response, token: string): void {

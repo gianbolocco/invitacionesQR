@@ -4,6 +4,7 @@ import { people, unitMembers, authTokens, units } from '../db/schema.js'
 import { randomToken, sha256, hashPassword } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
 import { sendMail } from '../lib/mail.js'
+import { revokeAllSessions } from './sessions.js'
 import { AppError } from '../lib/errors.js'
 
 const INVITE_DAYS = 7
@@ -60,8 +61,19 @@ export async function sendInviteMail(email: string, name: string, token: string)
   )
 }
 
+/**
+ * Cambia la contraseña y cierra TODAS las sesiones abiertas de esa persona.
+ *
+ * Las dos cosas van juntas acá y no en cada endpoint porque los tres caminos
+ * —alta, "olvidé mi contraseña" y reset del admin— pasan por esta función, y
+ * uno solo que se olvidara dejaría viva la sesión que se quería echar.
+ *
+ * Quien tenga que seguir adentro (el que hace su propio reset) crea su sesión
+ * DESPUÉS de esto, así que no se autoexpulsa.
+ */
 export async function setPassword(personId: string, plain: string): Promise<void> {
   await db.update(people).set({ passwordHash: await hashPassword(plain) }).where(eq(people.id, personId))
+  await revokeAllSessions(personId)
 }
 
 export async function listPeople(neighborhoodId: string) {
@@ -93,6 +105,13 @@ export async function listPeople(neighborhoodId: string) {
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/*
+ * PENDIENTE: estas funciones reciben neighborhoodId pero solo lo usan para el
+ * audit log — buscan la persona por id y nada más. Un admin de otro barrio
+ * puede operar sobre cualquier cuenta de la base. Con un solo barrio el impacto
+ * es cero; el arreglo está especificado en tests/aislamiento-barrios.test.ts,
+ * salteado hasta que se decida si la app maneja más de un barrio.
+ */
 export async function disablePerson(personId: string, actorId: string, neighborhoodId: string): Promise<void> {
   await db.update(people).set({ status: 'disabled' }).where(eq(people.id, personId))
   await audit(actorId, neighborhoodId, 'person.disabled', 'person', personId)

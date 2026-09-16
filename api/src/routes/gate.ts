@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
+import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
   checkByToken, checkById, registerEntry, searchGuests, agendaForDay,
@@ -12,6 +13,7 @@ import { entriesLog } from '../services/reports.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
+validarUuid(gateRoutes)
 
 gateRoutes.get('/check/:token', async (req, res) => {
   res.json(await checkByToken(req.params.token))

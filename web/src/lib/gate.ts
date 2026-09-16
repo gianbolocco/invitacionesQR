@@ -50,12 +50,3 @@ export function hora(iso: string): string {
     timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(iso))
 }
-
-/** Oscuro entre las 19 y las 7: una pantalla blanca a las 3am encandila y el
- *  guardia termina bajando el brillo hasta no ver nada de día. */
-export function esDeNoche(): boolean {
-  const h = Number(new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', hour12: false,
-  }).format(new Date()))
-  return h >= 19 || h < 7
-}

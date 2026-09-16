@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
+import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import { createUnit, listUnits, labelForLot, setPersonLot } from '../services/units.js'
 import {
@@ -10,6 +11,7 @@ import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.j
 
 export const adminRoutes = Router()
 adminRoutes.use(requireAuth, requireRole('admin'))
+validarUuid(adminRoutes)
 
 adminRoutes.get('/units', async (req, res) => {
   res.json(await listUnits(req.person!.neighborhoodId))

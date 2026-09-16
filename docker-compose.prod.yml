@@ -1,0 +1,66 @@
+# Despliegue real, sobre un VPS con dominio.
+#
+# Se usa JUNTO al docker-compose.yml, no en lugar de él:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Lo que agrega respecto de desarrollo:
+#   - Caddy adelante, que saca y renueva el certificado de Let's Encrypt solo.
+#     No es comodidad: el escáner de QR usa getUserMedia, y el navegador solo
+#     da acceso a la cámara en https:// o localhost. Sin certificado, el
+#     guardia no puede escanear desde su celular. Nunca.
+#   - NODE_ENV=production, que es lo que hace que la cookie de sesión salga
+#     con Secure.
+#   - La contraseña de la base sale del entorno y el puerto 5432 deja de estar
+#     publicado: en desarrollo se expone para poder mirar la base desde afuera,
+#     acá no tiene por qué salir del Docker.
+#   - restart: unless-stopped, para que el barrio no se quede sin garita
+#     porque se reinició el server.
+#
+# Variables, en un .env al lado de este archivo (ver .env.prod.example).
+
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?falta DB_PASSWORD}
+    # Sin `ports`: la base se habla solo por la red interna de Docker.
+    ports: !override []
+    restart: unless-stopped
+
+  api:
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://invitaciones:${DB_PASSWORD:?falta DB_PASSWORD}@db:5432/invitaciones
+      WEB_ORIGIN: https://${DOMINIO:?falta DOMINIO}
+      API_ORIGIN: https://${DOMINIO}/api
+      PORT: 8080
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    ports: !override []
+    restart: unless-stopped
+
+  web:
+    build:
+      args:
+        # El navegador del vecino llama a la API por el dominio público, no por
+        # el hostname de Docker. Va horneado en el build de Next.
+        NEXT_PUBLIC_API_URL: https://${DOMINIO:?falta DOMINIO}/api
+    ports: !override []
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    environment:
+      DOMINIO: ${DOMINIO:?falta DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on: [web, api]
+
+volumes:
+  caddydata:
+  caddyconfig:

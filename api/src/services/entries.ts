@@ -8,6 +8,12 @@ import { AppError } from '../lib/errors.js'
 /** db o una transacción: las queries de lectura sirven para las dos. */
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
 
+/*
+ * PENDIENTE: no filtra por barrio, así que checkById, checkByToken y
+ * registerEntry aceptan invitaciones de cualquier barrio de la base. Un guardia
+ * ajeno puede registrar un ingreso que no le corresponde. Con un solo barrio el
+ * impacto es cero; ver tests/aislamiento-barrios.test.ts.
+ */
 async function loadForCheck(where: SQL) {
   const [row] = await db.select({
     id: invitations.id,

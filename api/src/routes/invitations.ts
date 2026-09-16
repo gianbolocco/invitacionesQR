@@ -9,6 +9,7 @@ import {
 import { unitsOfPerson } from '../services/units.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { AppError } from '../lib/errors.js'
+import { validarUuid } from '../middleware/uuidParam.js'
 
 export const invitationRoutes = Router()
 
@@ -52,6 +53,7 @@ invitationRoutes.post('/public/:token/join', publicWriteLimit, async (req, res) 
 
 /* ---------- De acá para abajo, todo pide sesión. ---------- */
 invitationRoutes.use(requireAuth)
+validarUuid(invitationRoutes)
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-MM-DD')
 

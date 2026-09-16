@@ -51,7 +51,7 @@ export default function GuardiasPage() {
     await api(`/admin/people/${reseteando.id}/password`, {
       method: 'POST', body: JSON.stringify({ password: nuevaClave }),
     })
-    setAviso(`Contraseña de ${reseteando.name} cambiada.`)
+    setAviso(`Contraseña de ${reseteando.name} cambiada. Si estaba adentro, quedó deslogueado.`)
     setReseteando(null)
     setNuevaClave('')
     cargar()
@@ -140,7 +140,15 @@ export default function GuardiasPage() {
                 </div>
               </Filete>
               {reseteando?.id === g.id && (
-                <form onSubmit={resetear} className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <form onSubmit={resetear} className="mt-2 flex flex-col gap-3">
+                  {/* Cambiar la contraseña cierra las sesiones abiertas. Si el
+                      guardia está en la barrera, se queda afuera al instante:
+                      el admin tiene que saberlo ANTES de tocar el botón. */}
+                  <p className="rounded border-l-4 border-alamo/40 bg-alamo/5 px-3 py-2 text-sm">
+                    Si {g.name} está usando la garita ahora, la contraseña nueva lo
+                    deja afuera en el acto y va a tener que volver a entrar.
+                  </p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="flex-1">
                     <Field label="Contraseña nueva" type="password" autoFocus value={nuevaClave}
                       onChange={(e) => setNuevaClave(e.target.value)} />
@@ -149,6 +157,7 @@ export default function GuardiasPage() {
                   <Button variant="quiet" type="button" onClick={() => setReseteando(null)}>
                     Cancelar
                   </Button>
+                  </div>
                 </form>
               )}
             </li>
