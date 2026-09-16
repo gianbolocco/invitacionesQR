@@ -5,6 +5,7 @@ import { useMe } from '@/lib/session'
 import { Shell } from '@/components/shell'
 import { ESTADO, fecha, useAdminData, type Person } from '@/lib/admin'
 import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
+import { SkeletonTarjetas, Cargando, Aviso, useAviso, Confirmar } from '@/components/feedback'
 
 export default function GuardiasPage() {
   const me = useMe()
@@ -13,7 +14,8 @@ export default function GuardiasPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [aviso, setAviso] = useState<string | null>(null)
+  const [aviso, setAviso] = useAviso()
+  const [porDarDeBaja, setPorDarDeBaja] = useState<Person | null>(null)
   const [reseteando, setReseteando] = useState<Person | null>(null)
   const [nuevaClave, setNuevaClave] = useState('')
 
@@ -62,8 +64,9 @@ export default function GuardiasPage() {
   }
 
   async function deshabilitar(g: Person) {
-    if (!confirm(`¿Dar de baja a ${g.name}? No va a poder entrar a la garita.`)) return
+    setPorDarDeBaja(null)
     await api(`/admin/people/${g.id}/disable`, { method: 'POST' })
+    setAviso(`${g.name} quedó dado de baja.`)
     cargar()
   }
 
@@ -97,12 +100,12 @@ export default function GuardiasPage() {
                 onChange={(e) => setPassword(e.target.value)} />
             </div>
             {error && <ErrorNote>{error}</ErrorNote>}
-            {aviso && <p role="status" className="text-sm text-alamo">{aviso}</p>}
+            {aviso && <Aviso>{aviso}</Aviso>}
             <Button type="submit" className="self-start">Dar de alta</Button>
           </form>
         </Filete>
 
-        {people === null && <p className="text-ink-soft">Cargando…</p>}
+        {people === null && <Cargando><SkeletonTarjetas cantidad={2} /></Cargando>}
         {people !== null && guardias.length === 0 && (
           <Filete className="bg-white px-5 py-8 text-center">
             <p className="text-ink-soft">
@@ -130,7 +133,7 @@ export default function GuardiasPage() {
                     Cambiar contraseña
                   </Button>
                   {g.status !== 'disabled' ? (
-                    <Button variant="quiet" onClick={() => deshabilitar(g)}>Dar de baja</Button>
+                    <Button variant="quiet" onClick={() => setPorDarDeBaja(g)}>Dar de baja</Button>
                   ) : (
                     <Button variant="quiet" onClick={() => reactivar(g)}>Reactivar</Button>
                   )}
@@ -152,6 +155,15 @@ export default function GuardiasPage() {
           ))}
         </ul>
       </div>
+      {porDarDeBaja && (
+        <Confirmar
+          titulo={`¿Dar de baja a ${porDarDeBaja.name}?`}
+          detalle="No va a poder entrar a la garita. Los ingresos que ya registró quedan igual."
+          accion="Dar de baja"
+          onConfirmar={() => deshabilitar(porDarDeBaja)}
+          onCancelar={() => setPorDarDeBaja(null)}
+        />
+      )}
     </Shell>
   )
 }

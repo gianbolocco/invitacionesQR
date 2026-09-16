@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { Shell } from '@/components/shell'
 import { Filete, Eyebrow } from '@/components/ui'
+import { SkeletonTiles, Cargando } from '@/components/feedback'
 import { BarChart, type Barra } from '@/components/bar-chart'
 import { fechaHora } from '@/lib/admin'
 
@@ -79,6 +80,8 @@ export default function TableroPage() {
       <div className="flex flex-col gap-8">
         <h1 className="display text-2xl">Tablero</h1>
 
+        {!kpis && <Cargando><SkeletonTiles /></Cargando>}
+
         {kpis && (
           <>
             {/* El agujero del padrón va primero y aparte: es el número accionable. */}
@@ -87,7 +90,7 @@ export default function TableroPage() {
                 value={kpis.unitsWithoutResidents} />
             )}
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="escalonar grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Tile label="Ingresos hoy" value={kpis.entriesToday} />
               <Tile label="Ingresos esta semana" value={kpis.entriesWeek} />
               <Tile label="Ingresos este mes" value={kpis.entriesMonth} />

@@ -74,7 +74,7 @@ function Seccion({ label, rows, borde, tenue, onAbrir }: {
       <p className="eyebrow" style={{ color: 'inherit', opacity: 0.7 }}>
         {label} ({rows.length})
       </p>
-      <ul className="flex flex-col gap-2">
+      <ul className="escalonar flex flex-col gap-2">
         {rows.map((r) => <Fila key={r.id} r={r} borde={borde} tenue={tenue} onAbrir={onAbrir} />)}
       </ul>
     </section>

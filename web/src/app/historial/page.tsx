@@ -6,6 +6,7 @@ import { useMe } from '@/lib/session'
 import { KIND_LABEL, fechaCorta, vigencia, type Invitation } from '@/lib/invitations'
 import { Shell } from '@/components/shell'
 import { Eyebrow, Filete } from '@/components/ui'
+import { SkeletonTarjetas, Cargando } from '@/components/feedback'
 
 export default function HistorialPage() {
   const me = useMe()
@@ -32,7 +33,7 @@ export default function HistorialPage() {
           </label>
         </div>
 
-        {invitaciones === null && <p className="text-ink-soft">Cargando…</p>}
+        {invitaciones === null && <Cargando><SkeletonTarjetas cantidad={4} /></Cargando>}
         {invitaciones !== null && lista.length === 0 && (
           <Filete className="bg-white px-5 py-10 text-center">
             <p className="text-ink-soft">Todavía no hay invitaciones.</p>

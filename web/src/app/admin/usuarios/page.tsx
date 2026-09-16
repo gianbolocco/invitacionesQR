@@ -5,6 +5,7 @@ import { useMe } from '@/lib/session'
 import { Shell } from '@/components/shell'
 import { ESTADO, fecha, useAdminData, type Person } from '@/lib/admin'
 import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
+import { SkeletonTarjetas, Cargando, Aviso, useAviso, Confirmar } from '@/components/feedback'
 
 export default function UsuariosPage() {
   const me = useMe()
@@ -12,7 +13,8 @@ export default function UsuariosPage() {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [aviso, setAviso] = useState<string | null>(null)
+  const [aviso, setAviso] = useAviso()
+  const [porDarDeBaja, setPorDarDeBaja] = useState<Person | null>(null)
   const [corrigiendo, setCorrigiendo] = useState<Person | null>(null)
   const [nuevoLote, setNuevoLote] = useState('')
 
@@ -60,8 +62,9 @@ export default function UsuariosPage() {
   }
 
   async function deshabilitar(p: Person) {
-    if (!confirm(`¿Deshabilitar a ${p.name}? No va a poder entrar ni crear invitaciones.`)) return
+    setPorDarDeBaja(null)
     await api(`/admin/people/${p.id}/disable`, { method: 'POST' })
+    setAviso(`${p.name} quedó dado de baja.`)
     cargar()
   }
 
@@ -84,12 +87,12 @@ export default function UsuariosPage() {
                 onChange={(e) => setEmail(e.target.value)} />
             </div>
             {error && <ErrorNote>{error}</ErrorNote>}
-            {aviso && <p role="status" className="text-sm text-alamo">{aviso}</p>}
+            {aviso && <Aviso>{aviso}</Aviso>}
             <Button type="submit" className="self-start">Dar de alta y enviar invitación</Button>
           </form>
         </Filete>
 
-        {people === null && <p className="text-ink-soft">Cargando…</p>}
+        {people === null && <Cargando><SkeletonTarjetas cantidad={4} /></Cargando>}
 
         <ul className="flex flex-col gap-2">
           {vecinos.map((p) => (
@@ -119,7 +122,7 @@ export default function UsuariosPage() {
                     </Button>
                   )}
                   {p.status !== 'disabled' && p.id !== me.id && (
-                    <Button variant="quiet" onClick={() => deshabilitar(p)}>Dar de baja</Button>
+                    <Button variant="quiet" onClick={() => setPorDarDeBaja(p)}>Dar de baja</Button>
                   )}
                   {p.status === 'disabled' && (
                     <Button variant="quiet" onClick={() => reactivar(p)}>Reactivar</Button>
@@ -145,6 +148,15 @@ export default function UsuariosPage() {
           ))}
         </ul>
       </div>
+      {porDarDeBaja && (
+        <Confirmar
+          titulo={`¿Dar de baja a ${porDarDeBaja.name}?`}
+          detalle="No va a poder entrar ni crear invitaciones. Se puede reactivar después."
+          accion="Dar de baja"
+          onConfirmar={() => deshabilitar(porDarDeBaja)}
+          onCancelar={() => setPorDarDeBaja(null)}
+        />
+      )}
     </Shell>
   )
 }

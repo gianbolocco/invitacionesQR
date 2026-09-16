@@ -84,9 +84,50 @@ body {
   outline-offset: 2px;
 }
 
+/*
+  Movimiento: una sola apuesta, el veredicto de la garita. Todo lo demás es
+  invisible — el contenido aparece, no "entra con efecto".
+*/
+@keyframes surgir {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* El sello del veredicto: rápido y seco, como estampar. Es el único lugar
+   donde la animación se nota a propósito. */
+@keyframes sello {
+  0%   { opacity: 0; transform: scale(1.12); }
+  60%  { opacity: 1; transform: scale(0.98); }
+  100% { opacity: 1; transform: none; }
+}
+
+.surgir { animation: surgir 200ms ease-out both; }
+.sello  { animation: sello 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+
+/* Listas que escalonan apenas: da orden de lectura sin que parezca una demo. */
+.escalonar > * { animation: surgir 200ms ease-out both; }
+.escalonar > *:nth-child(1) { animation-delay: 0ms }
+.escalonar > *:nth-child(2) { animation-delay: 40ms }
+.escalonar > *:nth-child(3) { animation-delay: 80ms }
+.escalonar > *:nth-child(4) { animation-delay: 120ms }
+.escalonar > *:nth-child(n+5) { animation-delay: 160ms }
+
+@keyframes latir {
+  50% { opacity: 0.45 }
+}
+.skeleton {
+  animation: latir 1.4s ease-in-out infinite;
+  background: color-mix(in srgb, var(--color-ink) 12%, transparent);
+  border-radius: 4px;
+}
+
+/* La barra inferior del vecino no puede taparle el último ítem de la lista. */
+.con-barra-inferior { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }

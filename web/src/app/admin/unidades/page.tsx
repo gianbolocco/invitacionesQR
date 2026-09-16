@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { Shell } from '@/components/shell'
 import { Button, Field, ErrorNote, Filete } from '@/components/ui'
+import { SkeletonTarjetas, Cargando } from '@/components/feedback'
 
 type Unit = { id: string; label: string }
 
@@ -48,7 +49,7 @@ export default function UnidadesPage() {
           {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
         </Filete>
 
-        {units === null && <p className="text-ink-soft">Cargando…</p>}
+        {units === null && <Cargando><SkeletonTarjetas cantidad={3} /></Cargando>}
         {units?.length === 0 && <p className="text-ink-soft">Todavía no hay unidades cargadas.</p>}
 
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

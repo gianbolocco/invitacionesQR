@@ -6,6 +6,7 @@ import { esDeNoche, hora } from '@/lib/gate'
 import { hoyISO } from '@/lib/invitations'
 import { GaritaShell } from '@/components/garita-shell'
 import { Eyebrow } from '@/components/ui'
+import { SkeletonFilas, Cargando } from '@/components/feedback'
 
 type AuditRow = {
   id: string
@@ -166,7 +167,7 @@ export default function AuditoriaPage() {
           ))}
         </div>
 
-        {pagina === null && <p className="opacity-70">Cargando…</p>}
+        {pagina === null && <Cargando><SkeletonFilas /></Cargando>}
         {pagina !== null && lista.length === 0 && (
           <p className="opacity-70">No hay invitaciones en ese rango.</p>
         )}
@@ -219,7 +220,7 @@ export default function AuditoriaPage() {
                     {abierta === r.id && (
                       <tr className="border-b border-current/10">
                         <td colSpan={8} className="bg-current/5 px-4 py-3">
-                          {movimientos === null && <p className="opacity-70">Cargando…</p>}
+                          {movimientos === null && <Cargando><SkeletonFilas cantidad={2} columnas={4} /></Cargando>}
                           {movimientos?.length === 0 && <p className="opacity-70">Sin movimientos.</p>}
                           <ul className="flex flex-col gap-1">
                             {movimientos?.map((m) => (

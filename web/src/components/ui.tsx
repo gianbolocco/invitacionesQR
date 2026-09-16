@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, Ref } from 'react'
 
 /** El doble filete del cartel de entrada. Envuelve paneles y tarjetas. */
 export function Filete({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -14,17 +14,41 @@ export function Eyebrow({ children }: { children: ReactNode }) {
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'quiet'
+  variant?: 'primary' | 'quiet' | 'peligro'
+  ref?: Ref<HTMLButtonElement>
 }
 
 /** min-h-14 en primario: 56px, el pulgar del vecino en la calle. */
 export function Button({ variant = 'primary', className = '', ...props }: ButtonProps) {
   const base = 'inline-flex min-h-12 items-center justify-center rounded px-5 font-semibold ' +
-    'transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-  const look = variant === 'primary'
-    ? 'min-h-14 bg-alamo text-white hover:bg-alamo-deep'
-    : 'border border-alamo/30 text-alamo hover:bg-alamo/5'
+    'transition-[background-color,border-color,opacity] active:scale-[0.99] ' +
+    'disabled:opacity-50 disabled:cursor-not-allowed'
+  const look = {
+    primary: 'min-h-14 bg-alamo text-white hover:bg-alamo-deep',
+    quiet: 'border border-alamo/30 text-alamo hover:bg-alamo/5',
+    peligro: 'min-h-14 bg-deny-field text-deny-ink hover:opacity-90',
+  }[variant]
   return <button className={`${base} ${look} ${className}`} {...props} />
+}
+
+/**
+ * Un estado vacío es una invitación a hacer algo, no un cartel de "no hay nada".
+ * Por eso la acción viene adentro y no al final de una lista que no existe.
+ */
+export function Vacio({ titulo, detalle, children }: {
+  titulo: string
+  detalle?: string
+  children?: ReactNode
+}) {
+  return (
+    <Filete className="flex flex-col items-center gap-4 bg-white px-5 py-10 text-center">
+      <div>
+        <p className="display text-lg">{titulo}</p>
+        {detalle && <p className="mt-1 text-ink-soft">{detalle}</p>}
+      </div>
+      {children}
+    </Filete>
+  )
 }
 
 type FieldProps = InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }

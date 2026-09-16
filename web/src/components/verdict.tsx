@@ -57,8 +57,8 @@ export function Verdict({ resultado, onSalir }: {
     >
       <div>
         <div className="flex items-center gap-3">
-          <span aria-hidden className="text-5xl leading-none sm:text-6xl">{ok ? '✓' : '✕'}</span>
-          <h1 className="display text-5xl sm:text-7xl">{ok ? 'PASA' : 'NO PASA'}</h1>
+          <span aria-hidden className="sello text-5xl leading-none sm:text-6xl">{ok ? '✓' : '✕'}</span>
+          <h1 className="sello display text-5xl sm:text-7xl">{ok ? 'PASA' : 'NO PASA'}</h1>
         </div>
 
         {!ok && (

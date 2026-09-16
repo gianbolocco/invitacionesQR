@@ -26,7 +26,7 @@ export function QrShare({ token, guestName }: { token: string; guestName: string
 
   return (
     <div className="flex flex-col items-center gap-5">
-      <div className="filete">
+      <div className="filete sello">
         <div className="bg-white p-5">
           <QRCodeCanvas value={url} size={232} fgColor="#0d3d28" bgColor="#ffffff" />
         </div>
@@ -35,6 +35,9 @@ export function QrShare({ token, guestName }: { token: string; guestName: string
         <Eyebrow>Invitación</Eyebrow>
         <p className="display mt-1 text-xl">{guestName}</p>
       </div>
+      <p className="text-center text-sm text-ink-soft">
+        Quien lo reciba tiene que subir el brillo para que el lector lo tome.
+      </p>
       <div className="flex w-full flex-col gap-2">
         <Button onClick={compartir}>Compartir</Button>
         <Button variant="quiet" onClick={copiar} aria-live="polite">

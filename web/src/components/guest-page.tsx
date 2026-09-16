@@ -56,10 +56,17 @@ export function Cabecera({ inv }: { inv: Publica }) {
 
 export function Qr({ url }: { url: string }) {
   return (
-    <div className="filete self-center">
-      <div className="bg-white p-5">
-        <QRCodeCanvas value={url} size={232} fgColor="#0d3d28" bgColor="#ffffff" />
+    <div className="flex flex-col items-center gap-2">
+      <div className="filete sello">
+        <div className="bg-white p-5">
+          <QRCodeCanvas value={url} size={232} fgColor="#0d3d28" bgColor="#ffffff" />
+        </div>
       </div>
+      {/* El motivo más común de que un QR "no funcione" en la barrera es un
+          celular en ahorro de batería con el brillo al mínimo. */}
+      <p className="text-center text-sm text-ink-soft">
+        Subí el brillo de la pantalla para que el lector lo tome.
+      </p>
     </div>
   )
 }

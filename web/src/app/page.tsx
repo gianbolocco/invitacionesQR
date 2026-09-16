@@ -6,7 +6,8 @@ import { api } from '@/lib/api'
 import { useMe, homeFor } from '@/lib/session'
 import { KIND_LABEL, estaVigente, vigencia, type Invitation } from '@/lib/invitations'
 import { Shell } from '@/components/shell'
-import { Button, Eyebrow, Filete } from '@/components/ui'
+import { Button, Eyebrow, Filete, Vacio } from '@/components/ui'
+import { SkeletonTarjetas, Cargando, Confirmar } from '@/components/feedback'
 import { QrShare } from '@/components/qr-share'
 
 type Anotado = { id: string; guestName: string; guestDoc: string | null; revokedAt: string | null }
@@ -18,6 +19,8 @@ export default function HomePage() {
   const [verQr, setVerQr] = useState<Invitation | null>(null)
   const [verAnotados, setVerAnotados] = useState<Invitation | null>(null)
   const [anotados, setAnotados] = useState<Anotado[] | null>(null)
+  const [porAnular, setPorAnular] = useState<Invitation | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const cargar = useCallback(() => {
     api<Invitation[]>('/invitations').then(setInvitaciones).catch(() => setInvitaciones([]))
@@ -30,11 +33,24 @@ export default function HomePage() {
 
   useEffect(() => { if (me) cargar() }, [me, cargar])
 
+  /**
+   * Optimista: la tarjeta se va al toque y vuelve sola si el servidor falla.
+   * Esperar la respuesta para algo que casi siempre funciona hace que la app
+   * se sienta lenta justo en la acción más común después de crear.
+   */
   async function revocar(inv: Invitation) {
-    if (!confirm(`¿Anular la invitación de ${inv.guestName}? No va a poder entrar.`)) return
-    await api(`/invitations/${inv.id}/revoke`, { method: 'POST' })
+    const antes = invitaciones
+    setPorAnular(null)
     setVerQr(null)
-    cargar()
+    setInvitaciones((actual) => actual?.filter((i) => i.id !== inv.id) ?? null)
+
+    try {
+      await api(`/invitations/${inv.id}/revoke`, { method: 'POST' })
+      cargar()
+    } catch {
+      setInvitaciones(antes)
+      setError('No se pudo anular. Probá de nuevo.')
+    }
   }
 
   useEffect(() => {
@@ -64,17 +80,13 @@ export default function HomePage() {
             </p>
           </div>
 
-          {anotados === null && <p className="text-ink-soft">Cargando…</p>}
+          {anotados === null && <Cargando><SkeletonTarjetas cantidad={2} /></Cargando>}
           {anotados?.length === 0 && (
-            <Filete className="bg-white px-5 py-8 text-center">
-              <p className="text-ink-soft">
-                Todavía no se anotó nadie.<br />
-                Compartí el link y cada uno carga su nombre.
-              </p>
-            </Filete>
+            <Vacio titulo="Todavía no se anotó nadie"
+              detalle="Compartí el link del evento y cada uno carga su nombre." />
           )}
 
-          <ul className="flex flex-col gap-2">
+          <ul className="escalonar flex flex-col gap-2">
             {anotados?.map((a) => (
               <li key={a.id}>
                 <Filete className={`bg-white px-4 py-3 ${a.revokedAt ? 'opacity-50' : ''}`}>
@@ -95,7 +107,7 @@ export default function HomePage() {
             ← Volver
           </button>
           <QrShare token={verQr.token} guestName={verQr.guestName} />
-          <button onClick={() => revocar(verQr)} className="text-sm text-deny-field
+          <button onClick={() => setPorAnular(verQr)} className="text-sm text-deny-field
             underline underline-offset-4">
             Anular esta invitación
           </button>
@@ -109,18 +121,25 @@ export default function HomePage() {
             )}
           </div>
 
-          {invitaciones === null && <p className="text-ink-soft">Cargando…</p>}
-
-          {invitaciones !== null && vigentes.length === 0 && (
-            <Filete className="bg-white px-5 py-10 text-center">
-              <p className="text-ink-soft">
-                No tenés invitaciones vigentes.<br />
-                Creá una y compartila por WhatsApp.
-              </p>
-            </Filete>
+          {error && (
+            <p role="alert" className="surgir rounded border-l-4 border-deny-field
+              bg-deny-field/5 px-3 py-2 text-sm">{error}</p>
           )}
 
-          <ul className="flex flex-col gap-3">
+          {invitaciones === null && <Cargando><SkeletonTarjetas /></Cargando>}
+
+          {invitaciones !== null && vigentes.length === 0 && (
+            <Vacio titulo="Todavía no invitaste a nadie"
+              detalle="Creá una invitación y compartila por WhatsApp.">
+              <Link href="/nueva"
+                className="inline-flex min-h-14 items-center justify-center rounded bg-alamo
+                  px-6 font-semibold text-white">
+                Nueva invitación
+              </Link>
+            </Vacio>
+          )}
+
+          <ul className="escalonar flex flex-col gap-3">
             {vigentes.map((inv) => (
               <li key={inv.id}>
                 <Filete className="flex items-center justify-between gap-4 bg-white px-4 py-3.5">
@@ -148,12 +167,27 @@ export default function HomePage() {
             ))}
           </ul>
 
-          <Link href="/nueva"
-            className="inline-flex min-h-14 items-center justify-center rounded bg-alamo px-5
-              font-semibold text-white hover:bg-alamo-deep">
-            Nueva invitación
-          </Link>
+          {/* En pantalla ancha va al pie de la lista; en mobile queda fijo sobre
+              la barra inferior, porque es la acción del 90% de las visitas. */}
+          {vigentes.length > 0 && (
+            <Link href="/nueva"
+              className="fixed inset-x-4 bottom-20 z-20 inline-flex min-h-14 items-center
+                justify-center rounded bg-alamo px-5 font-semibold text-white shadow-lg
+                sm:static sm:shadow-none">
+              Nueva invitación
+            </Link>
+          )}
         </div>
+      )}
+
+      {porAnular && (
+        <Confirmar
+          titulo={`¿Anular la invitación de ${porAnular.guestName}?`}
+          detalle="No va a poder entrar. Si ya estaba en la barrera, avisale."
+          accion="Anular"
+          onConfirmar={() => revocar(porAnular)}
+          onCancelar={() => setPorAnular(null)}
+        />
       )}
     </Shell>
   )
