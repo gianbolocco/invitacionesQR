@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { anotadosDe, hora, type EventGuest } from '@/lib/gate'
+import { Estado } from './ui'
 
 function Grupo({ label, rows, tenue, onAbrir }: {
   label: string
@@ -18,16 +19,19 @@ function Grupo({ label, rows, tenue, onAbrir }: {
         {rows.map((g) => (
           <li key={g.id}>
             <button onClick={() => onAbrir(g.id)}
-              className={`w-full rounded border border-line px-4 py-3 text-left
-                ${tenue ? 'opacity-60' : ''}`}>
-              <span className="block text-lg font-semibold">{g.guestName}</span>
-              <span className="block text-sm opacity-75 tabular">
-                {g.guestDoc ?? 'Sin documento'}
-                {g.plate && ` · ${g.plate}`}
-                {g.revokedAt && ' · anulado'}
-                {g.lastEntryAt && ` · ${hora(g.lastEntryAt)}`}
-                {g.enteredCount > 1 && ` ×${g.enteredCount}`}
+              className="flex w-full items-start justify-between gap-3 rounded border
+                border-line px-4 py-3 text-left">
+              <span className={`min-w-0 ${tenue ? 'opacity-60' : ''}`}>
+                <span className="block text-lg font-semibold">{g.guestName}</span>
+                <span className="block text-sm opacity-75 tabular">
+                  {g.guestDoc ?? 'Sin documento'}
+                  {g.plate && ` · ${g.plate}`}
+                  {g.enteredCount > 1 && ` · ${g.enteredCount} ingresos`}
+                </span>
               </span>
+              <Estado
+                estado={g.revokedAt ? 'anulada' : g.enteredCount > 0 ? 'adentro' : 'esperando'}
+                detalle={g.lastEntryAt ? hora(g.lastEntryAt) : undefined} />
             </button>
           </li>
         ))}

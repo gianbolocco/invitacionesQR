@@ -221,3 +221,38 @@ export function Tabla<T>({ columnas, filas, claveDe, detalle }: {
     </>
   )
 }
+
+export type EstadoInvitacion = 'esperando' | 'adentro' | 'anulada'
+
+/**
+ * En qué estado está una invitación, de un vistazo.
+ *
+ * Ni bien se escanea, la invitación pasa a "Adentro" y tiene que verse distinta
+ * en la lista sin leerla: antes la única diferencia era un `opacity-60`, que a
+ * dos metros en la barrera no se distingue de nada.
+ *
+ * Como en el veredicto, la diferencia es de LUMINANCIA y no de tono: "Adentro"
+ * es un chip macizo y "Esperando" un contorno. Se sigue leyendo en escala de
+ * grises y con daltonismo.
+ */
+export function Estado({ estado, detalle }: {
+  estado: EstadoInvitacion
+  /** La hora del ingreso, o lo que haga falta al lado de la palabra. */
+  detalle?: string
+}) {
+  const look = {
+    esperando: 'border border-current/35 opacity-80',
+    adentro: 'bg-pass-ink text-pass-field',
+    anulada: 'bg-deny-field text-deny-ink',
+  }[estado]
+  const label = { esperando: 'Esperando', adentro: 'Adentro', anulada: 'Anulada' }[estado]
+
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1
+      text-xs font-bold uppercase tracking-wide ${look}`}>
+      {estado === 'adentro' && <span aria-hidden>✓</span>}
+      {label}
+      {detalle && <span className="tabular font-semibold opacity-90">{detalle}</span>}
+    </span>
+  )
+}

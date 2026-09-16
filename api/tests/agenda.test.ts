@@ -107,7 +107,7 @@ describe('agenda del día', () => {
     expect(res.body[0].lastEntryAt).not.toBeNull()
   })
 
-  it('un evento va como UNA fila con sus anotados contados, no 30 filas', async () => {
+  it('los anotados a un evento salen como filas propias, con el evento al lado', async () => {
     const ctx = await base()
     const evento = await invitacion(ctx, {
       guestName: 'Asado del sábado', kind: 'evento', capacity: 30,
@@ -120,10 +120,62 @@ describe('agenda del día', () => {
     }
 
     const res = await request(app).get('/gate/agenda').set('Cookie', ctx.cookie)
-    expect(res.body).toHaveLength(1)
-    expect(res.body[0]).toMatchObject({
+    // El paraguas del evento más cada uno de los tres anotados.
+    expect(res.body).toHaveLength(4)
+
+    const paraguas = res.body.find((r: { parentId: string | null }) => r.parentId === null)
+    expect(paraguas).toMatchObject({
       guestName: 'Asado del sábado', kind: 'evento', joinedCount: 3, capacity: 30,
     })
+
+    const anotados = res.body.filter((r: { parentId: string | null }) => r.parentId !== null)
+    expect(anotados.map((r: { guestName: string }) => r.guestName).sort())
+      .toEqual(['Martina', 'Nicolás', 'Sofía'])
+    // El evento va como contexto, no como nombre: el guardia busca a la persona.
+    for (const a of anotados) {
+      expect(a.eventName).toBe('Asado del sábado')
+      expect(a.parentId).toBe(evento.id)
+    }
+  })
+
+  it('escanear a un anotado lo pasa a "ya entró" sin mover a los demás', async () => {
+    const ctx = await base()
+    const evento = await invitacion(ctx, { guestName: 'Asado', kind: 'evento', capacity: 10 })
+    const anotar = (guestName: string) => db.insert(invitations).values({
+      unitId: ctx.unitId, createdBy: ctx.vecinoId, parentId: evento.id, kind: 'evento',
+      guestName, validFrom: hoy, validTo: hoy, capacity: 1, token: randomToken(16),
+    }).returning()
+
+    const [martina] = await anotar('Martina')
+    await anotar('Nicolás')
+
+    const antes = await request(app).get('/gate/agenda').set('Cookie', ctx.cookie)
+    for (const r of antes.body) expect(r.enteredCount).toBe(0)
+
+    await registerEntry(martina.id, null, { guestName: 'Martina' })
+
+    const despues = await request(app).get('/gate/agenda').set('Cookie', ctx.cookie)
+    const fila = (nombre: string) =>
+      despues.body.find((r: { guestName: string }) => r.guestName === nombre)
+
+    expect(fila('Martina').enteredCount).toBe(1)
+    expect(fila('Martina').lastEntryAt).not.toBeNull()
+    expect(fila('Nicolás').enteredCount).toBe(0)
+    // El paraguas acumula: 1 de 10 entraron al evento.
+    expect(fila('Asado').enteredCount).toBe(1)
+  })
+
+  it('un anotado anulado no aparece en la lista del día', async () => {
+    const ctx = await base()
+    const evento = await invitacion(ctx, { guestName: 'Asado', kind: 'evento', capacity: 10 })
+    const [fuera] = await db.insert(invitations).values({
+      unitId: ctx.unitId, createdBy: ctx.vecinoId, parentId: evento.id, kind: 'evento',
+      guestName: 'Colado', validFrom: hoy, validTo: hoy, capacity: 1,
+      token: randomToken(16), revokedAt: new Date(),
+    }).returning()
+
+    const res = await request(app).get('/gate/agenda').set('Cookie', ctx.cookie)
+    expect(res.body.map((r: { id: string }) => r.id)).not.toContain(fuera.id)
   })
 
   it('los ingresos de los anotados cuentan para el evento', async () => {
@@ -136,7 +188,8 @@ describe('agenda del día', () => {
     await registerEntry(hija.id, null, { guestName: 'Martina' })
 
     const res = await request(app).get('/gate/agenda').set('Cookie', ctx.cookie)
-    expect(res.body[0].enteredCount).toBe(1)
+    const paraguas = res.body.find((r: { id: string }) => r.id === evento.id)
+    expect(paraguas.enteredCount).toBe(1)
   })
 
   it('un vecino no puede ver la agenda del barrio', async () => {

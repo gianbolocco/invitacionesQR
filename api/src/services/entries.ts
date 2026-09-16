@@ -188,6 +188,10 @@ export type AgendaRow = {
   unitLabel: string
   inviterName: string
   capacity: number
+  /** Id del evento al que pertenece; null si es una invitación suelta. */
+  parentId: string | null
+  /** Nombre del evento que la engloba, para mostrarlo como contexto. */
+  eventName: string | null
   joinedCount: number      // anotados, solo para eventos
   enteredCount: number     // ingresos de la familia
   lastEntryAt: Date | null
@@ -200,9 +204,11 @@ export type AgendaRow = {
  * cupo agotado igual aparece, marcada como "ya entró". El guardia necesita ver
  * quién vino, no solo quién falta.
  *
- * Los anotados a un evento NO salen como filas sueltas: un cumpleaños de 30
- * taparía las tres visitas que importan. El evento va como una fila con su
- * cupo, y se despliega aparte.
+ * Los anotados a un evento salen como filas propias, con el evento al lado. Un
+ * evento no es una invitación: es un paraguas sobre las invitaciones de los
+ * que se anotaron, y cada uno de ellos tiene su QR y entra por su cuenta. Antes
+ * quedaban escondidos adentro del evento y el guardia no podía ver en la lista
+ * del día a la persona que tenía adelante.
  */
 export type EventGuestRow = {
   id: string
@@ -260,6 +266,8 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       i.guest_doc         as "guestDoc",
       i.plate,
       i.kind,
+      i.parent_id         as "parentId",
+      padre.guest_name    as "eventName",
       u.label             as "unitLabel",
       p.name              as "inviterName",
       i.capacity,
@@ -276,12 +284,13 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
+    left join invitation padre on padre.id = i.parent_id
     where u.neighborhood_id = ${neighborhoodId}
-      and i.parent_id is null            -- los anotados se ven dentro de su evento
       and i.revoked_at is null
       and ${day}::date between i.valid_from and i.valid_to
       and (i.weekdays is null or ${dow} = any(i.weekdays))
-    order by i.kind = 'evento' desc, lower(i.guest_name)
+    -- El paraguas del evento primero; los anotados ordenan con el resto.
+    order by (i.kind = 'evento' and i.parent_id is null) desc, lower(i.guest_name)
   `)
 
   return res.rows as unknown as AgendaRow[]

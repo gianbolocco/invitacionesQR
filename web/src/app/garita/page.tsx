@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { porId, type Hit, type Resultado } from '@/lib/gate'
 import { Shell } from '@/components/shell'
-import { Agenda, type AgendaRow } from '@/components/agenda'
+import { Agenda, esParaguas, type AgendaRow } from '@/components/agenda'
 import { EventGuests } from '@/components/event-guests'
 import { Verdict } from '@/components/verdict'
 
@@ -22,12 +22,12 @@ export default function GaritaHome() {
   }, [])
 
   /*
-   * Un evento no se despacha de un toque: adentro está la lista de anotados y
-   * el guardia elige a la persona que tiene adelante. Si no, el ingreso queda
-   * contra el evento entero y no se sabe quién entró.
+   * El paraguas de un evento no se despacha de un toque: adentro está la lista
+   * de anotados. Un anotado, en cambio, es una invitación como cualquier otra y
+   * abre su veredicto derecho — que es como aparece ahora en la lista del día.
    */
   const abrirFila = useCallback((r: AgendaRow) => {
-    if (r.kind === 'evento') setEvento(r)
+    if (esParaguas(r)) setEvento(r)
     else abrir(r.id)
   }, [abrir])
 
