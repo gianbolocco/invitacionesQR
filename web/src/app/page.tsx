@@ -6,9 +6,9 @@ import { api } from '@/lib/api'
 import { useMe, homeFor } from '@/lib/session'
 import { KIND_LABEL, estaVigente, vigencia, type Invitation } from '@/lib/invitations'
 import { Shell } from '@/components/shell'
-import { Button, Eyebrow, Filete, Vacio } from '@/components/ui'
+import { Eyebrow, Filete, Vacio } from '@/components/ui'
 import { SkeletonTarjetas, Cargando, Confirmar } from '@/components/feedback'
-import { QrShare } from '@/components/qr-share'
+import { InvitationDetail } from '@/components/invitation-detail'
 
 type Anotado = { id: string; guestName: string; guestDoc: string | null; revokedAt: string | null }
 
@@ -63,9 +63,16 @@ export default function HomePage() {
   if (!me) return <main className="p-6 text-ink-soft">Cargando…</main>
 
   const vigentes = (invitaciones ?? []).filter(estaVigente)
+  const mostrandoLista = !verQr && !verAnotados
 
   return (
-    <Shell me={me}>
+    <Shell me={me} accion={mostrandoLista && vigentes.length > 0 ? (
+      <Link href="/nueva"
+        className="flex min-h-14 items-center justify-center rounded bg-alamo px-5
+          font-semibold text-white">
+        Nueva invitación
+      </Link>
+    ) : undefined}>
       {verAnotados ? (
         <div className="mx-auto flex max-w-sm flex-col gap-5">
           <button onClick={() => { setVerAnotados(null); setAnotados(null) }}
@@ -101,17 +108,14 @@ export default function HomePage() {
           </ul>
         </div>
       ) : verQr ? (
-        <div className="mx-auto flex max-w-sm flex-col gap-6">
-          <button onClick={() => setVerQr(null)} className="self-start text-sm text-alamo
-            underline underline-offset-4">
-            ← Volver
-          </button>
-          <QrShare token={verQr.token} guestName={verQr.guestName} />
-          <button onClick={() => setPorAnular(verQr)} className="text-sm text-deny-field
-            underline underline-offset-4">
-            Anular esta invitación
-          </button>
-        </div>
+        <InvitationDetail
+          inv={verQr}
+          units={me.units}
+          onVolver={() => setVerQr(null)}
+          onAnular={() => setPorAnular(verQr)}
+          onGuardado={() => { setVerQr(null); cargar() }}
+          onVerAnotados={verQr.kind === 'evento' ? () => setVerAnotados(verQr) : undefined}
+        />
       ) : (
         <div className="flex flex-col gap-5">
           <div className="flex items-baseline justify-between">
@@ -139,44 +143,31 @@ export default function HomePage() {
             </Vacio>
           )}
 
+          {/* Toda la tarjeta abre el detalle: un botón "Ver QR" al costado
+              dejaba editar y anular escondidos adentro de esa pantalla. */}
           <ul className="escalonar flex flex-col gap-3">
             {vigentes.map((inv) => (
               <li key={inv.id}>
-                <Filete className="flex items-center justify-between gap-4 bg-white px-4 py-3.5">
-                  <div className="min-w-0">
-                    <Eyebrow>{KIND_LABEL[inv.kind]}</Eyebrow>
-                    <p className="display truncate text-lg">{inv.guestName}</p>
-                    <p className="text-sm text-ink-soft tabular">
-                      {vigencia(inv)}
-                      {inv.capacity > 1 && ` · ${inv.usedCount} de ${inv.capacity} entraron`}
-                      {me.units.length > 1 && ` · ${inv.unitLabel}`}
-                    </p>
-                    {inv.kind === 'evento' && (
-                      <button onClick={() => setVerAnotados(inv)}
-                        className="mt-0.5 text-sm text-alamo underline underline-offset-4">
-                        Ver quién se anotó
-                      </button>
-                    )}
-                    {inv.createdBy !== me.id && (
-                      <p className="text-sm text-ink-soft">Creada por {inv.creatorName}</p>
-                    )}
-                  </div>
-                  <Button variant="quiet" onClick={() => setVerQr(inv)}>Ver QR</Button>
-                </Filete>
+                <button onClick={() => setVerQr(inv)} className="w-full text-left">
+                  <Filete className="flex items-center justify-between gap-4 bg-white px-4 py-3.5">
+                    <div className="min-w-0">
+                      <Eyebrow>{KIND_LABEL[inv.kind]}</Eyebrow>
+                      <p className="display truncate text-lg">{inv.guestName}</p>
+                      <p className="text-sm text-ink-soft tabular">
+                        {vigencia(inv)}
+                        {inv.capacity > 1 && ` · ${inv.usedCount} de ${inv.capacity} entraron`}
+                        {me.units.length > 1 && ` · ${inv.unitLabel}`}
+                      </p>
+                      {inv.createdBy !== me.id && (
+                        <p className="text-sm text-ink-soft">Creada por {inv.creatorName}</p>
+                      )}
+                    </div>
+                    <span aria-hidden className="shrink-0 text-2xl text-alamo/40">›</span>
+                  </Filete>
+                </button>
               </li>
             ))}
           </ul>
-
-          {/* En pantalla ancha va al pie de la lista; en mobile queda fijo sobre
-              la barra inferior, porque es la acción del 90% de las visitas. */}
-          {vigentes.length > 0 && (
-            <Link href="/nueva"
-              className="fixed inset-x-4 bottom-20 z-20 inline-flex min-h-14 items-center
-                justify-center rounded bg-alamo px-5 font-semibold text-white shadow-lg
-                sm:static sm:shadow-none">
-              Nueva invitación
-            </Link>
-          )}
         </div>
       )}
 

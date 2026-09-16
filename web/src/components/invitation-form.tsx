@@ -21,21 +21,24 @@ function enUnAnio(): string {
   return d.toISOString().slice(0, 10)
 }
 
-export function InvitationForm({ units, defaults, onCreated }: {
+export function InvitationForm({ units, defaults, invitacion, onCreated }: {
   units: { id: string; label: string }[]
   defaults?: Partial<{ kind: Kind; guestName: string; guestDoc: string; plate: string }>
+  /** Si viene, el formulario edita esa invitación en vez de crear una nueva. */
+  invitacion?: Invitation
   onCreated: (inv: Invitation) => void
 }) {
   const hoy = hoyISO()
-  const [kind, setKind] = useState<Kind>(defaults?.kind ?? 'visita')
-  const [unitId, setUnitId] = useState(units[0]?.id ?? '')
-  const [guestName, setGuestName] = useState(defaults?.guestName ?? '')
-  const [guestDoc, setGuestDoc] = useState(defaults?.guestDoc ?? '')
-  const [plate, setPlate] = useState(defaults?.plate ?? '')
-  const [validFrom, setValidFrom] = useState(hoy)
-  const [validTo, setValidTo] = useState(enUnAnio())
-  const [weekdays, setWeekdays] = useState<number[]>([])
-  const [capacity, setCapacity] = useState(10)
+  const editando = Boolean(invitacion)
+  const [kind, setKind] = useState<Kind>(invitacion?.kind ?? defaults?.kind ?? 'visita')
+  const [unitId, setUnitId] = useState(invitacion?.unitId ?? units[0]?.id ?? '')
+  const [guestName, setGuestName] = useState(invitacion?.guestName ?? defaults?.guestName ?? '')
+  const [guestDoc, setGuestDoc] = useState(invitacion?.guestDoc ?? defaults?.guestDoc ?? '')
+  const [plate, setPlate] = useState(invitacion?.plate ?? defaults?.plate ?? '')
+  const [validFrom, setValidFrom] = useState(invitacion?.validFrom ?? hoy)
+  const [validTo, setValidTo] = useState(invitacion?.validTo ?? enUnAnio())
+  const [weekdays, setWeekdays] = useState<number[]>(invitacion?.weekdays ?? [])
+  const [capacity, setCapacity] = useState(invitacion?.capacity ?? 10)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -46,28 +49,37 @@ export function InvitationForm({ units, defaults, onCreated }: {
     e.preventDefault()
     setBusy(true)
     setError(null)
+    const cuerpo = {
+      guestName,
+      guestDoc: guestDoc || null,
+      plate: plate || null,
+      validFrom,
+      validTo: esFrecuente ? validTo : validFrom,
+      weekdays: esFrecuente && weekdays.length ? weekdays : null,
+      capacity: esEvento ? capacity : esFrecuente ? 999 : 1,
+    }
+
     try {
-      const inv = await api<Invitation>('/invitations', {
-        method: 'POST',
-        body: JSON.stringify({
-          unitId, kind, guestName,
-          guestDoc: guestDoc || undefined,
-          plate: plate || undefined,
-          validFrom,
-          validTo: esFrecuente ? validTo : validFrom,
-          weekdays: esFrecuente && weekdays.length ? weekdays : undefined,
-          capacity: esEvento ? capacity : esFrecuente ? 999 : 1,
-        }),
-      })
+      // Editar no crea un token nuevo: quien ya tiene el link sigue usándolo.
+      const inv = invitacion
+        ? await api<Invitation>(`/invitations/${invitacion.id}`, {
+          method: 'PATCH', body: JSON.stringify(cuerpo),
+        })
+        : await api<Invitation>('/invitations', {
+          method: 'POST', body: JSON.stringify({ ...cuerpo, unitId, kind }),
+        })
       onCreated(inv)
     } catch {
-      setError('No se pudo crear la invitación. Revisá el nombre y la fecha.')
+      setError(editando
+        ? 'No se pudo guardar. Si ya entró gente, no podés bajar el cupo por debajo de ese número.'
+        : 'No se pudo crear la invitación. Revisá el nombre y la fecha.')
       setBusy(false)
     }
   }
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">
+      {!editando && (
       <fieldset className="flex flex-col gap-2">
         <legend className="eyebrow mb-2">Tipo</legend>
         <div className="flex flex-wrap gap-2">
@@ -84,9 +96,10 @@ export function InvitationForm({ units, defaults, onCreated }: {
           ))}
         </div>
       </fieldset>
+      )}
 
       {/* El selector de UF solo aparece si la persona tiene más de una. */}
-      {units.length > 1 && (
+      {!editando && units.length > 1 && (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="unit" className="text-sm font-semibold">Unidad</label>
           <select id="unit" value={unitId} onChange={(e) => setUnitId(e.target.value)}
@@ -144,7 +157,9 @@ export function InvitationForm({ units, defaults, onCreated }: {
       </div>
 
       {error && <ErrorNote>{error}</ErrorNote>}
-      <Button type="submit" disabled={busy}>{busy ? 'Creando…' : 'Crear invitación'}</Button>
+      <Button type="submit" disabled={busy}>
+        {busy ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear invitación'}
+      </Button>
     </form>
   )
 }

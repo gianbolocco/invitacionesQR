@@ -160,3 +160,98 @@ describe('revocar un evento', () => {
     }
   })
 })
+
+describe('editar una invitación', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  async function visita(ctx: { cookie: string[]; unitId: string }, over = {}) {
+    const res = await request(app).post('/invitations').set('Cookie', ctx.cookie).send({
+      unitId: ctx.unitId, kind: 'visita', guestName: 'Juan Pérez',
+      validFrom: '2026-09-20', validTo: '2026-09-20', capacity: 1, ...over,
+    })
+    return res.body
+  }
+
+  it('cambia nombre, documento y fecha', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const inv = await visita(ctx)
+
+    const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', ctx.cookie)
+      .send({ guestName: 'Juan Carlos Pérez', guestDoc: '30123456', validTo: '2026-09-21' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.guestName).toBe('Juan Carlos Pérez')
+    expect(res.body.guestDoc).toBe('30123456')
+    expect(res.body.validTo).toBe('2026-09-21')
+    // El token no cambia: el invitado ya tiene el link.
+    expect(res.body.token).toBe(inv.token)
+  })
+
+  it('un vecino de otra UF no puede editar', async () => {
+    const a = await resident('martin@example.com', 'Lote 142')
+    const b = await resident('ana@example.com', 'Lote 7')
+    const inv = await visita(a)
+
+    const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', b.cookie)
+      .send({ guestName: 'Me la robo' })
+    expect(res.status).toBe(403)
+  })
+
+  it('no deja invertir la ventana', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const inv = await visita(ctx)
+
+    const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', ctx.cookie)
+      .send({ validFrom: '2026-09-25', validTo: '2026-09-20' })
+    expect(res.status).toBe(400)
+  })
+
+  it('no deja bajar el cupo por debajo de los que ya entraron', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const hoy = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date())
+    const evento = await visita(ctx, { kind: 'evento', capacity: 10, validFrom: hoy, validTo: hoy })
+
+    const { registerEntry } = await import('../src/services/entries.js')
+    await registerEntry(evento.id, null, { guestName: 'Uno' })
+    await registerEntry(evento.id, null, { guestName: 'Dos' })
+
+    const res = await request(app).patch(`/invitations/${evento.id}`).set('Cookie', ctx.cookie)
+      .send({ capacity: 1 })
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('cupo_menor_al_usado')
+
+    // Subirlo sí se puede.
+    await request(app).patch(`/invitations/${evento.id}`).set('Cookie', ctx.cookie)
+      .send({ capacity: 20 }).expect(200)
+  })
+
+  it('no se edita una anulada', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const inv = await visita(ctx)
+    await request(app).post(`/invitations/${inv.id}/revoke`).set('Cookie', ctx.cookie)
+
+    const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', ctx.cookie)
+      .send({ guestName: 'Otro' })
+    expect(res.status).toBe(409)
+  })
+
+  it('no se edita a alguien que se anotó a un evento: esa invitación es suya', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const hoy = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date())
+    const evento = await visita(ctx, { kind: 'evento', capacity: 10, validFrom: hoy, validTo: hoy })
+    const anotado = await request(app).post(`/invitations/public/${evento.token}/join`)
+      .send({ guestName: 'Martina' })
+
+    const { rows } = await db.execute(
+      sql`select id from invitation where token = ${anotado.body.token}`,
+    )
+    const res = await request(app).patch(`/invitations/${rows[0].id}`).set('Cookie', ctx.cookie)
+      .send({ guestName: 'Le cambio el nombre' })
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('es_un_anotado')
+  })
+})

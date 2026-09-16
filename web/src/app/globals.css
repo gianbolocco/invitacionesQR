@@ -121,8 +121,14 @@ body {
   border-radius: 4px;
 }
 
-/* La barra inferior del vecino no puede taparle el último ítem de la lista. */
+/* Ni la barra inferior ni el botón de acción pueden taparle el último ítem de
+   la lista: el alto que ocupan se descuenta como padding del contenido. */
 .con-barra-inferior { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)); }
+.con-accion         { padding-bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px)); }
+
+@media (min-width: 640px) {
+  .con-barra-inferior, .con-accion { padding-bottom: 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

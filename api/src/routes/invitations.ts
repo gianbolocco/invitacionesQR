@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import {
   createInvitation, listForUnits, revokeInvitation, findPublicByToken,
-  fillGuestDetails, joinEvent, listEventGuests,
+  fillGuestDetails, joinEvent, listEventGuests, editInvitation,
 } from '../services/invitations.js'
 import { unitsOfPerson } from '../services/units.js'
 import { rateLimit } from '../middleware/rateLimit.js'
@@ -83,4 +83,18 @@ invitationRoutes.post('/:id/revoke', async (req, res) => {
 /** Los anotados a un evento, para que el vecino vea quién viene. */
 invitationRoutes.get('/:id/guests', async (req, res) => {
   res.json(await listEventGuests(req.params.id))
+})
+
+const editSchema = z.object({
+  guestName: z.string().min(1).optional(),
+  guestDoc: z.string().nullable().optional(),
+  plate: z.string().nullable().optional(),
+  validFrom: isoDate.optional(),
+  validTo: isoDate.optional(),
+  weekdays: z.array(z.number().int().min(0).max(6)).nullable().optional(),
+  capacity: z.number().int().min(1).optional(),
+})
+
+invitationRoutes.patch('/:id', async (req, res) => {
+  res.json(await editInvitation(req.params.id, req.person!.id, editSchema.parse(req.body)))
 })

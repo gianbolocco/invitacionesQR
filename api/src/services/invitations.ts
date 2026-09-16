@@ -259,3 +259,56 @@ export async function listEventGuests(eventId: string) {
     .where(eq(invitations.parentId, eventId))
     .orderBy(invitations.createdAt)
 }
+
+export type EditInvitationInput = {
+  guestName?: string
+  guestDoc?: string | null
+  plate?: string | null
+  validFrom?: string
+  validTo?: string
+  weekdays?: number[] | null
+  capacity?: number
+}
+
+/**
+ * Editar una invitación ya creada.
+ *
+ * No se puede cambiar de unidad ni de tipo: eso es otra invitación, no la misma
+ * editada, y el guardia ya vio la anterior. Tampoco se puede bajar el cupo por
+ * debajo de la gente que ya entró, porque dejaría el contador mintiendo.
+ */
+export async function editInvitation(
+  id: string,
+  personId: string,
+  input: EditInvitationInput,
+) {
+  const [inv] = await db.select().from(invitations).where(eq(invitations.id, id)).limit(1)
+  if (!inv) throw new AppError(404, 'not_found')
+  await assertMemberOfUnit(personId, inv.unitId)
+
+  if (inv.revokedAt) throw new AppError(409, 'revoked')
+  // Un anotado a un evento es de quien se anotó, no del vecino que creó el evento.
+  if (inv.parentId) throw new AppError(409, 'es_un_anotado')
+
+  const [{ usados }] = await db.select({ usados: sql<number>`count(*)::int` })
+    .from(entryLogs).where(eq(entryLogs.invitationId, id))
+
+  const validFrom = input.validFrom ?? inv.validFrom
+  const validTo = input.validTo ?? inv.validTo
+  if (validTo < validFrom) throw new AppError(400, 'ventana_invertida')
+
+  const capacity = input.capacity ?? inv.capacity
+  if (capacity < Math.max(1, usados)) throw new AppError(409, 'cupo_menor_al_usado')
+
+  const [actualizada] = await db.update(invitations).set({
+    ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),
+    ...(input.guestDoc !== undefined ? { guestDoc: input.guestDoc?.trim() || null } : {}),
+    ...(input.plate !== undefined ? { plate: input.plate?.trim().toUpperCase() || null } : {}),
+    validFrom,
+    validTo,
+    ...(input.weekdays !== undefined ? { weekdays: input.weekdays?.length ? input.weekdays : null } : {}),
+    capacity,
+  }).where(eq(invitations.id, id)).returning()
+
+  return actualizada
+}
