@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { invitations, entryLogs, people, units, unitMembers, neighborhoods } from '../db/schema.js'
 import { randomToken } from '../lib/crypto.js'
@@ -46,7 +46,13 @@ export async function createInvitation(input: CreateInvitationInput) {
   return inv
 }
 
-/** Invitaciones de las UF indicadas, con cuántas veces se usó cada una. */
+/**
+ * Invitaciones de las UF indicadas, con cuántas veces se usó cada una.
+ *
+ * Excluye a los anotados a un evento: son invitaciones hijas y aparecían en la
+ * lista del vecino como si cada uno fuera un evento propio de cupo 1. Se ven
+ * donde corresponde, entrando al evento.
+ */
 export async function listForUnits(unitIds: string[]) {
   if (!unitIds.length) return []
   return db.select({
@@ -72,7 +78,7 @@ export async function listForUnits(unitIds: string[]) {
     .innerJoin(people, eq(people.id, invitations.createdBy))
     .innerJoin(units, eq(units.id, invitations.unitId))
     .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
-    .where(inArray(invitations.unitId, unitIds))
+    .where(and(inArray(invitations.unitId, unitIds), isNull(invitations.parentId)))
     .groupBy(invitations.id, people.name, units.label)
     .orderBy(desc(invitations.createdAt))
 }

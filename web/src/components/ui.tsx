@@ -98,13 +98,13 @@ export function TemaToggle({ tema, onTema }: {
 
   return (
     <div role="radiogroup" aria-label="Tema"
-      className="flex rounded-full border border-line p-0.5">
+      className="flex rounded-full border border-line">
       {opciones.map((o) => (
         <button key={o.id} role="radio" aria-checked={tema === o.id}
           title={o.label} onClick={() => onTema(o.id)}
-          className={`flex size-8 items-center justify-center rounded-full text-sm
+          className={`flex size-9 items-center justify-center rounded-full text-sm
             transition-colors ${
-              tema === o.id ? 'bg-alamo text-surface' : 'text-ink-soft hover:text-ink'
+              tema === o.id ? 'bg-alamo text-surface' : 'text-ink-soft'
             }`}>
           <span aria-hidden>{o.icono}</span>
           <span className="sr-only">{o.label}</span>

@@ -127,7 +127,7 @@ function BarraInferior({ path }: { path: string }) {
   )
 }
 
-export function Shell({ me, accion, children }: {
+export function Shell({ me, accion, atras, children }: {
   me: Me
   /**
    * La acción principal de la pantalla. Se renderiza ACÁ, fuera de <main>, y no
@@ -136,6 +136,13 @@ export function Shell({ me, accion, children }: {
    * contenedor en vez de a la pantalla y se montaba sobre las tarjetas.
    */
   accion?: React.ReactNode
+  /**
+   * Cuando la pantalla es una sub-vista, el encabezado se convierte en la
+   * barra de volver. Es el patrón de mobile: el "atrás" vive arriba a la
+   * izquierda, grande y siempre en el mismo lugar — no perdido adentro del
+   * contenido, que es donde estaba y por eso no se veía.
+   */
+  atras?: { label?: string; onClick: () => void }
   children: React.ReactNode
 }) {
   const path = usePathname()
@@ -146,12 +153,29 @@ export function Shell({ me, accion, children }: {
   return (
     <div className={`min-h-dvh ${esAdmin ? '' : 'con-barra-inferior sm:pb-0'} ${accion ? 'con-accion' : ''}`}>
       <header className="sticky top-0 z-20 border-b border-alamo/15 bg-card">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-3">
-          <Wordmark subtitle={me.units[0]?.label ?? me.role} />
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5">
+          {atras ? (
+            <button onClick={atras.onClick}
+              className="-ml-2 flex min-h-11 items-center gap-1.5 rounded px-2 font-semibold text-alamo">
+              <svg viewBox="0 0 24 24" aria-hidden className="size-5" fill="none"
+                stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+              {atras.label ?? 'Volver'}
+            </button>
+          ) : (
+            <Wordmark subtitle={me.units[0]?.label ?? me.role} />
+          )}
+
+          <div className="flex shrink-0 items-center gap-2">
             <TemaToggle tema={tema} onTema={setTema} />
-            <button onClick={logout} className="text-sm text-ink-soft underline underline-offset-4">
-              Salir
+            <button onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión"
+              className="flex size-11 items-center justify-center rounded text-ink-soft">
+              <svg viewBox="0 0 24 24" aria-hidden className="size-5" fill="none"
+                stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5M21 12H9" />
+              </svg>
             </button>
           </div>
         </div>

@@ -20,6 +20,7 @@ export default function HomePage() {
   const [verAnotados, setVerAnotados] = useState<Invitation | null>(null)
   const [anotados, setAnotados] = useState<Anotado[] | null>(null)
   const [porAnular, setPorAnular] = useState<Invitation | null>(null)
+  const [editando, setEditando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const cargar = useCallback(() => {
@@ -66,7 +67,15 @@ export default function HomePage() {
   const mostrandoLista = !verQr && !verAnotados
 
   return (
-    <Shell me={me} accion={mostrandoLista && vigentes.length > 0 ? (
+    <Shell me={me}
+      atras={editando
+        ? { label: 'Cancelar', onClick: () => setEditando(false) }
+        : verAnotados
+          ? { label: 'Volver', onClick: () => { setVerAnotados(null); setAnotados(null) } }
+          : verQr
+            ? { label: 'Invitaciones', onClick: () => { setVerQr(null); setEditando(false) } }
+            : undefined}
+      accion={mostrandoLista && vigentes.length > 0 ? (
       <Link href="/nueva"
         className="flex min-h-14 items-center justify-center rounded bg-alamo px-5
           font-semibold text-surface">
@@ -75,10 +84,6 @@ export default function HomePage() {
     ) : undefined}>
       {verAnotados ? (
         <div className="mx-auto flex max-w-sm flex-col gap-5">
-          <button onClick={() => { setVerAnotados(null); setAnotados(null) }}
-            className="self-start text-sm text-alamo underline underline-offset-4">
-            ← Volver
-          </button>
           <div>
             <Eyebrow>Anotados</Eyebrow>
             <h1 className="display text-2xl">{verAnotados.guestName}</h1>
@@ -111,9 +116,10 @@ export default function HomePage() {
         <InvitationDetail
           inv={verQr}
           units={me.units}
-          onVolver={() => setVerQr(null)}
+          editando={editando}
+          onEditar={() => setEditando(true)}
           onAnular={() => setPorAnular(verQr)}
-          onGuardado={() => { setVerQr(null); cargar() }}
+          onGuardado={() => { setEditando(false); setVerQr(null); cargar() }}
           onVerAnotados={verQr.kind === 'evento' ? () => setVerAnotados(verQr) : undefined}
         />
       ) : (

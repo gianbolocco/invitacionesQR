@@ -255,3 +255,38 @@ describe('editar una invitación', () => {
     expect(res.body.error).toBe('es_un_anotado')
   })
 })
+
+describe('los anotados no son invitaciones del vecino', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('quien se anotó a un evento NO aparece como un evento propio en la lista', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const hoy = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date())
+
+    const evento = await request(app).post('/invitations').set('Cookie', ctx.cookie).send({
+      unitId: ctx.unitId, kind: 'evento', guestName: 'Cumple de Sofi',
+      validFrom: hoy, validTo: hoy, capacity: 20,
+    })
+
+    for (const nombre of ['juan carlos', 'Martina']) {
+      await request(app).post(`/invitations/public/${evento.body.token}/join`)
+        .send({ guestName: nombre }).expect(201)
+    }
+
+    const lista = await request(app).get('/invitations').set('Cookie', ctx.cookie)
+    const nombres = lista.body.map((i: { guestName: string }) => i.guestName)
+
+    // Solo el evento. Los anotados se ven entrando al evento, no sueltos.
+    expect(nombres).toEqual(['Cumple de Sofi'])
+    expect(nombres).not.toContain('juan carlos')
+
+    // Y siguen estando, adentro del evento.
+    const anotados = await request(app).get(`/invitations/${evento.body.id}/guests`)
+      .set('Cookie', ctx.cookie)
+    expect(anotados.body.map((a: { guestName: string }) => a.guestName)).toEqual(
+      ['juan carlos', 'Martina'],
+    )
+  })
+})
