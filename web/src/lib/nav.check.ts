@@ -21,13 +21,16 @@ assert.equal(seccionDe('/', 'resident'), 'vecino')
 assert.equal(seccionDe('/historial', 'resident'), 'vecino')
 assert.equal(seccionDe('/garita', 'guard'), 'garita')
 assert.equal(seccionDe('/garita/escanear', 'guard'), 'garita')
-assert.equal(seccionDe('/garita/auditoria', 'guard'), 'garita')
+assert.equal(seccionDe('/auditoria', 'guard'), 'garita')
 assert.equal(seccionDe('/admin/usuarios', 'admin'), 'admin')
 
-// La que tiene gracia: auditoría es de los dos menús. Al admin le queda como
-// una solapa más de su sección; al guardia, como la garita.
-assert.equal(seccionDe('/garita/auditoria', 'admin'), 'admin')
+// La que tiene gracia: auditoría es del guardia Y del admin, y no cuelga de
+// /garita. Cada uno la ve dentro de su propio menú.
+assert.equal(seccionDe('/auditoria', 'admin'), 'admin')
+assert.equal(seccionDe('/auditoria', 'guard'), 'garita')
+// Y el admin que se mete en la garita propiamente dicha sí ve la garita.
 assert.equal(seccionDe('/garita', 'admin'), 'garita')
+assert.equal(seccionDe('/garita/escanear', 'admin'), 'garita')
 
 // Un admin mirando la home del vecino sigue en la sección del vecino.
 assert.equal(seccionDe('/', 'admin'), 'vecino')
@@ -36,7 +39,9 @@ assert.equal(seccionDe('/', 'admin'), 'vecino')
 // marcada como activa en todas las pantallas.
 assert.equal(esActivo('/', '/'), true)
 assert.equal(esActivo('/', '/historial'), false)
-assert.equal(esActivo('/garita', '/garita/auditoria'), true)
+assert.equal(esActivo('/garita', '/garita/escanear'), true)
+// Auditoría ya no cuelga de la garita: estando en ella, "Hoy" no va marcada.
+assert.equal(esActivo('/garita', '/auditoria'), false)
 assert.equal(esActivo('/historial', '/'), false)
 
 console.log('nav: ok')

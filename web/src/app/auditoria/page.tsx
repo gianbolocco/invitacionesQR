@@ -109,7 +109,7 @@ export default function AuditoriaPage() {
   if (!me) return <main className="p-6">Cargando…</main>
 
   if (me.role !== 'guard' && me.role !== 'admin') {
-    return <main className="p-6"><p>Esta pantalla es de la garita.</p></main>
+    return <main className="p-6"><p>La auditoría es de la guardia y la administración.</p></main>
   }
 
   const lista = pagina?.rows ?? []
