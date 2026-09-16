@@ -171,11 +171,18 @@ export default function HomePage() {
         />
       ) : (
         <div className="flex flex-col gap-5">
-          <div className="flex items-baseline justify-between">
-            <h1 className="display text-2xl">Invitaciones</h1>
-            {vigentes.length > 0 && (
-              <span className="eyebrow tabular">{vigentes.length} vigentes</span>
-            )}
+          <div>
+            {/* Solo el nombre de pila: "Bienvenido/a" no lo escribe nadie y el
+                género del vecino no lo sabemos. */}
+            <h1 className="display text-2xl">
+              Te damos la bienvenida, {me.name.split(' ')[0]}
+            </h1>
+            <div className="mt-3 flex items-baseline justify-between">
+              <p className="eyebrow">Invitaciones</p>
+              {vigentes.length > 0 && (
+                <span className="eyebrow tabular">{vigentes.length} vigentes</span>
+              )}
+            </div>
           </div>
 
           {error && (

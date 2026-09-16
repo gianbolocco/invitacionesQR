@@ -403,3 +403,127 @@ describe('administrar a los anotados de un evento', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('historial: buscar, filtrar y paginar', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  // Fecha real, no fija: anotarse a un evento ya vencido devuelve 409, así que
+  // una constante en el pasado haría fallar el test con el correr de los días.
+  const HOY = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(new Date())
+
+  async function poblar() {
+    const { cookie, unitId, personId } = await resident('martin@example.com', 'Lote 142')
+    const crear = (guestName: string, extra: Record<string, unknown> = {}) =>
+      request(app).post('/invitations').set('Cookie', cookie).send({
+        unitId, kind: 'visita', guestName, validFrom: HOY, validTo: HOY, capacity: 1, ...extra,
+      }).expect(201)
+
+    const martin = await crear('Martín Gómez', { guestDoc: '30111222', plate: 'AB123CD' })
+    const ana = await crear('Ana López')
+    const evento = await crear('Cumple de Sofi', { kind: 'evento', capacity: 5 })
+    for (let i = 0; i < 12; i++) await crear(`Relleno ${i}`)
+
+    return { cookie, unitId, personId, martin: martin.body, ana: ana.body, evento: evento.body }
+  }
+
+  it('busca sin tildes y en documento y patente', async () => {
+    const { cookie } = await poblar()
+    const nombres = async (q: string) =>
+      (await request(app).get(`/invitations/historial?q=${encodeURIComponent(q)}`)
+        .set('Cookie', cookie).expect(200)).body.rows.map((i: { guestName: string }) => i.guestName)
+
+    expect(await nombres('martin')).toEqual(['Martín Gómez'])
+    expect(await nombres('GÓMEZ')).toEqual(['Martín Gómez'])
+    expect(await nombres('30111')).toEqual(['Martín Gómez'])
+    expect(await nombres('ab123cd')).toEqual(['Martín Gómez'])
+    expect(await nombres('nadie')).toEqual([])
+  })
+
+  it('pagina y el total es el del filtro, no el de la página', async () => {
+    const { cookie } = await poblar()
+    const p1 = await request(app).get('/invitations/historial?pageSize=5').set('Cookie', cookie).expect(200)
+    expect(p1.body.rows).toHaveLength(5)
+    expect(p1.body.total).toBe(15)
+
+    const p3 = await request(app).get('/invitations/historial?pageSize=5&page=3').set('Cookie', cookie).expect(200)
+    expect(p3.body.rows).toHaveLength(5)
+    expect(p3.body.total).toBe(15)
+
+    const ids = new Set([...p1.body.rows, ...p3.body.rows].map((i: { id: string }) => i.id))
+    expect(ids.size).toBe(10)
+
+    const p4 = await request(app).get('/invitations/historial?pageSize=5&page=4').set('Cookie', cookie).expect(200)
+    expect(p4.body.rows).toHaveLength(0)
+    expect(p4.body.total).toBe(15)
+  })
+
+  it('filtra por tipo y por estado', async () => {
+    const { cookie, martin, evento } = await poblar()
+
+    const porTipo = await request(app).get('/invitations/historial?kind=evento')
+      .set('Cookie', cookie).expect(200)
+    expect(porTipo.body.rows.map((i: { id: string }) => i.id)).toEqual([evento.id])
+
+    await request(app).post(`/invitations/${martin.id}/revoke`).set('Cookie', cookie).expect(200)
+    const anuladas = await request(app).get('/invitations/historial?estado=anulada')
+      .set('Cookie', cookie).expect(200)
+    expect(anuladas.body.total).toBe(1)
+    expect(anuladas.body.rows[0].id).toBe(martin.id)
+
+    // Nadie entró todavía: todas las que no están anuladas son "no entró".
+    const sinEntrar = await request(app).get('/invitations/historial?estado=no_entro')
+      .set('Cookie', cookie).expect(200)
+    expect(sinEntrar.body.total).toBe(14)
+
+    const entraron = await request(app).get('/invitations/historial?estado=entro')
+      .set('Cookie', cookie).expect(200)
+    expect(entraron.body.total).toBe(0)
+  })
+
+  it('"solo las mías" deja afuera las de los demás de la UF', async () => {
+    const { cookie, unitId } = await poblar()
+    const barrio = await neighborhood()
+    const [ana] = await db.insert(people).values({
+      neighborhoodId: barrio.id, email: 'ana@example.com', name: 'Ana', role: 'resident',
+      status: 'active', passwordHash: await hashPassword(PASS),
+    }).returning()
+    await db.insert(unitMembers).values({ unitId, personId: ana.id })
+    const login = await request(app).post('/auth/login').send({ email: 'ana@example.com', password: PASS })
+
+    await request(app).post('/invitations').set('Cookie', login.headers['set-cookie']).send({
+      unitId, kind: 'visita', guestName: 'Invitado de Ana',
+      validFrom: HOY, validTo: HOY, capacity: 1,
+    }).expect(201)
+
+    const todas = await request(app).get('/invitations/historial')
+      .set('Cookie', login.headers['set-cookie']).expect(200)
+    expect(todas.body.total).toBe(16)
+
+    const mias = await request(app).get('/invitations/historial?soloMias=true')
+      .set('Cookie', login.headers['set-cookie']).expect(200)
+    expect(mias.body.total).toBe(1)
+    expect(mias.body.rows[0].guestName).toBe('Invitado de Ana')
+  })
+
+  it('no muestra a los anotados de un evento como filas sueltas', async () => {
+    const { cookie, evento } = await poblar()
+    await request(app).post(`/invitations/public/${evento.token}/join`)
+      .send({ guestName: 'Juan Carlos' }).expect(201)
+
+    const res = await request(app).get('/invitations/historial?q=juan')
+      .set('Cookie', cookie).expect(200)
+    expect(res.body.total).toBe(0)
+
+    const todo = await request(app).get('/invitations/historial').set('Cookie', cookie).expect(200)
+    expect(todo.body.total).toBe(15)
+  })
+
+  it('no filtra por UF ajena: solo ve lo de la suya', async () => {
+    await poblar()
+    const otro = await resident('vecina@example.com', 'Lote 7')
+    const res = await request(app).get('/invitations/historial').set('Cookie', otro.cookie).expect(200)
+    expect(res.body.total).toBe(0)
+  })
+})

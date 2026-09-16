@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/requireAuth.js'
 import {
   createInvitation, listForUnits, revokeInvitation, findPublicByToken,
   fillGuestDetails, joinEvent, listEventGuests, editInvitation, restoreInvitation,
+  searchInvitations,
 } from '../services/invitations.js'
 import { unitsOfPerson } from '../services/units.js'
 import { rateLimit } from '../middleware/rateLimit.js'
@@ -74,6 +75,27 @@ invitationRoutes.post('/', async (req, res) => {
 invitationRoutes.get('/', async (req, res) => {
   const units = await unitsOfPerson(req.person!.id)
   res.json(await listForUnits(units.map((u) => u.id)))
+})
+
+const historySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  kind: z.enum(['visita', 'frecuente', 'evento', 'proveedor']).optional(),
+  estado: z.enum(['entro', 'no_entro', 'anulada']).optional(),
+  // Llega como string desde la query. z.coerce.boolean() no sirve acá:
+  // Boolean('false') es true.
+  soloMias: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
+})
+
+/** Historial: buscable, filtrable y paginado. Va antes de /:id/... */
+invitationRoutes.get('/historial', async (req, res) => {
+  const { soloMias, ...f } = historySchema.parse(req.query)
+  const units = await unitsOfPerson(req.person!.id)
+  res.json(await searchInvitations(units.map((u) => u.id), {
+    ...f,
+    createdBy: soloMias ? req.person!.id : undefined,
+  }))
 })
 
 invitationRoutes.post('/:id/revoke', async (req, res) => {

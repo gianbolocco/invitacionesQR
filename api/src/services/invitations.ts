@@ -89,6 +89,102 @@ export async function listForUnits(unitIds: string[]) {
     .orderBy(desc(invitations.createdAt))
 }
 
+export type HistoryFilters = {
+  q?: string
+  kind?: 'visita' | 'frecuente' | 'evento' | 'proveedor'
+  estado?: 'entro' | 'no_entro' | 'anulada'
+  /** Id del vecino, para el filtro "solo las mías". */
+  createdBy?: string
+  page?: number
+  pageSize?: number
+}
+
+export type HistoryPage = {
+  rows: Awaited<ReturnType<typeof listForUnits>>
+  total: number
+  page: number
+  pageSize: number
+}
+
+/**
+ * El historial: lo mismo que la lista, pero buscable, filtrable y paginado.
+ *
+ * El filtro y el conteo van del lado del servidor. Filtrar la página que llegó
+ * daría un "3 resultados" que en realidad son 3 de esta página, y el buscador
+ * no encontraría a nadie que esté más atrás en el tiempo.
+ *
+ * El estado se resuelve con un EXISTS sobre entry_log y no con el count de
+ * ingresos: así la condición entra en el WHERE y el total sale de un count
+ * simple, sin que el join de ingresos multiplique filas.
+ */
+export async function searchInvitations(
+  unitIds: string[],
+  f: HistoryFilters,
+): Promise<HistoryPage> {
+  const page = Math.max(1, f.page ?? 1)
+  const pageSize = Math.min(100, Math.max(1, f.pageSize ?? 20))
+  if (!unitIds.length) return { rows: [], total: 0, page, pageSize }
+
+  const entro = sql`exists (select 1 from entry_log e where e.invitation_id = ${invitations.id})`
+
+  const donde = and(
+    inArray(invitations.unitId, unitIds),
+    isNull(invitations.parentId),
+    f.kind ? eq(invitations.kind, f.kind) : undefined,
+    f.createdBy ? eq(invitations.createdBy, f.createdBy) : undefined,
+    // unaccent para que "martin" encuentre a "Martín". Documento y patente van
+    // sin unaccent: no llevan tildes.
+    f.q
+      ? sql`(unaccent(${invitations.guestName}) ilike unaccent(${'%' + f.q + '%'})
+             or ${invitations.guestDoc} ilike ${'%' + f.q + '%'}
+             or ${invitations.plate} ilike ${'%' + f.q + '%'})`
+      : undefined,
+    f.estado === 'anulada' ? sql`${invitations.revokedAt} is not null` : undefined,
+    f.estado === 'entro' ? and(isNull(invitations.revokedAt), entro) : undefined,
+    f.estado === 'no_entro' ? and(isNull(invitations.revokedAt), sql`not ${entro}`) : undefined,
+  )
+
+  const [rows, [conteo]] = await Promise.all([
+    db.select({
+      id: invitations.id,
+      kind: invitations.kind,
+      guestName: invitations.guestName,
+      guestDoc: invitations.guestDoc,
+      plate: invitations.plate,
+      validFrom: invitations.validFrom,
+      validTo: invitations.validTo,
+      weekdays: invitations.weekdays,
+      capacity: invitations.capacity,
+      token: invitations.token,
+      revokedAt: invitations.revokedAt,
+      createdAt: invitations.createdAt,
+      createdBy: invitations.createdBy,
+      creatorName: people.name,
+      unitId: invitations.unitId,
+      unitLabel: units.label,
+      usedCount: count(entryLogs.id),
+      joinedCount: sql<number>`(
+        select count(*)::int from invitation h
+        where h.parent_id = ${invitations.id} and h.revoked_at is null
+      )`,
+    })
+      .from(invitations)
+      .innerJoin(people, eq(people.id, invitations.createdBy))
+      .innerJoin(units, eq(units.id, invitations.unitId))
+      .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
+      .where(donde)
+      .groupBy(invitations.id, people.name, units.label)
+      .orderBy(desc(invitations.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize),
+    db.select({ n: sql<number>`count(*)::int` })
+      .from(invitations)
+      .where(donde),
+  ])
+
+  return { rows, total: conteo?.n ?? 0, page, pageSize }
+}
+
 export async function revokeInvitation(id: string, personId: string, neighborhoodId: string): Promise<void> {
   const [inv] = await db.select().from(invitations).where(eq(invitations.id, id)).limit(1)
   if (!inv) throw new AppError(404, 'not_found')
