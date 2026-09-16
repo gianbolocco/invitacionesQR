@@ -161,7 +161,9 @@ export default function HomePage() {
                       <p className="display truncate text-lg">{inv.guestName}</p>
                       <p className="text-sm text-ink-soft tabular">
                         {vigencia(inv)}
-                        {inv.capacity > 1 && ` · ${inv.usedCount} de ${inv.capacity} entraron`}
+                        {inv.kind === 'evento'
+                          ? ` · ${inv.joinedCount} de ${inv.capacity} anotados`
+                          : inv.capacity > 1 && ` · ${inv.usedCount} de ${inv.capacity} entraron`}
                         {me.units.length > 1 && ` · ${inv.unitLabel}`}
                       </p>
                       {inv.createdBy !== me.id && (

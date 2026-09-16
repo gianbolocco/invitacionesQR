@@ -16,6 +16,7 @@ export type Invitation = {
   unitId: string
   unitLabel: string
   usedCount: number
+  joinedCount: number
 }
 
 export const KIND_LABEL: Record<Invitation['kind'], string> = {

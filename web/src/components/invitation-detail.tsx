@@ -2,6 +2,7 @@
 import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
 import { Button, Eyebrow, Filete } from './ui'
 import { QrShare } from './qr-share'
+import { EventShare } from './event-share'
 import { InvitationForm } from './invitation-form'
 
 function Dato({ label, children }: { label: string; children: React.ReactNode }) {
@@ -49,20 +50,24 @@ export function InvitationDetail({
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6">
-      <QrShare token={inv.token} guestName={inv.guestName} />
+      {esEvento
+        ? <EventShare inv={inv} />
+        : <QrShare token={inv.token} guestName={inv.guestName} />}
 
       <Filete className="bg-card px-4 py-2">
         <Dato label="Tipo">{KIND_LABEL[inv.kind]}</Dato>
         <Dato label="Vigencia">{vigencia(inv)}</Dato>
         {inv.guestDoc && <Dato label="Documento">{inv.guestDoc}</Dato>}
         {inv.plate && <Dato label="Patente">{inv.plate}</Dato>}
-        {esEvento && <Dato label="Cupo">{inv.usedCount} de {inv.capacity} entraron</Dato>}
+        {esEvento && <Dato label="Entraron">{inv.usedCount} de {inv.capacity}</Dato>}
         <Dato label="Unidad">{inv.unitLabel}</Dato>
       </Filete>
 
       <div className="flex flex-col gap-2">
         {esEvento && onVerAnotados && (
-          <Button variant="quiet" onClick={onVerAnotados}>Ver quién se anotó</Button>
+          <Button variant="quiet" onClick={onVerAnotados}>
+            Ver quién se anotó ({inv.joinedCount})
+          </Button>
         )}
         <Button variant="quiet" onClick={onEditar}>Editar</Button>
         <Button variant="peligro" onClick={onAnular}>Anular invitación</Button>

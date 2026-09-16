@@ -290,3 +290,31 @@ describe('los anotados no son invitaciones del vecino', () => {
     )
   })
 })
+
+describe('cuántos se anotaron', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('el evento reporta sus anotados, la visita reporta cero', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const hoy = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date())
+
+    const evento = await request(app).post('/invitations').set('Cookie', ctx.cookie).send({
+      unitId: ctx.unitId, kind: 'evento', guestName: 'Cumple', validFrom: hoy, validTo: hoy, capacity: 20,
+    })
+    await request(app).post('/invitations').set('Cookie', ctx.cookie).send({
+      unitId: ctx.unitId, kind: 'visita', guestName: 'Juan', validFrom: hoy, validTo: hoy, capacity: 1,
+    })
+    for (const n of ['Uno', 'Dos', 'Tres']) {
+      await request(app).post(`/invitations/public/${evento.body.token}/join`).send({ guestName: n })
+    }
+
+    const lista = await request(app).get('/invitations').set('Cookie', ctx.cookie)
+    const porNombre = Object.fromEntries(
+      lista.body.map((i: { guestName: string; joinedCount: number }) => [i.guestName, i.joinedCount]),
+    )
+    expect(porNombre['Cumple']).toBe(3)
+    expect(porNombre['Juan']).toBe(0)
+  })
+})

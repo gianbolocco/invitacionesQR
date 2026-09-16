@@ -73,6 +73,12 @@ export async function listForUnits(unitIds: string[]) {
     unitId: invitations.unitId,
     unitLabel: units.label,
     usedCount: count(entryLogs.id),
+    // Anotados a un evento. El vecino quiere saber cuántos se anotaron ANTES
+    // de la fiesta; cuántos entraron es un dato de después.
+    joinedCount: sql<number>`(
+      select count(*)::int from invitation h
+      where h.parent_id = ${invitations.id} and h.revoked_at is null
+    )`,
   })
     .from(invitations)
     .innerJoin(people, eq(people.id, invitations.createdBy))
