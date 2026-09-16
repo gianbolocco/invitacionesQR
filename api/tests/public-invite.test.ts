@@ -228,3 +228,36 @@ describe('anotarse a un evento', () => {
     expect(res.status).toBe(429)
   })
 })
+
+describe('anotarse pide los datos una sola vez', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('el que se anota con documento y patente no tiene que volver a cargarlos', async () => {
+    const { inv } = await escenario({ kind: 'evento', capacity: 10 })
+
+    const anotado = await request(app).post(`/invitations/public/${inv.token}/join`)
+      .send({ guestName: 'Martina Gómez', guestDoc: '35111222', plate: 'ab123cd' })
+      .expect(201)
+
+    // Su propia página ya tiene los dos datos: no hay nada más que pedirle.
+    const suya = await request(app).get(`/invitations/public/${anotado.body.token}`)
+    expect(suya.body.hasDoc).toBe(true)
+    expect(suya.body.hasPlate).toBe(true)
+
+    // Y la garita los lee sin tipear nada.
+    const [fila] = await db.select().from(invitations)
+      .where(eq(invitations.token, anotado.body.token))
+    expect(fila.guestDoc).toBe('35111222')
+    expect(fila.plate).toBe('AB123CD')
+  })
+
+  it('sin patente, solo queda pendiente la patente', async () => {
+    const { inv } = await escenario({ kind: 'evento', capacity: 10 })
+    const anotado = await request(app).post(`/invitations/public/${inv.token}/join`)
+      .send({ guestName: 'Sin auto', guestDoc: '35111222' }).expect(201)
+
+    const suya = await request(app).get(`/invitations/public/${anotado.body.token}`)
+    expect(suya.body.hasDoc).toBe(true)
+    expect(suya.body.hasPlate).toBe(false)
+  })
+})

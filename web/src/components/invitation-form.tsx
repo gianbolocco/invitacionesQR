@@ -42,17 +42,24 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const esEvento = kind === 'evento'
+  // Un anotado tiene kind 'evento' pero NO es un evento: es una persona suelta
+  // dentro de uno. Hereda fecha y cupo del padre, y sí lleva documento y patente.
+  const esAnotado = Boolean(invitacion?.parentId)
+  const esEvento = kind === 'evento' && !esAnotado
   const esFrecuente = kind === 'frecuente'
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    const cuerpo = {
+    const cuerpo = esAnotado ? {
       guestName,
       guestDoc: guestDoc || null,
       plate: plate || null,
+    } : {
+      guestName,
+      guestDoc: esEvento ? null : guestDoc || null,
+      plate: esEvento ? null : plate || null,
       validFrom,
       validTo: esFrecuente ? validTo : validFrom,
       weekdays: esFrecuente && weekdays.length ? weekdays : null,
@@ -113,8 +120,10 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
         placeholder={esEvento ? 'Cumple de Sofi' : 'Juan Pérez'}
         value={guestName} onChange={(e) => setGuestName(e.target.value)} />
 
-      <Field label={esFrecuente ? 'Desde' : 'Fecha'} type="date" value={validFrom}
-        onChange={(e) => setValidFrom(e.target.value)} className="tabular" />
+      {!esAnotado && (
+        <Field label={esFrecuente ? 'Desde' : 'Fecha'} type="date" value={validFrom}
+          onChange={(e) => setValidFrom(e.target.value)} className="tabular" />
+      )}
 
       {esFrecuente && (
         <>
@@ -143,18 +152,25 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
 
       {esEvento && (
         <Field label="Cuántos invitados" type="number" min={1} value={capacity} className="tabular"
-          hint="El guardia anota el nombre de cada uno al entrar."
+          hint="Cada uno se anota con su nombre desde el link y se lleva su propio código."
           onChange={(e) => setCapacity(Number(e.target.value))} />
       )}
 
-      <div className="flex flex-col gap-4 border-t border-line pt-5">
-        <Eyebrow>Opcional</Eyebrow>
-        <Field label="DNI" inputMode="numeric" value={guestDoc} className="tabular"
-          hint="Si lo cargás, el guardia no tiene que tipearlo en la barrera."
-          onChange={(e) => setGuestDoc(e.target.value)} />
-        <Field label="Patente" value={plate} className="tabular uppercase"
-          onChange={(e) => setPlate(e.target.value)} />
-      </div>
+      {/*
+        En un evento el documento y la patente son de cada invitado, no del
+        evento: uno solo para un cumpleaños de treinta no significa nada. Cada
+        uno los carga al anotarse.
+      */}
+      {!esEvento && (
+        <div className="flex flex-col gap-4 border-t border-line pt-5">
+          <Eyebrow>Opcional</Eyebrow>
+          <Field label="Documento" value={guestDoc} className="tabular"
+            hint="Si lo cargás, el guardia no tiene que pedirlo en la barrera."
+            onChange={(e) => setGuestDoc(e.target.value)} />
+          <Field label="Patente" value={plate} className="tabular uppercase"
+            onChange={(e) => setPlate(e.target.value)} />
+        </div>
+      )}
 
       {error && <ErrorNote>{error}</ErrorNote>}
       <Button type="submit" disabled={busy}>

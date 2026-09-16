@@ -168,7 +168,8 @@ async function entriesOf(invitationId: string): Promise<number> {
 async function spotsLeft(eventId: string, capacity: number): Promise<number> {
   const [row] = await db.select({
     taken: sql<number>`
-      (select count(*) from invitation h where h.parent_id = ${eventId})
+      (select count(*) from invitation h
+         where h.parent_id = ${eventId} and h.revoked_at is null)
       + (select count(*) from entry_log e where e.invitation_id = ${eventId})`,
   }).from(invitations).where(eq(invitations.id, eventId)).limit(1)
   return Math.max(0, capacity - Number(row?.taken ?? 0))
@@ -212,7 +213,7 @@ export async function fillGuestDetails(
  */
 export async function joinEvent(
   eventToken: string,
-  data: { guestName: string; guestDoc?: string },
+  data: { guestName: string; guestDoc?: string; plate?: string },
 ): Promise<{ token: string; alreadyJoined: boolean }> {
   return db.transaction(async (tx) => {
     const [evento] = await tx.select().from(invitations)
@@ -234,7 +235,8 @@ export async function joinEvent(
 
     const [{ taken }] = await tx.select({
       taken: sql<number>`
-        (select count(*) from invitation h where h.parent_id = ${evento.id})
+        (select count(*) from invitation h
+           where h.parent_id = ${evento.id} and h.revoked_at is null)
         + (select count(*) from entry_log e where e.invitation_id = ${evento.id})`,
     }).from(invitations).where(eq(invitations.id, evento.id))
 
@@ -247,6 +249,7 @@ export async function joinEvent(
       kind: 'evento',
       guestName: data.guestName.trim(),
       guestDoc: doc,
+      plate: data.plate?.trim().toUpperCase() || null,
       validFrom: evento.validFrom,
       validTo: evento.validTo,
       weekdays: evento.weekdays,
@@ -259,17 +262,77 @@ export async function joinEvent(
 }
 
 /** Anotados a un evento, para que el vecino vea quién viene. */
+/**
+ * Anotados a un evento, con la forma completa de una invitación: el vecino los
+ * abre de a uno y los administra como a cualquier otra — editar, anular,
+ * habilitar. Por eso devuelve token y cupo, no solo el nombre.
+ */
 export async function listEventGuests(eventId: string) {
   return db.select({
     id: invitations.id,
+    kind: invitations.kind,
+    parentId: invitations.parentId,
     guestName: invitations.guestName,
     guestDoc: invitations.guestDoc,
+    plate: invitations.plate,
+    validFrom: invitations.validFrom,
+    validTo: invitations.validTo,
+    weekdays: invitations.weekdays,
+    capacity: invitations.capacity,
+    token: invitations.token,
     revokedAt: invitations.revokedAt,
     createdAt: invitations.createdAt,
+    createdBy: invitations.createdBy,
+    creatorName: people.name,
+    unitId: invitations.unitId,
+    unitLabel: units.label,
+    usedCount: count(entryLogs.id),
+    joinedCount: sql<number>`0`,
   })
     .from(invitations)
+    .innerJoin(people, eq(people.id, invitations.createdBy))
+    .innerJoin(units, eq(units.id, invitations.unitId))
+    .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
     .where(eq(invitations.parentId, eventId))
+    .groupBy(invitations.id, people.name, units.label)
     .orderBy(invitations.createdAt)
+}
+
+/**
+ * Deshacer una anulación.
+ *
+ * Un anotado no se puede habilitar si el evento sigue anulado —entraría a una
+ * fiesta cancelada— ni si mientras tanto se llenó el cupo.
+ *
+ * Habilitar un evento habilita también a sus anotados, en espejo de la
+ * anulación en cascada. Contrapartida conocida: si alguien había anulado a un
+ * invitado ANTES de anular el evento, al habilitarlo vuelve junto con el resto.
+ */
+export async function restoreInvitation(
+  id: string,
+  personId: string,
+  neighborhoodId: string,
+): Promise<void> {
+  const [inv] = await db.select().from(invitations).where(eq(invitations.id, id)).limit(1)
+  if (!inv) throw new AppError(404, 'not_found')
+  await assertMemberOfUnit(personId, inv.unitId)
+  if (!inv.revokedAt) return
+
+  if (inv.parentId) {
+    const [padre] = await db.select().from(invitations)
+      .where(eq(invitations.id, inv.parentId)).limit(1)
+    if (padre?.revokedAt) throw new AppError(409, 'evento_anulado')
+
+    const libres = await spotsLeft(inv.parentId, padre!.capacity)
+    if (libres <= 0) throw new AppError(409, 'no_capacity')
+  }
+
+  await db.update(invitations).set({ revokedAt: null }).where(eq(invitations.id, id))
+  if (!inv.parentId) {
+    await db.update(invitations).set({ revokedAt: null }).where(eq(invitations.parentId, id))
+  }
+
+  await audit(personId, neighborhoodId, 'invitation.restored', 'invitation', id)
 }
 
 export type EditInvitationInput = {
@@ -299,8 +362,21 @@ export async function editInvitation(
   await assertMemberOfUnit(personId, inv.unitId)
 
   if (inv.revokedAt) throw new AppError(409, 'revoked')
-  // Un anotado a un evento es de quien se anotó, no del vecino que creó el evento.
-  if (inv.parentId) throw new AppError(409, 'es_un_anotado')
+
+  /*
+   * De un anotado solo se editan sus datos: el nombre, el documento y la
+   * patente. Las fechas y el cupo los hereda del evento, y dejarlos cambiar por
+   * separado permitiría que un invitado quedara vigente un día en que el evento
+   * ya terminó.
+   */
+  if (inv.parentId) {
+    const [actualizada] = await db.update(invitations).set({
+      ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),
+      ...(input.guestDoc !== undefined ? { guestDoc: input.guestDoc?.trim() || null } : {}),
+      ...(input.plate !== undefined ? { plate: input.plate?.trim().toUpperCase() || null } : {}),
+    }).where(eq(invitations.id, id)).returning()
+    return actualizada
+  }
 
   const [{ usados }] = await db.select({ usados: sql<number>`count(*)::int` })
     .from(entryLogs).where(eq(entryLogs.invitationId, id))

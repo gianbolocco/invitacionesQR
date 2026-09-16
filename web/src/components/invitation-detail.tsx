@@ -22,13 +22,15 @@ function Dato({ label, children }: { label: string; children: React.ReactNode })
  * edición o del detalle.
  */
 export function InvitationDetail({
-  inv, units, editando, onEditar, onAnular, onGuardado, onVerAnotados,
+  inv, units, editando, onEditar, onAnular, onHabilitar, onGuardado, onVerAnotados,
 }: {
   inv: Invitation
   units: { id: string; label: string }[]
   editando: boolean
   onEditar: () => void
   onAnular: () => void
+  /** Si viene, una invitación anulada se puede volver a habilitar. */
+  onHabilitar?: () => void
   onGuardado: () => void
   onVerAnotados?: () => void
 }) {
@@ -46,10 +48,19 @@ export function InvitationDetail({
     )
   }
 
-  const esEvento = inv.kind === 'evento'
+  // Un anotado tiene kind 'evento' pero su link es un QR personal, no la puerta
+  // de anotación del evento.
+  const esEvento = inv.kind === 'evento' && !inv.parentId
+  const anulada = Boolean(inv.revokedAt)
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6">
+      {anulada && (
+        <p role="status" className="filete bg-deny-field/5 px-4 py-3 text-sm">
+          <strong>Anulada.</strong> Con este código no puede entrar.
+        </p>
+      )}
+
       {esEvento
         ? <EventShare inv={inv} />
         : <QrShare token={inv.token} guestName={inv.guestName} />}
@@ -59,6 +70,9 @@ export function InvitationDetail({
         <Dato label="Vigencia">{vigencia(inv)}</Dato>
         {inv.guestDoc && <Dato label="Documento">{inv.guestDoc}</Dato>}
         {inv.plate && <Dato label="Patente">{inv.plate}</Dato>}
+        {/* Dos números distintos: anotados es antes de la fiesta, entraron es
+            durante. El vecino mira el primero para saber si repartir más. */}
+        {esEvento && <Dato label="Anotados">{inv.joinedCount} de {inv.capacity}</Dato>}
         {esEvento && <Dato label="Entraron">{inv.usedCount} de {inv.capacity}</Dato>}
         <Dato label="Unidad">{inv.unitLabel}</Dato>
       </Filete>
@@ -69,8 +83,14 @@ export function InvitationDetail({
             Ver quién se anotó ({inv.joinedCount})
           </Button>
         )}
-        <Button variant="quiet" onClick={onEditar}>Editar</Button>
-        <Button variant="peligro" onClick={onAnular}>Anular invitación</Button>
+        {anulada && onHabilitar
+          ? <Button onClick={onHabilitar}>Volver a habilitar</Button>
+          : (
+            <>
+              <Button variant="quiet" onClick={onEditar}>Editar</Button>
+              <Button variant="peligro" onClick={onAnular}>Anular invitación</Button>
+            </>
+          )}
       </div>
     </div>
   )

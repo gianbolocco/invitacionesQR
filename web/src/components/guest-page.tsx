@@ -74,14 +74,24 @@ export function Qr({ url }: { url: string }) {
 }
 
 /**
- * El invitado carga su documento y patente. No bloquea nada: el QR ya existe,
- * esto solo evita que el guardia tipee en la barrera.
+ * Pide SOLO lo que falta.
+ *
+ * Antes se mostraba entero si faltaba cualquiera de los dos campos, así que a
+ * quien ya había cargado su documento al anotarse al evento se lo volvía a
+ * pedir. Los datos se piden una vez.
  */
-export function FormularioDatos({ token, onListo }: { token: string; onListo: () => void }) {
+export function FormularioDatos({ token, faltaDoc, faltaPatente, onListo }: {
+  token: string
+  faltaDoc: boolean
+  faltaPatente: boolean
+  onListo: () => void
+}) {
   const [doc, setDoc] = useState('')
   const [plate, setPlate] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  if (!faltaDoc && !faltaPatente) return null
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
@@ -106,14 +116,22 @@ export function FormularioDatos({ token, onListo }: { token: string; onListo: ()
         <div>
           <p className="display text-lg">Entrá más rápido</p>
           <p className="mt-0.5 text-sm text-ink-soft">
-            Cargá tus datos y el guardia no te los tiene que pedir en la barrera.
+            {faltaDoc && faltaPatente
+              ? 'Cargá tus datos y el guardia no te los tiene que pedir en la barrera.'
+              : faltaDoc
+                ? 'Cargá tu documento y el guardia no te lo tiene que pedir en la barrera.'
+                : 'Si venís en auto, cargá la patente y no te la piden en la barrera.'}
           </p>
         </div>
-        <Field label="Documento" value={doc} inputMode="text" className="tabular"
-          placeholder="30.123.456" hint="DNI, pasaporte o documento del país que sea."
-          onChange={(e) => setDoc(e.target.value)} />
-        <Field label="Patente" value={plate} className="tabular uppercase"
-          placeholder="AB 123 CD" onChange={(e) => setPlate(e.target.value)} />
+        {faltaDoc && (
+          <Field label="Documento" value={doc} inputMode="text" className="tabular"
+            placeholder="30.123.456" hint="DNI, pasaporte o documento del país que sea."
+            onChange={(e) => setDoc(e.target.value)} />
+        )}
+        {faltaPatente && (
+          <Field label="Patente" value={plate} className="tabular uppercase"
+            placeholder="AB 123 CD" onChange={(e) => setPlate(e.target.value)} />
+        )}
         {error && <ErrorNote>{error}</ErrorNote>}
         <Button type="submit" disabled={busy}>{busy ? 'Guardando…' : 'Guardar'}</Button>
       </div>
@@ -129,6 +147,7 @@ export function FormularioAnotarse({ token, spotsLeft, onAnotado }: {
 }) {
   const [name, setName] = useState('')
   const [doc, setDoc] = useState('')
+  const [plate, setPlate] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -141,7 +160,12 @@ export function FormularioAnotarse({ token, spotsLeft, onAnotado }: {
     try {
       const r = await api<{ token: string }>(`/invitations/public/${token}/join`, {
         method: 'POST',
-        body: JSON.stringify({ guestName: name, guestDoc: doc || undefined }),
+        // Todo junto y una sola vez: despues no se le vuelve a pedir nada.
+        body: JSON.stringify({
+          guestName: name,
+          guestDoc: doc || undefined,
+          plate: plate || undefined,
+        }),
       })
       onAnotado(r.token)
     } catch {
@@ -178,8 +202,11 @@ export function FormularioAnotarse({ token, spotsLeft, onAnotado }: {
         <Field label="Tu nombre y apellido" required value={name}
           placeholder="Martina Gómez" onChange={(e) => setName(e.target.value)} />
         <Field label="Documento" value={doc} className="tabular"
-          placeholder="35.111.222" hint="Opcional, pero te ahorra el trámite en la barrera."
+          placeholder="35.111.222" hint="Opcional. Si lo cargás, el guardia no te lo pide en la barrera."
           onChange={(e) => setDoc(e.target.value)} />
+        <Field label="Patente" value={plate} className="tabular uppercase"
+          placeholder="AB 123 CD" hint="Opcional, si venís en auto."
+          onChange={(e) => setPlate(e.target.value)} />
         {error && <ErrorNote>{error}</ErrorNote>}
         <Button type="submit" disabled={busy}>{busy ? 'Anotando…' : 'Anotarme'}</Button>
       </div>

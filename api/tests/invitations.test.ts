@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
-import { neighborhoods, units, people, unitMembers } from '../src/db/schema.js'
+import { neighborhoods, units, people, unitMembers, invitations } from '../src/db/schema.js'
 import { hashPassword } from '../src/lib/crypto.js'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
 
@@ -237,23 +237,6 @@ describe('editar una invitación', () => {
     expect(res.status).toBe(409)
   })
 
-  it('no se edita a alguien que se anotó a un evento: esa invitación es suya', async () => {
-    const ctx = await resident('martin@example.com', 'Lote 142')
-    const hoy = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date())
-    const evento = await visita(ctx, { kind: 'evento', capacity: 10, validFrom: hoy, validTo: hoy })
-    const anotado = await request(app).post(`/invitations/public/${evento.token}/join`)
-      .send({ guestName: 'Martina' })
-
-    const { rows } = await db.execute(
-      sql`select id from invitation where token = ${anotado.body.token}`,
-    )
-    const res = await request(app).patch(`/invitations/${rows[0].id}`).set('Cookie', ctx.cookie)
-      .send({ guestName: 'Le cambio el nombre' })
-    expect(res.status).toBe(409)
-    expect(res.body.error).toBe('es_un_anotado')
-  })
 })
 
 describe('los anotados no son invitaciones del vecino', () => {
@@ -316,5 +299,107 @@ describe('cuántos se anotaron', () => {
     )
     expect(porNombre['Cumple']).toBe(3)
     expect(porNombre['Juan']).toBe(0)
+  })
+})
+
+describe('administrar a los anotados de un evento', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  const hoy = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+
+  async function eventoCon(anotados: string[], capacity = 10) {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const ev = await request(app).post('/invitations').set('Cookie', ctx.cookie).send({
+      unitId: ctx.unitId, kind: 'evento', guestName: 'Cumple', validFrom: hoy, validTo: hoy, capacity,
+    })
+    for (const n of anotados) {
+      await request(app).post(`/invitations/public/${ev.body.token}/join`).send({ guestName: n })
+    }
+    const guests = await request(app).get(`/invitations/${ev.body.id}/guests`).set('Cookie', ctx.cookie)
+    return { ctx, evento: ev.body, guests: guests.body }
+  }
+
+  it('el listado trae lo necesario para abrir a cada uno como una invitación', async () => {
+    const { guests } = await eventoCon(['Martina'])
+    expect(guests[0]).toMatchObject({ guestName: 'Martina', capacity: 1, kind: 'evento' })
+    expect(guests[0].token).toMatch(/^[A-Za-z0-9_-]+$/)
+    expect(guests[0].unitLabel).toBe('Lote 142')
+  })
+
+  it('se le puede editar el nombre y el documento', async () => {
+    const { ctx, guests } = await eventoCon(['Martina'])
+    const res = await request(app).patch(`/invitations/${guests[0].id}`).set('Cookie', ctx.cookie)
+      .send({ guestName: 'Martina Gómez', guestDoc: '35111222' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.guestName).toBe('Martina Gómez')
+    expect(res.body.guestDoc).toBe('35111222')
+    expect(res.body.token).toBe(guests[0].token)
+  })
+
+  it('editarlo NO le cambia las fechas: las hereda del evento', async () => {
+    const { ctx, guests } = await eventoCon(['Martina'])
+    await request(app).patch(`/invitations/${guests[0].id}`).set('Cookie', ctx.cookie)
+      .send({ guestName: 'Martina', validFrom: '2030-01-01', validTo: '2030-01-01', capacity: 99 })
+
+    const [fila] = await db.select().from(invitations).where(eq(invitations.id, guests[0].id))
+    expect(fila.validFrom).toBe(hoy)
+    expect(fila.capacity).toBe(1)
+  })
+
+  it('se anula y se vuelve a habilitar', async () => {
+    const { ctx, guests } = await eventoCon(['Martina'])
+
+    await request(app).post(`/invitations/${guests[0].id}/revoke`).set('Cookie', ctx.cookie).expect(200)
+    let lista = await request(app).get(`/invitations/${guests[0].id}/guests`).set('Cookie', ctx.cookie)
+    let [fila] = await db.select().from(invitations).where(eq(invitations.id, guests[0].id))
+    expect(fila.revokedAt).not.toBeNull()
+
+    await request(app).post(`/invitations/${guests[0].id}/restore`).set('Cookie', ctx.cookie).expect(200)
+    ;[fila] = await db.select().from(invitations).where(eq(invitations.id, guests[0].id))
+    expect(fila.revokedAt).toBeNull()
+    expect(lista.status).toBe(200)
+  })
+
+  it('no se habilita un anotado si el evento sigue anulado', async () => {
+    const { ctx, evento, guests } = await eventoCon(['Martina'])
+    await request(app).post(`/invitations/${evento.id}/revoke`).set('Cookie', ctx.cookie).expect(200)
+
+    const res = await request(app).post(`/invitations/${guests[0].id}/restore`).set('Cookie', ctx.cookie)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('evento_anulado')
+  })
+
+  it('habilitar el evento habilita también a los anotados', async () => {
+    const { ctx, evento, guests } = await eventoCon(['Martina', 'Nico'])
+    await request(app).post(`/invitations/${evento.id}/revoke`).set('Cookie', ctx.cookie)
+    await request(app).post(`/invitations/${evento.id}/restore`).set('Cookie', ctx.cookie).expect(200)
+
+    for (const g of guests) {
+      const [fila] = await db.select().from(invitations).where(eq(invitations.id, g.id))
+      expect(fila.revokedAt).toBeNull()
+    }
+  })
+
+  it('no se habilita si mientras tanto se llenó el cupo', async () => {
+    const { ctx, evento, guests } = await eventoCon(['Uno', 'Dos'], 2)
+    await request(app).post(`/invitations/${guests[0].id}/revoke`).set('Cookie', ctx.cookie)
+
+    // El lugar que quedó libre lo toma otro.
+    await request(app).post(`/invitations/public/${evento.token}/join`)
+      .send({ guestName: 'Tres' }).expect(201)
+
+    const res = await request(app).post(`/invitations/${guests[0].id}/restore`).set('Cookie', ctx.cookie)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('no_capacity')
+  })
+
+  it('un vecino de otra UF no puede habilitar', async () => {
+    const { guests } = await eventoCon(['Martina'])
+    const otro = await resident('ana@example.com', 'Lote 7')
+    const res = await request(app).post(`/invitations/${guests[0].id}/restore`).set('Cookie', otro.cookie)
+    expect(res.status).toBe(403)
   })
 })

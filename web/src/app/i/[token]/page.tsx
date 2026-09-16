@@ -106,8 +106,10 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
             </p>
           </div>
 
-          {!muerta && !inv.frozen && !(inv.hasDoc && inv.hasPlate) && !datosListos && (
-            <FormularioDatos token={token} onListo={() => { setDatosListos(true); cargar() }} />
+          {!muerta && !inv.frozen && !datosListos && (
+            <FormularioDatos token={token}
+              faltaDoc={!inv.hasDoc} faltaPatente={!inv.hasPlate}
+              onListo={() => { setDatosListos(true); cargar() }} />
           )}
 
           {datosListos && (

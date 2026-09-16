@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import {
   createInvitation, listForUnits, revokeInvitation, findPublicByToken,
-  fillGuestDetails, joinEvent, listEventGuests, editInvitation,
+  fillGuestDetails, joinEvent, listEventGuests, editInvitation, restoreInvitation,
 } from '../services/invitations.js'
 import { unitsOfPerson } from '../services/units.js'
 import { rateLimit } from '../middleware/rateLimit.js'
@@ -43,6 +43,7 @@ invitationRoutes.post('/public/:token/join', publicWriteLimit, async (req, res) 
   const body = z.object({
     guestName: z.string().min(1).max(80),
     guestDoc: z.string().max(40).optional(),
+    plate: z.string().max(20).optional(),
   }).parse(req.body)
 
   res.status(201).json(await joinEvent(String(req.params.token), body))
@@ -97,4 +98,10 @@ const editSchema = z.object({
 
 invitationRoutes.patch('/:id', async (req, res) => {
   res.json(await editInvitation(req.params.id, req.person!.id, editSchema.parse(req.body)))
+})
+
+/** Deshacer una anulación. */
+invitationRoutes.post('/:id/restore', async (req, res) => {
+  await restoreInvitation(req.params.id, req.person!.id, req.person!.neighborhoodId)
+  res.json({ ok: true })
 })

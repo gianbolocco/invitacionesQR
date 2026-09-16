@@ -1,6 +1,8 @@
 export type Invitation = {
   id: string
   kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
+  /** Solo viene en los anotados a un evento: es el id del evento. */
+  parentId?: string | null
   guestName: string
   guestDoc: string | null
   plate: string | null

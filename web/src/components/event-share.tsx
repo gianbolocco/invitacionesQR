@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import { QRCodeCanvas } from 'qrcode.react'
 import type { Invitation } from '@/lib/invitations'
 import { Button, Eyebrow, Filete } from './ui'
 
@@ -14,7 +13,6 @@ import { Button, Eyebrow, Filete } from './ui'
  */
 export function EventShare({ inv }: { inv: Invitation }) {
   const [copiado, setCopiado] = useState(false)
-  const [verQr, setVerQr] = useState(false)
 
   const url = typeof window === 'undefined' ? '' : `${window.location.origin}/i/${inv.token}`
   const texto = `Te invito a "${inv.guestName}" en Álamo Alto. ` +
@@ -58,25 +56,11 @@ export function EventShare({ inv }: { inv: Invitation }) {
         </Button>
       </Filete>
 
-      {/* El QR del evento es secundario: sirve para pegarlo en la entrada de la
-          fiesta, no para que alguien lo muestre en la barrera. */}
-      <button onClick={() => setVerQr((v) => !v)}
-        className="self-start text-sm text-alamo underline underline-offset-4">
-        {verQr ? 'Ocultar' : 'Ver'} el código del evento para imprimir
-      </button>
-
-      {verQr && (
-        <div className="surgir flex flex-col items-center gap-2">
-          <div className="filete">
-            <div className="bg-[#ffffff] p-5">
-              <QRCodeCanvas value={url} size={200} fgColor="#0d3d28" bgColor="#ffffff" />
-            </div>
-          </div>
-          <p className="max-w-xs text-center text-sm text-ink-soft">
-            Quien lo escanee llega al mismo formulario para anotarse.
-          </p>
-        </div>
-      )}
+      {/*
+        Acá había un QR del link del evento. No va: ese link sirve para
+        anotarse ANTES, y quien tiene el QR delante ya está en la entrada —
+        a esa altura lo registra el guardia a mano. Era decoración.
+      */}
     </div>
   )
 }
