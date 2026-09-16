@@ -97,7 +97,9 @@ export async function activityByGuard(neighborhoodId: string) {
   return res.rows
 }
 
-export type EntryFilters = { from?: string; to?: string; unitId?: string; guardId?: string }
+export type EntryFilters = {
+  from?: string; to?: string; unitId?: string; guardId?: string; invitationId?: string
+}
 
 export type EntryRow = {
   id: string
@@ -121,6 +123,7 @@ export async function entriesLog(neighborhoodId: string, f: EntryFilters): Promi
       and (${f.to ?? null}::date is null or (e.entered_at at time zone ${TZ})::date <= ${f.to ?? null}::date)
       and (${f.unitId ?? null}::uuid is null or e.unit_id = ${f.unitId ?? null}::uuid)
       and (${f.guardId ?? null}::uuid is null or e.guard_id = ${f.guardId ?? null}::uuid)
+      and (${f.invitationId ?? null}::uuid is null or e.invitation_id = ${f.invitationId ?? null}::uuid)
     order by e.entered_at desc
     limit 1000
   `)

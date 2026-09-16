@@ -260,19 +260,105 @@ export type AuditRow = {
   guardName: string | null
 }
 
+export type AuditStatus = AuditRow['status']
+
+export type AuditFilters = {
+  from?: string
+  to?: string
+  unitId?: string
+  status?: AuditStatus
+  page?: number
+  pageSize?: number
+}
+
+export type AuditPage = {
+  rows: AuditRow[]
+  total: number
+  page: number
+  pageSize: number
+  counts: Record<AuditStatus, number>
+}
+
 /**
  * Auditoría a nivel invitación: quién entró y quién NO.
  *
- * Es distinta de la bitácora, que lista ingresos: acá cada fila es una
- * invitación, incluidas las que nadie usó. "No entró nadie" es justamente el
- * dato que la bitácora no puede mostrar.
+ * Cada fila es una invitación, incluidas las que nadie usó. "No vino nadie" es
+ * justamente el dato que un listado de ingresos no puede mostrar; los ingresos
+ * de cada una se piden aparte al desplegar la fila.
  *
  * Los anotados a un evento salen como filas propias, con el evento en su
  * columna: para auditar querés una fila por persona.
+ *
+ * El filtro por estado y los contadores van del lado del servidor: con
+ * paginación, filtrar la página que llegó daría números que mienten.
  */
 export async function auditInvitations(
   neighborhoodId: string,
-  f: { from?: string; to?: string; unitId?: string },
+  f: AuditFilters,
+): Promise<AuditPage> {
+  const page = Math.max(1, f.page ?? 1)
+  const pageSize = Math.min(200, Math.max(1, f.pageSize ?? 50))
+  const [rows, counts] = await Promise.all([
+    auditRows(neighborhoodId, f, pageSize, (page - 1) * pageSize),
+    auditCounts(neighborhoodId, f),
+  ])
+
+  const total = f.status
+    ? counts[f.status]
+    : counts.entro + counts.esperando + counts.vencida + counts.anulada
+
+  return { rows, total, page, pageSize, counts }
+}
+
+/**
+ * Todas las filas que matchean el filtro, sin paginar. Para exportar.
+ * El tope de 5000 es una red, no una página: nadie espera que un export
+ * respete el scroll, pero tampoco que tire la base abajo.
+ */
+export function auditAll(neighborhoodId: string, f: AuditFilters): Promise<AuditRow[]> {
+  return auditRows(neighborhoodId, f, 5000, 0)
+}
+
+async function auditCounts(
+  neighborhoodId: string,
+  f: AuditFilters,
+): Promise<Record<AuditStatus, number>> {
+  const hoy = todayInBuenosAires()
+  const { rows } = await db.execute(sql`
+    with uso as (
+      select e.invitation_id, count(*)::int as veces
+      from entry_log e group by e.invitation_id
+    ),
+    clasificadas as (
+      select case
+        when i.revoked_at is not null then 'anulada'
+        when coalesce(uso.veces, 0) > 0 then 'entro'
+        when i.valid_to < ${hoy}::date then 'vencida'
+        else 'esperando'
+      end as status
+      from invitation i
+      join unit u on u.id = i.unit_id
+      left join uso on uso.invitation_id = i.id
+      where u.neighborhood_id = ${neighborhoodId}
+        and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
+        and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
+        and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+    )
+    select
+      count(*) filter (where status = 'entro')::int      as entro,
+      count(*) filter (where status = 'esperando')::int  as esperando,
+      count(*) filter (where status = 'vencida')::int    as vencida,
+      count(*) filter (where status = 'anulada')::int    as anulada
+    from clasificadas
+  `)
+  return rows[0] as unknown as Record<AuditStatus, number>
+}
+
+async function auditRows(
+  neighborhoodId: string,
+  f: AuditFilters,
+  limit: number,
+  offset: number,
 ): Promise<AuditRow[]> {
   const hoy = todayInBuenosAires()
 
@@ -316,8 +402,14 @@ export async function auditInvitations(
       and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
       and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
       and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+      and (${f.status ?? null}::text is null or ${f.status ?? null}::text = case
+        when i.revoked_at is not null then 'anulada'
+        when coalesce(uso.veces, 0) > 0 then 'entro'
+        when i.valid_to < ${hoy}::date then 'vencida'
+        else 'esperando'
+      end)
     order by i.valid_from desc, lower(i.guest_name)
-    limit 2000
+    limit ${limit} offset ${offset}
   `)
 
   return res.rows as unknown as AuditRow[]

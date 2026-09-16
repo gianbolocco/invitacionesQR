@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { esDeNoche, hora } from '@/lib/gate'
@@ -43,25 +43,72 @@ function fechaCorta(iso: string): string {
     .format(new Date(y, m - 1, d))
 }
 
+type Movimiento = {
+  id: string
+  enteredAt: string
+  guestName: string
+  guestDoc: string | null
+  plate: string | null
+  guardName: string | null
+}
+
+type Pagina = {
+  rows: AuditRow[]
+  total: number
+  page: number
+  pageSize: number
+  counts: Record<AuditRow['status'], number>
+}
+
+const PAGE_SIZE = 25
+
 export default function AuditoriaPage() {
   const me = useMe()
   const [oscuro, setOscuro] = useState(false)
   const [from, setFrom] = useState(haceDias(30))
   const [to, setTo] = useState(hoyISO())
   const [estado, setEstado] = useState<'todos' | AuditRow['status']>('todos')
-  const [filas, setFilas] = useState<AuditRow[] | null>(null)
+  const [pagina, setPagina] = useState<Pagina | null>(null)
+  const [page, setPage] = useState(1)
+  const [abierta, setAbierta] = useState<string | null>(null)
+  const [movimientos, setMovimientos] = useState<Movimiento[] | null>(null)
+
+  // Los movimientos se piden al desplegar, no con la tabla: una invitación
+  // frecuente puede tener decenas y casi nunca se miran.
+  async function desplegar(id: string) {
+    if (abierta === id) { setAbierta(null); return }
+    setAbierta(id)
+    setMovimientos(null)
+    setMovimientos(await api<Movimiento[]>(`/gate/audit/${id}/entries`).catch(() => []))
+  }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOscuro(esDeNoche())
   }, [])
 
-  const qs = useCallback(() => new URLSearchParams({ from, to }).toString(), [from, to])
+  const filtros = useCallback(() => {
+    const p = new URLSearchParams({ from, to })
+    if (estado !== 'todos') p.set('status', estado)
+    return p
+  }, [from, to, estado])
 
   useEffect(() => {
     if (!me) return
-    api<AuditRow[]>(`/gate/audit?${qs()}`).then(setFilas).catch(() => setFilas([]))
-  }, [me, qs])
+    const p = filtros()
+    p.set('page', String(page))
+    p.set('pageSize', String(PAGE_SIZE))
+    api<Pagina>(`/gate/audit?${p}`).then(setPagina).catch(() => setPagina(null))
+  }, [me, filtros, page])
+
+  // Cambiar un filtro vuelve a la primera página: quedarse en la 4 de una lista
+  // que ahora tiene 2 muestra una tabla vacía sin explicar por qué.
+  function filtrar<T>(set: (v: T) => void) {
+    return (v: T) => { set(v); setPage(1); setAbierta(null) }
+  }
+  const cambiarDesde = filtrar(setFrom)
+  const cambiarHasta = filtrar(setTo)
+  const cambiarEstado = filtrar<'todos' | AuditRow['status']>(setEstado)
 
   if (!me) return <main className="p-6">Cargando…</main>
 
@@ -69,10 +116,14 @@ export default function AuditoriaPage() {
     return <main className="p-6"><p>Esta pantalla es de la garita.</p></main>
   }
 
-  const todas = filas ?? []
-  const lista = estado === 'todos' ? todas : todas.filter((r) => r.status === estado)
+  const lista = pagina?.rows ?? []
   const borde = oscuro ? 'border-white/20' : 'border-ink/12'
-  const conteo = (s: AuditRow['status']) => todas.filter((r) => r.status === s).length
+  const counts = pagina?.counts
+  const total = pagina?.total ?? 0
+  const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const todos = counts
+    ? counts.entro + counts.esperando + counts.vencida + counts.anulada
+    : 0
 
   return (
     <GaritaShell oscuro={oscuro} onTema={() => setOscuro((v) => !v)} guardName={me.name}>
@@ -82,15 +133,15 @@ export default function AuditoriaPage() {
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Desde
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+            <input type="date" value={from} onChange={(e) => cambiarDesde(e.target.value)}
               className={`tabular min-h-11 rounded border ${borde} bg-white px-3 text-ink`} />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Hasta
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+            <input type="date" value={to} onChange={(e) => cambiarHasta(e.target.value)}
               className={`tabular min-h-11 rounded border ${borde} bg-white px-3 text-ink`} />
           </label>
-          <a href={`${apiBase}/gate/audit.csv?${qs()}`}
+          <a href={`${apiBase}/gate/audit.xlsx?${filtros()}`}
             className="inline-flex min-h-11 items-center rounded bg-alamo px-4 text-sm
               font-semibold text-white">
             Exportar a Excel
@@ -99,13 +150,13 @@ export default function AuditoriaPage() {
 
         <div className="flex flex-wrap gap-2">
           {([
-            ['todos', `Todos (${todas.length})`],
-            ['entro', `Entraron (${conteo('entro')})`],
-            ['esperando', `Esperando (${conteo('esperando')})`],
-            ['vencida', `No entraron (${conteo('vencida')})`],
-            ['anulada', `Anuladas (${conteo('anulada')})`],
+            ['todos', `Todos (${todos})`],
+            ['entro', `Entraron (${counts?.entro ?? 0})`],
+            ['esperando', `Esperando (${counts?.esperando ?? 0})`],
+            ['vencida', `No entraron (${counts?.vencida ?? 0})`],
+            ['anulada', `Anuladas (${counts?.anulada ?? 0})`],
           ] as const).map(([valor, label]) => (
-            <button key={valor} onClick={() => setEstado(valor)}
+            <button key={valor} onClick={() => cambiarEstado(valor)}
               aria-pressed={estado === valor}
               className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
                 estado === valor ? 'border-alamo bg-alamo text-white' : borde
@@ -115,8 +166,8 @@ export default function AuditoriaPage() {
           ))}
         </div>
 
-        {filas === null && <p className="opacity-70">Cargando…</p>}
-        {filas !== null && lista.length === 0 && (
+        {pagina === null && <p className="opacity-70">Cargando…</p>}
+        {pagina !== null && lista.length === 0 && (
           <p className="opacity-70">No hay invitaciones en ese rango.</p>
         )}
 
@@ -131,36 +182,87 @@ export default function AuditoriaPage() {
               </thead>
               <tbody>
                 {lista.map((r) => (
-                  <tr key={r.id} className="border-b border-current/10">
-                    <td className="py-2.5 pr-4">
-                      <span className="font-semibold">{r.guestName}</span>
-                      {r.eventName && (
-                        <span className="block text-xs opacity-70">en {r.eventName}</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 pr-4 tabular">{r.guestDoc ?? '—'}</td>
-                    <td className="py-2.5 pr-4 tabular">{r.unitLabel}</td>
-                    <td className="py-2.5 pr-4">{r.inviterName}</td>
-                    <td className="py-2.5 pr-4 tabular">
-                      {r.validFrom === r.validTo
-                        ? fechaCorta(r.validFrom)
-                        : `${fechaCorta(r.validFrom)}–${fechaCorta(r.validTo)}`}
-                    </td>
-                    <td className={`py-2.5 pr-4 font-semibold ${ESTADO[r.status].clase}`}>
-                      {ESTADO[r.status].label}
-                      {r.enteredCount > 1 && (
-                        <span className="tabular font-normal"> ×{r.enteredCount}</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 pr-4 tabular">
-                      {r.enteredAt ? hora(r.enteredAt) : '—'}
-                    </td>
-                    <td className="py-2.5 pr-4">{r.guardName ?? '—'}</td>
-                  </tr>
+                  <Fragment key={r.id}>
+                    <tr className="border-b border-current/10">
+                      <td className="py-2.5 pr-4">
+                        <span className="font-semibold">{r.guestName}</span>
+                        {r.eventName && (
+                          <span className="block text-xs opacity-70">en {r.eventName}</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4 tabular">{r.guestDoc ?? '—'}</td>
+                      <td className="py-2.5 pr-4 tabular">{r.unitLabel}</td>
+                      <td className="py-2.5 pr-4">{r.inviterName}</td>
+                      <td className="py-2.5 pr-4 tabular">
+                        {r.validFrom === r.validTo
+                          ? fechaCorta(r.validFrom)
+                          : `${fechaCorta(r.validFrom)}–${fechaCorta(r.validTo)}`}
+                      </td>
+                      <td className={`py-2.5 pr-4 font-semibold ${ESTADO[r.status].clase}`}>
+                        {ESTADO[r.status].label}
+                      </td>
+                      <td className="py-2.5 pr-4 tabular">
+                        {r.enteredCount === 0 ? '—' : (
+                          <button onClick={() => desplegar(r.id)}
+                            aria-expanded={abierta === r.id}
+                            className="underline underline-offset-4">
+                            {hora(r.enteredAt!)}
+                            {r.enteredCount > 1 && ` ×${r.enteredCount}`}
+                          </button>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4">{r.guardName ?? '—'}</td>
+                    </tr>
+
+                    {/* Lo que antes vivía en la bitácora: cada movimiento con su
+                        hora y su guardia, desplegable desde la fila que lo resume. */}
+                    {abierta === r.id && (
+                      <tr className="border-b border-current/10">
+                        <td colSpan={8} className="bg-current/5 px-4 py-3">
+                          {movimientos === null && <p className="opacity-70">Cargando…</p>}
+                          {movimientos?.length === 0 && <p className="opacity-70">Sin movimientos.</p>}
+                          <ul className="flex flex-col gap-1">
+                            {movimientos?.map((m) => (
+                              <li key={m.id} className="tabular">
+                                {fechaCorta(m.enteredAt.slice(0, 10))} {hora(m.enteredAt)}
+                                {' · '}<span className="font-semibold">{m.guestName}</span>
+                                {m.guestDoc && ` · ${m.guestDoc}`}
+                                {m.plate && ` · ${m.plate}`}
+                                {' · lo dejó pasar '}{m.guardName ?? '(sin registrar)'}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
           </div>
+        )}
+
+        {total > PAGE_SIZE && (
+          <nav aria-label="Paginación" className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm opacity-70 tabular">
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                className={`min-h-11 rounded border ${borde} px-4 text-sm font-semibold
+                  disabled:opacity-40`}>
+                ‹ Anterior
+              </button>
+              <span className="flex min-h-11 items-center px-2 text-sm tabular">
+                {page} de {paginas}
+              </span>
+              <button onClick={() => setPage((p) => Math.min(paginas, p + 1))} disabled={page >= paginas}
+                className={`min-h-11 rounded border ${borde} px-4 text-sm font-semibold
+                  disabled:opacity-40`}>
+                Siguiente ›
+              </button>
+            </div>
+          </nav>
         )}
       </div>
     </GaritaShell>

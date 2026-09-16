@@ -15,7 +15,7 @@ const ADMIN_NAV = [
   { href: '/admin/usuarios', label: 'Vecinos' },
   { href: '/admin/guardias', label: 'Guardias' },
   { href: '/admin/barrio', label: 'Barrio' },
-  { href: '/admin/bitacora', label: 'Bitácora' },
+  { href: '/garita/auditoria', label: 'Auditoría' },
 ]
 
 export function Shell({ me, children }: { me: Me; children: React.ReactNode }) {

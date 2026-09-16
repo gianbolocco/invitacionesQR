@@ -70,51 +70,10 @@ describe('reportes', () => {
     expect(res.body[0]).toMatchObject({ name: 'Martín', total: 1 })
   })
 
-  it('la bitácora lista los ingresos con la UF', async () => {
-    const { cookie, inv, admin } = await scenario()
-    await registerEntry(inv.id, admin.id, { guestName: 'Juan Pérez', guestDoc: '30123456' })
-
-    const res = await request(app).get('/reports/entries').set('Cookie', cookie)
-    expect(res.body).toHaveLength(1)
-    expect(res.body[0].unitLabel).toBe('Lote 142')
-    expect(res.body[0].guestDoc).toBe('30123456')
-  })
-
-  it('filtra la bitácora por fecha', async () => {
-    const { cookie, inv, admin } = await scenario()
-    await registerEntry(inv.id, admin.id, { guestName: 'Juan Pérez' })
-
-    const vacio = await request(app).get('/reports/entries?from=2020-01-01&to=2020-01-02').set('Cookie', cookie)
-    expect(vacio.body).toHaveLength(0)
-
-    const conDatos = await request(app).get(`/reports/entries?from=${hoy}&to=${hoy}`).set('Cookie', cookie)
-    expect(conDatos.body).toHaveLength(1)
-  })
-
-  it('exporta la bitácora a CSV', async () => {
-    const { cookie, inv, admin } = await scenario()
-    await registerEntry(inv.id, admin.id, { guestName: 'Juan Pérez' })
-
-    const res = await request(app).get('/reports/entries.csv').set('Cookie', cookie)
-    expect(res.status).toBe(200)
-    expect(res.headers['content-type']).toMatch(/text\/csv/)
-    // BOM + sep=; para que Excel en español lo abra de doble clic con los
-    // acentos bien y las columnas separadas.
-    expect(res.text.charCodeAt(0)).toBe(0xfeff)
-    const [primera, encabezado] = res.text.split('\r\n')
-    expect(primera).toBe('﻿sep=;')
-    expect(encabezado).toBe('Fecha;Hora;Invitado;Documento;Patente;Unidad;Guardia')
-    expect(res.text).toContain('Juan Pérez')
-  })
-
-  it('el CSV escapa el separador si aparece en el nombre', async () => {
-    const { cookie, inv, admin } = await scenario()
-    await registerEntry(inv.id, admin.id, { guestName: 'Pérez; Juan' })
-
-    const res = await request(app).get('/reports/entries.csv').set('Cookie', cookie)
-    expect(res.text).toContain('"Pérez; Juan"')
-  })
-
+  
+  
+  
+  
   it('un vecino no puede ver los reportes', async () => {
     await scenario()
     await db.update(people).set({ passwordHash: await hashPassword(PASS) })

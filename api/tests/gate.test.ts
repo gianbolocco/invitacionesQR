@@ -289,7 +289,7 @@ describe('quién dio el ingreso', () => {
       .send({ invitationId: inv.id, guestName: 'Juan Pérez' }).expect(201)
 
     const res = await request(app).get('/gate/audit').set('Cookie', cookie)
-    const fila = res.body.find((r: { guestName: string }) => r.guestName === 'Juan Pérez')
+    const fila = res.body.rows.find((r: { guestName: string }) => r.guestName === 'Juan Pérez')
     expect(fila.guardName).toBe('Garita')
     expect(fila.status).toBe('entro')
   })

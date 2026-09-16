@@ -4,10 +4,11 @@ import { requireAuth } from '../middleware/requireAuth.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
   checkByToken, checkById, registerEntry, searchGuests, agendaForDay,
-  auditInvitations,
+  auditInvitations, auditAll,
 } from '../services/entries.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
-import { toExcelCsv } from '../lib/csv.js'
+import { buildWorkbook, XLSX_MIME } from '../lib/excel.js'
+import { entriesLog } from '../services/reports.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
@@ -52,37 +53,112 @@ const auditFilters = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   unitId: z.string().uuid().optional(),
+  status: z.enum(['entro', 'esperando', 'vencida', 'anulada']).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(200).optional(),
 })
 
-/** Auditoría: una fila por invitación, entró o no entró. */
+/** Auditoría: una fila por invitación, entró o no entró. Paginada. */
 gateRoutes.get('/audit', async (req, res) => {
   res.json(await auditInvitations(req.person!.neighborhoodId, auditFilters.parse(req.query)))
 })
 
-const ESTADO_CSV: Record<string, string> = {
+const ESTADO_EXCEL: Record<string, string> = {
   entro: 'Entró',
   esperando: 'Esperando',
-  vencida: 'No entró (vencida)',
+  vencida: 'No entró',
   anulada: 'Anulada',
 }
 
-gateRoutes.get('/audit.csv', async (req, res) => {
-  const rows = await auditInvitations(req.person!.neighborhoodId, auditFilters.parse(req.query))
-  const fmt = new Intl.DateTimeFormat('es-AR', {
+const KIND_EXCEL: Record<string, string> = {
+  visita: 'Visita',
+  frecuente: 'Frecuente',
+  evento: 'Evento',
+  proveedor: 'Proveedor',
+}
+
+/**
+ * El Excel trae DOS hojas: las invitaciones y los ingresos del mismo rango.
+ * En pantalla los ingresos se ven desplegando una fila; en un archivo que alguien
+ * va a filtrar y sumar, conviene tenerlos planos y aparte.
+ *
+ * Exporta TODO lo que matchea el filtro, no la página que se está viendo: nadie
+ * espera que un export respete el scroll.
+ */
+gateRoutes.get('/audit.xlsx', async (req, res) => {
+  const f = auditFilters.parse(req.query)
+  const fecha = new Intl.DateTimeFormat('es-AR', {
     timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: false,
   })
 
-  const csv = toExcelCsv(
-    ['Invitado', 'Documento', 'Patente', 'Tipo', 'Evento', 'Unidad', 'Invitó',
-      'Desde', 'Hasta', 'Estado', 'Ingresó', 'Ingresos', 'Guardia'],
-    rows.map((r) => [
-      r.guestName, r.guestDoc, r.plate, r.kind, r.eventName, r.unitLabel, r.inviterName,
-      r.validFrom, r.validTo, ESTADO_CSV[r.status] ?? r.status,
-      r.enteredAt ? fmt.format(new Date(r.enteredAt)) : '',
-      r.enteredCount, r.guardName,
-    ]),
-  )
+  const [auditoria, ingresos] = await Promise.all([
+    auditAll(req.person!.neighborhoodId, f),
+    entriesLog(req.person!.neighborhoodId, { from: f.from, to: f.to, unitId: f.unitId }),
+  ])
 
-  res.type('text/csv; charset=utf-8').attachment('invitaciones.csv').send(csv)
+  const buffer = await buildWorkbook([
+    {
+      nombre: 'Invitaciones',
+      columnas: [
+        { header: 'Invitado', key: 'invitado', width: 26 },
+        { header: 'Documento', key: 'documento' },
+        { header: 'Patente', key: 'patente' },
+        { header: 'Tipo', key: 'tipo' },
+        { header: 'Evento', key: 'evento', width: 22 },
+        { header: 'Unidad', key: 'unidad' },
+        { header: 'Invitó', key: 'invito', width: 20 },
+        { header: 'Desde', key: 'desde' },
+        { header: 'Hasta', key: 'hasta' },
+        { header: 'Estado', key: 'estado' },
+        { header: 'Último ingreso', key: 'ingreso', width: 18 },
+        { header: 'Ingresos', key: 'ingresos' },
+        { header: 'Guardia', key: 'guardia', width: 20 },
+      ],
+      filas: auditoria.map((r) => ({
+        invitado: r.guestName,
+        documento: r.guestDoc ?? '',
+        patente: r.plate ?? '',
+        tipo: KIND_EXCEL[r.kind] ?? r.kind,
+        evento: r.eventName ?? '',
+        unidad: r.unitLabel,
+        invito: r.inviterName,
+        desde: r.validFrom,
+        hasta: r.validTo,
+        estado: ESTADO_EXCEL[r.status] ?? r.status,
+        ingreso: r.enteredAt ? fecha.format(new Date(r.enteredAt)) : '',
+        ingresos: r.enteredCount,
+        guardia: r.guardName ?? '',
+      })),
+    },
+    {
+      nombre: 'Ingresos',
+      columnas: [
+        { header: 'Fecha y hora', key: 'cuando', width: 18 },
+        { header: 'Invitado', key: 'invitado', width: 26 },
+        { header: 'Documento', key: 'documento' },
+        { header: 'Patente', key: 'patente' },
+        { header: 'Unidad', key: 'unidad' },
+        { header: 'Guardia', key: 'guardia', width: 20 },
+      ],
+      filas: ingresos.map((e) => ({
+        cuando: fecha.format(new Date(e.enteredAt)),
+        invitado: e.guestName,
+        documento: e.guestDoc ?? '',
+        patente: e.plate ?? '',
+        unidad: e.unitLabel,
+        guardia: e.guardName ?? '',
+      })),
+    },
+  ])
+
+  res.type(XLSX_MIME).attachment('alamo-alto-auditoria.xlsx').send(buffer)
+})
+
+/**
+ * Los ingresos de UNA invitación: es lo que se despliega al tocar una fila de
+ * la auditoría. La auditoría dice "×3"; acá están los tres, con hora y guardia.
+ */
+gateRoutes.get('/audit/:id/entries', async (req, res) => {
+  res.json(await entriesLog(req.person!.neighborhoodId, { invitationId: req.params.id }))
 })

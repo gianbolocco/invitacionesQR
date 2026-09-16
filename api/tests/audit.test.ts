@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
+import ExcelJS from 'exceljs'
 import request from 'supertest'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
@@ -49,7 +50,7 @@ describe('auditoría de invitaciones', () => {
 
     const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
     const porNombre = Object.fromEntries(
-      res.body.map((r: { guestName: string; status: string }) => [r.guestName, r.status]),
+      res.body.rows.map((r: { guestName: string; status: string }) => [r.guestName, r.status]),
     )
     expect(porNombre['Sí vino']).toBe('entro')
     expect(porNombre['No vino']).toBe('esperando')
@@ -61,7 +62,7 @@ describe('auditoría de invitaciones', () => {
     await registerEntry(i.id, ctx.guardiaId, { guestName: 'Juan' })
 
     const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
-    const fila = res.body.find((r: { guestName: string }) => r.guestName === 'Juan')
+    const fila = res.body.rows.find((r: { guestName: string }) => r.guestName === 'Juan')
     expect(fila.enteredAt).not.toBeNull()
     expect(fila.guardName).toBe('Rulo')
     expect(fila.enteredCount).toBe(1)
@@ -75,14 +76,14 @@ describe('auditoría de invitaciones', () => {
     await inv(ctx, { guestName: 'Nunca vino', validFrom: iso, validTo: iso })
 
     const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
-    expect(res.body[0].status).toBe('vencida')
+    expect(res.body.rows[0].status).toBe('vencida')
   })
 
   it('la anulada se distingue de la que no vino', async () => {
     const ctx = await base()
     await inv(ctx, { guestName: 'Anulada', revokedAt: new Date() })
     const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
-    expect(res.body[0].status).toBe('anulada')
+    expect(res.body.rows[0].status).toBe('anulada')
   })
 
   it('los anotados a un evento salen como filas propias con el evento al lado', async () => {
@@ -91,26 +92,90 @@ describe('auditoría de invitaciones', () => {
     await inv(ctx, { guestName: 'Martina', kind: 'evento', parentId: evento.id })
 
     const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
-    const martina = res.body.find((r: { guestName: string }) => r.guestName === 'Martina')
+    const martina = res.body.rows.find((r: { guestName: string }) => r.guestName === 'Martina')
     expect(martina.eventName).toBe('Cumple de Sofi')
 
-    const padre = res.body.find((r: { guestName: string }) => r.guestName === 'Cumple de Sofi')
+    const padre = res.body.rows.find((r: { guestName: string }) => r.guestName === 'Cumple de Sofi')
     expect(padre.eventName).toBeNull()
   })
 
-  it('el CSV sale legible para Excel: BOM, separador y acentos', async () => {
+  it('exporta un .xlsx de verdad, con las hojas Invitaciones e Ingresos', async () => {
     const ctx = await base()
     const i = await inv(ctx, { guestName: 'Martín Pérez' })
     await registerEntry(i.id, ctx.guardiaId, { guestName: 'Martín Pérez' })
 
-    const res = await request(app).get('/gate/audit.csv').set('Cookie', ctx.cookie)
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+
     expect(res.status).toBe(200)
-    expect(res.headers['content-type']).toMatch(/text\/csv/)
-    expect(res.text.charCodeAt(0)).toBe(0xfeff)        // BOM
-    // El BOM va pegado al sep=, sin salto ni espacio: así lo espera Excel.
-    expect(res.text.split('\r\n')[0]).toBe('﻿sep=;')
-    expect(res.text).toContain('Martín Pérez')
-    expect(res.text).toContain('Entró')
+    expect(res.headers['content-type']).toMatch(/spreadsheetml/)
+
+    // Un .xlsx es un zip: tiene que empezar con "PK", no con texto.
+    const buf = res.body as Buffer
+    expect(buf.subarray(0, 2).toString()).toBe('PK')
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(buf)
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Invitaciones', 'Ingresos'])
+
+    const inv1 = wb.getWorksheet('Invitaciones')!
+    expect(inv1.getRow(1).getCell(1).value).toBe('Invitado')
+    expect(inv1.getRow(2).getCell(1).value).toBe('Martín Pérez')
+    expect(inv1.getRow(2).getCell(10).value).toBe('Entró')
+
+    const ing = wb.getWorksheet('Ingresos')!
+    expect(ing.getRow(2).getCell(2).value).toBe('Martín Pérez')
+    expect(ing.getRow(2).getCell(6).value).toBe('Rulo')
+  })
+
+  it('el export trae todo, no solo la página que se está viendo', async () => {
+    const ctx = await base()
+    for (let n = 0; n < 7; n++) await inv(ctx, { guestName: `Invitado ${n}` })
+
+    const pagina = await request(app).get('/gate/audit?pageSize=3').set('Cookie', ctx.cookie)
+    expect(pagina.body.rows).toHaveLength(3)
+    expect(pagina.body.total).toBe(7)
+
+    const res = await request(app).get('/gate/audit.xlsx?pageSize=3').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    // 7 filas + encabezado
+    expect(wb.getWorksheet('Invitaciones')!.rowCount).toBe(8)
+  })
+
+  it('pagina y cuenta por estado del lado del servidor', async () => {
+    const ctx = await base()
+    const entro = await inv(ctx, { guestName: 'Vino' })
+    await registerEntry(entro.id, ctx.guardiaId, { guestName: 'Vino' })
+    await inv(ctx, { guestName: 'No vino 1' })
+    await inv(ctx, { guestName: 'No vino 2' })
+    await inv(ctx, { guestName: 'Anulada', revokedAt: new Date() })
+
+    const todo = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
+    expect(todo.body.total).toBe(4)
+    expect(todo.body.counts).toMatchObject({ entro: 1, esperando: 2, anulada: 1 })
+
+    // Filtrar por estado cambia el total, no solo lo que se ve.
+    const soloEsperando = await request(app).get('/gate/audit?status=esperando').set('Cookie', ctx.cookie)
+    expect(soloEsperando.body.total).toBe(2)
+    expect(soloEsperando.body.rows).toHaveLength(2)
+
+    const p1 = await request(app).get('/gate/audit?pageSize=2&page=1').set('Cookie', ctx.cookie)
+    const p2 = await request(app).get('/gate/audit?pageSize=2&page=2').set('Cookie', ctx.cookie)
+    expect(p1.body.rows).toHaveLength(2)
+    expect(p2.body.rows).toHaveLength(2)
+    const ids = [...p1.body.rows, ...p2.body.rows].map((r: { id: string }) => r.id)
+    expect(new Set(ids).size).toBe(4)   // sin repetidos entre páginas
   })
 
   it('un vecino no puede auditar', async () => {
@@ -121,5 +186,35 @@ describe('auditoría de invitaciones', () => {
       .send({ email: 'martin@example.com', password: PASS })
     const res = await request(app).get('/gate/audit').set('Cookie', login.headers['set-cookie'])
     expect(res.status).toBe(403)
+  })
+})
+
+describe('detalle de ingresos de una invitación', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('devuelve los movimientos que la auditoría resume como ×N', async () => {
+    const ctx = await base()
+    const evento = await inv(ctx, { guestName: 'Cumple de Sofi', kind: 'evento', capacity: 10 })
+    await registerEntry(evento.id, ctx.guardiaId, { guestName: 'Tía Ana' })
+    await registerEntry(evento.id, ctx.guardiaId, { guestName: 'Primo Juan' })
+    await registerEntry(evento.id, ctx.guardiaId, { guestName: 'Vecina' })
+
+    const audit = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
+    const fila = audit.body.rows.find((r: { guestName: string }) => r.guestName === 'Cumple de Sofi')
+    expect(fila.enteredCount).toBe(3)
+
+    const detalle = await request(app).get(`/gate/audit/${evento.id}/entries`).set('Cookie', ctx.cookie)
+    expect(detalle.body).toHaveLength(3)
+    expect(detalle.body.map((e: { guestName: string }) => e.guestName).sort())
+      .toEqual(['Primo Juan', 'Tía Ana', 'Vecina'])
+    expect(detalle.body[0].guardName).toBe('Rulo')
+    expect(detalle.body[0].enteredAt).toBeTruthy()
+  })
+
+  it('una invitación sin ingresos devuelve lista vacía', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'No vino' })
+    const res = await request(app).get(`/gate/audit/${i.id}/entries`).set('Cookie', ctx.cookie)
+    expect(res.body).toEqual([])
   })
 })
