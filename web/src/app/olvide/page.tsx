@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import { Button, Field, Wordmark } from '@/components/ui'
+import { TemaFlotante } from '@/components/tema-flotante'
 
 export default function OlvidePage() {
   const [email, setEmail] = useState('')
@@ -16,6 +17,7 @@ export default function OlvidePage() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 p-6">
+      <TemaFlotante />
       <Wordmark />
       {sent ? (
         <div>

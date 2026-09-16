@@ -58,7 +58,9 @@ export function Qr({ url }: { url: string }) {
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="filete sello">
-        <div className="bg-white p-5">
+        {/* Claro siempre, en los dos temas: un QR oscuro sobre fondo oscuro
+            no lo lee ningún lector. */}
+        <div className="bg-[#ffffff] p-5">
           <QRCodeCanvas value={url} size={232} fgColor="#0d3d28" bgColor="#ffffff" />
         </div>
       </div>
@@ -100,7 +102,7 @@ export function FormularioDatos({ token, onListo }: { token: string; onListo: ()
 
   return (
     <form onSubmit={guardar} className="filete">
-      <div className="flex flex-col gap-4 bg-white p-5">
+      <div className="flex flex-col gap-4 bg-card p-5">
         <div>
           <p className="display text-lg">Entrá más rápido</p>
           <p className="mt-0.5 text-sm text-ink-soft">
@@ -151,7 +153,7 @@ export function FormularioAnotarse({ token, spotsLeft, onAnotado }: {
   if (sinLugar) {
     return (
       <div className="filete">
-        <div className="bg-white p-5">
+        <div className="bg-card p-5">
           <p className="display text-lg">No quedan lugares</p>
           <p className="mt-1 text-ink-soft">
             El cupo de este evento está completo. Avisale a quien te invitó.
@@ -163,7 +165,7 @@ export function FormularioAnotarse({ token, spotsLeft, onAnotado }: {
 
   return (
     <form onSubmit={anotarse} className="filete">
-      <div className="flex flex-col gap-4 bg-white p-5">
+      <div className="flex flex-col gap-4 bg-card p-5">
         <div>
           <p className="display text-lg">Anotate</p>
           <p className="mt-0.5 text-sm text-ink-soft">

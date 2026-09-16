@@ -83,12 +83,12 @@ export function Verdict({ resultado, onSalir }: {
             <label className="flex flex-1 flex-col gap-1 font-semibold">
               Documento
               <input value={doc} onChange={(e) => setDoc(e.target.value)}
-                className="tabular min-h-14 w-full rounded border-2 border-pass-ink/25 bg-white px-3 text-xl" />
+                className="tabular min-h-14 w-full rounded border-2 border-pass-ink/25 bg-card px-3 text-xl" />
             </label>
             <label className="flex flex-1 flex-col gap-1 font-semibold">
               Patente
               <input value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                className="tabular min-h-14 w-full rounded border-2 border-pass-ink/25 bg-white px-3 text-xl" />
+                className="tabular min-h-14 w-full rounded border-2 border-pass-ink/25 bg-card px-3 text-xl" />
             </label>
           </div>
           <button ref={accionRef} onClick={registrar} disabled={busy}

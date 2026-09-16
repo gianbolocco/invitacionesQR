@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { logout, type Me } from '@/lib/session'
-import { Wordmark } from './ui'
+import { useTema } from '@/lib/theme'
+import { TemaToggle, Wordmark } from './ui'
 
 /**
  * Íconos propios en vez de caracteres sueltos: un rombo y un reloj tipográficos
@@ -71,7 +72,7 @@ function MenuAdmin({ path }: { path: string }) {
       <button onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto} aria-haspopup="menu"
         className="flex min-h-12 w-full items-center justify-between gap-3 border-t
-          border-ink/10 px-5 font-semibold">
+          border-line px-5 font-semibold">
         {actual?.label ?? 'Menú'}
         <span aria-hidden className={`transition-transform ${abierto ? 'rotate-180' : ''}`}>⌄</span>
       </button>
@@ -80,8 +81,8 @@ function MenuAdmin({ path }: { path: string }) {
         <>
           <button aria-hidden tabIndex={-1} onClick={() => setAbierto(false)}
             className="fixed inset-0 z-10 cursor-default bg-ink/20" />
-          <nav className="surgir absolute inset-x-0 top-full z-20 border-b border-ink/10
-            bg-white shadow-lg">
+          <nav className="surgir absolute inset-x-0 top-full z-20 border-b border-line
+            bg-card shadow-lg">
             {ADMIN_NAV.map((item) => (
               // Se cierra al elegir: si no, queda abierto sobre la pantalla nueva.
               <Link key={item.href} href={item.href} onClick={() => setAbierto(false)}
@@ -108,7 +109,7 @@ function MenuAdmin({ path }: { path: string }) {
 function BarraInferior({ path }: { path: string }) {
   return (
     <nav aria-label="Secciones"
-      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-ink/10 bg-white sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-card sm:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {RESIDENT_NAV.map(({ href, label, Icono }) => {
         const activo = esActivo(href, path)
@@ -138,17 +139,21 @@ export function Shell({ me, accion, children }: {
   children: React.ReactNode
 }) {
   const path = usePathname()
+  const [tema, setTema] = useTema()
   const esAdmin = path.startsWith('/admin')
   const nav = esAdmin ? ADMIN_NAV : RESIDENT_NAV
 
   return (
     <div className={`min-h-dvh ${esAdmin ? '' : 'con-barra-inferior sm:pb-0'} ${accion ? 'con-accion' : ''}`}>
-      <header className="sticky top-0 z-20 border-b border-alamo/15 bg-white">
+      <header className="sticky top-0 z-20 border-b border-alamo/15 bg-card">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-3">
           <Wordmark subtitle={me.units[0]?.label ?? me.role} />
-          <button onClick={logout} className="text-sm text-ink-soft underline underline-offset-4">
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-3">
+            <TemaToggle tema={tema} onTema={setTema} />
+            <button onClick={logout} className="text-sm text-ink-soft underline underline-offset-4">
+              Salir
+            </button>
+          </div>
         </div>
 
         {/* En pantalla ancha, las solapas de siempre para los dos roles. */}
@@ -179,7 +184,7 @@ export function Shell({ me, accion, children }: {
       <main className="surgir mx-auto max-w-5xl px-5 py-6">{children}</main>
 
       {accion && (
-        <div className="fixed inset-x-0 bottom-16 z-30 border-t border-ink/10 bg-surface/95
+        <div className="fixed inset-x-0 bottom-16 z-30 border-t border-line bg-surface/95
           px-4 py-3 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-5 sm:pb-8 sm:pt-0"
           style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="mx-auto max-w-5xl">{accion}</div>
@@ -189,7 +194,7 @@ export function Shell({ me, accion, children }: {
       {!esAdmin && <BarraInferior path={path} />}
       {!esAdmin && me.role === 'admin' && (
         <Link href="/admin" className="fixed right-4 top-3 z-40 rounded-full border
-          border-alamo/30 bg-white px-3 py-1.5 text-xs font-semibold text-alamo sm:hidden">
+          border-alamo/30 bg-card px-3 py-1.5 text-xs font-semibold text-alamo sm:hidden">
           Admin
         </Link>
       )}

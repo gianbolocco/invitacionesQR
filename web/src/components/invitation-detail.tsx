@@ -7,7 +7,7 @@ import { InvitationForm } from './invitation-form'
 
 function Dato({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-ink/8 py-2">
+    <div className="flex items-baseline justify-between gap-4 border-b border-line py-2">
       <Eyebrow>{label}</Eyebrow>
       <span className="text-right tabular">{children}</span>
     </div>
@@ -57,7 +57,7 @@ export function InvitationDetail({ inv, units, onVolver, onAnular, onGuardado, o
 
       <QrShare token={inv.token} guestName={inv.guestName} />
 
-      <Filete className="bg-white px-4 py-2">
+      <Filete className="bg-card px-4 py-2">
         <Dato label="Tipo">{KIND_LABEL[inv.kind]}</Dato>
         <Dato label="Vigencia">{vigencia(inv)}</Dato>
         {inv.guestDoc && <Dato label="Documento">{inv.guestDoc}</Dato>}

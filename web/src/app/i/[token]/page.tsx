@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { KIND_LABEL, hoyISO } from '@/lib/invitations'
 import { Eyebrow, Wordmark } from '@/components/ui'
+import { TemaFlotante } from '@/components/tema-flotante'
 import {
   Cabecera, Qr, FormularioDatos, FormularioAnotarse, fechaCorta, type Publica,
 } from '@/components/guest-page'
@@ -49,6 +50,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
   if (noExiste) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 p-6 text-center">
+      <TemaFlotante />
         <Wordmark />
         <h1 className="display text-xl">Esta invitación no existe</h1>
         <p className="text-ink-soft">Pedile a quien te invitó que te mande el link de nuevo.</p>
@@ -65,6 +67,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col gap-6 p-6">
+      <TemaFlotante />
       <Cabecera inv={inv} />
 
       {muerta && (

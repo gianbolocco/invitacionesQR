@@ -24,7 +24,7 @@ export function Button({ variant = 'primary', className = '', ...props }: Button
     'transition-[background-color,border-color,opacity] active:scale-[0.99] ' +
     'disabled:opacity-50 disabled:cursor-not-allowed'
   const look = {
-    primary: 'min-h-14 bg-alamo text-white hover:bg-alamo-deep',
+    primary: 'min-h-14 bg-alamo text-surface hover:bg-alamo-deep',
     quiet: 'border border-alamo/30 text-alamo hover:bg-alamo/5',
     peligro: 'min-h-14 bg-deny-field text-deny-ink hover:opacity-90',
   }[variant]
@@ -41,7 +41,7 @@ export function Vacio({ titulo, detalle, children }: {
   children?: ReactNode
 }) {
   return (
-    <Filete className="flex flex-col items-center gap-4 bg-white px-5 py-10 text-center">
+    <Filete className="flex flex-col items-center gap-4 bg-card px-5 py-10 text-center">
       <div>
         <p className="display text-lg">{titulo}</p>
         {detalle && <p className="mt-1 text-ink-soft">{detalle}</p>}
@@ -60,7 +60,7 @@ export function Field({ label, hint, id, className = '', ...props }: FieldProps)
       <label htmlFor={inputId} className="text-sm font-semibold">{label}</label>
       <input
         id={inputId}
-        className={`min-h-12 rounded border border-ink/15 bg-white px-3 text-base
+        className={`min-h-12 rounded border border-line bg-card px-3 text-base
           placeholder:text-ink-soft/60 ${className}`}
         {...props}
       />
@@ -78,6 +78,39 @@ export function ErrorNote({ children }: { children: ReactNode }) {
     <p role="alert" className="rounded border-l-4 border-deny-field bg-deny-field/5 px-3 py-2 text-sm">
       {children}
     </p>
+  )
+}
+
+/**
+ * Tres estados y no dos: "Sistema" tiene que existir, porque quien tiene el
+ * celular en oscuro automático de noche espera que la app lo siga sola.
+ * Un toggle de dos lo obliga a elegir un tema fijo para siempre.
+ */
+export function TemaToggle({ tema, onTema }: {
+  tema: 'sistema' | 'claro' | 'oscuro'
+  onTema: (t: 'sistema' | 'claro' | 'oscuro') => void
+}) {
+  const opciones = [
+    { id: 'claro', label: 'Claro', icono: '☀' },
+    { id: 'sistema', label: 'Auto', icono: '◐' },
+    { id: 'oscuro', label: 'Oscuro', icono: '☾' },
+  ] as const
+
+  return (
+    <div role="radiogroup" aria-label="Tema"
+      className="flex rounded-full border border-line p-0.5">
+      {opciones.map((o) => (
+        <button key={o.id} role="radio" aria-checked={tema === o.id}
+          title={o.label} onClick={() => onTema(o.id)}
+          className={`flex size-8 items-center justify-center rounded-full text-sm
+            transition-colors ${
+              tema === o.id ? 'bg-alamo text-surface' : 'text-ink-soft hover:text-ink'
+            }`}>
+          <span aria-hidden>{o.icono}</span>
+          <span className="sr-only">{o.label}</span>
+        </button>
+      ))}
+    </div>
   )
 }
 

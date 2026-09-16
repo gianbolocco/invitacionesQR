@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { api, ApiError, apiBase } from '@/lib/api'
 import { homeFor, type Me } from '@/lib/session'
 import { Button, Field, ErrorNote, Wordmark } from '@/components/ui'
+import { TemaFlotante } from '@/components/tema-flotante'
 
 const ERROR_GOOGLE: Record<string, string> = {
   not_in_padron: 'Ese mail no está en el padrón de Álamo Alto. Pedile el alta a la administración.',
@@ -52,6 +53,7 @@ function Login() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 p-6">
+      <TemaFlotante />
       <Wordmark />
       <form onSubmit={submit} className="flex flex-col gap-5">
         <Field label="Mail" type="email" autoComplete="email" required

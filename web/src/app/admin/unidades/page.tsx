@@ -36,7 +36,7 @@ export default function UnidadesPage() {
       <div className="flex flex-col gap-6">
         <h1 className="display text-2xl">Unidades</h1>
 
-        <Filete className="bg-white p-5">
+        <Filete className="bg-card p-5">
           <form onSubmit={crear} className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="flex-1">
               <Field label="Número de lote" required value={lot} className="tabular"
@@ -55,7 +55,7 @@ export default function UnidadesPage() {
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {units?.map((u) => (
             <li key={u.id}>
-              <Filete className="bg-white px-4 py-3">
+              <Filete className="bg-card px-4 py-3">
                 <span className="font-semibold tabular">{u.label}</span>
               </Filete>
             </li>

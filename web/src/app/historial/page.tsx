@@ -35,7 +35,7 @@ export default function HistorialPage() {
 
         {invitaciones === null && <Cargando><SkeletonTarjetas cantidad={4} /></Cargando>}
         {invitaciones !== null && lista.length === 0 && (
-          <Filete className="bg-white px-5 py-10 text-center">
+          <Filete className="bg-card px-5 py-10 text-center">
             <p className="text-ink-soft">Todavía no hay invitaciones.</p>
           </Filete>
         )}
@@ -43,7 +43,7 @@ export default function HistorialPage() {
         <ul className="flex flex-col gap-3">
           {lista.map((inv) => (
             <li key={inv.id}>
-              <Filete className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3.5">
+              <Filete className="flex flex-wrap items-center justify-between gap-3 bg-card px-4 py-3.5">
                 <div className="min-w-0">
                   <Eyebrow>{KIND_LABEL[inv.kind]} · {fechaCorta(inv.createdAt.slice(0, 10))}</Eyebrow>
                   <p className="display truncate text-lg">{inv.guestName}</p>

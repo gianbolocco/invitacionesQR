@@ -85,7 +85,7 @@ export default function GuardiasPage() {
           </p>
         </div>
 
-        <Filete className="bg-white p-5">
+        <Filete className="bg-card p-5">
           <Eyebrow>Dar de alta un guardia</Eyebrow>
           <form onSubmit={alta} className="mt-4 flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-3">
@@ -107,7 +107,7 @@ export default function GuardiasPage() {
 
         {people === null && <Cargando><SkeletonTarjetas cantidad={2} /></Cargando>}
         {people !== null && guardias.length === 0 && (
-          <Filete className="bg-white px-5 py-8 text-center">
+          <Filete className="bg-card px-5 py-8 text-center">
             <p className="text-ink-soft">
               Todavía no hay guardias cargados.<br />
               Sin al menos uno, nadie puede escanear en la barrera.
@@ -118,7 +118,7 @@ export default function GuardiasPage() {
         <ul className="flex flex-col gap-2">
           {guardias.map((g) => (
             <li key={g.id}>
-              <Filete className={`flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3
+              <Filete className={`flex flex-wrap items-center justify-between gap-3 bg-card px-4 py-3
                 ${g.status === 'disabled' ? 'opacity-50' : ''}`}>
                 <div className="min-w-0">
                   <p className="font-semibold">{g.name}</p>

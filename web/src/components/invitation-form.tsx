@@ -88,8 +88,8 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
               aria-pressed={kind === k.id}
               className={`min-h-12 rounded-full border px-5 text-sm font-semibold ${
                 kind === k.id
-                  ? 'border-alamo bg-alamo text-white'
-                  : 'border-ink/15 bg-white text-ink-soft'
+                  ? 'border-alamo bg-alamo text-surface'
+                  : 'border-line bg-card text-ink-soft'
               }`}>
               {k.label}
             </button>
@@ -103,7 +103,7 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
         <div className="flex flex-col gap-1.5">
           <label htmlFor="unit" className="text-sm font-semibold">Unidad</label>
           <select id="unit" value={unitId} onChange={(e) => setUnitId(e.target.value)}
-            className="min-h-12 rounded border border-ink/15 bg-white px-3">
+            className="min-h-12 rounded border border-line bg-card px-3">
             {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
           </select>
         </div>
@@ -129,8 +129,8 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
                     w.includes(i) ? w.filter((x) => x !== i) : [...w, i].sort())}
                   className={`min-h-12 flex-1 rounded border text-xs font-semibold ${
                     weekdays.includes(i)
-                      ? 'border-alamo bg-alamo text-white'
-                      : 'border-ink/15 bg-white text-ink-soft'
+                      ? 'border-alamo bg-alamo text-surface'
+                      : 'border-line bg-card text-ink-soft'
                   }`}>
                   {d}
                 </button>
@@ -147,7 +147,7 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
           onChange={(e) => setCapacity(Number(e.target.value))} />
       )}
 
-      <div className="flex flex-col gap-4 border-t border-ink/10 pt-5">
+      <div className="flex flex-col gap-4 border-t border-line pt-5">
         <Eyebrow>Opcional</Eyebrow>
         <Field label="DNI" inputMode="numeric" value={guestDoc} className="tabular"
           hint="Si lo cargás, el guardia no tiene que tipearlo en la barrera."

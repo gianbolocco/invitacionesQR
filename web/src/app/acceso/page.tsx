@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { homeFor, type Me } from '@/lib/session'
 import { Button, Field, ErrorNote, Wordmark } from '@/components/ui'
+import { TemaFlotante } from '@/components/tema-flotante'
 
 function Acceso() {
   const router = useRouter()
@@ -58,6 +59,7 @@ function Acceso() {
   if (invalid) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 p-6">
+      <TemaFlotante />
         <Wordmark />
         <h1 className="display text-xl font-bold">
           Este link no sirve
@@ -73,6 +75,7 @@ function Acceso() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 p-6">
+      <TemaFlotante />
       <Wordmark />
       <div>
         <h1 className="display text-2xl font-bold">

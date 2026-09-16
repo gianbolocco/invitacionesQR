@@ -18,7 +18,7 @@ export function SkeletonTarjetas({ cantidad = 3 }: { cantidad?: number }) {
     <ul className="flex flex-col gap-3" aria-hidden>
       {Array.from({ length: cantidad }, (_, i) => (
         <li key={i}>
-          <Filete className="flex items-center justify-between gap-4 bg-white px-4 py-3.5">
+          <Filete className="flex items-center justify-between gap-4 bg-card px-4 py-3.5">
             <div className="flex flex-col gap-2">
               <SkeletonLinea ancho="w-16" />
               <SkeletonLinea ancho="w-40" />
@@ -50,7 +50,7 @@ export function SkeletonTiles({ cantidad = 6 }: { cantidad?: number }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
       {Array.from({ length: cantidad }, (_, i) => (
-        <Filete key={i} className="bg-white px-4 py-3.5">
+        <Filete key={i} className="bg-card px-4 py-3.5">
           <SkeletonLinea ancho="w-24" />
           <span className="skeleton mt-3 block h-8 w-16" />
         </Filete>
@@ -126,7 +126,7 @@ export function Confirmar({ titulo, detalle, accion, onConfirmar, onCancelar }: 
     <div role="dialog" aria-modal="true" aria-label={titulo}
       className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
       <div className="surgir w-full max-w-sm">
-        <Filete className="flex flex-col gap-4 bg-white p-5">
+        <Filete className="flex flex-col gap-4 bg-card p-5">
           <div>
             <p className="display text-lg">{titulo}</p>
             {detalle && <p className="mt-1 text-sm text-ink-soft">{detalle}</p>}

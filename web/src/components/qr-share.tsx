@@ -27,7 +27,9 @@ export function QrShare({ token, guestName }: { token: string; guestName: string
   return (
     <div className="flex flex-col items-center gap-5">
       <div className="filete sello">
-        <div className="bg-white p-5">
+        {/* Claro siempre, en los dos temas: un QR oscuro sobre fondo oscuro
+            no lo lee ningún lector. */}
+        <div className="bg-[#ffffff] p-5">
           <QRCodeCanvas value={url} size={232} fgColor="#0d3d28" bgColor="#ffffff" />
         </div>
       </div>

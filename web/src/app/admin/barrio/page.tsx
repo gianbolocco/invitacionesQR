@@ -52,7 +52,7 @@ export default function BarrioPage() {
           </p>
         </div>
 
-        <Filete className="bg-white p-5">
+        <Filete className="bg-card p-5">
           <Eyebrow>Cómo llegar</Eyebrow>
           <form onSubmit={guardar} className="mt-4 flex flex-col gap-4">
             <Field label="Dirección" value={address} placeholder="Ruta 8 km 62, Pilar"

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Archivo, Playfair_Display } from 'next/font/google'
+import { SCRIPT_ANTI_PARPADEO } from '@/lib/theme'
 import './globals.css'
 
 // Archivo es variable y trae eje de ancho (wdth). Una sola carga: la jerarquía
@@ -21,7 +22,10 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#1e6b47',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#1e6b47' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b1712' },
+  ],
   width: 'device-width',
   initialScale: 1,
   // Sin maximumScale: el vecino tiene que poder hacer zoom.
@@ -29,7 +33,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es-AR" className={`${archivo.variable} ${playfair.variable}`}>
+    <html lang="es-AR" className={`${archivo.variable} ${playfair.variable}`}
+      suppressHydrationWarning>
+      <head>
+        {/* Antes de pintar: si no, la pantalla arranca clara y salta a oscura. */}
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_ANTI_PARPADEO }} />
+      </head>
       <body>{children}</body>
     </html>
   )

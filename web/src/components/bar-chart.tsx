@@ -39,7 +39,7 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
             <div key={b.label} className="group relative flex h-full flex-1 flex-col justify-end">
               {/* Tooltip por barra. El área de hover es la columna entera, no la barra. */}
               <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden
-                -translate-x-1/2 whitespace-nowrap rounded bg-ink px-2 py-1 text-xs text-white
+                -translate-x-1/2 whitespace-nowrap rounded bg-ink px-2 py-1 text-xs text-surface
                 group-hover:block">
                 <span className="tabular">{b.hint ?? b.label}: {b.total}</span>
               </div>
@@ -54,7 +54,7 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
       )}
 
       {hayDatos && !tabla && (
-        <div className="flex justify-between border-t border-ink/10 pt-1 text-xs text-ink-soft tabular">
+        <div className="flex justify-between border-t border-line pt-1 text-xs text-ink-soft tabular">
           {/* Etiquetas selectivas: extremos y máximo, no una por barra. */}
           <span>{bars[0]?.label}</span>
           <span className="font-semibold text-ink">
@@ -67,14 +67,14 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
       {tabla && (
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-ink/15">
+            <tr className="border-b border-line">
               <th className="py-1"><Eyebrow>Tramo</Eyebrow></th>
               <th className="py-1"><Eyebrow>Ingresos</Eyebrow></th>
             </tr>
           </thead>
           <tbody>
             {bars.filter((b) => b.total > 0).map((b) => (
-              <tr key={b.label} className="border-b border-ink/8">
+              <tr key={b.label} className="border-b border-line">
                 <td className="py-1.5 tabular">{b.hint ?? b.label}</td>
                 <td className="py-1.5 tabular">{b.total}</td>
               </tr>

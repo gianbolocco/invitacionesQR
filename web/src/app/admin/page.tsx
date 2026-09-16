@@ -27,7 +27,7 @@ function Tile({ label, value, tone = 'normal' }: {
   label: string; value: number | string; tone?: 'normal' | 'alerta'
 }) {
   return (
-    <Filete className={`px-4 py-3.5 ${tone === 'alerta' ? 'bg-deny-field/5' : 'bg-white'}`}>
+    <Filete className={`px-4 py-3.5 ${tone === 'alerta' ? 'bg-deny-field/5' : 'bg-card'}`}>
       <Eyebrow>{label}</Eyebrow>
       <p className={`display mt-1 text-3xl tabular ${tone === 'alerta' ? 'text-deny-field' : ''}`}>
         {value}
@@ -103,10 +103,10 @@ export default function TableroPage() {
         )}
 
         <div className="grid gap-8 lg:grid-cols-2">
-          <Filete className="bg-white p-5">
+          <Filete className="bg-card p-5">
             <BarChart title="Ingresos por día · últimos 30" bars={dias} />
           </Filete>
-          <Filete className="bg-white p-5">
+          <Filete className="bg-card p-5">
             <BarChart title="Ingresos por hora del día" bars={horas}
               emptyText="Sin ingresos registrados todavía." />
           </Filete>
@@ -134,7 +134,7 @@ export default function TableroPage() {
             <table className="w-full text-left text-sm">
               <tbody>
                 {porGuardia.map((g) => (
-                  <tr key={g.id ?? 'sin'} className="border-b border-ink/8">
+                  <tr key={g.id ?? 'sin'} className="border-b border-line">
                     <td className="py-2">{g.name ?? 'Sin asignar'}</td>
                     <td className="py-2 tabular">{g.total}</td>
                     <td className="py-2 text-ink-soft tabular">

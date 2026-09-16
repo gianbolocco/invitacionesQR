@@ -8,25 +8,79 @@
   luminancia, que sobrevive al daltonismo y a las pantallas malas.
 */
 @theme {
-  --color-alamo: #1e6b47;
-  --color-alamo-deep: #0d3d28;
-  --color-alamo-line: #f2f0e8;
+  /* Los valores reales viven en :root y en el bloque oscuro de más abajo.
+     Acá solo se declaran los nombres para que Tailwind genere las clases. */
+  --color-alamo: var(--alamo);
+  --color-alamo-deep: var(--alamo-deep);
+  --color-alamo-line: var(--alamo-line);
 
   --color-pass-field: #eaf5ec;
   --color-pass-ink: #0d3d28;
   --color-deny-field: #7a1420;
   --color-deny-ink: #fff1f0;
 
-  --color-ink: #16211c;
-  --color-ink-soft: #55635c;
-  --color-surface: #fbfaf6;
-  --color-surface-sunk: #f1efe7;
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-surface: var(--surface);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-card: var(--card);
+  --color-line: var(--line);
 
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 
+/*
+  Tema claro: el default. El oscuro NO es una inversión automática — cada valor
+  está elegido contra su fondo, que es lo único que mantiene el contraste.
+*/
 :root {
   color-scheme: light;
+  --alamo: #1e6b47;
+  --alamo-deep: #0d3d28;
+  --alamo-line: #f2f0e8;
+  --ink: #16211c;
+  --ink-soft: #55635c;
+  --surface: #fbfaf6;
+  --surface-sunk: #f1efe7;
+  --card: #ffffff;
+  --line: #16211c1f;
+}
+
+/*
+  Tema oscuro. El verde de marca (#1e6b47) sobre fondo oscuro no llega a
+  contraste de texto, así que acá el acento es un paso más claro del MISMO tono:
+  la marca se mantiene, cambia qué paso de la escala se usa.
+
+  Va escrito dos veces a propósito — una para la preferencia del sistema y otra
+  para la elección explícita — porque CSS no tiene mixins y encadenar los
+  selectores haría que el toggle no pueda ganarle al sistema.
+*/
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --alamo: #5cb98a;
+  --alamo-deep: #8fd4ae;
+  --alamo-line: #e8f1ea;
+  --ink: #e9efea;
+  --ink-soft: #9fb0a7;
+  --surface: #0b1712;
+  --surface-sunk: #0f1f18;
+  --card: #14261d;
+  --line: #e9efea24;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --alamo: #5cb98a;
+    --alamo-deep: #8fd4ae;
+    --alamo-line: #e8f1ea;
+    --ink: #e9efea;
+    --ink-soft: #9fb0a7;
+    --surface: #0b1712;
+    --surface-sunk: #0f1f18;
+    --card: #14261d;
+    --line: #e9efea24;
+  }
 }
 
 html {
@@ -35,8 +89,9 @@ html {
 }
 
 body {
-  background: var(--color-surface);
-  color: var(--color-ink);
+  background: var(--surface);
+  color: var(--ink);
+  transition: background-color 150ms ease, color 150ms ease;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
@@ -63,24 +118,24 @@ body {
   letter-spacing: 0.18em;
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--color-ink-soft);
+  color: var(--ink-soft);
 }
 
 /* El doble filete del cartel, convertido en el marco del sistema. */
 .filete {
-  border: 1px solid color-mix(in srgb, var(--color-alamo) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--alamo) 22%, transparent);
   border-radius: 4px;
   padding: 3px;
-  background: white;
+  background: var(--card);
 }
 .filete > * {
-  border: 1px solid color-mix(in srgb, var(--color-alamo) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--alamo) 14%, transparent);
   border-radius: 2px;
 }
 
 /* El foco tiene que verse siempre: la garita se opera con teclado. */
 :focus-visible {
-  outline: 3px solid var(--color-alamo);
+  outline: 3px solid var(--alamo);
   outline-offset: 2px;
 }
 
@@ -117,7 +172,7 @@ body {
 }
 .skeleton {
   animation: latir 1.4s ease-in-out infinite;
-  background: color-mix(in srgb, var(--color-ink) 12%, transparent);
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
   border-radius: 4px;
 }
 

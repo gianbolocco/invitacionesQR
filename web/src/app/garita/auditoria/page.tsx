@@ -2,7 +2,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
-import { esDeNoche, hora } from '@/lib/gate'
+import { hora } from '@/lib/gate'
 import { hoyISO } from '@/lib/invitations'
 import { GaritaShell } from '@/components/garita-shell'
 import { Eyebrow } from '@/components/ui'
@@ -65,7 +65,6 @@ const PAGE_SIZE = 25
 
 export default function AuditoriaPage() {
   const me = useMe()
-  const [oscuro, setOscuro] = useState(false)
   const [from, setFrom] = useState(haceDias(30))
   const [to, setTo] = useState(hoyISO())
   const [estado, setEstado] = useState<'todos' | AuditRow['status']>('todos')
@@ -83,10 +82,6 @@ export default function AuditoriaPage() {
     setMovimientos(await api<Movimiento[]>(`/gate/audit/${id}/entries`).catch(() => []))
   }
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOscuro(esDeNoche())
-  }, [])
 
   const filtros = useCallback(() => {
     const p = new URLSearchParams({ from, to })
@@ -118,7 +113,6 @@ export default function AuditoriaPage() {
   }
 
   const lista = pagina?.rows ?? []
-  const borde = oscuro ? 'border-white/20' : 'border-ink/12'
   const counts = pagina?.counts
   const total = pagina?.total ?? 0
   const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -127,7 +121,7 @@ export default function AuditoriaPage() {
     : 0
 
   return (
-    <GaritaShell oscuro={oscuro} onTema={() => setOscuro((v) => !v)} guardName={me.name}>
+    <GaritaShell guardName={me.name}>
       <div className="flex flex-col gap-5">
         <h1 className="display text-2xl">Auditoría</h1>
 
@@ -135,16 +129,16 @@ export default function AuditoriaPage() {
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Desde
             <input type="date" value={from} onChange={(e) => cambiarDesde(e.target.value)}
-              className={`tabular min-h-11 rounded border ${borde} bg-white px-3 text-ink`} />
+              className="tabular min-h-11 rounded border border-line bg-card px-3 text-ink" />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Hasta
             <input type="date" value={to} onChange={(e) => cambiarHasta(e.target.value)}
-              className={`tabular min-h-11 rounded border ${borde} bg-white px-3 text-ink`} />
+              className="tabular min-h-11 rounded border border-line bg-card px-3 text-ink" />
           </label>
           <a href={`${apiBase}/gate/audit.xlsx?${filtros()}`}
             className="inline-flex min-h-11 items-center rounded bg-alamo px-4 text-sm
-              font-semibold text-white">
+              font-semibold text-surface">
             Exportar a Excel
           </a>
         </div>
@@ -160,7 +154,7 @@ export default function AuditoriaPage() {
             <button key={valor} onClick={() => cambiarEstado(valor)}
               aria-pressed={estado === valor}
               className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
-                estado === valor ? 'border-alamo bg-alamo text-white' : borde
+                estado === valor ? 'border-alamo bg-alamo text-surface' : 'border-line'
               }`}>
               {label}
             </button>
@@ -176,7 +170,7 @@ export default function AuditoriaPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[46rem] border-collapse text-left text-sm">
               <thead>
-                <tr className={`border-b ${borde}`}>
+                <tr className="border-b border-line">
                   {['Invitado', 'Documento', 'Unidad', 'Invitó', 'Fecha', 'Estado', 'Ingreso', 'Guardia']
                     .map((h) => <th key={h} className="py-2 pr-4"><Eyebrow>{h}</Eyebrow></th>)}
                 </tr>
@@ -250,16 +244,16 @@ export default function AuditoriaPage() {
             </p>
             <div className="flex gap-2">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                className={`min-h-11 rounded border ${borde} px-4 text-sm font-semibold
-                  disabled:opacity-40`}>
+                className="min-h-11 rounded border border-line px-4 text-sm font-semibold
+                  disabled:opacity-40">
                 ‹ Anterior
               </button>
               <span className="flex min-h-11 items-center px-2 text-sm tabular">
                 {page} de {paginas}
               </span>
               <button onClick={() => setPage((p) => Math.min(paginas, p + 1))} disabled={page >= paginas}
-                className={`min-h-11 rounded border ${borde} px-4 text-sm font-semibold
-                  disabled:opacity-40`}>
+                className="min-h-11 rounded border border-line px-4 text-sm font-semibold
+                  disabled:opacity-40">
                 Siguiente ›
               </button>
             </div>

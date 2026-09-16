@@ -69,7 +69,7 @@ export default function HomePage() {
     <Shell me={me} accion={mostrandoLista && vigentes.length > 0 ? (
       <Link href="/nueva"
         className="flex min-h-14 items-center justify-center rounded bg-alamo px-5
-          font-semibold text-white">
+          font-semibold text-surface">
         Nueva invitación
       </Link>
     ) : undefined}>
@@ -96,7 +96,7 @@ export default function HomePage() {
           <ul className="escalonar flex flex-col gap-2">
             {anotados?.map((a) => (
               <li key={a.id}>
-                <Filete className={`bg-white px-4 py-3 ${a.revokedAt ? 'opacity-50' : ''}`}>
+                <Filete className={`bg-card px-4 py-3 ${a.revokedAt ? 'opacity-50' : ''}`}>
                   <p className="font-semibold">{a.guestName}</p>
                   <p className="text-sm text-ink-soft tabular">
                     {a.guestDoc ?? 'Sin documento'}
@@ -137,7 +137,7 @@ export default function HomePage() {
               detalle="Creá una invitación y compartila por WhatsApp.">
               <Link href="/nueva"
                 className="inline-flex min-h-14 items-center justify-center rounded bg-alamo
-                  px-6 font-semibold text-white">
+                  px-6 font-semibold text-surface">
                 Nueva invitación
               </Link>
             </Vacio>
@@ -149,7 +149,7 @@ export default function HomePage() {
             {vigentes.map((inv) => (
               <li key={inv.id}>
                 <button onClick={() => setVerQr(inv)} className="w-full text-left">
-                  <Filete className="flex items-center justify-between gap-4 bg-white px-4 py-3.5">
+                  <Filete className="flex items-center justify-between gap-4 bg-card px-4 py-3.5">
                     <div className="min-w-0">
                       <Eyebrow>{KIND_LABEL[inv.kind]}</Eyebrow>
                       <p className="display truncate text-lg">{inv.guestName}</p>

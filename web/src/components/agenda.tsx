@@ -38,16 +38,15 @@ function titulo(fecha: string): string {
     .format(new Date(y, m - 1, d))
 }
 
-function Fila({ r, borde, tenue, onAbrir }: {
+function Fila({ r, tenue, onAbrir }: {
   r: AgendaRow
-  borde: string
   tenue?: boolean
   onAbrir: (id: string) => void
 }) {
   return (
     <li>
       <button onClick={() => onAbrir(r.id)}
-        className={`w-full rounded border ${borde} px-4 py-3 text-left ${tenue ? 'opacity-60' : ''}`}>
+        className={`w-full rounded border border-line px-4 py-3 text-left ${tenue ? 'opacity-60' : ''}`}>
         <span className="block text-lg font-semibold">{r.guestName}</span>
         <span className="block text-sm opacity-75 tabular">
           {r.unitLabel} · invita {r.inviterName}
@@ -61,10 +60,9 @@ function Fila({ r, borde, tenue, onAbrir }: {
   )
 }
 
-function Seccion({ label, rows, borde, tenue, onAbrir }: {
+function Seccion({ label, rows, tenue, onAbrir }: {
   label: string
   rows: AgendaRow[]
-  borde: string
   tenue?: boolean
   onAbrir: (id: string) => void
 }) {
@@ -75,7 +73,7 @@ function Seccion({ label, rows, borde, tenue, onAbrir }: {
         {label} ({rows.length})
       </p>
       <ul className="escalonar flex flex-col gap-2">
-        {rows.map((r) => <Fila key={r.id} r={r} borde={borde} tenue={tenue} onAbrir={onAbrir} />)}
+        {rows.map((r) => <Fila key={r.id} r={r} tenue={tenue} onAbrir={onAbrir} />)}
       </ul>
     </section>
   )
@@ -91,10 +89,7 @@ function Seccion({ label, rows, borde, tenue, onAbrir }: {
  * 30 anotados taparía las tres visitas que importan. Los frecuentes van aparte
  * y colapsados, porque aparecen todos los días y el guardia deja de leerlos.
  */
-export function Agenda({ oscuro, onAbrir }: {
-  oscuro: boolean
-  onAbrir: (id: string) => void
-}) {
+export function Agenda({ onAbrir }: { onAbrir: (id: string) => void }) {
   const [fecha, setFecha] = useState(hoyISO())
   const [filas, setFilas] = useState<AgendaRow[] | null>(null)
   const [verFrecuentes, setVerFrecuentes] = useState(false)
@@ -112,20 +107,19 @@ export function Agenda({ oscuro, onAbrir }: {
   const esperando = puntuales.filter((r) => r.enteredCount === 0)
   const entraron = puntuales.filter((r) => r.enteredCount > 0)
 
-  const borde = oscuro ? 'border-current/20' : 'border-ink/12'
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2">
         <button onClick={() => setFecha(corrido(-1))}
-          className={`min-h-11 rounded border ${borde} px-3 text-sm`}>‹ Ayer</button>
+          className="min-h-11 rounded border border-line px-3 text-sm">‹ Ayer</button>
         <button onClick={() => setFecha(hoyISO())}
-          className={`min-h-11 rounded border ${borde} px-4 text-sm font-semibold`}>Hoy</button>
+          className="min-h-11 rounded border border-line px-4 text-sm font-semibold">Hoy</button>
         <button onClick={() => setFecha(corrido(1))}
-          className={`min-h-11 rounded border ${borde} px-3 text-sm`}>Mañana ›</button>
+          className="min-h-11 rounded border border-line px-3 text-sm">Mañana ›</button>
         <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value || hoyISO())}
           aria-label="Otra fecha"
-          className={`tabular min-h-11 rounded border ${borde} bg-white px-3 text-sm text-ink`} />
+          className="tabular min-h-11 rounded border border-line bg-card px-3 text-sm text-ink" />
       </div>
 
       <h2 className="display text-2xl capitalize">{titulo(fecha)}</h2>
@@ -135,9 +129,9 @@ export function Agenda({ oscuro, onAbrir }: {
         <p className="opacity-70">Nadie tiene autorización para este día.</p>
       )}
 
-      <Seccion label="Esperando" rows={esperando} borde={borde} onAbrir={onAbrir} />
-      <Seccion label="Eventos" rows={eventos} borde={borde} onAbrir={onAbrir} />
-      <Seccion label="Ya entraron" rows={entraron} borde={borde} tenue onAbrir={onAbrir} />
+      <Seccion label="Esperando" rows={esperando} onAbrir={onAbrir} />
+      <Seccion label="Eventos" rows={eventos} onAbrir={onAbrir} />
+      <Seccion label="Ya entraron" rows={entraron} tenue onAbrir={onAbrir} />
 
       {frecuentes.length > 0 && (
         <section className="flex flex-col gap-2">
@@ -148,7 +142,7 @@ export function Agenda({ oscuro, onAbrir }: {
           {verFrecuentes && (
             <ul className="flex flex-col gap-2">
               {frecuentes.map((r) => (
-                <Fila key={r.id} r={r} borde={borde} onAbrir={onAbrir} />
+                <Fila key={r.id} r={r} onAbrir={onAbrir} />
               ))}
             </ul>
           )}

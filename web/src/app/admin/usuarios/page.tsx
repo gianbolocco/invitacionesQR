@@ -77,7 +77,7 @@ export default function UsuariosPage() {
       <div className="flex flex-col gap-6">
         <h1 className="display text-2xl">Vecinos</h1>
 
-        <Filete className="bg-white p-5">
+        <Filete className="bg-card p-5">
           <Eyebrow>Dar de alta un vecino</Eyebrow>
           <form onSubmit={alta} className="mt-4 flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -97,7 +97,7 @@ export default function UsuariosPage() {
         <ul className="flex flex-col gap-2">
           {vecinos.map((p) => (
             <li key={p.id}>
-              <Filete className={`flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3
+              <Filete className={`flex flex-wrap items-center justify-between gap-3 bg-card px-4 py-3
                 ${p.status === 'disabled' ? 'opacity-50' : ''}`}>
                 <div className="min-w-0">
                   <p className="font-semibold">
