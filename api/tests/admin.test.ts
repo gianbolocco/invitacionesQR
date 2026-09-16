@@ -26,37 +26,37 @@ async function loginAs(role: 'admin' | 'resident') {
 describe('padrón', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
 
-  it('el admin crea una UF', async () => {
+  it('el admin crea una UF por número', async () => {
     const { cookie } = await loginAs('admin')
-    const res = await request(app).post('/admin/units').set('Cookie', cookie).send({ label: 'Lote 142' })
+    const res = await request(app).post('/admin/units').set('Cookie', cookie).send({ lot: 142 })
     expect(res.status).toBe(201)
+    // La etiqueta se deriva del número: una sola forma de escribirla.
     expect(res.body.label).toBe('Lote 142')
   })
 
   it('un vecino no puede crear una UF', async () => {
     const { cookie } = await loginAs('resident')
-    const res = await request(app).post('/admin/units').set('Cookie', cookie).send({ label: 'Lote 9' })
+    const res = await request(app).post('/admin/units').set('Cookie', cookie).send({ lot: 9 })
     expect(res.status).toBe(403)
   })
 
   it('sin sesión devuelve 401', async () => {
-    const res = await request(app).post('/admin/units').send({ label: 'Lote 9' })
+    const res = await request(app).post('/admin/units').send({ lot: 9 })
     expect(res.status).toBe(401)
   })
 
-  it('el admin da de alta un vecino y queda listado con su UF', async () => {
+  it('el alta del vecino no pide unidad: la declara él al entrar', async () => {
     const { cookie } = await loginAs('admin')
-    const unit = await request(app).post('/admin/units').set('Cookie', cookie).send({ label: 'Lote 142' })
 
     const alta = await request(app).post('/admin/people').set('Cookie', cookie).send({
-      email: 'martin@example.com', name: 'Martín', role: 'resident', unitIds: [unit.body.id],
+      email: 'martin@example.com', name: 'Martín', role: 'resident',
     })
     expect(alta.status).toBe(201)
 
     const lista = await request(app).get('/admin/people').set('Cookie', cookie)
     const martin = lista.body.find((p: { email: string }) => p.email === 'martin@example.com')
     expect(martin.status).toBe('invited')
-    expect(martin.units[0].label).toBe('Lote 142')
+    expect(martin.units).toEqual([])
   })
 
   it('deshabilitar un vecino lo saca pero no lo borra', async () => {

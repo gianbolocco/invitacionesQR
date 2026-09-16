@@ -11,6 +11,8 @@ function Acceso() {
   const [name, setName] = useState<string | null>(null)
   const [fallo, setFallo] = useState(false)
   const [password, setPassword] = useState('')
+  const [lot, setLot] = useState('')
+  const [needsLot, setNeedsLot] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -18,9 +20,12 @@ function Acceso() {
   // por acá, no consume nada y la invitación sigue sirviendo.
   useEffect(() => {
     if (!token) return
-        api<{ name: string }>(`/auth/invite/${token}`)
+    api<{ name: string }>(`/auth/invite/${token}`)
       .then((r) => setName(r.name))
       .catch(() => setFallo(true))
+    api<{ needsLot: boolean }>(`/auth/invite/${token}/needs-lot`)
+      .then((r) => setNeedsLot(r.needsLot))
+      .catch(() => {})
   }, [token])
 
   async function submit(e: React.FormEvent) {
@@ -29,9 +34,16 @@ function Acceso() {
       setError('La contraseña necesita al menos 10 caracteres.')
       return
     }
+    if (needsLot && !lot.trim()) {
+      setError('Escribí el número de tu lote.')
+      return
+    }
     setBusy(true)
     try {
-      await api('/auth/invite', { method: 'POST', body: JSON.stringify({ token, password }) })
+      await api('/auth/invite', {
+        method: 'POST',
+        body: JSON.stringify({ token, password, lot: needsLot ? Number(lot) : undefined }),
+      })
       const yo = await api<Me>('/auth/me')
       router.push(homeFor(yo.role))
     } catch {
@@ -67,10 +79,18 @@ function Acceso() {
           Hola {name}
         </h1>
         <p className="mt-1 text-ink-soft">
-          Elegí una contraseña y ya podés gestionar las visitas de tu casa.
+          {needsLot
+            ? 'Decinos tu lote y elegí una contraseña. Con eso ya podés gestionar las visitas.'
+            : 'Elegí una contraseña y ya podés gestionar las visitas de tu casa.'}
         </p>
       </div>
       <form onSubmit={submit} className="flex flex-col gap-5">
+        {needsLot && (
+          <Field label="Número de lote" required value={lot} className="tabular"
+                 inputMode="numeric" pattern="[0-9]*" placeholder="142"
+                 hint="Solo el número. Después solo la administración puede cambiarlo."
+                 onChange={(e) => setLot(e.target.value.replace(/\D/g, ''))} />
+        )}
         <Field label="Contraseña" type="password" autoComplete="new-password"
                hint="Mínimo 10 caracteres. No hace falta que tenga símbolos raros."
                value={password} onChange={(e) => setPassword(e.target.value)} />

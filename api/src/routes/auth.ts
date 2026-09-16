@@ -7,7 +7,7 @@ import { peekToken, consumeToken, requestPasswordReset } from '../services/auth.
 import { setPassword } from '../services/people.js'
 import { verifyPassword } from '../lib/crypto.js'
 import { rateLimit } from '../middleware/rateLimit.js'
-import { unitsOfPerson } from '../services/units.js'
+import { unitsOfPerson, findOrCreateLot, joinUnit, personNeedsLot } from '../services/units.js'
 import {
   createSession, setSessionCookie, clearSessionCookie, revokeSession,
 } from '../services/sessions.js'
@@ -27,13 +27,37 @@ authRoutes.get('/invite/:token', async (req, res) => {
 })
 
 authRoutes.post('/invite', async (req, res) => {
-  const { token, password } = z.object({ token: z.string(), password: passwordSchema }).parse(req.body)
+  const { token, password, lot } = z.object({
+    token: z.string(),
+    password: passwordSchema,
+    // El vecino declara su lote al entrar. Numérico a propósito: derivar la
+    // etiqueta de un número evita "lote 142" y "Lote 142" como dos unidades.
+    lot: z.coerce.number().int().min(1).max(99999).optional(),
+  }).parse(req.body)
+
   const personId = await consumeToken(token, 'invite')
   await setPassword(personId, password)
-  await db.update(people).set({ status: 'active', lastLoginAt: new Date() }).where(eq(people.id, personId))
+
+  const [person] = await db.update(people)
+    .set({ status: 'active', lastLoginAt: new Date() })
+    .where(eq(people.id, personId))
+    .returning()
+
+  // Solo los vecinos tienen lote, y solo si el admin no se lo asignó ya.
+  if (lot && person.role === 'resident' && (await unitsOfPerson(personId)).length === 0) {
+    const unidad = await findOrCreateLot(person.neighborhoodId, lot)
+    await joinUnit(unidad.id, personId)
+  }
 
   setSessionCookie(res, await createSession(personId, req.get('user-agent')))
   res.json({ ok: true })
+})
+
+/** Le dice a la pantalla de acceso si tiene que pedir el lote. */
+authRoutes.get('/invite/:token/needs-lot', async (req, res) => {
+  const row = await peekToken(req.params.token, 'invite')
+  if (!row) throw new AppError(400, 'invalid_token')
+  res.json({ needsLot: await personNeedsLot(row.personId) })
 })
 
 const loginLimiter = rateLimit({

@@ -10,7 +10,7 @@ type Unit = { id: string; label: string }
 export default function UnidadesPage() {
   const me = useMe()
   const [units, setUnits] = useState<Unit[] | null>(null)
-  const [label, setLabel] = useState('')
+  const [lot, setLot] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const cargar = () => api<Unit[]>('/admin/units').then(setUnits).catch(() => setUnits([]))
@@ -20,11 +20,11 @@ export default function UnidadesPage() {
     e.preventDefault()
     setError(null)
     try {
-      await api('/admin/units', { method: 'POST', body: JSON.stringify({ label }) })
-      setLabel('')
+      await api('/admin/units', { method: 'POST', body: JSON.stringify({ lot: Number(lot) }) })
+      setLot('')
       cargar()
     } catch {
-      setError('No se pudo crear. Puede que ya exista una unidad con esa etiqueta.')
+      setError('No se pudo crear. Puede que ese lote ya esté cargado.')
     }
   }
 
@@ -38,10 +38,10 @@ export default function UnidadesPage() {
         <Filete className="bg-white p-5">
           <form onSubmit={crear} className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="flex-1">
-              <Field label="Etiqueta de la unidad" required value={label}
-                placeholder="Lote 142"
-                hint="Como la nombra el barrio. Es lo que ve el guardia en la barrera."
-                onChange={(e) => setLabel(e.target.value)} />
+              <Field label="Número de lote" required value={lot} className="tabular"
+                inputMode="numeric" pattern="[0-9]*" placeholder="142"
+                hint="Solo el número. Cargar los lotes es opcional: el vecino declara el suyo al entrar."
+                onChange={(e) => setLot(e.target.value.replace(/\D/g, ''))} />
             </div>
             <Button type="submit">Agregar</Button>
           </form>

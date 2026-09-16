@@ -8,12 +8,13 @@ import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
 
 export default function UsuariosPage() {
   const me = useMe()
-  const { people, units, cargar } = useAdminData()
+  const { people, cargar } = useAdminData()
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
-  const [unitIds, setUnitIds] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [corrigiendo, setCorrigiendo] = useState<Person | null>(null)
+  const [nuevoLote, setNuevoLote] = useState('')
 
   useEffect(() => { if (me) cargar() }, [me]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -22,16 +23,29 @@ export default function UsuariosPage() {
     setError(null)
     setAviso(null)
     try {
+      // Sin unidad: el lote lo declara el vecino cuando abre el link.
       await api('/admin/people', {
         method: 'POST',
-        body: JSON.stringify({ email, name, role: 'resident', unitIds }),
+        body: JSON.stringify({ email, name, role: 'resident' }),
       })
-      setAviso(`Le mandamos la invitación a ${email}. Vence en 7 días.`)
-      setEmail(''); setName(''); setUnitIds([])
+      setAviso(`Le mandamos la invitación a ${email}. Él carga su lote al entrar.`)
+      setEmail(''); setName('')
       cargar()
     } catch {
       setError('No se pudo dar de alta. Puede que ese mail ya esté en el padrón.')
     }
+  }
+
+  async function corregirLote(e: React.FormEvent) {
+    e.preventDefault()
+    if (!corrigiendo || !nuevoLote.trim()) return
+    await api(`/admin/people/${corrigiendo.id}/lot`, {
+      method: 'POST', body: JSON.stringify({ lot: Number(nuevoLote) }),
+    })
+    setAviso(`${corrigiendo.name} ahora está en el Lote ${nuevoLote}.`)
+    setCorrigiendo(null)
+    setNuevoLote('')
+    cargar()
   }
 
   async function reenviar(p: Person) {
@@ -66,29 +80,9 @@ export default function UsuariosPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Nombre" required value={name} onChange={(e) => setName(e.target.value)} />
               <Field label="Mail" type="email" required value={email}
-                hint="Le llega un link para entrar y crear su contraseña."
+                hint="Le llega un link para entrar, cargar su lote y crear su contraseña."
                 onChange={(e) => setEmail(e.target.value)} />
             </div>
-            <fieldset>
-              <legend className="text-sm font-semibold">Unidades</legend>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {units.map((u) => (
-                  <button key={u.id} type="button" aria-pressed={unitIds.includes(u.id)}
-                    onClick={() => setUnitIds((s) =>
-                      s.includes(u.id) ? s.filter((x) => x !== u.id) : [...s, u.id])}
-                    className={`min-h-11 rounded-full border px-4 text-sm font-semibold tabular ${
-                      unitIds.includes(u.id)
-                        ? 'border-alamo bg-alamo text-white'
-                        : 'border-ink/15 text-ink-soft'
-                    }`}>
-                    {u.label}
-                  </button>
-                ))}
-                {units.length === 0 && (
-                  <p className="text-sm text-ink-soft">Cargá unidades primero en la solapa Unidades.</p>
-                )}
-              </div>
-            </fieldset>
             {error && <ErrorNote>{error}</ErrorNote>}
             {aviso && <p role="status" className="text-sm text-alamo">{aviso}</p>}
             <Button type="submit" className="self-start">Dar de alta y enviar invitación</Button>
@@ -109,13 +103,20 @@ export default function UsuariosPage() {
                   </p>
                   <p className="truncate text-sm text-ink-soft">{p.email}</p>
                   <p className="text-sm text-ink-soft tabular">
-                    {p.units.map((u) => u.label).join(' · ') || 'Sin unidad'} · {ESTADO[p.status]}
+                    {p.units.map((u) => u.label).join(' · ') || 'Todavía no cargó su lote'}
+                    {' · '}{ESTADO[p.status]}
                     {p.lastLoginAt && ` · entró ${fecha(p.lastLoginAt)}`}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {p.status === 'invited' && (
                     <Button variant="quiet" onClick={() => reenviar(p)}>Reenviar</Button>
+                  )}
+                  {p.role === 'resident' && (
+                    <Button variant="quiet"
+                      onClick={() => { setCorrigiendo(p); setNuevoLote('') }}>
+                      Cambiar lote
+                    </Button>
                   )}
                   {p.status !== 'disabled' && p.id !== me.id && (
                     <Button variant="quiet" onClick={() => deshabilitar(p)}>Dar de baja</Button>
@@ -125,6 +126,21 @@ export default function UsuariosPage() {
                   )}
                 </div>
               </Filete>
+
+              {corrigiendo?.id === p.id && (
+                <form onSubmit={corregirLote} className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <Field label="Número de lote" autoFocus value={nuevoLote} className="tabular"
+                      inputMode="numeric" pattern="[0-9]*" placeholder="142"
+                      hint="Lo saca de su lote actual y lo pasa a este."
+                      onChange={(e) => setNuevoLote(e.target.value.replace(/\D/g, ''))} />
+                  </div>
+                  <Button type="submit">Guardar</Button>
+                  <Button variant="quiet" type="button" onClick={() => setCorrigiendo(null)}>
+                    Cancelar
+                  </Button>
+                </form>
+              )}
             </li>
           ))}
         </ul>

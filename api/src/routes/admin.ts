@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireRole } from '../middleware/requireRole.js'
-import { createUnit, listUnits } from '../services/units.js'
+import { createUnit, listUnits, labelForLot, setPersonLot } from '../services/units.js'
 import {
   createPerson, listPeople, disablePerson, enablePerson, resendInvite, setGuardPassword,
 } from '../services/people.js'
@@ -16,8 +16,9 @@ adminRoutes.get('/units', async (req, res) => {
 })
 
 adminRoutes.post('/units', async (req, res) => {
-  const { label } = z.object({ label: z.string().min(1) }).parse(req.body)
-  res.status(201).json(await createUnit(req.person!.neighborhoodId, label, req.person!.id))
+  // Numérico, igual que cuando lo carga el vecino: una sola forma de escribirlo.
+  const { lot } = z.object({ lot: z.coerce.number().int().min(1).max(99999) }).parse(req.body)
+  res.status(201).json(await createUnit(req.person!.neighborhoodId, labelForLot(lot), req.person!.id))
 })
 
 adminRoutes.get('/people', async (req, res) => {
@@ -29,11 +30,12 @@ adminRoutes.post('/people', async (req, res) => {
     email: z.string().email(),
     name: z.string().min(1),
     role: z.enum(['resident', 'guard', 'admin']),
-    unitIds: z.array(z.string().uuid()).default([]),
+    // Sin unitIds: el lote lo declara el vecino al entrar.
   }).parse(req.body)
 
   const { person } = await createPerson({
     ...body,
+    unitIds: [],
     neighborhoodId: req.person!.neighborhoodId,
     actorId: req.person!.id,
   })
@@ -74,4 +76,10 @@ adminRoutes.patch('/neighborhood', async (req, res) => {
 adminRoutes.post('/people/:id/enable', async (req, res) => {
   await enablePerson(req.params.id, req.person!.id, req.person!.neighborhoodId)
   res.json({ ok: true })
+})
+
+/** Corregir el lote de un vecino que se equivocó al entrar. Solo el admin. */
+adminRoutes.post('/people/:id/lot', async (req, res) => {
+  const { lot } = z.object({ lot: z.coerce.number().int().min(1).max(99999) }).parse(req.body)
+  res.json(await setPersonLot(req.person!.neighborhoodId, req.params.id, lot, req.person!.id))
 })
