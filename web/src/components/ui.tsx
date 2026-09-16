@@ -103,8 +103,8 @@ export function TemaToggle({ tema, onTema }: {
       {opciones.map((o) => (
         <button key={o.id} role="radio" aria-checked={tema === o.id}
           title={o.label} onClick={() => onTema(o.id)}
-          className={`flex size-9 items-center justify-center rounded-full text-sm
-            transition-colors ${
+          className={`flex size-8 items-center justify-center rounded-full text-sm
+            transition-colors sm:size-9 ${
               tema === o.id ? 'bg-alamo text-surface' : 'text-ink-soft'
             }`}>
           <span aria-hidden>{o.icono}</span>
@@ -115,14 +115,22 @@ export function TemaToggle({ tema, onTema }: {
   )
 }
 
-/** Lockup del encabezado: la itálica del cartel vive acá y en ningún otro lado. */
+/**
+ * Lockup del encabezado: la itálica del cartel vive acá y en ningún otro lado.
+ *
+ * Se apila abajo de `sm`. En una línea, el nombre más el subtítulo más el
+ * toggle de tema más el botón de salir no entran en un teléfono angosto: el
+ * encabezado empujaba la página entera y aparecía el scroll horizontal, con el
+ * nombre cortado por la izquierda.
+ */
 export function Wordmark({ subtitle = 'Barrio cerrado' }: { subtitle?: string }) {
   return (
-    <div className="flex items-baseline gap-3">
-      <span className="font-[family-name:var(--font-playfair)] text-2xl italic text-alamo">
+    <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
+      <span className="truncate font-[family-name:var(--font-playfair)] text-xl
+        italic leading-tight text-alamo sm:text-2xl">
         Álamo Alto
       </span>
-      <span className="eyebrow">{subtitle}</span>
+      <span className="eyebrow truncate">{subtitle}</span>
     </div>
   )
 }

@@ -363,7 +363,14 @@ export async function joinEvent(
  * abre de a uno y los administra como a cualquier otra — editar, anular,
  * habilitar. Por eso devuelve token y cupo, no solo el nombre.
  */
-export async function listEventGuests(eventId: string) {
+export async function listEventGuests(eventId: string, personId: string) {
+  // Sin esto, cualquiera con sesión podía listar los anotados a un evento de
+  // otra UF con solo tener el id. El vecino ve los eventos de su unidad; la
+  // garita tiene su propia vista, acotada al barrio.
+  const [evento] = await db.select().from(invitations).where(eq(invitations.id, eventId)).limit(1)
+  if (!evento) throw new AppError(404, 'not_found')
+  await assertMemberOfUnit(personId, evento.unitId)
+
   return db.select({
     id: invitations.id,
     kind: invitations.kind,

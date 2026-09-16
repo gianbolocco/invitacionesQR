@@ -527,3 +527,30 @@ describe('historial: buscar, filtrar y paginar', () => {
     expect(res.body.total).toBe(0)
   })
 })
+
+describe('los anotados de un evento no son públicos entre UF', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('un vecino de otra UF no puede listar los anotados', async () => {
+    const hoy = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+    }).format(new Date())
+    const dueno = await resident('martin@example.com', 'Lote 142')
+    const ajeno = await resident('colado@example.com', 'Lote 7')
+
+    const evento = await request(app).post('/invitations').set('Cookie', dueno.cookie).send({
+      unitId: dueno.unitId, kind: 'evento', guestName: 'Cumple de Sofi',
+      validFrom: hoy, validTo: hoy, capacity: 5,
+    }).expect(201)
+
+    await request(app).post(`/invitations/public/${evento.body.token}/join`)
+      .send({ guestName: 'Martina' }).expect(201)
+
+    await request(app).get(`/invitations/${evento.body.id}/guests`)
+      .set('Cookie', ajeno.cookie).expect(403)
+
+    const propios = await request(app).get(`/invitations/${evento.body.id}/guests`)
+      .set('Cookie', dueno.cookie).expect(200)
+    expect(propios.body.map((g: { guestName: string }) => g.guestName)).toEqual(['Martina'])
+  })
+})

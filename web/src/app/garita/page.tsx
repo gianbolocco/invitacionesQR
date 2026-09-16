@@ -5,7 +5,8 @@ import { api } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { porId, type Hit, type Resultado } from '@/lib/gate'
 import { Shell } from '@/components/shell'
-import { Agenda } from '@/components/agenda'
+import { Agenda, type AgendaRow } from '@/components/agenda'
+import { EventGuests } from '@/components/event-guests'
 import { Verdict } from '@/components/verdict'
 
 export default function GaritaHome() {
@@ -13,12 +14,22 @@ export default function GaritaHome() {
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<Hit[] | null>(null)
   const [resultado, setResultado] = useState<Resultado | null>(null)
-
+  const [evento, setEvento] = useState<AgendaRow | null>(null)
 
   const abrir = useCallback(async (id: string) => {
     const r = await porId(id).catch(() => null)
     if (r) setResultado(r)
   }, [])
+
+  /*
+   * Un evento no se despacha de un toque: adentro está la lista de anotados y
+   * el guardia elige a la persona que tiene adelante. Si no, el ingreso queda
+   * contra el evento entero y no se sabe quién entró.
+   */
+  const abrirFila = useCallback((r: AgendaRow) => {
+    if (r.kind === 'evento') setEvento(r)
+    else abrir(r.id)
+  }, [abrir])
 
   async function buscar(e: React.FormEvent) {
     e.preventDefault()
@@ -39,7 +50,26 @@ export default function GaritaHome() {
   }
 
   if (resultado) {
-    return <Verdict resultado={resultado} onSalir={volver} />
+    // Tras registrar a un anotado, vuelve a la lista del evento: en un
+    // cumpleaños entran de a varios seguidos.
+    return <Verdict resultado={resultado} onSalir={evento ? () => setResultado(null) : volver} />
+  }
+
+  if (evento) {
+    return (
+      <Shell me={me} atras={{ label: 'Hoy', onClick: () => setEvento(null) }}>
+        <div className="flex flex-col gap-5">
+          <div>
+            <h1 className="display text-2xl">{evento.guestName}</h1>
+            <p className="text-sm opacity-75 tabular">
+              {evento.unitLabel} · invita {evento.inviterName}
+              {` · ${evento.joinedCount} anotados de ${evento.capacity}`}
+            </p>
+          </div>
+          <EventGuests eventoId={evento.id} onAbrir={abrir} />
+        </div>
+      </Shell>
+    )
   }
 
 
@@ -84,7 +114,7 @@ export default function GaritaHome() {
           </ul>
         )}
 
-        {hits === null && <Agenda onAbrir={abrir} />}
+        {hits === null && <Agenda onAbrir={abrirFila} />}
       </div>
     </Shell>
   )

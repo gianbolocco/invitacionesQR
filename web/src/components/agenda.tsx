@@ -41,11 +41,11 @@ function titulo(fecha: string): string {
 function Fila({ r, tenue, onAbrir }: {
   r: AgendaRow
   tenue?: boolean
-  onAbrir: (id: string) => void
+  onAbrir: (r: AgendaRow) => void
 }) {
   return (
     <li>
-      <button onClick={() => onAbrir(r.id)}
+      <button onClick={() => onAbrir(r)}
         className={`w-full rounded border border-line px-4 py-3 text-left ${tenue ? 'opacity-60' : ''}`}>
         <span className="block text-lg font-semibold">{r.guestName}</span>
         <span className="block text-sm opacity-75 tabular">
@@ -55,6 +55,12 @@ function Fila({ r, tenue, onAbrir }: {
           {r.kind === 'evento' && r.enteredCount > 0 && ` · ${r.enteredCount} entraron`}
           {r.kind !== 'evento' && r.lastEntryAt && ` · ${hora(r.lastEntryAt)}`}
         </span>
+        {/* Un evento no se despacha de un toque: adentro está la lista. */}
+        {r.kind === 'evento' && (
+          <span className="mt-1 block text-sm font-semibold opacity-90">
+            Ver quién se anotó ›
+          </span>
+        )}
       </button>
     </li>
   )
@@ -64,7 +70,7 @@ function Seccion({ label, rows, tenue, onAbrir }: {
   label: string
   rows: AgendaRow[]
   tenue?: boolean
-  onAbrir: (id: string) => void
+  onAbrir: (r: AgendaRow) => void
 }) {
   if (!rows.length) return null
   return (
@@ -89,7 +95,7 @@ function Seccion({ label, rows, tenue, onAbrir }: {
  * 30 anotados taparía las tres visitas que importan. Los frecuentes van aparte
  * y colapsados, porque aparecen todos los días y el guardia deja de leerlos.
  */
-export function Agenda({ onAbrir }: { onAbrir: (id: string) => void }) {
+export function Agenda({ onAbrir }: { onAbrir: (r: AgendaRow) => void }) {
   const [fecha, setFecha] = useState(hoyISO())
   const [filas, setFilas] = useState<AgendaRow[] | null>(null)
   const [verFrecuentes, setVerFrecuentes] = useState(false)

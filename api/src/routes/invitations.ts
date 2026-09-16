@@ -105,7 +105,7 @@ invitationRoutes.post('/:id/revoke', async (req, res) => {
 
 /** Los anotados a un evento, para que el vecino vea quién viene. */
 invitationRoutes.get('/:id/guests', async (req, res) => {
-  res.json(await listEventGuests(req.params.id))
+  res.json(await listEventGuests(req.params.id, req.person!.id))
 })
 
 const editSchema = z.object({

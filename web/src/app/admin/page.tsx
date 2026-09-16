@@ -119,7 +119,7 @@ export default function TableroPage() {
             <ul className="flex flex-col gap-1.5">
               {porPersona.slice(0, 12).map((p) => (
                 <li key={p.id} className="flex items-center gap-3">
-                  <span className="w-40 shrink-0 truncate text-sm">{p.name}</span>
+                  <span className="w-24 shrink-0 truncate text-sm sm:w-40">{p.name}</span>
                   <span className="h-2.5 rounded-full bg-[#0f8f52]"
                     style={{ width: `${(p.total / maxInvit) * 100}%`, minWidth: '4px' }} />
                   <span className="text-sm text-ink-soft tabular">{p.total}</span>

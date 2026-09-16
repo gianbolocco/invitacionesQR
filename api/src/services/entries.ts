@@ -204,6 +204,51 @@ export type AgendaRow = {
  * taparía las tres visitas que importan. El evento va como una fila con su
  * cupo, y se despliega aparte.
  */
+export type EventGuestRow = {
+  id: string
+  guestName: string
+  guestDoc: string | null
+  plate: string | null
+  revokedAt: string | null
+  enteredCount: number
+  lastEntryAt: string | null
+}
+
+/**
+ * Los anotados a un evento, para la garita.
+ *
+ * Tocar un evento en la agenda llevaba derecho a registrar un ingreso contra el
+ * evento entero, y ahí se perdía de quién era: un cumpleaños de treinta
+ * quedaba como treinta ingresos anónimos contra la misma invitación. El guardia
+ * tiene que poder abrir el evento y elegir a la persona que tiene adelante.
+ *
+ * Los anulados vienen igual, marcados: si alguien se presenta con un QR que le
+ * anularon, el guardia necesita ver que existe y que no puede entrar, no que no
+ * aparezca por ningún lado.
+ */
+export async function eventGuestsForGate(
+  neighborhoodId: string,
+  eventId: string,
+): Promise<EventGuestRow[]> {
+  const res = await db.execute(sql`
+    select
+      h.id,
+      h.guest_name  as "guestName",
+      h.guest_doc   as "guestDoc",
+      h.plate,
+      h.revoked_at  as "revokedAt",
+      (select count(*) from entry_log e where e.invitation_id = h.id)::int as "enteredCount",
+      (select max(e.entered_at) from entry_log e where e.invitation_id = h.id) as "lastEntryAt"
+    from invitation h
+    join unit u on u.id = h.unit_id
+    where h.parent_id = ${eventId}
+      and u.neighborhood_id = ${neighborhoodId}
+    order by h.revoked_at nulls first, lower(h.guest_name)
+  `)
+
+  return res.rows as unknown as EventGuestRow[]
+}
+
 export async function agendaForDay(neighborhoodId: string, day: string): Promise<AgendaRow[]> {
   // 0 = domingo, igual que weekdayInBuenosAires y que la columna weekdays.
   const dow = new Date(`${day}T12:00:00Z`).getUTCDay()

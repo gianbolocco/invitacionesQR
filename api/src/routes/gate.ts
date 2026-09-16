@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/requireAuth.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
   checkByToken, checkById, registerEntry, searchGuests, agendaForDay,
-  auditInvitations, auditAll,
+  auditInvitations, auditAll, eventGuestsForGate,
 } from '../services/entries.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { buildWorkbook, XLSX_MIME } from '../lib/excel.js'
@@ -38,6 +38,11 @@ gateRoutes.post('/entries', async (req, res) => {
   // El guardia sale de la sesión, no del body: un dato de auditoría no puede
   // depender de lo que mande el cliente ni de que alguien elija bien.
   res.status(201).json(await registerEntry(body.invitationId, req.person!.id, body))
+})
+
+/** Los anotados a un evento: el guardia elige a la persona que tiene adelante. */
+gateRoutes.get('/event/:id/guests', async (req, res) => {
+  res.json(await eventGuestsForGate(req.person!.neighborhoodId, req.params.id))
 })
 
 /** La agenda del día: quién está habilitado a entrar. */

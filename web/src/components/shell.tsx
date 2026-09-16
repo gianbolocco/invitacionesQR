@@ -184,15 +184,17 @@ export function Shell({ me, accion, atras, children }: {
   return (
     <div className={`min-h-dvh ${enBarra ? 'con-barra-inferior sm:pb-0' : ''} ${accion ? 'con-accion' : ''}`}>
       <header className="sticky top-0 z-20 border-b border-alamo/15 bg-card">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between
+          gap-x-3 gap-y-1 px-4 py-2.5">
           {atras ? (
             <button onClick={atras.onClick}
-              className="-ml-2 flex min-h-11 items-center gap-1.5 rounded px-2 font-semibold text-alamo">
-              <svg viewBox="0 0 24 24" aria-hidden className="size-5" fill="none"
+              className="-ml-2 flex min-h-11 min-w-0 items-center gap-1.5 rounded px-2
+                font-semibold text-alamo">
+              <svg viewBox="0 0 24 24" aria-hidden className="size-5 shrink-0" fill="none"
                 stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 5l-7 7 7 7" />
               </svg>
-              {atras.label ?? 'Volver'}
+              <span className="truncate">{atras.label ?? 'Volver'}</span>
             </button>
           ) : (
             <Wordmark subtitle={subtitulo} />
