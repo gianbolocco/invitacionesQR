@@ -1,8 +1,6 @@
 export type Invitation = {
   id: string
-  kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
-  /** Solo viene en los anotados a un evento: es el id del evento. */
-  parentId?: string | null
+  kind: 'visita' | 'frecuente' | 'proveedor'
   guestName: string
   guestDoc: string | null
   plate: string | null
@@ -18,13 +16,11 @@ export type Invitation = {
   unitId: string
   unitLabel: string
   usedCount: number
-  joinedCount: number
 }
 
 export const KIND_LABEL: Record<Invitation['kind'], string> = {
   visita: 'Visita',
   frecuente: 'Frecuente',
-  evento: 'Evento',
   proveedor: 'Proveedor',
 }
 

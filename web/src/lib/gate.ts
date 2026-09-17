@@ -6,7 +6,7 @@ export type Check = { ok: true } | { ok: false; reason: string }
 export type Resultado = {
   invitation: {
     id: string
-    kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
+    kind: 'visita' | 'frecuente' | 'proveedor'
     guestName: string
     guestDoc: string | null
     plate: string | null
@@ -30,20 +30,8 @@ export const MOTIVO: Record<string, string> = {
   no_capacity: 'Cupo agotado',
 }
 
-export type EventGuest = {
-  id: string
-  guestName: string
-  guestDoc: string | null
-  plate: string | null
-  revokedAt: string | null
-  enteredCount: number
-  lastEntryAt: string | null
-}
-
 export const porToken = (token: string) => api<Resultado>(`/gate/check/${token}`)
 export const porId = (id: string) => api<Resultado>(`/gate/invitation/${id}`)
-export const anotadosDe = (eventoId: string) =>
-  api<EventGuest[]>(`/gate/event/${eventoId}/guests`)
 
 export function hora(iso: string): string {
   return new Intl.DateTimeFormat('es-AR', {

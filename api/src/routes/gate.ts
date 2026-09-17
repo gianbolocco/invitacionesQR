@@ -5,7 +5,7 @@ import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
   checkByToken, checkById, registerEntry, searchGuests, agendaForDay,
-  auditInvitations, auditAll, eventGuestsForGate,
+  auditInvitations, auditAll,
 } from '../services/entries.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { buildWorkbook, XLSX_MIME } from '../lib/excel.js'
@@ -42,11 +42,6 @@ gateRoutes.post('/entries', async (req, res) => {
   res.status(201).json(await registerEntry(body.invitationId, req.person!.id, body))
 })
 
-/** Los anotados a un evento: el guardia elige a la persona que tiene adelante. */
-gateRoutes.get('/event/:id/guests', async (req, res) => {
-  res.json(await eventGuestsForGate(req.person!.neighborhoodId, req.params.id))
-})
-
 /** La agenda del día: quién está habilitado a entrar. */
 gateRoutes.get('/agenda', async (req, res) => {
   const { date } = z.object({
@@ -80,7 +75,6 @@ const ESTADO_EXCEL: Record<string, string> = {
 const KIND_EXCEL: Record<string, string> = {
   visita: 'Visita',
   frecuente: 'Frecuente',
-  evento: 'Evento',
   proveedor: 'Proveedor',
 }
 
@@ -112,7 +106,6 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
         { header: 'Documento', key: 'documento' },
         { header: 'Patente', key: 'patente' },
         { header: 'Tipo', key: 'tipo' },
-        { header: 'Evento', key: 'evento', width: 22 },
         { header: 'Unidad', key: 'unidad' },
         { header: 'Invitó', key: 'invito', width: 20 },
         { header: 'Desde', key: 'desde' },
@@ -127,7 +120,6 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
         documento: r.guestDoc ?? '',
         patente: r.plate ?? '',
         tipo: KIND_EXCEL[r.kind] ?? r.kind,
-        evento: r.eventName ?? '',
         unidad: r.unitLabel,
         invito: r.inviterName,
         desde: r.validFrom,

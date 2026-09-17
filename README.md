@@ -9,17 +9,16 @@ en la barrera.
 
 **El vecino** crea una invitación a nivel unidad (UF), no a nivel persona: los
 que viven en la misma casa ven y gestionan las invitaciones de esa casa. Hay
-cuatro tipos —visita, frecuente, evento y proveedor— y son todos la misma tabla,
-con distinta ventana de validez y distinto cupo.
+tres tipos —visita, frecuente y proveedor— y son todos la misma tabla, con
+distinta ventana de validez y distinto cupo.
 
 **El invitado** recibe un link. Ahí ve quién lo invita, a qué unidad y cómo
 llegar, carga su documento y su patente si quiere, y se queda con su QR.
 
-**Un evento** es un caso aparte: el link es una *puerta de anotación*. Cada
-invitado se anota con su nombre y **se lleva su propio QR**, así se sabe quién
-entró y quién no. El evento no es una invitación, es el paraguas de las
-invitaciones de los anotados; todos ellos aparecen en la lista del día de la
-garita como cualquier otra.
+**Un evento no es nada especial**: es una invitación por invitado. No hay tipo
+"evento", ni cupo compartido, ni links de anotación. Cada persona tiene su
+invitación, su QR y su fila en la lista del día, y eso es justamente lo que da
+la trazabilidad de quién entró y quién no.
 
 **El guardia** tiene su propia cuenta —cada ingreso queda a nombre de quien
 estaba logueado, que es lo que hace auditable el "¿quién lo dejó pasar?"—, la
@@ -56,7 +55,7 @@ cd web && npm ci && npm run dev
 ### Tests
 
 ```bash
-cd api && npm test          # 204 tests, contra una base invitaciones_test aparte
+cd api && npm test          # contra una base invitaciones_test aparte
 cd web && npm run check     # el chequeo de navegación (no hay runner de tests en el front)
 ```
 
@@ -105,15 +104,15 @@ todas de una.
 
 **Todo en hora de Buenos Aires.** Ningún límite de día sale del reloj del
 proceso: entre las 21 y la medianoche acá ya es el día siguiente en UTC, que es
-justo cuando más gente entra a un evento.
+justo cuando más gente entra al barrio.
 
 ### Dónde mirar primero
 
 | Archivo | Qué es |
 |---|---|
 | [`api/src/authz.ts`](api/src/authz.ts) | `canEnter()`. La única pieza no trivial: función pura, sin base ni reloj interno. El orden de los rechazos importa y está testeado. |
-| [`api/src/services/entries.ts`](api/src/services/entries.ts) | Registro de ingresos, agenda del día, búsqueda y auditoría. El `FOR UPDATE` va sobre la **raíz** del evento: es la fila que comparten los anotados y por lo tanto la que serializa el cupo. |
-| [`api/src/services/invitations.ts`](api/src/services/invitations.ts) | Alta, edición, anulación en cascada y anotación a eventos. |
+| [`api/src/services/entries.ts`](api/src/services/entries.ts) | Registro de ingresos, agenda del día, búsqueda y auditoría. El `FOR UPDATE` sobre la invitación es lo que serializa el cupo: sin él, dos escaneos simultáneos del mismo QR leen el mismo contador y los dos entran. |
+| [`api/src/services/invitations.ts`](api/src/services/invitations.ts) | Alta, edición, anulación y la página pública del invitado. |
 | [`web/src/components/shell.tsx`](web/src/components/shell.tsx) | El marco de las tres secciones. Qué menú va lo decide [`web/src/lib/nav.ts`](web/src/lib/nav.ts). |
 | [`web/src/app/globals.css`](web/src/app/globals.css) | Los tokens del tema. Claro y oscuro son valores de variables CSS: ningún componente sabe en qué tema está. |
 

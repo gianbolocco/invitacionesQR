@@ -2,7 +2,6 @@
 import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
 import { Button, Eyebrow, Filete } from './ui'
 import { QrShare } from './qr-share'
-import { EventShare } from './event-share'
 import { InvitationForm } from './invitation-form'
 
 function Dato({ label, children }: { label: string; children: React.ReactNode }) {
@@ -22,7 +21,7 @@ function Dato({ label, children }: { label: string; children: React.ReactNode })
  * edición o del detalle.
  */
 export function InvitationDetail({
-  inv, units, editando, onEditar, onAnular, onHabilitar, onGuardado, onVerAnotados,
+  inv, units, editando, onEditar, onAnular, onHabilitar, onGuardado,
 }: {
   inv: Invitation
   units: { id: string; label: string }[]
@@ -32,7 +31,6 @@ export function InvitationDetail({
   /** Si viene, una invitación anulada se puede volver a habilitar. */
   onHabilitar?: () => void
   onGuardado: () => void
-  onVerAnotados?: () => void
 }) {
   if (editando) {
     return (
@@ -48,9 +46,6 @@ export function InvitationDetail({
     )
   }
 
-  // Un anotado tiene kind 'evento' pero su link es un QR personal, no la puerta
-  // de anotación del evento.
-  const esEvento = inv.kind === 'evento' && !inv.parentId
   const anulada = Boolean(inv.revokedAt)
 
   return (
@@ -61,28 +56,18 @@ export function InvitationDetail({
         </p>
       )}
 
-      {esEvento
-        ? <EventShare inv={inv} />
-        : <QrShare token={inv.token} guestName={inv.guestName} />}
+      <QrShare token={inv.token} guestName={inv.guestName} />
 
       <Filete className="bg-card px-4 py-2">
         <Dato label="Tipo">{KIND_LABEL[inv.kind]}</Dato>
         <Dato label="Vigencia">{vigencia(inv)}</Dato>
         {inv.guestDoc && <Dato label="Documento">{inv.guestDoc}</Dato>}
         {inv.plate && <Dato label="Patente">{inv.plate}</Dato>}
-        {/* Dos números distintos: anotados es antes de la fiesta, entraron es
-            durante. El vecino mira el primero para saber si repartir más. */}
-        {esEvento && <Dato label="Anotados">{inv.joinedCount} de {inv.capacity}</Dato>}
-        {esEvento && <Dato label="Entraron">{inv.usedCount} de {inv.capacity}</Dato>}
+        {inv.capacity > 1 && <Dato label="Entraron">{inv.usedCount} de {inv.capacity}</Dato>}
         <Dato label="Unidad">{inv.unitLabel}</Dato>
       </Filete>
 
       <div className="flex flex-col gap-2">
-        {esEvento && onVerAnotados && (
-          <Button variant="quiet" onClick={onVerAnotados}>
-            Ver quién se anotó ({inv.joinedCount})
-          </Button>
-        )}
         {anulada && onHabilitar
           ? <Button onClick={onHabilitar}>Volver a habilitar</Button>
           : (

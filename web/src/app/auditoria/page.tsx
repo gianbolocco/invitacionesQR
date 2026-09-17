@@ -13,8 +13,7 @@ type AuditRow = {
   guestName: string
   guestDoc: string | null
   plate: string | null
-  kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
-  eventName: string | null
+  kind: 'visita' | 'frecuente' | 'proveedor'
   unitLabel: string
   inviterName: string
   validFrom: string
@@ -124,12 +123,7 @@ export default function AuditoriaPage() {
   const COLUMNAS: Columna<AuditRow>[] = [
     {
       key: 'invitado', label: 'Invitado',
-      celda: (r) => (
-        <>
-          <span className="font-semibold">{r.guestName}</span>
-          {r.eventName && <span className="block text-xs opacity-70">en {r.eventName}</span>}
-        </>
-      ),
+      celda: (r) => <span className="font-semibold">{r.guestName}</span>,
     },
     { key: 'doc', label: 'Documento', celda: (r) => <span className="tabular">{r.guestDoc ?? '—'}</span> },
     { key: 'unidad', label: 'Unidad', celda: (r) => <span className="tabular">{r.unitLabel}</span> },

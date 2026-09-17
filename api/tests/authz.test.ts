@@ -49,10 +49,10 @@ describe('canEnter', () => {
     expect(canEnter(base, lunes15h, 1)).toEqual({ ok: false, reason: 'no_capacity' })
   })
 
-  it('un evento de 30 deja pasar al 30 pero no al 31', () => {
-    const evento = { ...base, capacity: 30 }
-    expect(canEnter(evento, lunes15h, 29)).toEqual({ ok: true })
-    expect(canEnter(evento, lunes15h, 30)).toEqual({ ok: false, reason: 'no_capacity' })
+  it('un cupo de 30 deja pasar al 30 pero no al 31', () => {
+    const invitacion = { ...base, capacity: 30 }
+    expect(canEnter(invitacion, lunes15h, 29)).toEqual({ ok: true })
+    expect(canEnter(invitacion, lunes15h, 30)).toEqual({ ok: false, reason: 'no_capacity' })
   })
 
   it('el último día vale hasta las 23:59 de Buenos Aires', () => {

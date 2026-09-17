@@ -9,7 +9,7 @@ import { AppError } from '../lib/errors.js'
 export type CreateInvitationInput = {
   unitId: string
   createdBy: string
-  kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor'
   guestName: string
   guestDoc?: string
   plate?: string
@@ -57,10 +57,6 @@ export async function createInvitation(input: CreateInvitationInput) {
  * "Vigente" es: no anulada, todavía dentro de la ventana, y con cupo libre. El
  * día de la semana NO entra: una frecuente de lunes y miércoles sigue siendo
  * una invitación vigente un martes.
- *
- * Excluye a los anotados a un evento: son invitaciones hijas y aparecían en la
- * lista del vecino como si cada uno fuera un evento propio de cupo 1. Se ven
- * donde corresponde, entrando al evento.
  */
 export async function listForUnits(unitIds: string[]) {
   if (!unitIds.length) return []
@@ -83,12 +79,6 @@ export async function listForUnits(unitIds: string[]) {
     unitId: invitations.unitId,
     unitLabel: units.label,
     usedCount: count(entryLogs.id),
-    // Anotados a un evento. El vecino quiere saber cuántos se anotaron ANTES
-    // de la fiesta; cuántos entraron es un dato de después.
-    joinedCount: sql<number>`(
-      select count(*)::int from invitation h
-      where h.parent_id = ${invitations.id} and h.revoked_at is null
-    )`,
   })
     .from(invitations)
     .innerJoin(people, eq(people.id, invitations.createdBy))
@@ -96,7 +86,6 @@ export async function listForUnits(unitIds: string[]) {
     .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
     .where(and(
       inArray(invitations.unitId, unitIds),
-      isNull(invitations.parentId),
       isNull(invitations.revokedAt),
       gte(invitations.validTo, hoy),
     ))
@@ -108,7 +97,7 @@ export async function listForUnits(unitIds: string[]) {
 
 export type HistoryFilters = {
   q?: string
-  kind?: 'visita' | 'frecuente' | 'evento' | 'proveedor'
+  kind?: 'visita' | 'frecuente' | 'proveedor'
   estado?: 'entro' | 'no_entro' | 'anulada'
   /** Id del vecino, para el filtro "solo las mías". */
   createdBy?: string
@@ -146,7 +135,6 @@ export async function searchInvitations(
 
   const donde = and(
     inArray(invitations.unitId, unitIds),
-    isNull(invitations.parentId),
     f.kind ? eq(invitations.kind, f.kind) : undefined,
     f.createdBy ? eq(invitations.createdBy, f.createdBy) : undefined,
     // unaccent para que "martin" encuentre a "Martín". Documento y patente van
@@ -180,10 +168,6 @@ export async function searchInvitations(
       unitId: invitations.unitId,
       unitLabel: units.label,
       usedCount: count(entryLogs.id),
-      joinedCount: sql<number>`(
-        select count(*)::int from invitation h
-        where h.parent_id = ${invitations.id} and h.revoked_at is null
-      )`,
     })
       .from(invitations)
       .innerJoin(people, eq(people.id, invitations.createdBy))
@@ -207,12 +191,7 @@ export async function revokeInvitation(id: string, personId: string, neighborhoo
   if (!inv) throw new AppError(404, 'not_found')
   await assertMemberOfUnit(personId, inv.unitId)
 
-  const now = new Date()
-  await db.update(invitations).set({ revokedAt: now }).where(eq(invitations.id, id))
-  // En cascada: anular un evento anula a todos los que se anotaron. Si no, cada
-  // hija seguiría entrando con su propio QR después de cancelado el cumpleaños.
-  await db.update(invitations).set({ revokedAt: now }).where(eq(invitations.parentId, id))
-
+  await db.update(invitations).set({ revokedAt: new Date() }).where(eq(invitations.id, id))
   await audit(personId, neighborhoodId, 'invitation.revoked', 'invitation', id)
 }
 
@@ -229,8 +208,6 @@ export async function findPublicByToken(token: string) {
     guestDoc: invitations.guestDoc,
     plate: invitations.plate,
     kind: invitations.kind,
-    parentId: invitations.parentId,
-    capacity: invitations.capacity,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
     revokedAt: invitations.revokedAt,
@@ -249,9 +226,6 @@ export async function findPublicByToken(token: string) {
 
   if (!row) return null
 
-  // Un evento (padre) es una puerta de anotación, no un QR personal.
-  const isEventDoor = row.kind === 'evento' && !row.parentId
-
   return {
     guestName: row.guestName,
     kind: row.kind,
@@ -261,12 +235,10 @@ export async function findPublicByToken(token: string) {
     unitLabel: row.unitLabel,
     inviterName: row.inviterName,
     neighborhood: { name: row.neighborhoodName, address: row.address, mapUrl: row.mapUrl },
-    isEventDoor,
     // Solo se informa si YA hay datos, nunca cuáles: el link puede estar en
     // manos de cualquiera.
     hasDoc: Boolean(row.guestDoc),
     hasPlate: Boolean(row.plate),
-    spotsLeft: isEventDoor ? await spotsLeft(row.id, row.capacity) : null,
     frozen: (await entriesOf(row.id)) > 0,
   }
 }
@@ -275,17 +247,6 @@ async function entriesOf(invitationId: string): Promise<number> {
   const [row] = await db.select({ n: sql<number>`count(*)::int` })
     .from(entryLogs).where(eq(entryLogs.invitationId, invitationId))
   return row?.n ?? 0
-}
-
-/** Lugares libres de un evento: cupo menos anotados menos ingresos directos. */
-async function spotsLeft(eventId: string, capacity: number): Promise<number> {
-  const [row] = await db.select({
-    taken: sql<number>`
-      (select count(*) from invitation h
-         where h.parent_id = ${eventId} and h.revoked_at is null)
-      + (select count(*) from entry_log e where e.invitation_id = ${eventId})`,
-  }).from(invitations).where(eq(invitations.id, eventId)).limit(1)
-  return Math.max(0, capacity - Number(row?.taken ?? 0))
 }
 
 /**
@@ -316,118 +277,7 @@ export async function fillGuestDetails(
   }
 }
 
-/**
- * Un invitado se anota a un evento y se lleva su propia invitación, con su
- * nombre y su QR. El cupo se controla dentro de la transacción con FOR UPDATE
- * sobre el evento, igual que el registro de ingreso.
- *
- * Si ese documento ya se anotó, devuelve la hija existente en vez de crear otra
- * y quemar un lugar: el invitado que reabre el link no gasta cupo.
- */
-export async function joinEvent(
-  eventToken: string,
-  data: { guestName: string; guestDoc?: string; plate?: string },
-): Promise<{ token: string; alreadyJoined: boolean }> {
-  return db.transaction(async (tx) => {
-    const [evento] = await tx.select().from(invitations)
-      .where(eq(invitations.token, eventToken)).for('update').limit(1)
-
-    if (!evento) throw new AppError(404, 'not_found')
-    if (evento.kind !== 'evento' || evento.parentId) throw new AppError(400, 'not_an_event')
-    if (evento.revokedAt) throw new AppError(409, 'revoked')
-    if (todayInBuenosAires() > evento.validTo) throw new AppError(409, 'expired')
-
-    const doc = data.guestDoc?.trim() || null
-
-    if (doc) {
-      const [yaAnotado] = await tx.select().from(invitations)
-        .where(and(eq(invitations.parentId, evento.id), eq(invitations.guestDoc, doc)))
-        .limit(1)
-      if (yaAnotado) return { token: yaAnotado.token, alreadyJoined: true }
-    }
-
-    const [{ taken }] = await tx.select({
-      taken: sql<number>`
-        (select count(*) from invitation h
-           where h.parent_id = ${evento.id} and h.revoked_at is null)
-        + (select count(*) from entry_log e where e.invitation_id = ${evento.id})`,
-    }).from(invitations).where(eq(invitations.id, evento.id))
-
-    if (Number(taken) >= evento.capacity) throw new AppError(409, 'no_capacity')
-
-    const [hija] = await tx.insert(invitations).values({
-      unitId: evento.unitId,
-      createdBy: evento.createdBy,
-      parentId: evento.id,
-      kind: 'evento',
-      guestName: data.guestName.trim(),
-      guestDoc: doc,
-      plate: data.plate?.trim().toUpperCase() || null,
-      validFrom: evento.validFrom,
-      validTo: evento.validTo,
-      weekdays: evento.weekdays,
-      capacity: 1,
-      token: randomToken(16),
-    }).returning()
-
-    return { token: hija.token, alreadyJoined: false }
-  })
-}
-
-/** Anotados a un evento, para que el vecino vea quién viene. */
-/**
- * Anotados a un evento, con la forma completa de una invitación: el vecino los
- * abre de a uno y los administra como a cualquier otra — editar, anular,
- * habilitar. Por eso devuelve token y cupo, no solo el nombre.
- */
-export async function listEventGuests(eventId: string, personId: string) {
-  // Sin esto, cualquiera con sesión podía listar los anotados a un evento de
-  // otra UF con solo tener el id. El vecino ve los eventos de su unidad; la
-  // garita tiene su propia vista, acotada al barrio.
-  const [evento] = await db.select().from(invitations).where(eq(invitations.id, eventId)).limit(1)
-  if (!evento) throw new AppError(404, 'not_found')
-  await assertMemberOfUnit(personId, evento.unitId)
-
-  return db.select({
-    id: invitations.id,
-    kind: invitations.kind,
-    parentId: invitations.parentId,
-    guestName: invitations.guestName,
-    guestDoc: invitations.guestDoc,
-    plate: invitations.plate,
-    validFrom: invitations.validFrom,
-    validTo: invitations.validTo,
-    weekdays: invitations.weekdays,
-    capacity: invitations.capacity,
-    token: invitations.token,
-    revokedAt: invitations.revokedAt,
-    createdAt: invitations.createdAt,
-    createdBy: invitations.createdBy,
-    creatorName: people.name,
-    unitId: invitations.unitId,
-    unitLabel: units.label,
-    usedCount: count(entryLogs.id),
-    joinedCount: sql<number>`0`,
-  })
-    .from(invitations)
-    .innerJoin(people, eq(people.id, invitations.createdBy))
-    .innerJoin(units, eq(units.id, invitations.unitId))
-    .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
-    .where(eq(invitations.parentId, eventId))
-    .groupBy(invitations.id, people.name, units.label)
-    .orderBy(invitations.createdAt)
-}
-
-/**
- * Deshacer una anulación.
- *
- * Un anotado no se puede habilitar si el evento sigue anulado —entraría a una
- * fiesta cancelada— ni si mientras tanto se llenó el cupo.
- *
- * Habilitar un evento habilita también a sus anotados, en espejo de la
- * anulación en cascada. Contrapartida conocida: si alguien había anulado a un
- * invitado ANTES de anular el evento, al habilitarlo vuelve junto con el resto.
- */
+/** Deshacer una anulación. */
 export async function restoreInvitation(
   id: string,
   personId: string,
@@ -438,20 +288,7 @@ export async function restoreInvitation(
   await assertMemberOfUnit(personId, inv.unitId)
   if (!inv.revokedAt) return
 
-  if (inv.parentId) {
-    const [padre] = await db.select().from(invitations)
-      .where(eq(invitations.id, inv.parentId)).limit(1)
-    if (padre?.revokedAt) throw new AppError(409, 'evento_anulado')
-
-    const libres = await spotsLeft(inv.parentId, padre!.capacity)
-    if (libres <= 0) throw new AppError(409, 'no_capacity')
-  }
-
   await db.update(invitations).set({ revokedAt: null }).where(eq(invitations.id, id))
-  if (!inv.parentId) {
-    await db.update(invitations).set({ revokedAt: null }).where(eq(invitations.parentId, id))
-  }
-
   await audit(personId, neighborhoodId, 'invitation.restored', 'invitation', id)
 }
 
@@ -483,44 +320,15 @@ export async function editInvitation(
 
   if (inv.revokedAt) throw new AppError(409, 'revoked')
 
-  /*
-   * De un anotado solo se editan sus datos: el nombre, el documento y la
-   * patente. Las fechas y el cupo los hereda del evento, y dejarlos cambiar por
-   * separado permitiría que un invitado quedara vigente un día en que el evento
-   * ya terminó.
-   */
-  if (inv.parentId) {
-    const [actualizada] = await db.update(invitations).set({
-      ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),
-      ...(input.guestDoc !== undefined ? { guestDoc: input.guestDoc?.trim() || null } : {}),
-      ...(input.plate !== undefined ? { plate: input.plate?.trim().toUpperCase() || null } : {}),
-    }).where(eq(invitations.id, id)).returning()
-    return actualizada
-  }
-
-  /*
-   * El piso del cupo es lo YA COMPROMETIDO, y en un evento eso no son solo los
-   * ingresos: cada anotado tiene su código en la mano. Contando solo ingresos se
-   * podía bajar un evento de 5 a 1 con tres anotados, y los otros dos se
-   * enteraban parados en la barrera, con el QR abierto y rebotados por cupo.
-   *
-   * Un anotado anulado no cuenta: ya liberó su lugar, igual que en spotsLeft.
-   */
-  const [{ comprometido }] = await db.select({
-    comprometido: sql<number>`
-      (select count(*) from entry_log e where e.invitation_id = ${id})
-      + (select count(*) from invitation h
-           where h.parent_id = ${id} and h.revoked_at is null)`,
-  }).from(invitations).where(eq(invitations.id, id))
+  const [{ usados }] = await db.select({ usados: sql<number>`count(*)::int` })
+    .from(entryLogs).where(eq(entryLogs.invitationId, id))
 
   const validFrom = input.validFrom ?? inv.validFrom
   const validTo = input.validTo ?? inv.validTo
   if (validTo < validFrom) throw new AppError(400, 'ventana_invertida')
 
   const capacity = input.capacity ?? inv.capacity
-  if (capacity < Math.max(1, Number(comprometido))) {
-    throw new AppError(409, 'cupo_menor_al_usado')
-  }
+  if (capacity < Math.max(1, usados)) throw new AppError(409, 'cupo_menor_al_usado')
 
   const [actualizada] = await db.update(invitations).set({
     ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),

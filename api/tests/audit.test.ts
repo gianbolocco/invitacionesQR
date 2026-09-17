@@ -86,18 +86,6 @@ describe('auditoría de invitaciones', () => {
     expect(res.body.rows[0].status).toBe('anulada')
   })
 
-  it('los anotados a un evento salen como filas propias con el evento al lado', async () => {
-    const ctx = await base()
-    const evento = await inv(ctx, { guestName: 'Cumple de Sofi', kind: 'evento', capacity: 20 })
-    await inv(ctx, { guestName: 'Martina', kind: 'evento', parentId: evento.id })
-
-    const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
-    const martina = res.body.rows.find((r: { guestName: string }) => r.guestName === 'Martina')
-    expect(martina.eventName).toBe('Cumple de Sofi')
-
-    const padre = res.body.rows.find((r: { guestName: string }) => r.guestName === 'Cumple de Sofi')
-    expect(padre.eventName).toBeNull()
-  })
 
   it('exporta un .xlsx de verdad, con las hojas Invitaciones e Ingresos', async () => {
     const ctx = await base()
@@ -123,9 +111,12 @@ describe('auditoría de invitaciones', () => {
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Invitaciones', 'Ingresos'])
 
     const inv1 = wb.getWorksheet('Invitaciones')!
+    const encabezados = (inv1.getRow(1).values as unknown[]).map(String)
+    const columna = (titulo: string) => encabezados.indexOf(titulo)
+
     expect(inv1.getRow(1).getCell(1).value).toBe('Invitado')
     expect(inv1.getRow(2).getCell(1).value).toBe('Martín Pérez')
-    expect(inv1.getRow(2).getCell(10).value).toBe('Entró')
+    expect(inv1.getRow(2).getCell(columna('Estado')).value).toBe('Entró')
 
     const ing = wb.getWorksheet('Ingresos')!
     expect(ing.getRow(2).getCell(2).value).toBe('Martín Pérez')
@@ -194,19 +185,18 @@ describe('detalle de ingresos de una invitación', () => {
 
   it('devuelve los movimientos que la auditoría resume como ×N', async () => {
     const ctx = await base()
-    const evento = await inv(ctx, { guestName: 'Cumple de Sofi', kind: 'evento', capacity: 10 })
-    await registerEntry(evento.id, ctx.guardiaId, { guestName: 'Tía Ana' })
-    await registerEntry(evento.id, ctx.guardiaId, { guestName: 'Primo Juan' })
-    await registerEntry(evento.id, ctx.guardiaId, { guestName: 'Vecina' })
+    const frec = await inv(ctx, { guestName: 'Mucama', kind: 'frecuente', capacity: 10 })
+    await registerEntry(frec.id, ctx.guardiaId, { guestName: 'Mucama' })
+    await registerEntry(frec.id, ctx.guardiaId, { guestName: 'Mucama' })
+    await registerEntry(frec.id, ctx.guardiaId, { guestName: 'Mucama' })
 
     const audit = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
-    const fila = audit.body.rows.find((r: { guestName: string }) => r.guestName === 'Cumple de Sofi')
+    const fila = audit.body.rows.find((r: { guestName: string }) => r.guestName === 'Mucama')
     expect(fila.enteredCount).toBe(3)
 
-    const detalle = await request(app).get(`/gate/audit/${evento.id}/entries`).set('Cookie', ctx.cookie)
+    const detalle = await request(app).get(`/gate/audit/${frec.id}/entries`).set('Cookie', ctx.cookie)
     expect(detalle.body).toHaveLength(3)
-    expect(detalle.body.map((e: { guestName: string }) => e.guestName).sort())
-      .toEqual(['Primo Juan', 'Tía Ana', 'Vecina'])
+    expect(detalle.body.every((e: { guestName: string }) => e.guestName === 'Mucama')).toBe(true)
     expect(detalle.body[0].guardName).toBe('Rulo')
     expect(detalle.body[0].enteredAt).toBeTruthy()
   })

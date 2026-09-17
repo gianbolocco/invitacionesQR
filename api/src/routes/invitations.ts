@@ -3,8 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import {
   createInvitation, listForUnits, revokeInvitation, findPublicByToken,
-  fillGuestDetails, joinEvent, listEventGuests, editInvitation, restoreInvitation,
-  searchInvitations,
+  fillGuestDetails, editInvitation, restoreInvitation, searchInvitations,
 } from '../services/invitations.js'
 import { unitsOfPerson } from '../services/units.js'
 import { rateLimit } from '../middleware/rateLimit.js'
@@ -21,8 +20,8 @@ invitationRoutes.get('/public/:token', async (req, res) => {
   res.json(row)
 })
 
-// Limita por token, no por IP: varios invitados de un mismo evento comparten
-// la conexión de una casa, y no queremos que se bloqueen entre sí.
+// Limita por token, no por IP: varios invitados pueden compartir la conexión de
+// una casa, y no queremos que se bloqueen entre sí.
 const publicWriteLimit = rateLimit({
   max: 10,
   windowMs: 10 * 60_000,
@@ -40,17 +39,6 @@ invitationRoutes.patch('/public/:token', publicWriteLimit, async (req, res) => {
   res.json({ ok: true })
 })
 
-/** El invitado se anota a un evento y se lleva su propio QR. */
-invitationRoutes.post('/public/:token/join', publicWriteLimit, async (req, res) => {
-  const body = z.object({
-    guestName: z.string().min(1).max(80),
-    guestDoc: z.string().max(40).optional(),
-    plate: z.string().max(20).optional(),
-  }).parse(req.body)
-
-  res.status(201).json(await joinEvent(String(req.params.token), body))
-})
-
 /* ---------- De acá para abajo, todo pide sesión. ---------- */
 invitationRoutes.use(requireAuth)
 validarUuid(invitationRoutes)
@@ -59,7 +47,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-M
 
 const createSchema = z.object({
   unitId: z.string().uuid(),
-  kind: z.enum(['visita', 'frecuente', 'evento', 'proveedor']),
+  kind: z.enum(['visita', 'frecuente', 'proveedor']),
   guestName: z.string().min(1),
   guestDoc: z.string().optional(),
   plate: z.string().optional(),
@@ -81,7 +69,7 @@ invitationRoutes.get('/', async (req, res) => {
 
 const historySchema = z.object({
   q: z.string().trim().max(80).optional(),
-  kind: z.enum(['visita', 'frecuente', 'evento', 'proveedor']).optional(),
+  kind: z.enum(['visita', 'frecuente', 'proveedor']).optional(),
   estado: z.enum(['entro', 'no_entro', 'anulada']).optional(),
   // Llega como string desde la query. z.coerce.boolean() no sirve acá:
   // Boolean('false') es true.
@@ -103,11 +91,6 @@ invitationRoutes.get('/historial', async (req, res) => {
 invitationRoutes.post('/:id/revoke', async (req, res) => {
   await revokeInvitation(req.params.id, req.person!.id, req.person!.neighborhoodId)
   res.json({ ok: true })
-})
-
-/** Los anotados a un evento, para que el vecino vea quién viene. */
-invitationRoutes.get('/:id/guests', async (req, res) => {
-  res.json(await listEventGuests(req.params.id, req.person!.id))
 })
 
 const editSchema = z.object({

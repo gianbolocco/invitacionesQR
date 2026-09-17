@@ -10,7 +10,7 @@ import { InvitationForm } from '@/components/invitation-form'
 import { QrShare } from '@/components/qr-share'
 
 type Kind = Invitation['kind']
-const KINDS: Kind[] = ['visita', 'frecuente', 'evento', 'proveedor']
+const KINDS: Kind[] = ['visita', 'frecuente', 'proveedor']
 
 function Nueva() {
   const me = useMe()

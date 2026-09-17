@@ -26,65 +26,27 @@ async function loadForCheck(where: SQL) {
     weekdays: invitations.weekdays,
     capacity: invitations.capacity,
     revokedAt: invitations.revokedAt,
-    parentId: invitations.parentId,
     unitId: invitations.unitId,
     unitLabel: units.label,
   }).from(invitations).innerJoin(units, eq(units.id, invitations.unitId)).where(where).limit(1)
   return row ?? null
 }
 
-/** La raíz del evento: el padre si es un anotado, o la propia invitación. */
-function rootIdOf(inv: { id: string; parentId: string | null }): string {
-  return inv.parentId ?? inv.id
-}
-
-/**
- * Uso de la FAMILIA: ingresos contra la raíz más los de todas sus hijas.
- * El cupo de un evento es del evento, no de cada anotado, y el QR compartido del
- * evento sigue vivo para el que no se anotó: los dos caminos descuentan igual.
- */
-async function familyUsage(rootId: string, tx: Executor = db) {
-  const [row] = await tx.select({
-    used: sql<number>`count(*)::int`,
-    last: sql<Date | null>`max(${entryLogs.enteredAt})`,
-  })
-    .from(entryLogs)
-    .innerJoin(invitations, eq(invitations.id, entryLogs.invitationId))
-    .where(or(eq(invitations.id, rootId), eq(invitations.parentId, rootId)))
-  return { usedCount: row?.used ?? 0, lastEntryAt: row?.last ?? null }
-}
-
-async function ownUsage(invitationId: string, tx: Executor = db) {
-  const [row] = await tx.select({ used: sql<number>`count(*)::int` })
-    .from(entryLogs).where(eq(entryLogs.invitationId, invitationId))
-  return row?.used ?? 0
-}
-
 type LoadedInvitation = NonNullable<Awaited<ReturnType<typeof loadForCheck>>>
 
 async function buildCheck(invitation: LoadedInvitation) {
-  const rootId = rootIdOf(invitation)
-  const { usedCount, lastEntryAt } = await familyUsage(rootId)
-
-  // Un anotado compara contra la capacidad del EVENTO, no contra la suya.
-  const capacity = invitation.parentId
-    ? (await capacityOf(rootId)) ?? invitation.capacity
-    : invitation.capacity
-
-  let check: EntryCheck = canEnter({ ...invitation, capacity }, new Date(), usedCount)
-
-  // Y además no puede entrar dos veces, aunque al evento le sobre cupo.
-  if (check.ok && invitation.parentId && (await ownUsage(invitation.id)) >= 1) {
-    check = { ok: false, reason: 'no_capacity' }
-  }
-
+  const { usedCount, lastEntryAt } = await usage(invitation.id)
+  const check: EntryCheck = canEnter(invitation, new Date(), usedCount)
   return { invitation, check, usedCount, lastEntryAt }
 }
 
-async function capacityOf(id: string, tx: Executor = db): Promise<number | null> {
-  const [row] = await tx.select({ capacity: invitations.capacity })
-    .from(invitations).where(eq(invitations.id, id)).limit(1)
-  return row?.capacity ?? null
+/** Cuántas veces se usó una invitación y cuándo fue la última. */
+async function usage(invitationId: string, tx: Executor = db) {
+  const [row] = await tx.select({
+    used: sql<number>`count(*)::int`,
+    last: sql<Date | null>`max(${entryLogs.enteredAt})`,
+  }).from(entryLogs).where(eq(entryLogs.invitationId, invitationId))
+  return { usedCount: row?.used ?? 0, lastEntryAt: row?.last ?? null }
 }
 
 export async function checkByToken(token: string) {
@@ -102,9 +64,8 @@ export async function checkById(id: string) {
 /**
  * Registra el ingreso revalidando el cupo DENTRO de la transacción.
  *
- * El FOR UPDATE va sobre la RAÍZ del evento, no sobre la invitación escaneada:
- * es la fila que comparten todos los anotados, y por lo tanto la que serializa
- * el cupo. Bloquear la hija dejaría entrar al 31 de un evento de 30.
+ * El FOR UPDATE sobre la invitación es lo que serializa el cupo: sin él, dos
+ * escaneos simultáneos del mismo QR leen el mismo contador y los dos entran.
  */
 export async function registerEntry(
   invitationId: string,
@@ -113,24 +74,13 @@ export async function registerEntry(
 ) {
   return db.transaction(async (tx) => {
     const [target] = await tx.select().from(invitations)
-      .where(eq(invitations.id, invitationId)).limit(1)
+      .where(eq(invitations.id, invitationId)).for('update').limit(1)
     if (!target) throw new AppError(404, 'not_found')
 
-    const rootId = rootIdOf(target)
-    const [root] = await tx.select().from(invitations)
-      .where(eq(invitations.id, rootId)).for('update').limit(1)
-    if (!root) throw new AppError(404, 'not_found')
+    const { usedCount } = await usage(invitationId, tx)
 
-    const { usedCount } = await familyUsage(rootId, tx)
-
-    // La ventana y la revocación se miran en la invitación escaneada; el cupo,
-    // en el evento. Una hija revocada no entra aunque al evento le sobre lugar.
-    const check = canEnter({ ...target, capacity: root.capacity }, new Date(), usedCount)
+    const check = canEnter(target, new Date(), usedCount)
     if (!check.ok) throw new AppError(409, check.reason)
-
-    if (target.parentId && (await ownUsage(target.id, tx)) >= 1) {
-      throw new AppError(409, 'no_capacity')
-    }
 
     const [entry] = await tx.insert(entryLogs).values({
       invitationId,
@@ -190,16 +140,11 @@ export type AgendaRow = {
   guestName: string
   guestDoc: string | null
   plate: string | null
-  kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor'
   unitLabel: string
   inviterName: string
   capacity: number
-  /** Id del evento al que pertenece; null si es una invitación suelta. */
-  parentId: string | null
-  /** Nombre del evento que la engloba, para mostrarlo como contexto. */
-  eventName: string | null
-  joinedCount: number      // anotados, solo para eventos
-  enteredCount: number     // ingresos de la familia
+  enteredCount: number
   lastEntryAt: Date | null
 }
 
@@ -210,57 +155,7 @@ export type AgendaRow = {
  * cupo agotado igual aparece, marcada como "ya entró". El guardia necesita ver
  * quién vino, no solo quién falta.
  *
- * Los anotados a un evento salen como filas propias, con el evento al lado. Un
- * evento no es una invitación: es un paraguas sobre las invitaciones de los
- * que se anotaron, y cada uno de ellos tiene su QR y entra por su cuenta. Antes
- * quedaban escondidos adentro del evento y el guardia no podía ver en la lista
- * del día a la persona que tenía adelante.
  */
-export type EventGuestRow = {
-  id: string
-  guestName: string
-  guestDoc: string | null
-  plate: string | null
-  revokedAt: string | null
-  enteredCount: number
-  lastEntryAt: string | null
-}
-
-/**
- * Los anotados a un evento, para la garita.
- *
- * Tocar un evento en la agenda llevaba derecho a registrar un ingreso contra el
- * evento entero, y ahí se perdía de quién era: un cumpleaños de treinta
- * quedaba como treinta ingresos anónimos contra la misma invitación. El guardia
- * tiene que poder abrir el evento y elegir a la persona que tiene adelante.
- *
- * Los anulados vienen igual, marcados: si alguien se presenta con un QR que le
- * anularon, el guardia necesita ver que existe y que no puede entrar, no que no
- * aparezca por ningún lado.
- */
-export async function eventGuestsForGate(
-  neighborhoodId: string,
-  eventId: string,
-): Promise<EventGuestRow[]> {
-  const res = await db.execute(sql`
-    select
-      h.id,
-      h.guest_name  as "guestName",
-      h.guest_doc   as "guestDoc",
-      h.plate,
-      h.revoked_at  as "revokedAt",
-      (select count(*) from entry_log e where e.invitation_id = h.id)::int as "enteredCount",
-      (select max(e.entered_at) from entry_log e where e.invitation_id = h.id) as "lastEntryAt"
-    from invitation h
-    join unit u on u.id = h.unit_id
-    where h.parent_id = ${eventId}
-      and u.neighborhood_id = ${neighborhoodId}
-    order by h.revoked_at nulls first, lower(h.guest_name)
-  `)
-
-  return res.rows as unknown as EventGuestRow[]
-}
-
 export async function agendaForDay(neighborhoodId: string, day: string): Promise<AgendaRow[]> {
   // 0 = domingo, igual que weekdayInBuenosAires y que la columna weekdays.
   const dow = new Date(`${day}T12:00:00Z`).getUTCDay()
@@ -271,8 +166,8 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
    * el martes y el miércoles, y la agenda de ayer mostraba el ingreso de hoy.
    *
    * El corte del día va en hora de Buenos Aires y no en UTC: entre las 21 y la
-   * medianoche acá ya es el día siguiente en UTC, que es justo el horario en que
-   * más gente entra a un evento.
+   * medianoche acá ya es el día siguiente en UTC, que es justo el horario en
+   * que más gente entra al barrio.
    */
   const eseDia = sql`(e.entered_at at time zone ${TZ})::date = ${day}::date`
 
@@ -283,33 +178,21 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       i.guest_doc         as "guestDoc",
       i.plate,
       i.kind,
-      i.parent_id         as "parentId",
-      padre.guest_name    as "eventName",
       u.label             as "unitLabel",
       p.name              as "inviterName",
       i.capacity,
-      (select count(*) from invitation h
-        where h.parent_id = i.id and h.revoked_at is null)::int as "joinedCount",
       (select count(*) from entry_log e
-        where ${eseDia}
-          and (e.invitation_id = i.id
-            or e.invitation_id in (select h.id from invitation h where h.parent_id = i.id)))::int
-        as "enteredCount",
+        where ${eseDia} and e.invitation_id = i.id)::int as "enteredCount",
       (select max(e.entered_at) from entry_log e
-        where ${eseDia}
-          and (e.invitation_id = i.id
-            or e.invitation_id in (select h.id from invitation h where h.parent_id = i.id)))
-        as "lastEntryAt"
+        where ${eseDia} and e.invitation_id = i.id)      as "lastEntryAt"
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
-    left join invitation padre on padre.id = i.parent_id
     where u.neighborhood_id = ${neighborhoodId}
       and i.revoked_at is null
       and ${day}::date between i.valid_from and i.valid_to
       and (i.weekdays is null or ${dow} = any(i.weekdays))
-    -- El paraguas del evento primero; los anotados ordenan con el resto.
-    order by (i.kind = 'evento' and i.parent_id is null) desc, lower(i.guest_name)
+    order by lower(i.guest_name)
   `)
 
   return res.rows as unknown as AgendaRow[]
@@ -320,8 +203,7 @@ export type AuditRow = {
   guestName: string
   guestDoc: string | null
   plate: string | null
-  kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
-  eventName: string | null      // si es alguien anotado a un evento
+  kind: 'visita' | 'frecuente' | 'proveedor'
   unitLabel: string
   inviterName: string
   validFrom: string
@@ -358,9 +240,6 @@ export type AuditPage = {
  * Cada fila es una invitación, incluidas las que nadie usó. "No vino nadie" es
  * justamente el dato que un listado de ingresos no puede mostrar; los ingresos
  * de cada una se piden aparte al desplegar la fila.
- *
- * Los anotados a un evento salen como filas propias, con el evento en su
- * columna: para auditar querés una fila por persona.
  *
  * El filtro por estado y los contadores van del lado del servidor: con
  * paginación, filtrar la página que llegó daría números que mienten.
@@ -451,7 +330,6 @@ async function auditRows(
       i.guest_doc                 as "guestDoc",
       i.plate,
       i.kind,
-      padre.guest_name            as "eventName",
       u.label                     as "unitLabel",
       p.name                      as "inviterName",
       i.valid_from                as "validFrom",
@@ -469,7 +347,6 @@ async function auditRows(
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
-    left join invitation padre on padre.id = i.parent_id
     left join uso on uso.invitation_id = i.id
     where u.neighborhood_id = ${neighborhoodId}
       and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)

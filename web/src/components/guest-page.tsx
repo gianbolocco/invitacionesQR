@@ -6,17 +6,15 @@ import { Button, Field, ErrorNote, Eyebrow, Wordmark } from '@/components/ui'
 
 export type Publica = {
   guestName: string
-  kind: 'visita' | 'frecuente' | 'evento' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor'
   validFrom: string
   validTo: string
   revokedAt: string | null
   unitLabel: string
   inviterName: string
   neighborhood: { name: string; address: string | null; mapUrl: string | null }
-  isEventDoor: boolean
   hasDoc: boolean
   hasPlate: boolean
-  spotsLeft: number | null
   frozen: boolean
 }
 
@@ -77,8 +75,8 @@ export function Qr({ url }: { url: string }) {
  * Pide SOLO lo que falta.
  *
  * Antes se mostraba entero si faltaba cualquiera de los dos campos, así que a
- * quien ya había cargado su documento al anotarse al evento se lo volvía a
- * pedir. Los datos se piden una vez.
+ * quien ya tenía el documento cargado se lo volvían a pedir. Los datos se piden
+ * una vez.
  */
 export function FormularioDatos({ token, faltaDoc, faltaPatente, onListo }: {
   token: string
@@ -134,81 +132,6 @@ export function FormularioDatos({ token, faltaDoc, faltaPatente, onListo }: {
         )}
         {error && <ErrorNote>{error}</ErrorNote>}
         <Button type="submit" disabled={busy}>{busy ? 'Guardando…' : 'Guardar'}</Button>
-      </div>
-    </form>
-  )
-}
-
-/** Puerta de anotación de un evento: el invitado se anota y se lleva su QR. */
-export function FormularioAnotarse({ token, spotsLeft, onAnotado }: {
-  token: string
-  spotsLeft: number | null
-  onAnotado: (tokenPropio: string) => void
-}) {
-  const [name, setName] = useState('')
-  const [doc, setDoc] = useState('')
-  const [plate, setPlate] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const sinLugar = spotsLeft !== null && spotsLeft <= 0
-
-  async function anotarse(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      const r = await api<{ token: string }>(`/invitations/public/${token}/join`, {
-        method: 'POST',
-        // Todo junto y una sola vez: despues no se le vuelve a pedir nada.
-        body: JSON.stringify({
-          guestName: name,
-          guestDoc: doc || undefined,
-          plate: plate || undefined,
-        }),
-      })
-      onAnotado(r.token)
-    } catch {
-      setError('No se pudo anotar. Puede que se haya llenado el cupo: preguntale a quien te invitó.')
-      setBusy(false)
-    }
-  }
-
-  if (sinLugar) {
-    return (
-      <div className="filete">
-        <div className="bg-card p-5">
-          <p className="display text-lg">No quedan lugares</p>
-          <p className="mt-1 text-ink-soft">
-            El cupo de este evento está completo. Avisale a quien te invitó.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <form onSubmit={anotarse} className="filete">
-      <div className="flex flex-col gap-4 bg-card p-5">
-        <div>
-          <p className="display text-lg">Anotate</p>
-          <p className="mt-0.5 text-sm text-ink-soft">
-            Cargá tus datos y te llevás tu propio código para entrar.
-            {spotsLeft !== null && spotsLeft <= 5 && (
-              <span className="font-semibold"> Quedan {spotsLeft} lugares.</span>
-            )}
-          </p>
-        </div>
-        <Field label="Tu nombre y apellido" required value={name}
-          placeholder="Martina Gómez" onChange={(e) => setName(e.target.value)} />
-        <Field label="Documento" value={doc} className="tabular"
-          placeholder="35.111.222" hint="Opcional. Si lo cargás, el guardia no te lo pide en la barrera."
-          onChange={(e) => setDoc(e.target.value)} />
-        <Field label="Patente" value={plate} className="tabular uppercase"
-          placeholder="AB 123 CD" hint="Opcional, si venís en auto."
-          onChange={(e) => setPlate(e.target.value)} />
-        {error && <ErrorNote>{error}</ErrorNote>}
-        <Button type="submit" disabled={busy}>{busy ? 'Anotando…' : 'Anotarme'}</Button>
       </div>
     </form>
   )

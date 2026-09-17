@@ -1,35 +1,13 @@
 'use client'
 import { use, useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { KIND_LABEL, hoyISO } from '@/lib/invitations'
 import { Eyebrow, Wordmark } from '@/components/ui'
 import { TemaFlotante } from '@/components/tema-flotante'
-import {
-  Cabecera, Qr, FormularioDatos, FormularioAnotarse, fechaCorta, type Publica,
-} from '@/components/guest-page'
-
-/** Recuerda en este dispositivo a qué hija de un evento corresponde el invitado. */
-function anotacionGuardada(eventToken: string): string | null {
-  try {
-    return localStorage.getItem(`anotado:${eventToken}`)
-  } catch {
-    return null   // modo incógnito o cookies bloqueadas: no es un error
-  }
-}
-
-function guardarAnotacion(eventToken: string, propio: string) {
-  try {
-    localStorage.setItem(`anotado:${eventToken}`, propio)
-  } catch {
-    // Sin localStorage el invitado tendría que anotarse de nuevo, pero el
-    // servidor deduplica por documento y le devuelve la misma anotación.
-  }
-}
+import { Cabecera, Qr, FormularioDatos, fechaCorta, type Publica } from '@/components/guest-page'
 
 export default function InvitacionPublica({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
-  const router = useRouter()
   const [inv, setInv] = useState<Publica | null>(null)
   const [noExiste, setNoExiste] = useState(false)
   const [datosListos, setDatosListos] = useState(false)
@@ -39,13 +17,6 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
   }, [token])
 
   useEffect(cargar, [cargar])
-
-  // Si ya se anotó a este evento desde este dispositivo, va directo a su QR.
-  useEffect(() => {
-    if (!inv?.isEventDoor) return
-    const propio = anotacionGuardada(token)
-    if (propio) router.replace(`/i/${propio}`)
-  }, [inv, token, router])
 
   if (noExiste) {
     return (
@@ -77,24 +48,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
         </div>
       )}
 
-      {!muerta && inv.isEventDoor ? (
-        /* Puerta de anotación: acá no hay QR todavía. */
-        <>
-          <div>
-            <Eyebrow>{KIND_LABEL[inv.kind]}</Eyebrow>
-            <p className="display mt-0.5 text-2xl">{inv.guestName}</p>
-            <p className="text-ink-soft tabular">
-              {inv.validFrom === inv.validTo
-                ? fechaCorta(inv.validFrom)
-                : `${fechaCorta(inv.validFrom)} a ${fechaCorta(inv.validTo)}`}
-            </p>
-          </div>
-          <FormularioAnotarse token={token} spotsLeft={inv.spotsLeft}
-            onAnotado={(propio) => { guardarAnotacion(token, propio); router.push(`/i/${propio}`) }} />
-        </>
-      ) : (
-        /* QR personal: una visita, un proveedor, o alguien ya anotado. */
-        <>
+      <>
           <Qr url={url} />
           <div className="text-center">
             <Eyebrow>{KIND_LABEL[inv.kind]}</Eyebrow>
@@ -118,9 +72,8 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
             </p>
           )}
 
-          <p className="text-center text-sm text-ink-soft">Mostrá esta pantalla en la garita.</p>
-        </>
-      )}
+        <p className="text-center text-sm text-ink-soft">Mostrá esta pantalla en la garita.</p>
+      </>
     </main>
   )
 }
