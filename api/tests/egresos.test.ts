@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import request from 'supertest'
 import { buildApp } from '../src/app.js'
 import { db, pool } from '../src/db/index.js'
-import { neighborhoods, units, people, unitMembers, invitations, entryLogs } from '../src/db/schema.js'
+import { neighborhoods, units, people, unitMembers, invitations, entryLogs, auditLogs } from '../src/db/schema.js'
 import { hashPassword, randomToken } from '../src/lib/crypto.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
 import { registerEntry, registerExit } from '../src/services/entries.js'
@@ -199,5 +199,90 @@ describe('registrar un egreso', () => {
     // Y la salida que quedó es la del que ganó.
     const [fila] = await db.select().from(entryLogs).where(eq(entryLogs.id, entrada.id))
     expect(fila.exitGuardId).toBe(guardia.id)
+  })
+})
+
+describe('deshacer el último movimiento', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('deshacer un egreso reabre la fila', async () => {
+    const { inv, cookie, guardia } = await escenario()
+    const entrada = await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+    await request(app).post('/gate/exits').set('Cookie', cookie)
+      .send({ invitationId: inv.id }).expect(201)
+
+    const res = await request(app).post(`/gate/entries/${entrada.id}/undo`)
+      .set('Cookie', cookie).expect(200)
+    expect(res.body.deshecho).toBe('egreso')
+
+    const [fila] = await db.select().from(entryLogs).where(eq(entryLogs.id, entrada.id))
+    expect(fila.exitedAt).toBeNull()
+    expect(fila.exitGuardId).toBeNull()
+  })
+
+  it('deshacer un ingreso borra la fila y libera el cupo', async () => {
+    const { inv, cookie, guardia } = await escenario()
+    const entrada = await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+
+    const res = await request(app).post(`/gate/entries/${entrada.id}/undo`)
+      .set('Cookie', cookie).expect(200)
+    expect(res.body.deshecho).toBe('ingreso')
+
+    const filas = await db.select().from(entryLogs).where(eq(entryLogs.id, entrada.id))
+    expect(filas).toHaveLength(0)
+
+    // Y con el cupo liberado, puede volver a entrar.
+    await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+  })
+
+  it('pasados 5 minutos ya no se puede deshacer', async () => {
+    const { inv, cookie, guardia } = await escenario()
+    const entrada = await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+
+    // Se envejece el movimiento seis minutos: deshacer es para corregir un
+    // error recién cometido, no para borrar la bitácora de la semana pasada.
+    await db.update(entryLogs)
+      .set({ enteredAt: new Date(Date.now() - 6 * 60_000) })
+      .where(eq(entryLogs.id, entrada.id))
+
+    const res = await request(app).post(`/gate/entries/${entrada.id}/undo`).set('Cookie', cookie)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('fuera_de_plazo')
+
+    const filas = await db.select().from(entryLogs).where(eq(entryLogs.id, entrada.id))
+    expect(filas).toHaveLength(1)
+  })
+
+  it('el plazo de un egreso se cuenta desde la salida, no desde la entrada', async () => {
+    const { inv, cookie, guardia } = await escenario()
+    const entrada = await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+    await request(app).post('/gate/exits').set('Cookie', cookie)
+      .send({ invitationId: inv.id }).expect(201)
+
+    // Entró hace dos horas y salió hace un minuto: el egreso se puede deshacer.
+    await db.update(entryLogs)
+      .set({ enteredAt: new Date(Date.now() - 2 * 3600_000) })
+      .where(eq(entryLogs.id, entrada.id))
+
+    await request(app).post(`/gate/entries/${entrada.id}/undo`).set('Cookie', cookie).expect(200)
+  })
+
+  it('queda en el audit log, con los datos del ingreso borrado', async () => {
+    const { inv, cookie, guardia } = await escenario()
+    const entrada = await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+    await request(app).post(`/gate/entries/${entrada.id}/undo`).set('Cookie', cookie).expect(200)
+
+    const [log] = await db.select().from(auditLogs).where(eq(auditLogs.entityId, entrada.id))
+    expect(log.action).toBe('entry.undone')
+    expect(log.actorId).toBe(guardia.id)
+    expect(log.meta).toMatchObject({ movimiento: 'ingreso', guestName: 'Juan Pérez' })
+  })
+
+  it('un id que no existe da 404', async () => {
+    const { cookie } = await escenario()
+    const res = await request(app)
+      .post('/gate/entries/00000000-0000-4000-8000-000000000000/undo')
+      .set('Cookie', cookie)
+    expect(res.status).toBe(404)
   })
 })

@@ -4,6 +4,7 @@ import { invitations, entryLogs, units, people } from '../db/schema.js'
 import { canEnter, type EntryCheck } from '../authz.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
+import { audit } from '../lib/audit.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -147,6 +148,59 @@ export async function registerExit(invitationId: string, guardId: string | null)
 
   if (!salida) throw new AppError(409, 'no_esta_adentro')
   return salida
+}
+
+/**
+ * Cuántos minutos se puede deshacer un movimiento.
+ *
+ * Es lo que separa "corregir un escaneo doble" de "borrar evidencia": sin
+ * límite, un guardia podría borrar un ingreso de hace tres semanas.
+ */
+const VENTANA_DESHACER_MIN = 5
+
+/**
+ * Deshace el último movimiento de una fila de la bitácora.
+ *
+ * Si tiene salida, la borra (deshace el egreso). Si no, borra la fila entera
+ * (deshace el ingreso) y con eso libera el cupo que había consumido.
+ *
+ * El ingreso borrado se guarda en el meta del audit_log: la fila desaparece,
+ * pero que desapareció y qué decía, no.
+ */
+export async function undoMovement(
+  entryId: string,
+  personId: string,
+  neighborhoodId: string,
+): Promise<{ deshecho: 'ingreso' | 'egreso' }> {
+  const [fila] = await db.select().from(entryLogs).where(eq(entryLogs.id, entryId)).limit(1)
+  if (!fila) throw new AppError(404, 'not_found')
+
+  // El plazo se cuenta desde el movimiento que se está deshaciendo: alguien que
+  // entró hace dos horas y salió hace un minuto puede deshacer esa salida.
+  const momento = fila.exitedAt ?? fila.enteredAt
+  if (Date.now() - momento.getTime() > VENTANA_DESHACER_MIN * 60_000) {
+    throw new AppError(409, 'fuera_de_plazo')
+  }
+
+  if (fila.exitedAt) {
+    await db.update(entryLogs).set({ exitedAt: null, exitGuardId: null })
+      .where(eq(entryLogs.id, entryId))
+    await audit(personId, neighborhoodId, 'entry.undone', 'entry', entryId, {
+      movimiento: 'egreso', exitedAt: fila.exitedAt,
+    })
+    return { deshecho: 'egreso' }
+  }
+
+  await db.delete(entryLogs).where(eq(entryLogs.id, entryId))
+  await audit(personId, neighborhoodId, 'entry.undone', 'entry', entryId, {
+    movimiento: 'ingreso',
+    guestName: fila.guestName,
+    guestDoc: fila.guestDoc,
+    plate: fila.plate,
+    enteredAt: fila.enteredAt,
+    guardId: fila.guardId,
+  })
+  return { deshecho: 'ingreso' }
 }
 
 /**

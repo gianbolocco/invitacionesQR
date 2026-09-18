@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/requireAuth.js'
 import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
-  checkByToken, checkById, registerEntry, registerExit, searchGuests, agendaForDay,
+  checkByToken, checkById, registerEntry, registerExit, undoMovement, searchGuests, agendaForDay,
   auditInvitations, auditAll,
 } from '../services/entries.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
@@ -46,6 +46,11 @@ gateRoutes.post('/entries', async (req, res) => {
 gateRoutes.post('/exits', async (req, res) => {
   const body = z.object({ invitationId: z.string().uuid() }).parse(req.body)
   res.status(201).json(await registerExit(body.invitationId, req.person!.id))
+})
+
+/** Deshacer el último movimiento, para el escaneo doble. */
+gateRoutes.post('/entries/:id/undo', async (req, res) => {
+  res.json(await undoMovement(req.params.id, req.person!.id, req.person!.neighborhoodId))
 })
 
 /** La agenda del día: quién está habilitado a entrar. */

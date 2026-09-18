@@ -35,6 +35,7 @@ describe('ids mal formados', () => {
     ['post', '/invitations/no-es-uuid/restore'],
     ['patch', '/invitations/no-es-uuid'],
     ['get', '/gate/invitation/no-es-uuid'],
+    ['post', '/gate/entries/no-es-uuid/undo'],
     ['post', '/admin/people/no-es-uuid/disable'],
     ['post', '/admin/people/no-es-uuid/enable'],
     ['post', '/admin/people/no-es-uuid/resend'],
