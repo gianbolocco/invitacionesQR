@@ -204,10 +204,12 @@ export async function undoMovement(
 }
 
 /**
- * Invitaciones todavía vigentes que matchean nombre, etiqueta de UF o patente.
+ * Invitaciones todavía vigentes que matchean nombre, documento, etiqueta de UF
+ * o patente.
  *
- * La comparación pasa por `unaccent`: con un auto esperando en la barrera nadie
- * escribe "Pérez" con tilde, y el vecino sí la escribió al cargar la invitación.
+ * La comparación del nombre y la UF pasa por `unaccent`: con un auto esperando
+ * en la barrera nadie escribe "Pérez" con tilde, y el vecino sí la escribió al
+ * cargar la invitación.
  *
  * ponytail: unaccent() no es IMMUTABLE, así que esto no usa índice y hace scan.
  * Con las invitaciones vigentes de un barrio son decenas de filas. Si alguna vez
@@ -220,11 +222,17 @@ export async function searchGuests(neighborhoodId: string, query: string) {
   return db.select({
     id: invitations.id,
     guestName: invitations.guestName,
+    guestDoc: invitations.guestDoc,
     kind: invitations.kind,
     plate: invitations.plate,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
     unitLabel: units.label,
+    // Para que el guardia sepa qué va a pasar antes de tocar el resultado.
+    adentro: sql<boolean>`exists (
+      select 1 from entry_log e
+      where e.invitation_id = ${invitations.id} and e.exited_at is null
+    )`,
   })
     .from(invitations)
     .innerJoin(units, eq(units.id, invitations.unitId))
@@ -235,6 +243,9 @@ export async function searchGuests(neighborhoodId: string, query: string) {
         sql`unaccent(${invitations.guestName}) ilike unaccent(${q})`,
         sql`unaccent(${units.label}) ilike unaccent(${q})`,
         ilike(invitations.plate, q),
+        // Sin unaccent: un documento no lleva tildes, y pasarlo por unaccent
+        // sería gasto sin efecto.
+        ilike(invitations.guestDoc, q),
       ),
     ))
     .orderBy(desc(invitations.createdAt))

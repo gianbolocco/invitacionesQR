@@ -233,3 +233,39 @@ describe('el check informa si la persona está adentro', () => {
     expect(res.body.adentro.entryId).toBe(segunda.id)
   })
 })
+
+describe('buscar por documento en la garita', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('encuentra por documento, entero y por pedazo', async () => {
+    const { inv, cookie } = await scenario()
+    await db.update(invitations).set({ guestDoc: '30111222' })
+      .where(eq(invitations.id, inv.id))
+
+    const entero = await request(app).get('/gate/search?q=30111222').set('Cookie', cookie).expect(200)
+    expect(entero.body).toHaveLength(1)
+    expect(entero.body[0].id).toBe(inv.id)
+    expect(entero.body[0].guestDoc).toBe('30111222')
+
+    const pedazo = await request(app).get('/gate/search?q=0111').set('Cookie', cookie).expect(200)
+    expect(pedazo.body).toHaveLength(1)
+  })
+
+  it('cada resultado dice si esa persona está adentro', async () => {
+    const { inv, cookie, guardia } = await scenario()
+
+    const antes = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie).expect(200)
+    expect(antes.body[0].adentro).toBe(false)
+
+    await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+
+    const despues = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie).expect(200)
+    expect(despues.body[0].adentro).toBe(true)
+  })
+
+  it('un documento que no existe no devuelve nada', async () => {
+    const { cookie } = await scenario()
+    const res = await request(app).get('/gate/search?q=99999999').set('Cookie', cookie).expect(200)
+    expect(res.body).toHaveLength(0)
+  })
+})
