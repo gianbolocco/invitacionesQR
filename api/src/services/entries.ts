@@ -126,6 +126,30 @@ export async function registerEntry(
 }
 
 /**
+ * Registra la salida: cierra la fila abierta más reciente de esa invitación.
+ *
+ * No valida NADA. Ni fechas, ni cupo, ni anulación: el que está adentro tiene
+ * que poder salir, y si le anularon la invitación mientras estaba adentro eso
+ * es justamente lo que se quiere registrado.
+ *
+ * El `isNull(exitedAt)` del WHERE no es redundante con la lectura de arriba: es
+ * lo que hace que dos egresos simultáneos no escriban los dos. El que pierde
+ * actualiza cero filas y se va con 409.
+ */
+export async function registerExit(invitationId: string, guardId: string | null) {
+  const abierta = await openEntry(invitationId)
+  if (!abierta) throw new AppError(409, 'no_esta_adentro')
+
+  const [salida] = await db.update(entryLogs)
+    .set({ exitedAt: new Date(), exitGuardId: guardId })
+    .where(and(eq(entryLogs.id, abierta.id), isNull(entryLogs.exitedAt)))
+    .returning()
+
+  if (!salida) throw new AppError(409, 'no_esta_adentro')
+  return salida
+}
+
+/**
  * Invitaciones todavía vigentes que matchean nombre, etiqueta de UF o patente.
  *
  * La comparación pasa por `unaccent`: con un auto esperando en la barrera nadie

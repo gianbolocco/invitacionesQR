@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/requireAuth.js'
 import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
-  checkByToken, checkById, registerEntry, searchGuests, agendaForDay,
+  checkByToken, checkById, registerEntry, registerExit, searchGuests, agendaForDay,
   auditInvitations, auditAll,
 } from '../services/entries.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
@@ -40,6 +40,12 @@ gateRoutes.post('/entries', async (req, res) => {
   // El guardia sale de la sesión, no del body: un dato de auditoría no puede
   // depender de lo que mande el cliente ni de que alguien elija bien.
   res.status(201).json(await registerEntry(body.invitationId, req.person!.id, body))
+})
+
+/** La salida. El guardia sale de la sesión, igual que en el ingreso. */
+gateRoutes.post('/exits', async (req, res) => {
+  const body = z.object({ invitationId: z.string().uuid() }).parse(req.body)
+  res.status(201).json(await registerExit(body.invitationId, req.person!.id))
 })
 
 /** La agenda del día: quién está habilitado a entrar. */
