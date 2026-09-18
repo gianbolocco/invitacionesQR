@@ -3,10 +3,10 @@ import { eq } from 'drizzle-orm'
 import request from 'supertest'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
-import { neighborhoods, units, people, unitMembers, invitations } from '../src/db/schema.js'
+import { neighborhoods, units, people, unitMembers, invitations, entryLogs } from '../src/db/schema.js'
 import { hashPassword, randomToken } from '../src/lib/crypto.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
-import { registerEntry } from '../src/services/entries.js'
+import { registerEntry, registerExit } from '../src/services/entries.js'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
 
@@ -155,4 +155,61 @@ describe('los ingresos se cuentan del día que se mira, no de siempre', () => {
     expect(ayer.body[0]).toMatchObject({ guestName: 'Jardinero', enteredCount: 0 })
   })
 
+})
+
+describe('la lista del día distingue adentro de salió', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  const fila = async (ctx: Awaited<ReturnType<typeof base>>, id: string) => {
+    const res = await request(app).get(`/gate/agenda?date=${hoy}`).set('Cookie', ctx.cookie)
+    return res.body.find((r: { id: string }) => r.id === id)
+  }
+
+  it('antes de entrar: ni adentro ni salida', async () => {
+    const ctx = await base()
+    const inv = await invitacion(ctx, { guestName: 'Juan' })
+    const r = await fila(ctx, inv.id)
+    expect(r).toMatchObject({ enteredCount: 0, adentro: false })
+    expect(r.lastExitAt).toBeNull()
+  })
+
+  it('después de entrar: adentro, sin salida', async () => {
+    const ctx = await base()
+    const inv = await invitacion(ctx, { guestName: 'Juan' })
+    await registerEntry(inv.id, null, { guestName: 'Juan' })
+
+    const r = await fila(ctx, inv.id)
+    expect(r).toMatchObject({ enteredCount: 1, adentro: true })
+    expect(r.lastExitAt).toBeNull()
+  })
+
+  it('después de salir: no adentro, con la hora de salida', async () => {
+    const ctx = await base()
+    const inv = await invitacion(ctx, { guestName: 'Juan' })
+    await registerEntry(inv.id, null, { guestName: 'Juan' })
+    await registerExit(inv.id, null)
+
+    const r = await fila(ctx, inv.id)
+    // enteredCount sigue en 1: el egreso no agrega ni quita un ingreso.
+    expect(r).toMatchObject({ enteredCount: 1, adentro: false })
+    expect(r.lastExitAt).not.toBeNull()
+  })
+
+  it('una fila abierta de ayer deja adentro en true hoy', async () => {
+    const ctx = await base()
+    const inv = await invitacion(ctx, {
+      guestName: 'Mucama', kind: 'frecuente', capacity: 999,
+      validFrom: masDias(-7), validTo: masDias(7),
+    })
+    const entrada = await registerEntry(inv.id, null, { guestName: 'Mucama' })
+    await db.update(entryLogs)
+      .set({ enteredAt: new Date(Date.now() - 36 * 3600_000) })
+      .where(eq(entryLogs.id, entrada.id))
+
+    const r = await fila(ctx, inv.id)
+    // El ingreso fue anteayer, así que no cuenta para hoy, pero la persona
+    // sigue sin registrar su salida: adentro es la verdad.
+    expect(r.enteredCount).toBe(0)
+    expect(r.adentro).toBe(true)
+  })
 })

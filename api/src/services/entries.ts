@@ -264,6 +264,13 @@ export type AgendaRow = {
   capacity: number
   enteredCount: number
   lastEntryAt: Date | null
+  /** Última salida registrada ESE día. */
+  lastExitAt: Date | null
+  /**
+   * Hay una fila abierta, de cualquier día. No se filtra por día a propósito:
+   * si entró anteayer y nadie registró su salida, sigue adentro hoy.
+   */
+  adentro: boolean
 }
 
 /**
@@ -302,7 +309,11 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       (select count(*) from entry_log e
         where ${eseDia} and e.invitation_id = i.id)::int as "enteredCount",
       (select max(e.entered_at) from entry_log e
-        where ${eseDia} and e.invitation_id = i.id)      as "lastEntryAt"
+        where ${eseDia} and e.invitation_id = i.id)      as "lastEntryAt",
+      (select max(e.exited_at) from entry_log e
+        where ${eseDia} and e.invitation_id = i.id)      as "lastExitAt",
+      exists (select 1 from entry_log e
+        where e.invitation_id = i.id and e.exited_at is null) as "adentro"
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
