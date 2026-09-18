@@ -29,6 +29,13 @@
       "when": 1789686602317,
       "tag": "0003_sin_eventos",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789701150334,
+      "tag": "0004_egresos",
+      "breakpoints": true
     }
   ]
 }

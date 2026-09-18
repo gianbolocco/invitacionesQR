@@ -72,6 +72,13 @@ export const entryLogs = pgTable('entry_log', {
   unitId: uuid('unit_id').notNull().references(() => units.id),
   guardId: uuid('guard_id').references(() => people.id),
   enteredAt: timestamp('entered_at', { withTimezone: true }).notNull().defaultNow(),
+  // NULL mientras la persona siga adentro. Una visita es UNA fila con sus dos
+  // horarios, no dos filas: así un egreso no agrega fila y ningún conteo de
+  // cupo cambia de significado.
+  exitedAt: timestamp('exited_at', { withTimezone: true }),
+  // El guardia de la salida no es el mismo que el de la entrada cuando hubo
+  // cambio de turno, y "quién lo dejó pasar" es un dato de auditoría.
+  exitGuardId: uuid('exit_guard_id').references(() => people.id),
   guestName: text('guest_name').notNull(),
   guestDoc: text('guest_doc'),
   plate: text('plate'),

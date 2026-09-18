@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { eq } from 'drizzle-orm'
 import { db } from '../src/db/index.js'
-import { invitations, units } from '../src/db/schema.js'
+import { invitations, units, entryLogs } from '../src/db/schema.js'
+import { randomToken } from '../src/lib/crypto.js'
 import { resetDb, seedBasics } from './helpers/db.js'
 import { violatedConstraint } from './helpers/constraint.js'
 
@@ -42,5 +44,45 @@ describe('constraints del schema', () => {
       db.insert(units).values({ neighborhoodId, label: 'Lote 142' })
     )
     expect(constraint).toBe('unit_label_uq')
+  })
+})
+
+describe('egresos en la bitácora', () => {
+  beforeEach(resetDb)
+
+  it('un ingreso nace sin salida registrada', async () => {
+    const { unitId, personId } = await seedBasics()
+    const [inv] = await db.insert(invitations).values({
+      unitId, createdBy: personId, kind: 'visita', guestName: 'Juan',
+      validFrom: '2026-01-01', validTo: '2030-01-01', capacity: 1, token: randomToken(16),
+    }).returning()
+
+    const [entrada] = await db.insert(entryLogs).values({
+      invitationId: inv.id, unitId, guestName: 'Juan',
+    }).returning()
+
+    expect(entrada.enteredAt).toBeInstanceOf(Date)
+    expect(entrada.exitedAt).toBeNull()
+    expect(entrada.exitGuardId).toBeNull()
+  })
+
+  it('la salida se puede escribir con su propio guardia', async () => {
+    const { unitId, personId } = await seedBasics()
+    const [inv] = await db.insert(invitations).values({
+      unitId, createdBy: personId, kind: 'visita', guestName: 'Juan',
+      validFrom: '2026-01-01', validTo: '2030-01-01', capacity: 1, token: randomToken(16),
+    }).returning()
+    const [entrada] = await db.insert(entryLogs).values({
+      invitationId: inv.id, unitId, guestName: 'Juan',
+    }).returning()
+
+    const salida = new Date()
+    const [cerrada] = await db.update(entryLogs)
+      .set({ exitedAt: salida, exitGuardId: personId })
+      .where(eq(entryLogs.id, entrada.id))
+      .returning()
+
+    expect(cerrada.exitedAt?.getTime()).toBe(salida.getTime())
+    expect(cerrada.exitGuardId).toBe(personId)
   })
 })
