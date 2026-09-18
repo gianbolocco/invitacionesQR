@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, or, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, gte, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { invitations, entryLogs, units, people } from '../db/schema.js'
 import { canEnter, type EntryCheck } from '../authz.js'
@@ -37,7 +37,20 @@ type LoadedInvitation = NonNullable<Awaited<ReturnType<typeof loadForCheck>>>
 async function buildCheck(invitation: LoadedInvitation) {
   const { usedCount, lastEntryAt } = await usage(invitation.id)
   const check: EntryCheck = canEnter(invitation, new Date(), usedCount)
-  return { invitation, check, usedCount, lastEntryAt }
+  const abierta = await openEntry(invitation.id)
+
+  return {
+    invitation,
+    check,
+    usedCount,
+    lastEntryAt,
+    /*
+     * Si viene, el próximo movimiento es un egreso y `check` no aplica: un
+     * egreso no se valida. El cliente decide a qué endpoint pegar con esto, y
+     * el servidor valida igual por si el dato quedó viejo.
+     */
+    adentro: abierta ? { entryId: abierta.id, enteredAt: abierta.enteredAt } : null,
+  }
 }
 
 /** Cuántas veces se usó una invitación y cuándo fue la última. */
@@ -47,6 +60,22 @@ async function usage(invitationId: string, tx: Executor = db) {
     last: sql<Date | null>`max(${entryLogs.enteredAt})`,
   }).from(entryLogs).where(eq(entryLogs.invitationId, invitationId))
   return { usedCount: row?.used ?? 0, lastEntryAt: row?.last ?? null }
+}
+
+/**
+ * La fila abierta de una invitación: alguien entró y no se registró su salida.
+ *
+ * Si hay más de una —una frecuente donde el guardia olvidó cerrar una— vale la
+ * más reciente. Las anteriores quedan abiertas y la auditoría las muestra sin
+ * salida, que es la verdad: no sabemos a qué hora se fue.
+ */
+async function openEntry(invitationId: string, tx: Executor = db) {
+  const [row] = await tx.select({ id: entryLogs.id, enteredAt: entryLogs.enteredAt })
+    .from(entryLogs)
+    .where(and(eq(entryLogs.invitationId, invitationId), isNull(entryLogs.exitedAt)))
+    .orderBy(desc(entryLogs.enteredAt))
+    .limit(1)
+  return row ?? null
 }
 
 export async function checkByToken(token: string) {

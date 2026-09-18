@@ -192,3 +192,44 @@ describe('quién dio el ingreso', () => {
     expect(fila.status).toBe('entro')
   })
 })
+
+describe('el check informa si la persona está adentro', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('adentro es null antes del primer ingreso', async () => {
+    const { inv, cookie } = await scenario()
+    const res = await request(app).get(`/gate/check/${inv.token}`).set('Cookie', cookie).expect(200)
+    expect(res.body.adentro).toBeNull()
+    expect(res.body.check.ok).toBe(true)
+  })
+
+  it('después de entrar, adentro trae el id del movimiento y la hora', async () => {
+    const { inv, cookie, guardia } = await scenario()
+    const entrada = await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+
+    const res = await request(app).get(`/gate/check/${inv.token}`).set('Cookie', cookie).expect(200)
+    expect(res.body.adentro).not.toBeNull()
+    expect(res.body.adentro.entryId).toBe(entrada.id)
+    expect(new Date(res.body.adentro.enteredAt).getTime())
+      .toBe(entrada.enteredAt.getTime())
+  })
+
+  it('una vez cerrada la fila, adentro vuelve a null', async () => {
+    const { inv, cookie, guardia } = await scenario()
+    const entrada = await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+    await db.update(entryLogs).set({ exitedAt: new Date() })
+      .where(eq(entryLogs.id, entrada.id))
+
+    const res = await request(app).get(`/gate/check/${inv.token}`).set('Cookie', cookie).expect(200)
+    expect(res.body.adentro).toBeNull()
+  })
+
+  it('con dos filas abiertas informa la más reciente', async () => {
+    const { inv, cookie, guardia } = await scenario(10)
+    await registerEntry(inv.id, guardia.id, { guestName: 'Primera' })
+    const segunda = await registerEntry(inv.id, guardia.id, { guestName: 'Segunda' })
+
+    const res = await request(app).get(`/gate/invitation/${inv.id}`).set('Cookie', cookie).expect(200)
+    expect(res.body.adentro.entryId).toBe(segunda.id)
+  })
+})
