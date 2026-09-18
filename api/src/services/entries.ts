@@ -342,6 +342,8 @@ export type AuditRow = {
   enteredAt: Date | null
   enteredCount: number
   guardName: string | null
+  exitedAt: Date | null
+  exitGuardName: string | null
 }
 
 export type AuditStatus = AuditRow['status']
@@ -448,9 +450,12 @@ async function auditRows(
       select e.invitation_id,
              count(*)::int as veces,
              max(e.entered_at) as ultima,
-             max(g.name) as guardia
+             max(g.name) as guardia,
+             max(e.exited_at) as ultima_salida,
+             max(gs.name) as guardia_salida
       from entry_log e
       left join person g on g.id = e.guard_id
+      left join person gs on gs.id = e.exit_guard_id
       group by e.invitation_id
     )
     select
@@ -472,7 +477,9 @@ async function auditRows(
       end                         as status,
       uso.ultima                  as "enteredAt",
       coalesce(uso.veces, 0)      as "enteredCount",
-      uso.guardia                 as "guardName"
+      uso.guardia                 as "guardName",
+      uso.ultima_salida           as "exitedAt",
+      uso.guardia_salida          as "exitGuardName"
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by

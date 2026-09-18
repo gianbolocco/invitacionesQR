@@ -123,6 +123,8 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
         { header: 'Hasta', key: 'hasta' },
         { header: 'Estado', key: 'estado' },
         { header: 'Último ingreso', key: 'ingreso', width: 18 },
+        { header: 'Salida', key: 'salida', width: 18 },
+        { header: 'Guardia salida', key: 'guardiaSalida', width: 20 },
         { header: 'Ingresos', key: 'ingresos' },
         { header: 'Guardia', key: 'guardia', width: 20 },
       ],
@@ -137,6 +139,8 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
         hasta: r.validTo,
         estado: ESTADO_EXCEL[r.status] ?? r.status,
         ingreso: r.enteredAt ? fecha.format(new Date(r.enteredAt)) : '',
+        salida: r.exitedAt ? fecha.format(new Date(r.exitedAt)) : '',
+        guardiaSalida: r.exitGuardName ?? '',
         ingresos: r.enteredCount,
         guardia: r.guardName ?? '',
       })),
@@ -145,6 +149,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
       nombre: 'Ingresos',
       columnas: [
         { header: 'Fecha y hora', key: 'cuando', width: 18 },
+        { header: 'Salida', key: 'salida', width: 18 },
         { header: 'Invitado', key: 'invitado', width: 26 },
         { header: 'Documento', key: 'documento' },
         { header: 'Patente', key: 'patente' },
@@ -153,6 +158,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
       ],
       filas: ingresos.map((e) => ({
         cuando: fecha.format(new Date(e.enteredAt)),
+        salida: e.exitedAt ? fecha.format(new Date(e.exitedAt)) : '',
         invitado: e.guestName,
         documento: e.guestDoc ?? '',
         patente: e.plate ?? '',

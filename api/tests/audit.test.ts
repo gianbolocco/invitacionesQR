@@ -7,7 +7,7 @@ import { db } from '../src/db/index.js'
 import { neighborhoods, units, people, unitMembers, invitations } from '../src/db/schema.js'
 import { hashPassword, randomToken } from '../src/lib/crypto.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
-import { registerEntry } from '../src/services/entries.js'
+import { registerEntry, registerExit } from '../src/services/entries.js'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
 
@@ -118,9 +118,14 @@ describe('auditoría de invitaciones', () => {
     expect(inv1.getRow(2).getCell(1).value).toBe('Martín Pérez')
     expect(inv1.getRow(2).getCell(columna('Estado')).value).toBe('Entró')
 
+    // Por encabezado, igual que la hoja de arriba: los índices fijos se
+    // rompen cada vez que se agrega una columna, y no es lo que se quiere
+    // afirmar acá.
     const ing = wb.getWorksheet('Ingresos')!
-    expect(ing.getRow(2).getCell(2).value).toBe('Martín Pérez')
-    expect(ing.getRow(2).getCell(6).value).toBe('Rulo')
+    const cabecerasIng = (ing.getRow(1).values as unknown[]).map(String)
+    const colIng = (t: string) => cabecerasIng.indexOf(t)
+    expect(ing.getRow(2).getCell(colIng('Invitado')).value).toBe('Martín Pérez')
+    expect(ing.getRow(2).getCell(colIng('Guardia')).value).toBe('Rulo')
   })
 
   it('el export trae todo, no solo la página que se está viendo', async () => {
@@ -206,5 +211,66 @@ describe('detalle de ingresos de una invitación', () => {
     const i = await inv(ctx, { guestName: 'No vino' })
     const res = await request(app).get(`/gate/audit/${i.id}/entries`).set('Cookie', ctx.cookie)
     expect(res.body).toEqual([])
+  })
+})
+
+describe('la auditoría muestra la salida', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('la fila trae la hora de salida y el guardia que la registró', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'Martín Pérez' })
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Martín Pérez' })
+    await registerExit(i.id, ctx.guardiaId)
+
+    const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie).expect(200)
+    const fila = res.body.rows.find((r: { id: string }) => r.id === i.id)
+    expect(fila.exitedAt).not.toBeNull()
+    expect(fila.exitGuardName).toBe('Rulo')
+  })
+
+  it('sin salida registrada, los dos campos vienen en null', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'Sigue adentro' })
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Sigue adentro' })
+
+    const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie).expect(200)
+    const fila = res.body.rows.find((r: { id: string }) => r.id === i.id)
+    expect(fila.exitedAt).toBeNull()
+    expect(fila.exitGuardName).toBeNull()
+  })
+
+  it('el Excel trae las columnas de salida en las dos hojas', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'Martín Pérez' })
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Martín Pérez' })
+    await registerExit(i.id, ctx.guardiaId)
+
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+      .expect(200)
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+
+    // Por encabezado y no por índice: agregar una columna no rompe el test.
+    const hoja = (nombre: string) => {
+      const w = wb.getWorksheet(nombre)!
+      const encabezados = (w.getRow(1).values as unknown[]).map(String)
+      return { w, columna: (t: string) => encabezados.indexOf(t) }
+    }
+
+    const invs = hoja('Invitaciones')
+    expect(invs.columna('Salida')).toBeGreaterThan(0)
+    expect(invs.columna('Guardia salida')).toBeGreaterThan(0)
+    expect(invs.w.getRow(2).getCell(invs.columna('Guardia salida')).value).toBe('Rulo')
+
+    const ing = hoja('Ingresos')
+    expect(ing.columna('Salida')).toBeGreaterThan(0)
+    expect(String(ing.w.getRow(2).getCell(ing.columna('Salida')).value)).not.toBe('')
   })
 })
