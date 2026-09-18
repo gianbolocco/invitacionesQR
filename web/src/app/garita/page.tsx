@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { porId, type Hit, type Resultado } from '@/lib/gate'
 import { Shell } from '@/components/shell'
+import { Estado } from '@/components/ui'
 import { Agenda } from '@/components/agenda'
 import { Verdict } from '@/components/verdict'
 
@@ -56,7 +57,7 @@ export default function GaritaHome() {
           <label htmlFor="q" className="font-semibold">Buscar</label>
           <div className="flex gap-2">
             <input id="q" value={query} onChange={(e) => setQuery(e.target.value)}
-              placeholder="Apellido, unidad o patente"
+              placeholder="Apellido, documento, unidad o patente"
               className="min-h-14 min-w-0 flex-1 rounded border border-line bg-card px-3 text-lg text-ink" />
             <button className="min-h-14 shrink-0 rounded bg-alamo px-5 font-semibold text-surface">
               Buscar
@@ -73,9 +74,19 @@ export default function GaritaHome() {
             {hits.map((h) => (
               <li key={h.id}>
                 <button onClick={() => abrir(h.id)}
-                  className="min-h-16 w-full rounded border border-line px-4 text-left text-lg">
-                  <span className="font-semibold">{h.guestName}</span>
-                  <span className="opacity-70 tabular"> · {h.unitLabel}{h.plate && ` · ${h.plate}`}</span>
+                  className="flex min-h-16 w-full items-center justify-between gap-3 rounded
+                    border border-line px-4 text-left text-lg">
+                  <span className="min-w-0">
+                    <span className="font-semibold">{h.guestName}</span>
+                    <span className="opacity-70 tabular">
+                      {' · '}{h.unitLabel}
+                      {h.guestDoc && ` · ${h.guestDoc}`}
+                      {h.plate && ` · ${h.plate}`}
+                    </span>
+                  </span>
+                  {/* Para que el guardia sepa si tocar esto va a registrar un
+                      ingreso o un egreso, antes de tocarlo. */}
+                  {h.adentro && <Estado estado="adentro" />}
                 </button>
               </li>
             ))}

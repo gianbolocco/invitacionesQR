@@ -20,9 +20,14 @@ llegar, carga su documento y su patente si quiere, y se queda con su QR.
 invitación, su QR y su fila en la lista del día, y eso es justamente lo que da
 la trazabilidad de quién entró y quién no.
 
-**El guardia** tiene su propia cuenta —cada ingreso queda a nombre de quien
+**El guardia** tiene su propia cuenta —cada movimiento queda a nombre de quien
 estaba logueado, que es lo que hace auditable el "¿quién lo dejó pasar?"—, la
 lista del día, el escáner y la auditoría exportable a Excel.
+
+Escanear el QR de nuevo, o buscar por documento, registra la **salida**: el
+sistema resuelve solo si el movimiento es un ingreso o un egreso según haya o no
+una fila abierta. Un egreso nunca se rechaza —el que está adentro tiene que
+poder salir— y no libera cupo, así que un reingreso rebota igual que antes.
 
 **El admin** da de alta vecinos y guardias, corrige lotes, edita los datos del
 barrio y ve el tablero.

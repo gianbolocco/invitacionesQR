@@ -22,6 +22,8 @@ type AuditRow = {
   enteredAt: string | null
   enteredCount: number
   guardName: string | null
+  exitedAt: string | null
+  exitGuardName: string | null
 }
 
 const ESTADO: Record<AuditRow['status'], { label: string; clase: string }> = {
@@ -46,6 +48,7 @@ function fechaCorta(iso: string): string {
 type Movimiento = {
   id: string
   enteredAt: string
+  exitedAt: string | null
   guestName: string
   guestDoc: string | null
   plate: string | null
@@ -153,7 +156,23 @@ export default function AuditoriaPage() {
         </button>
       ),
     },
-    { key: 'guardia', label: 'Guardia', celda: (r) => r.guardName ?? '—' },
+    {
+      key: 'salida', label: 'Salida',
+      celda: (r) => <span className="tabular">{r.exitedAt ? hora(r.exitedAt) : '—'}</span>,
+    },
+    {
+      key: 'guardia', label: 'Guardia',
+      celda: (r) => (
+        <>
+          <span>{r.guardName ?? '—'}</span>
+          {/* Solo si son distintos: en un cambio de turno entra con uno y sale
+              con otro, y ese es justo el caso que hay que poder ver. */}
+          {r.exitGuardName && r.exitGuardName !== r.guardName && (
+            <span className="block text-xs opacity-70">salió con {r.exitGuardName}</span>
+          )}
+        </>
+      ),
+    },
   ]
 
   return (
@@ -218,6 +237,9 @@ export default function AuditoriaPage() {
                       {m.guestDoc && ` · ${m.guestDoc}`}
                       {m.plate && ` · ${m.plate}`}
                       {' · lo dejó pasar '}{m.guardName ?? '(sin registrar)'}
+                      {m.exitedAt
+                        ? <> · salió {hora(m.exitedAt)}</>
+                        : <> · sin salida registrada</>}
                     </li>
                   ))}
                 </ul>

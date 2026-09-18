@@ -15,6 +15,8 @@ export type AgendaRow = {
   capacity: number
   enteredCount: number
   lastEntryAt: string | null
+  lastExitAt: string | null
+  adentro: boolean
 }
 
 function hora(iso: string): string {
@@ -43,7 +45,17 @@ function Fila({ r, tenue, onAbrir }: {
   tenue?: boolean
   onAbrir: (r: AgendaRow) => void
 }) {
-  const adentro = r.enteredCount > 0
+  /*
+   * `adentro` se pregunta PRIMERO, antes que enteredCount. Alguien que entró
+   * ayer y nadie le registró la salida tiene enteredCount 0 para hoy pero
+   * sigue adentro: preguntando al revés aparecería como "Esperando".
+   */
+  const estado = r.adentro ? 'adentro' : r.enteredCount === 0 ? 'esperando' : 'salio'
+  const detalle = estado === 'adentro'
+    ? (r.lastEntryAt ? hora(r.lastEntryAt) : undefined)
+    : estado === 'salio'
+      ? (r.lastExitAt ? hora(r.lastExitAt) : undefined)
+      : undefined
 
   return (
     <li>
@@ -61,8 +73,7 @@ function Fila({ r, tenue, onAbrir }: {
           </span>
         </span>
 
-        <Estado estado={adentro ? 'adentro' : 'esperando'}
-          detalle={adentro && r.lastEntryAt ? hora(r.lastEntryAt) : undefined} />
+        <Estado estado={estado} detalle={detalle} />
       </button>
     </li>
   )

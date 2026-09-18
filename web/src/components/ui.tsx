@@ -222,18 +222,19 @@ export function Tabla<T>({ columnas, filas, claveDe, detalle }: {
   )
 }
 
-export type EstadoInvitacion = 'esperando' | 'adentro' | 'anulada'
+export type EstadoInvitacion = 'esperando' | 'adentro' | 'salio' | 'anulada'
 
 /**
  * En qué estado está una invitación, de un vistazo.
  *
- * Ni bien se escanea, la invitación pasa a "Adentro" y tiene que verse distinta
- * en la lista sin leerla: antes la única diferencia era un `opacity-60`, que a
- * dos metros en la barrera no se distingue de nada.
+ * Ni bien se escanea, la invitación pasa a "Adentro", y al registrarse la
+ * salida pasa a "Salió". Tiene que verse distinta en la lista sin leerla: antes
+ * la única diferencia era un `opacity-60`, que a dos metros en la barrera no se
+ * distingue de nada.
  *
  * Como en el veredicto, la diferencia es de LUMINANCIA y no de tono: "Adentro"
- * es un chip macizo y "Esperando" un contorno. Se sigue leyendo en escala de
- * grises y con daltonismo.
+ * es un chip macizo, "Salió" un contorno grueso y "Esperando" un contorno fino.
+ * Se sigue leyendo en escala de grises y con daltonismo.
  */
 export function Estado({ estado, detalle }: {
   estado: EstadoInvitacion
@@ -243,9 +244,14 @@ export function Estado({ estado, detalle }: {
   const look = {
     esperando: 'border border-current/35 opacity-80',
     adentro: 'bg-pass-ink text-pass-field',
+    // Contorno macizo y no relleno: ya pasó, no es un estado que requiera algo
+    // del guardia. Se distingue de "esperando" por el peso del borde.
+    salio: 'border-2 border-current/60',
     anulada: 'bg-deny-field text-deny-ink',
   }[estado]
-  const label = { esperando: 'Esperando', adentro: 'Adentro', anulada: 'Anulada' }[estado]
+  const label = {
+    esperando: 'Esperando', adentro: 'Adentro', salio: 'Salió', anulada: 'Anulada',
+  }[estado]
 
   return (
     <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1
