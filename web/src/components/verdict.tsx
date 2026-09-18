@@ -1,6 +1,84 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { MOTIVO, hora, registrarIngreso, registrarEgreso, type Resultado } from '@/lib/gate'
+import {
+  MOTIVO, hora, registrarIngreso, registrarEgreso, deshacer,
+  type Movimiento, type Resultado,
+} from '@/lib/gate'
+
+/** Segundos que la confirmación espera antes de volver sola al escáner. */
+const SEGUNDOS_CONFIRMACION = 8
+
+/**
+ * Lo que se registró, con un Deshacer al alcance.
+ *
+ * Vuelve sola al escáner para que el camino común no sume ni un toque respecto
+ * de antes, y "Siguiente" la saltea para el que está despachando una fila. El
+ * Deshacer está acá y no en un menú porque el momento en que el guardia nota el
+ * escaneo doble es justo este.
+ */
+function Confirmacion({ movimiento, esEgreso, guestName, onListo }: {
+  movimiento: Movimiento
+  esEgreso: boolean
+  guestName: string
+  onListo: () => void
+}) {
+  const [restan, setRestan] = useState(SEGUNDOS_CONFIRMACION)
+  const [deshaciendo, setDeshaciendo] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = setInterval(() => setRestan((n) => n - 1), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    if (restan <= 0) onListo()
+  }, [restan, onListo])
+
+  const cuando = esEgreso ? movimiento.exitedAt : movimiento.enteredAt
+
+  async function revertir() {
+    setDeshaciendo(true)
+    setError(null)
+    try {
+      await deshacer(movimiento.id)
+      onListo()
+    } catch {
+      setError('No se pudo deshacer. Revisalo en la auditoría.')
+      setDeshaciendo(false)
+    }
+  }
+
+  return (
+    <main aria-live="polite"
+      className="flex min-h-dvh flex-col justify-between gap-6 overflow-x-hidden
+        bg-pass-field p-6 text-pass-ink sm:p-8">
+      <div>
+        <p className="eyebrow">Registrado</p>
+        <h1 className="sello display mt-1 text-4xl sm:text-6xl">
+          {esEgreso ? 'EGRESO' : 'INGRESO'}
+        </h1>
+        <p className="mt-6 break-words text-3xl font-semibold sm:text-4xl">{guestName}</p>
+        {cuando && (
+          <p className="mt-1 text-xl opacity-80 tabular sm:text-2xl">a las {hora(cuando)}</p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {error && <p role="alert" className="text-xl font-semibold">{error}</p>}
+        <button onClick={revertir} disabled={deshaciendo}
+          className="min-h-16 rounded border-2 border-pass-ink/40 text-xl font-bold
+            disabled:opacity-60">
+          {deshaciendo ? 'Deshaciendo…' : 'Deshacer'}
+        </button>
+        <button onClick={onListo}
+          className="min-h-16 rounded bg-pass-ink text-xl font-bold text-pass-field">
+          Siguiente ({Math.max(0, restan)})
+        </button>
+      </div>
+    </main>
+  )
+}
 
 /**
  * El veredicto se come la pantalla entera: el guardia no está usando una app,
@@ -28,6 +106,7 @@ export function Verdict({ resultado, onSalir }: {
   const [plate, setPlate] = useState(inv.plate ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hecho, setHecho] = useState<Movimiento | null>(null)
   const accionRef = useRef<HTMLButtonElement>(null)
 
   // El foco cae en el botón: Enter registra sin tocar el mouse.
@@ -44,18 +123,32 @@ export function Verdict({ resultado, onSalir }: {
     setBusy(true)
     setError(null)
     try {
-      if (esEgreso) await registrarEgreso(inv.id)
-      else await registrarIngreso({
-        invitationId: inv.id,
-        guestName: inv.guestName,
-        guestDoc: doc || undefined,
-        plate: plate || undefined,
-      })
-      onSalir()
+      const mov = esEgreso
+        ? await registrarEgreso(inv.id)
+        : await registrarIngreso({
+          invitationId: inv.id,
+          guestName: inv.guestName,
+          guestDoc: doc || undefined,
+          plate: plate || undefined,
+        })
+      // No sale: pasa a la confirmación, que es donde vive el Deshacer.
+      setHecho(mov)
+      setBusy(false)
     } catch {
       setError('No se pudo registrar. Probá de nuevo.')
       setBusy(false)
     }
+  }
+
+  if (hecho) {
+    return (
+      <Confirmacion
+        movimiento={hecho}
+        esEgreso={esEgreso}
+        guestName={inv.guestName}
+        onListo={onSalir}
+      />
+    )
   }
 
   const motivo = !ok ? MOTIVO[(check as { reason: string }).reason] ?? 'Rechazado' : ''
