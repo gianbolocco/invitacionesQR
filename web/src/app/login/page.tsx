@@ -10,6 +10,11 @@ import { TemaFlotante } from '@/components/tema-flotante'
 const ERROR_GOOGLE: Record<string, string> = {
   not_in_padron: 'Ese mail no está en el padrón de Álamo Alto. Pedile el alta a la administración.',
   email_not_verified: 'Google no confirmó ese mail, así que no podemos vincularlo. Entrá con tu contraseña.',
+  // Pasa con una pestaña vieja, o si alguien te mandó un link de vuelta de
+  // Google que no arrancó acá. El remedio es el mismo y es concreto: empezar
+  // de nuevo desde esta pantalla.
+  state_invalido: 'Ese intento de entrar con Google ya venció. Volvé a tocar el botón desde acá.',
+  google_not_configured: 'El ingreso con Google no está habilitado. Entrá con tu contraseña.',
   google_failed: 'No se pudo entrar con Google. Probá con tu contraseña.',
 }
 
