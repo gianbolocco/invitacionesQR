@@ -66,7 +66,7 @@ const auditFilters = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   unitId: z.string().uuid().optional(),
-  status: z.enum(['entro', 'esperando', 'vencida', 'anulada']).optional(),
+  status: z.enum(['adentro', 'concluida', 'esperando', 'vencida', 'anulada']).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 })
@@ -77,7 +77,8 @@ gateRoutes.get('/audit', async (req, res) => {
 })
 
 const ESTADO_EXCEL: Record<string, string> = {
-  entro: 'Entró',
+  adentro: 'Adentro',
+  concluida: 'Concluida',
   esperando: 'Esperando',
   vencida: 'No entró',
   anulada: 'Anulada',

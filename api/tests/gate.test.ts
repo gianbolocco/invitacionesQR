@@ -189,7 +189,7 @@ describe('quién dio el ingreso', () => {
     const res = await request(app).get('/gate/audit').set('Cookie', cookie)
     const fila = res.body.rows.find((r: { guestName: string }) => r.guestName === 'Juan Pérez')
     expect(fila.guardName).toBe('Garita')
-    expect(fila.status).toBe('entro')
+    expect(fila.status).toBe('adentro')
   })
 })
 

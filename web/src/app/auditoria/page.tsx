@@ -18,7 +18,7 @@ type AuditRow = {
   inviterName: string
   validFrom: string
   validTo: string
-  status: 'entro' | 'esperando' | 'vencida' | 'anulada'
+  status: 'adentro' | 'concluida' | 'esperando' | 'vencida' | 'anulada'
   enteredAt: string | null
   enteredCount: number
   guardName: string | null
@@ -26,10 +26,19 @@ type AuditRow = {
   exitGuardName: string | null
 }
 
+/*
+ * El ciclo de vida de una invitación. "Entró" se partió en dos al aparecer los
+ * egresos: mezclaba al que sigue adentro con el que ya se fue, y esa es
+ * justamente la diferencia que el admin necesita ver.
+ *
+ * "Adentro" va en negrita porque es el único estado que todavía está pasando;
+ * los otros cuatro ya terminaron o todavía no empezaron.
+ */
 const ESTADO: Record<AuditRow['status'], { label: string; clase: string }> = {
-  entro: { label: 'Entró', clase: 'text-alamo' },
+  adentro: { label: 'Adentro', clase: 'text-alamo font-bold' },
+  concluida: { label: 'Concluida', clase: 'text-alamo' },
   esperando: { label: 'Esperando', clase: '' },
-  vencida: { label: 'No entró', clase: 'text-deny-field' },
+  vencida: { label: 'No llegó', clase: 'text-deny-field' },
   anulada: { label: 'Anulada', clase: 'opacity-60' },
 }
 
@@ -119,7 +128,7 @@ export default function AuditoriaPage() {
   const total = pagina?.total ?? 0
   const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const todos = counts
-    ? counts.entro + counts.esperando + counts.vencida + counts.anulada
+    ? Object.values(counts).reduce((a, b) => a + b, 0)
     : 0
 
   // El invitado va primero: es el título de la tarjeta en mobile.
@@ -201,9 +210,10 @@ export default function AuditoriaPage() {
         <div className="flex flex-wrap gap-2">
           {([
             ['todos', `Todos (${todos})`],
-            ['entro', `Entraron (${counts?.entro ?? 0})`],
+            ['adentro', `Adentro (${counts?.adentro ?? 0})`],
+            ['concluida', `Concluidas (${counts?.concluida ?? 0})`],
             ['esperando', `Esperando (${counts?.esperando ?? 0})`],
-            ['vencida', `No entraron (${counts?.vencida ?? 0})`],
+            ['vencida', `No llegaron (${counts?.vencida ?? 0})`],
             ['anulada', `Anuladas (${counts?.anulada ?? 0})`],
           ] as const).map(([valor, label]) => (
             <button key={valor} onClick={() => cambiarEstado(valor)}

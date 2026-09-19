@@ -338,7 +338,12 @@ export type AuditRow = {
   validFrom: string
   validTo: string
   createdAt: Date
-  status: 'entro' | 'esperando' | 'vencida' | 'anulada'
+  /**
+   * El ciclo de vida de una invitación. 'entro' se partió en dos al aparecer
+   * los egresos: mezclaba al que sigue adentro con el que ya se fue, que es
+   * justo la diferencia que hay que poder ver.
+   */
+  status: 'adentro' | 'concluida' | 'esperando' | 'vencida' | 'anulada'
   enteredAt: Date | null
   enteredCount: number
   guardName: string | null
@@ -388,7 +393,7 @@ export async function auditInvitations(
 
   const total = f.status
     ? counts[f.status]
-    : counts.entro + counts.esperando + counts.vencida + counts.anulada
+    : Object.values(counts).reduce((a, b) => a + b, 0)
 
   return { rows, total, page, pageSize, counts }
 }
@@ -409,13 +414,16 @@ async function auditCounts(
   const hoy = todayInBuenosAires()
   const { rows } = await db.execute(sql`
     with uso as (
-      select e.invitation_id, count(*)::int as veces
+      select e.invitation_id,
+             count(*)::int as veces,
+             count(*) filter (where e.exited_at is null)::int as abiertas
       from entry_log e group by e.invitation_id
     ),
     clasificadas as (
       select case
         when i.revoked_at is not null then 'anulada'
-        when coalesce(uso.veces, 0) > 0 then 'entro'
+        when coalesce(uso.abiertas, 0) > 0 then 'adentro'
+        when coalesce(uso.veces, 0) > 0 then 'concluida'
         when i.valid_to < ${hoy}::date then 'vencida'
         else 'esperando'
       end as status
@@ -428,7 +436,8 @@ async function auditCounts(
         and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
     )
     select
-      count(*) filter (where status = 'entro')::int      as entro,
+      count(*) filter (where status = 'adentro')::int    as adentro,
+      count(*) filter (where status = 'concluida')::int  as concluida,
       count(*) filter (where status = 'esperando')::int  as esperando,
       count(*) filter (where status = 'vencida')::int    as vencida,
       count(*) filter (where status = 'anulada')::int    as anulada
@@ -451,6 +460,7 @@ async function auditRows(
              count(*)::int as veces,
              max(e.entered_at) as ultima,
              max(g.name) as guardia,
+             count(*) filter (where e.exited_at is null)::int as abiertas,
              max(e.exited_at) as ultima_salida,
              max(gs.name) as guardia_salida
       from entry_log e
@@ -471,7 +481,8 @@ async function auditRows(
       i.created_at                as "createdAt",
       case
         when i.revoked_at is not null then 'anulada'
-        when coalesce(uso.veces, 0) > 0 then 'entro'
+        when coalesce(uso.abiertas, 0) > 0 then 'adentro'
+        when coalesce(uso.veces, 0) > 0 then 'concluida'
         when i.valid_to < ${hoy}::date then 'vencida'
         else 'esperando'
       end                         as status,
@@ -490,7 +501,8 @@ async function auditRows(
       and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
       and (${f.status ?? null}::text is null or ${f.status ?? null}::text = case
         when i.revoked_at is not null then 'anulada'
-        when coalesce(uso.veces, 0) > 0 then 'entro'
+        when coalesce(uso.abiertas, 0) > 0 then 'adentro'
+        when coalesce(uso.veces, 0) > 0 then 'concluida'
         when i.valid_to < ${hoy}::date then 'vencida'
         else 'esperando'
       end)

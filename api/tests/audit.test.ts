@@ -52,7 +52,7 @@ describe('auditoría de invitaciones', () => {
     const porNombre = Object.fromEntries(
       res.body.rows.map((r: { guestName: string; status: string }) => [r.guestName, r.status]),
     )
-    expect(porNombre['Sí vino']).toBe('entro')
+    expect(porNombre['Sí vino']).toBe('adentro')
     expect(porNombre['No vino']).toBe('esperando')
   })
 
@@ -116,7 +116,7 @@ describe('auditoría de invitaciones', () => {
 
     expect(inv1.getRow(1).getCell(1).value).toBe('Invitado')
     expect(inv1.getRow(2).getCell(1).value).toBe('Martín Pérez')
-    expect(inv1.getRow(2).getCell(columna('Estado')).value).toBe('Entró')
+    expect(inv1.getRow(2).getCell(columna('Estado')).value).toBe('Adentro')
 
     // Por encabezado, igual que la hoja de arriba: los índices fijos se
     // rompen cada vez que se agrega una columna, y no es lo que se quiere
@@ -159,7 +159,7 @@ describe('auditoría de invitaciones', () => {
 
     const todo = await request(app).get('/gate/audit').set('Cookie', ctx.cookie)
     expect(todo.body.total).toBe(4)
-    expect(todo.body.counts).toMatchObject({ entro: 1, esperando: 2, anulada: 1 })
+    expect(todo.body.counts).toMatchObject({ adentro: 1, esperando: 2, anulada: 1 })
 
     // Filtrar por estado cambia el total, no solo lo que se ve.
     const soloEsperando = await request(app).get('/gate/audit?status=esperando').set('Cookie', ctx.cookie)
@@ -272,5 +272,97 @@ describe('la auditoría muestra la salida', () => {
     const ing = hoja('Ingresos')
     expect(ing.columna('Salida')).toBeGreaterThan(0)
     expect(String(ing.w.getRow(2).getCell(ing.columna('Salida')).value)).not.toBe('')
+  })
+})
+
+describe('el estado distingue al que sigue adentro del que ya se fue', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  const estadoDe = async (ctx: Awaited<ReturnType<typeof base>>, id: string) => {
+    const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie).expect(200)
+    return res.body.rows.find((r: { id: string }) => r.id === id)?.status
+  }
+
+  it('recorre los tres estados del ciclo de vida', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'Juan' })
+
+    expect(await estadoDe(ctx, i.id)).toBe('esperando')
+
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Juan' })
+    expect(await estadoDe(ctx, i.id)).toBe('adentro')
+
+    await registerExit(i.id, ctx.guardiaId)
+    expect(await estadoDe(ctx, i.id)).toBe('concluida')
+  })
+
+  it('una frecuente con una visita abierta cuenta como adentro', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'Mucama', kind: 'frecuente', capacity: 10 })
+
+    // Vino el lunes y se fue; hoy volvió y todavía está.
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Mucama' })
+    await registerExit(i.id, ctx.guardiaId)
+    expect(await estadoDe(ctx, i.id)).toBe('concluida')
+
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Mucama' })
+    expect(await estadoDe(ctx, i.id)).toBe('adentro')
+  })
+
+  it('anulada gana sobre todo, incluso si está adentro', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'Juan' })
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Juan' })
+    await db.update(invitations).set({ revokedAt: new Date() }).where(eq(invitations.id, i.id))
+
+    expect(await estadoDe(ctx, i.id)).toBe('anulada')
+  })
+
+  it('se puede filtrar por cada estado, y los contadores acompañan', async () => {
+    const ctx = await base()
+    const adentro = await inv(ctx, { guestName: 'Sigue adentro' })
+    const concluida = await inv(ctx, { guestName: 'Ya se fue' })
+    await inv(ctx, { guestName: 'No llegó' })
+
+    await registerEntry(adentro.id, ctx.guardiaId, { guestName: 'Sigue adentro' })
+    await registerEntry(concluida.id, ctx.guardiaId, { guestName: 'Ya se fue' })
+    await registerExit(concluida.id, ctx.guardiaId)
+
+    const filtrar = async (estado: string) => {
+      const res = await request(app).get(`/gate/audit?status=${estado}`)
+        .set('Cookie', ctx.cookie).expect(200)
+      return { total: res.body.total, nombres: res.body.rows.map((r: { guestName: string }) => r.guestName) }
+    }
+
+    expect(await filtrar('adentro')).toEqual({ total: 1, nombres: ['Sigue adentro'] })
+    expect(await filtrar('concluida')).toEqual({ total: 1, nombres: ['Ya se fue'] })
+    expect(await filtrar('esperando')).toEqual({ total: 1, nombres: ['No llegó'] })
+
+    const todos = await request(app).get('/gate/audit').set('Cookie', ctx.cookie).expect(200)
+    expect(todos.body.counts).toMatchObject({
+      adentro: 1, concluida: 1, esperando: 1, vencida: 0, anulada: 0,
+    })
+    expect(todos.body.total).toBe(3)
+  })
+
+  it('el Excel traduce los estados nuevos', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'Ya se fue' })
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Ya se fue' })
+    await registerExit(i.id, ctx.guardiaId)
+
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+      .expect(200)
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const w = wb.getWorksheet('Invitaciones')!
+    const cabeceras = (w.getRow(1).values as unknown[]).map(String)
+    expect(w.getRow(2).getCell(cabeceras.indexOf('Estado')).value).toBe('Concluida')
   })
 })
