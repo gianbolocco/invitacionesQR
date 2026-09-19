@@ -59,6 +59,10 @@ async function barrio(nombre: string, prefijo: string) {
  *   services/people.ts   disablePerson, enablePerson, resendInvite, setGuardPassword
  *   services/units.ts    setPersonLot
  *   services/entries.ts  loadForCheck (afecta a checkById, checkByToken y registerEntry)
+ *
+ * El login ambiguo, que también estaba acá, ya se resolvió: el mail pasó a ser
+ * único en todo el sistema, así que el estado "el mismo mail en dos barrios" no
+ * puede existir. Ver tests/schema.test.ts.
  * ============================================================================
  */
 describe.skip('aislamiento entre barrios', () => {
@@ -101,22 +105,5 @@ describe.skip('aislamiento entre barrios', () => {
 
     // El guardia propio sí puede.
     await request(app).get(`/gate/invitation/${inv.id}`).set('Cookie', a.guard.cookie).expect(200)
-  })
-
-  it('el mismo mail en dos barrios no vuelve ambiguo el login', async () => {
-    // El índice único es (neighborhoodId, email), pero /auth/login busca solo
-    // por email con limit(1): con el mismo mail en dos barrios, entrás a uno
-    // arbitrario. Decidir si el login pide barrio o si el mail es único global.
-    const a = await barrio('Álamo Alto', 'a')
-    const [n] = await db.insert(neighborhoods).values({ name: 'Vista Linda' }).returning()
-    await db.insert(people).values({
-      neighborhoodId: n.id, email: 'resident@a.test', name: 'Homónimo',
-      role: 'resident', status: 'active', passwordHash: await hashPassword(PASS),
-    })
-
-    const login = await request(app).post('/auth/login')
-      .send({ email: 'resident@a.test', password: PASS })
-    const me = await request(app).get('/auth/me').set('Cookie', login.headers['set-cookie'])
-    expect(me.body.id).toBe(a.resident.id)
   })
 })

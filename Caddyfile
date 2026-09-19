@@ -1,9 +1,13 @@
-# Un solo dominio para todo: la app en la raíz y la API bajo /api.
+# Un solo origen para todo: la app en la raíz y la API bajo /api.
 #
-# Que compartan origen no es casualidad. La cookie de sesión es SameSite=Lax:
-# desde el mismo sitio viaja sin problema, y así no hace falta ni un subdominio
-# aparte ni aflojar el CORS.
-{$DOMINIO} {
+# Que compartan origen no es casualidad. El front llama a la API con la ruta
+# relativa /api, así que la imagen no lleva ningún dominio adentro y sirve igual
+# en cualquier URL. De paso no hay CORS y la cookie de sesión es first-party.
+#
+# SITIO define cómo se sirve:
+#   un dominio  -> Caddy saca y renueva el certificado solo (producción)
+#   ":80"       -> HTTP plano, para cuando el TLS lo termina otro (un túnel)
+{$SITIO} {
 	encode zstd gzip
 
 	handle_path /api/* {

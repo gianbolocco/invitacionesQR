@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { Shell } from '@/components/shell'
 import { ESTADO, fecha, useAdminData, type Person } from '@/lib/admin'
@@ -33,8 +33,12 @@ export default function UsuariosPage() {
       setAviso(`Le mandamos la invitación a ${email}. Él carga su lote al entrar.`)
       setEmail(''); setName('')
       cargar()
-    } catch {
-      setError('No se pudo dar de alta. Puede que ese mail ya esté en el padrón.')
+    } catch (err) {
+      // La API ahora distingue el caso, así que el mensaje puede afirmar en vez
+      // de sugerir: "puede que ya esté" deja al admin sin saber qué hacer.
+      setError(err instanceof ApiError && err.code === 'mail_repetido'
+        ? `${email} ya está en el padrón. Buscalo en la lista de abajo.`
+        : 'No se pudo dar de alta. Revisá el mail y probá de nuevo.')
     }
   }
 

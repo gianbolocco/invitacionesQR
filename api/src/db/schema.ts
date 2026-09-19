@@ -31,7 +31,10 @@ export const people = pgTable('person', {
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  uniqueIndex('person_email_uq').on(t.neighborhoodId, t.email),
+  // Global, no por barrio. Con (neighborhood_id, email) el mismo mail podía
+  // existir en dos barrios, y el login —que busca solo por mail— entraba a uno
+  // arbitrario. Se impide el estado en vez de adivinar cuál era.
+  uniqueIndex('person_email_uq').on(t.email),
   check('person_role_ck', sql`${t.role} in ('resident','guard','admin')`),
   check('person_status_ck', sql`${t.status} in ('invited','active','disabled')`),
 ])

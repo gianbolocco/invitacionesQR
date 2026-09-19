@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { Shell } from '@/components/shell'
 import { ESTADO, fecha, useAdminData, type Person } from '@/lib/admin'
@@ -40,8 +40,10 @@ export default function GuardiasPage() {
       setAviso(`${name} ya puede entrar. Anotá la contraseña: no se puede volver a ver.`)
       setName(''); setEmail(''); setPassword('')
       cargar()
-    } catch {
-      setError('No se pudo crear. Puede que ese mail ya esté en el padrón.')
+    } catch (err) {
+      setError(err instanceof ApiError && err.code === 'mail_repetido'
+        ? `${email} ya está en el padrón. Buscalo en la lista de abajo.`
+        : 'No se pudo crear. Revisá el mail y probá de nuevo.')
     }
   }
 

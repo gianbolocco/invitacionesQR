@@ -9,6 +9,16 @@ import { AppError } from '../lib/errors.js'
 
 const INVITE_DAYS = 7
 
+/**
+ * Si el error viene de violar esa constraint.
+ *
+ * Drizzle envuelve los errores de pg: el mensaje es "Failed query: …" y el
+ * nombre de la constraint vive en `cause.constraint`.
+ */
+function violates(err: unknown, constraint: string): boolean {
+  return (err as { cause?: { constraint?: string } })?.cause?.constraint === constraint
+}
+
 export type CreatePersonInput = {
   neighborhoodId: string
   email: string
@@ -19,13 +29,21 @@ export type CreatePersonInput = {
 }
 
 export async function createPerson(input: CreatePersonInput) {
+  /*
+   * El mail es único en todo el sistema, no por barrio. Se deja que la base lo
+   * rechace en vez de consultar antes: un SELECT previo no cierra la ventana
+   * entre la lectura y el INSERT, y el índice sí.
+   */
   const [person] = await db.insert(people).values({
     neighborhoodId: input.neighborhoodId,
     email: input.email.toLowerCase().trim(),
     name: input.name.trim(),
     role: input.role,
     status: 'invited',
-  }).returning()
+  }).returning().catch((err: unknown) => {
+    if (violates(err, 'person_email_uq')) throw new AppError(409, 'mail_repetido')
+    throw err
+  })
 
   if (input.unitIds.length) {
     await db.insert(unitMembers).values(input.unitIds.map((unitId) => ({ unitId, personId: person.id })))

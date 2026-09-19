@@ -43,9 +43,10 @@ services:
   web:
     build:
       args:
-        # El navegador del vecino llama a la API por el dominio público, no por
-        # el hostname de Docker. Va horneado en el build de Next.
-        NEXT_PUBLIC_API_URL: https://${DOMINIO:?falta DOMINIO}/api
+        # Ruta relativa, no el dominio: Next hornea esto en el build, y con /api
+        # la misma imagen sirve para cualquier URL. Caddy pone los dos detrás
+        # del mismo origen.
+        NEXT_PUBLIC_API_URL: /api
     ports: !override []
     restart: unless-stopped
 
@@ -54,7 +55,7 @@ services:
     restart: unless-stopped
     ports: ['80:80', '443:443']
     environment:
-      DOMINIO: ${DOMINIO:?falta DOMINIO}
+      SITIO: ${DOMINIO:?falta DOMINIO}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data

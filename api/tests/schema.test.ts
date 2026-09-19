@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '../src/db/index.js'
-import { invitations, units, entryLogs } from '../src/db/schema.js'
+import { invitations, units, entryLogs, neighborhoods, people } from '../src/db/schema.js'
 import { randomToken } from '../src/lib/crypto.js'
 import { resetDb, seedBasics } from './helpers/db.js'
 import { violatedConstraint } from './helpers/constraint.js'
@@ -84,5 +84,36 @@ describe('egresos en la bitácora', () => {
 
     expect(cerrada.exitedAt?.getTime()).toBe(salida.getTime())
     expect(cerrada.exitGuardId).toBe(personId)
+  })
+})
+
+describe('un mail es una sola cuenta, en todo el sistema', () => {
+  beforeEach(resetDb)
+
+  /*
+   * El único era (neighborhood_id, email), y eso PERMITÍA el mismo mail en dos
+   * barrios. El login busca solo por mail con limit(1), así que ese estado
+   * dejaba a la persona entrando a un barrio arbitrario. Se arregla impidiendo
+   * el estado, no adivinando cuál eligió.
+   */
+  it('el mismo mail no se puede repetir en otro barrio', async () => {
+    const { neighborhoodId } = await seedBasics()
+    const [otro] = await db.insert(neighborhoods).values({ name: 'Vista Linda' }).returning()
+
+    const constraint = await violatedConstraint(db.insert(people).values({
+      neighborhoodId: otro.id, email: 'martin@example.com', name: 'Homónimo',
+      role: 'resident', status: 'active',
+    }))
+    expect(constraint).toBe('person_email_uq')
+    void neighborhoodId
+  })
+
+  it('tampoco repetido dentro del mismo barrio', async () => {
+    const { neighborhoodId } = await seedBasics()
+    const constraint = await violatedConstraint(db.insert(people).values({
+      neighborhoodId, email: 'martin@example.com', name: 'Otro Martín',
+      role: 'guard', status: 'active',
+    }))
+    expect(constraint).toBe('person_email_uq')
   })
 })

@@ -182,3 +182,29 @@ describe('reactivar una baja', () => {
     expect(login.status).toBe(200)
   })
 })
+
+describe('alta con un mail que ya existe', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('devuelve 409 con un código claro, no un 500', async () => {
+    const { cookie } = await loginAs('admin')
+    const alta = () => request(app).post('/admin/people').set('Cookie', cookie)
+      .send({ email: 'vecino@example.com', name: 'Vecino', role: 'resident' })
+
+    await alta().expect(201)
+
+    const repetida = await alta()
+    expect(repetida.status).toBe(409)
+    expect(repetida.body.error).toBe('mail_repetido')
+  })
+
+  it('el mail se normaliza: MAIL@X.COM choca con mail@x.com', async () => {
+    const { cookie } = await loginAs('admin')
+    await request(app).post('/admin/people').set('Cookie', cookie)
+      .send({ email: 'vecino@example.com', name: 'Vecino', role: 'resident' }).expect(201)
+
+    const res = await request(app).post('/admin/people').set('Cookie', cookie)
+      .send({ email: 'VECINO@example.com', name: 'Otro', role: 'guard' })
+    expect(res.status).toBe(409)
+  })
+})
