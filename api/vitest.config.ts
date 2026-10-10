@@ -8,6 +8,9 @@ process.loadEnvFile('.env')
 process.env.DATABASE_URL_DEV = process.env.DATABASE_URL
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST
 
+// Los logos de los tests van a un directorio aparte, descartable.
+process.env.LOGO_DIR = './.tmp-logos'
+
 export default defineConfig({
   test: {
     globalSetup: ['./tests/global-setup.ts'],

@@ -28,3 +28,20 @@ export const COLOR_DEFAULT = PALETA[0]
 export function esColorDeLaPaleta(v: unknown): v is string {
   return typeof v === 'string' && (PALETA as readonly string[]).includes(v)
 }
+
+/**
+ * Qué imagen es, mirando los primeros bytes del archivo.
+ *
+ * No se mira la extensión ni el Content-Type: los dos los elige quien sube, y
+ * un SVG con JavaScript adentro declarado como image/png sería un XSS servido
+ * desde nuestro propio origen.
+ *
+ * Solo PNG y JPEG. El SVG se podría permitir con una CSP o sirviéndolo desde
+ * otro dominio; mientras tanto, no aceptarlo es gratis.
+ */
+export function tipoDeImagen(buf: Buffer): 'image/png' | 'image/jpeg' | null {
+  if (buf.length < 4) return null
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png'
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'
+  return null
+}

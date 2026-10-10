@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import express, { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { validarUuid } from '../middleware/uuidParam.js'
@@ -8,6 +8,8 @@ import {
   createPerson, listPeople, disablePerson, enablePerson, resendInvite, setGuardPassword,
 } from '../services/people.js'
 import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
+import { guardarLogo, borrarLogo } from '../services/branding.js'
+import { AppError } from '../lib/errors.js'
 
 export const adminRoutes = Router()
 adminRoutes.use(requireAuth, requireRole('admin'))
@@ -86,4 +88,28 @@ adminRoutes.post('/people/:id/enable', async (req, res) => {
 adminRoutes.post('/people/:id/lot', async (req, res) => {
   const { lot } = z.object({ lot: z.coerce.number().int().min(1).max(99999) }).parse(req.body)
   res.json(await setPersonLot(req.person!.neighborhoodId, req.params.id, lot, req.person!.id))
+})
+
+/*
+ * El archivo viaja como body crudo, no como multipart: `express.raw` ya viene
+ * en Express 5 y aplica el límite de tamaño sin que entre nada al proceso de
+ * más. Una dependencia menos que mantener.
+ *
+ * `type` acepta los dos mimes y nada más, así que un Content-Type distinto ni
+ * siquiera se bufferea. Igual no se le cree: el formato real lo decide
+ * tipoDeImagen() mirando los bytes.
+ */
+adminRoutes.put('/branding/logo',
+  express.raw({ type: ['image/png', 'image/jpeg'], limit: '500kb' }),
+  async (req, res) => {
+    const bytes = req.body
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0) {
+      throw new AppError(400, 'formato_no_soportado')
+    }
+    res.json(await guardarLogo(bytes, req.person!.id))
+  })
+
+adminRoutes.delete('/branding/logo', async (req, res) => {
+  await borrarLogo(req.person!.id)
+  res.json({ ok: true })
 })
