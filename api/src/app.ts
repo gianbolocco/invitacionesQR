@@ -9,6 +9,7 @@ import { googleRoutes } from './routes/google.js'
 import { adminRoutes } from './routes/admin.js'
 import { invitationRoutes } from './routes/invitations.js'
 import { gateRoutes } from './routes/gate.js'
+import { brandingRoutes } from './routes/branding.js'
 import { reportRoutes } from './routes/reports.js'
 
 export function buildApp() {
@@ -27,6 +28,7 @@ export function buildApp() {
   app.use('/admin', adminRoutes)
   app.use('/invitations', invitationRoutes)
   app.use('/gate', gateRoutes)
+  app.use('/branding', brandingRoutes)
   app.use('/reports', reportRoutes)
 
   // Los errores de zod se traducen a 400 antes del handler genérico.
