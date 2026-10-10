@@ -274,7 +274,7 @@ paleta de ocho y la subida del logo. No hay pantalla nueva.
 
 | Situación | Respuesta |
 |---|---|
-| Logo de más de 500 KB | `400 archivo_muy_grande` |
+| Logo de más de 500 KB | `413` — lo corta `express.raw` antes de que entre al handler |
 | Logo que no es PNG ni JPEG | `400 formato_no_soportado` |
 | Color fuera de la paleta | `400 color_invalido` |
 | `GET /branding/logo` sin logo | `404` |
