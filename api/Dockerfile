@@ -4,4 +4,4 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npx tsc
-CMD ["sh", "-c", "npx drizzle-kit migrate && node dist/server.js"]
+CMD ["sh", "-c", "npx drizzle-kit migrate && node dist/seed-cli.js && node dist/server.js"]

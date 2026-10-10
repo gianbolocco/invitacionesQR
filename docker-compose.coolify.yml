@@ -68,6 +68,16 @@ services:
       MAIL_FROM: ${MAIL_FROM:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # El barrio de esta instalación. Se siembra al primer arranque; si la
+      # base ya tiene uno, no se hace nada.
+      BARRIO_NOMBRE: ${BARRIO_NOMBRE:?falta BARRIO_NOMBRE}
+      BARRIO_DIRECCION: ${BARRIO_DIRECCION:-}
+      BARRIO_MAPA: ${BARRIO_MAPA:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?falta ADMIN_EMAIL}
+      ADMIN_NOMBRE: ${ADMIN_NOMBRE:-}
+      LOGO_DIR: /data/branding
+    volumes:
+      - logos:/data/branding
     depends_on:
       db: { condition: service_healthy }
 
@@ -78,6 +88,9 @@ services:
         # Relativo a propósito: ver el comentario de arriba.
         NEXT_PUBLIC_API_URL: /api
     restart: unless-stopped
+    environment:
+      # Lo usa el layout de Next para leer la marca desde adentro de la red.
+      API_INTERNAL_URL: http://api:8080
     depends_on: [api]
 
   # El único servicio que Coolify expone al exterior.
@@ -93,3 +106,4 @@ services:
 
 volumes:
   dbdata:
+  logos:

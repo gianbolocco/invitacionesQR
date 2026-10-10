@@ -20,7 +20,16 @@ services:
       DATABASE_URL: postgres://invitaciones:invitaciones@db:5432/invitaciones
       WEB_ORIGIN: http://localhost:3000
       PORT: 8080
+      # Siembra el barrio en una base vacía. Si ya hay barrio, no hace nada.
+      BARRIO_NOMBRE: ${BARRIO_NOMBRE:-Mi barrio}
+      BARRIO_DIRECCION: ${BARRIO_DIRECCION:-}
+      BARRIO_MAPA: ${BARRIO_MAPA:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_NOMBRE: ${ADMIN_NOMBRE:-}
+      LOGO_DIR: /data/branding
     ports: ['8080:8080']
+    volumes:
+      - logos:/data/branding
     depends_on:
       db: { condition: service_healthy }
 
@@ -32,7 +41,11 @@ services:
         # esta URL es la pública, no el hostname del servicio.
         NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:8080}
     ports: ['3000:3000']
+    environment:
+      # El layout corre adentro del contenedor: /api relativo no le sirve.
+      API_INTERNAL_URL: http://api:8080
     depends_on: [api]
 
 volumes:
   dbdata:
+  logos:
