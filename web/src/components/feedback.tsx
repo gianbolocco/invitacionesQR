@@ -94,7 +94,7 @@ export function Aviso({ children }: { children: React.ReactNode }) {
   if (!children) return null
   return (
     <p role="status"
-      className="surgir rounded border-l-4 border-alamo bg-alamo/5 px-3 py-2 text-sm text-alamo">
+      className="surgir rounded border-l-4 border-marca bg-marca/5 px-3 py-2 text-sm text-marca">
       {children}
     </p>
   )

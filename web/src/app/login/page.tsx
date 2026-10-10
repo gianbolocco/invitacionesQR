@@ -72,12 +72,12 @@ function Login() {
       {google && (
         <a href={`${apiBase}/auth/google`}
           className="inline-flex min-h-12 items-center justify-center rounded border
-            border-alamo/30 px-5 font-semibold text-alamo">
+            border-marca/30 px-5 font-semibold text-marca">
           Continuar con Google
         </a>
       )}
 
-      <Link href="/olvide" className="text-sm text-alamo underline underline-offset-4">
+      <Link href="/olvide" className="text-sm text-marca underline underline-offset-4">
         Olvidé mi contraseña
       </Link>
     </main>

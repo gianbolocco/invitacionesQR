@@ -86,7 +86,7 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
               aria-pressed={kind === k.id}
               className={`min-h-12 rounded-full border px-5 text-sm font-semibold ${
                 kind === k.id
-                  ? 'border-alamo bg-alamo text-surface'
+                  ? 'border-marca bg-marca text-surface'
                   : 'border-line bg-card text-ink-soft'
               }`}>
               {k.label}
@@ -126,7 +126,7 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
                     w.includes(i) ? w.filter((x) => x !== i) : [...w, i].sort())}
                   className={`min-h-12 flex-1 rounded border text-xs font-semibold ${
                     weekdays.includes(i)
-                      ? 'border-alamo bg-alamo text-surface'
+                      ? 'border-marca bg-marca text-surface'
                       : 'border-line bg-card text-ink-soft'
                   }`}>
                   {d}

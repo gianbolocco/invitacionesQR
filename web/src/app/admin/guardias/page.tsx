@@ -146,7 +146,7 @@ export default function GuardiasPage() {
                   {/* Cambiar la contraseña cierra las sesiones abiertas. Si el
                       guardia está en la barrera, se queda afuera al instante:
                       el admin tiene que saberlo ANTES de tocar el botón. */}
-                  <p className="rounded border-l-4 border-alamo/40 bg-alamo/5 px-3 py-2 text-sm">
+                  <p className="rounded border-l-4 border-marca/40 bg-marca/5 px-3 py-2 text-sm">
                     Si {g.name} está usando la garita ahora, la contraseña nueva lo
                     deja afuera en el acto y va a tener que volver a entrar.
                   </p>

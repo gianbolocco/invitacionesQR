@@ -62,14 +62,14 @@ export default function BarrioPage() {
               hint='En Google Maps, buscá la entrada del barrio y tocá "Compartir" → "Copiar vínculo".'
               onChange={(e) => setMapUrl(e.target.value)} />
             {error && <ErrorNote>{error}</ErrorNote>}
-            {aviso && <p role="status" className="text-sm text-alamo">{aviso}</p>}
+            {aviso && <p role="status" className="text-sm text-marca">{aviso}</p>}
             <Button type="submit" className="self-start">Guardar</Button>
           </form>
         </Filete>
 
         {barrio?.mapUrl && (
           <a href={barrio.mapUrl} target="_blank" rel="noopener noreferrer"
-            className="text-sm text-alamo underline underline-offset-4">
+            className="text-sm text-marca underline underline-offset-4">
             Probar el link de mapas
           </a>
         )}

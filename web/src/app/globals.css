@@ -1,18 +1,22 @@
 @import 'tailwindcss';
 
 /*
-  Sistema de Álamo Alto.
-  La identidad viene del cartel de entrada: verde de chapa vial, doble filete
-  blanco, etiquetas en caja alta espaciada.
+  Sistema de VisitPass.
+  La identidad arranca del cartel de un barrio real: verde de chapa vial, doble
+  filete blanco, etiquetas en caja alta espaciada. El color es del barrio y
+  entra por --marca-base; el resto de la forma es del producto.
   El veredicto de la garita NO usa los colores de marca: se separa por
   luminancia, que sobrevive al daltonismo y a las pantallas malas.
 */
 @theme {
   /* Los valores reales viven en :root y en el bloque oscuro de más abajo.
      Acá solo se declaran los nombres para que Tailwind genere las clases. */
-  --color-alamo: var(--alamo);
-  --color-alamo-deep: var(--alamo-deep);
-  --color-alamo-line: var(--alamo-line);
+  --color-marca: var(--marca);
+  --color-marca-deep: var(--marca-deep);
+  --color-marca-line: var(--marca-line);
+
+  --color-escaner-fondo: var(--escaner-fondo);
+  --color-escaner-texto: var(--escaner-texto);
 
   --color-pass-field: #eaf5ec;
   --color-pass-ink: #0d3d28;
@@ -35,9 +39,30 @@
 */
 :root {
   color-scheme: light;
-  --alamo: #1e6b47;
-  --alamo-deep: #0d3d28;
-  --alamo-line: #f2f0e8;
+  /* El servidor pisa esto con el color del barrio. El verde es el default del
+     producto: una instalación nueva se ve bien sin elegir nada. */
+  --marca-base: #1e6b47;
+
+  /*
+   * Las variantes se derivan moviendo SOLO la luminosidad, con sintaxis de
+   * color relativa: `oklch(from X L c h)` conserva el croma y el tono.
+   * Con color-mix contra blanco o negro el color se desatura y el verde sale
+   * grisáceo; medido, daba 42 puntos de diferencia contra el valor a mano.
+   */
+  --marca: var(--marca-base);
+  --marca-deep: oklch(from var(--marca-base) 0.32 c h);
+  --marca-line: color-mix(in oklab, var(--marca-base) 8%, white);
+
+  /*
+   * El escáner es un visor de cámara: va oscuro SIEMPRE y no sigue el tema.
+   * Se declara acá y NO se redefine en los bloques oscuros, a propósito.
+   *
+   * Antes usaba --marca-deep y --marca-line, que en tema oscuro se vuelven los
+   * dos claros: medido, el texto quedaba en 1.5 de contraste sobre el fondo.
+   * Ilegible, y justo en el turno nocturno, que es cuando se usa.
+   */
+  --escaner-fondo: oklch(from var(--marca-base) 0.27 c h);
+  --escaner-texto: #f2f0e8;
   --ink: #16211c;
   --ink-soft: #55635c;
   --surface: #fbfaf6;
@@ -57,9 +82,13 @@
 */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --alamo: #5cb98a;
-  --alamo-deep: #8fd4ae;
-  --alamo-line: #e8f1ea;
+  /* En oscuro la marca SUBE de luminosidad: el verde sobre fondo oscuro no
+     llega a contraste de texto. Y `deep` sube todavía más, al revés que en
+     el tema claro. No se redefine --marca-base: un token no puede derivarse
+     de sí mismo. */
+  --marca: oklch(from var(--marca-base) 0.72 c h);
+  --marca-deep: oklch(from var(--marca-base) 0.83 c h);
+  --marca-line: color-mix(in oklab, var(--marca-base) 6%, white);
   --ink: #e9efea;
   --ink-soft: #9fb0a7;
   --surface: #0b1712;
@@ -71,9 +100,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --alamo: #5cb98a;
-    --alamo-deep: #8fd4ae;
-    --alamo-line: #e8f1ea;
+    /* En oscuro la marca SUBE de luminosidad: el verde sobre fondo oscuro no
+       llega a contraste de texto. Y `deep` sube todavía más, al revés que en
+       el tema claro. No se redefine --marca-base: un token no puede derivarse
+       de sí mismo. */
+    --marca: oklch(from var(--marca-base) 0.72 c h);
+    --marca-deep: oklch(from var(--marca-base) 0.83 c h);
+    --marca-line: color-mix(in oklab, var(--marca-base) 6%, white);
     --ink: #e9efea;
     --ink-soft: #9fb0a7;
     --surface: #0b1712;
@@ -123,19 +156,19 @@ body {
 
 /* El doble filete del cartel, convertido en el marco del sistema. */
 .filete {
-  border: 1px solid color-mix(in srgb, var(--alamo) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--marca) 22%, transparent);
   border-radius: 4px;
   padding: 3px;
   background: var(--card);
 }
 .filete > * {
-  border: 1px solid color-mix(in srgb, var(--alamo) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--marca) 14%, transparent);
   border-radius: 2px;
 }
 
 /* El foco tiene que verse siempre: la garita se opera con teclado. */
 :focus-visible {
-  outline: 3px solid var(--alamo);
+  outline: 3px solid var(--marca);
   outline-offset: 2px;
 }
 

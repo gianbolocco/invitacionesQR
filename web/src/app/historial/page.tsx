@@ -39,7 +39,7 @@ function Chips({ opciones, valor, onElegir, etiqueta }: {
             aria-pressed={valor === o.id}
             className={`min-h-10 rounded-full border px-4 text-sm font-semibold ${
               valor === o.id
-                ? 'border-alamo bg-alamo text-surface'
+                ? 'border-marca bg-marca text-surface'
                 : 'border-line bg-card text-ink-soft'
             }`}>
             {o.label}
@@ -164,7 +164,7 @@ export default function HistorialPage() {
                       ? <span className="text-deny-field">Anulada</span>
                       : inv.usedCount === 0
                         ? <span className="text-ink-soft">No entró</span>
-                        : <span className="text-alamo tabular">
+                        : <span className="text-marca tabular">
                             {inv.usedCount === 1 ? 'Entró' : `${inv.usedCount} ingresos`}
                           </span>}
                   </p>
@@ -173,8 +173,8 @@ export default function HistorialPage() {
                   href={`/nueva?kind=${inv.kind}&guestName=${encodeURIComponent(inv.guestName)}` +
                     `&guestDoc=${encodeURIComponent(inv.guestDoc ?? '')}` +
                     `&plate=${encodeURIComponent(inv.plate ?? '')}`}
-                  className="inline-flex min-h-12 items-center rounded border border-alamo/30 px-4
-                    text-sm font-semibold text-alamo">
+                  className="inline-flex min-h-12 items-center rounded border border-marca/30 px-4
+                    text-sm font-semibold text-marca">
                   Volver a invitar
                 </Link>
               </Filete>

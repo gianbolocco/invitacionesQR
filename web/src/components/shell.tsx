@@ -107,7 +107,7 @@ function MenuDesplegable({ items, path }: { items: ItemNav[]; path: string }) {
                 aria-current={esActivo(item.href, path) ? 'page' : undefined}
                 className={`flex min-h-12 items-center border-l-4 px-5 font-semibold ${
                   esActivo(item.href, path)
-                    ? 'border-alamo bg-alamo/5 text-alamo'
+                    ? 'border-marca bg-marca/5 text-marca'
                     : 'border-transparent text-ink-soft'
                 }`}>
                 {item.label}
@@ -136,7 +136,7 @@ function BarraInferior({ items, path }: { items: ItemNav[]; path: string }) {
           <Link key={href} href={href}
             aria-current={activo ? 'page' : undefined}
             className={`flex min-h-16 flex-1 flex-col items-center justify-center gap-1
-              text-xs font-semibold transition-colors ${activo ? 'text-alamo' : 'text-ink-soft'}`}>
+              text-xs font-semibold transition-colors ${activo ? 'text-marca' : 'text-ink-soft'}`}>
             {Icono && <Icono />}
             {label}
           </Link>
@@ -183,13 +183,13 @@ export function Shell({ me, accion, atras, children }: {
 
   return (
     <div className={`min-h-dvh ${enBarra ? 'con-barra-inferior sm:pb-0' : ''} ${accion ? 'con-accion' : ''}`}>
-      <header className="sticky top-0 z-20 border-b border-alamo/15 bg-card">
+      <header className="sticky top-0 z-20 border-b border-marca/15 bg-card">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between
           gap-x-3 gap-y-1 px-4 py-2.5">
           {atras ? (
             <button onClick={atras.onClick}
               className="-ml-2 flex min-h-11 min-w-0 items-center gap-1.5 rounded px-2
-                font-semibold text-alamo">
+                font-semibold text-marca">
               <svg viewBox="0 0 24 24" aria-hidden className="size-5 shrink-0" fill="none"
                 stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 5l-7 7 7 7" />
@@ -204,8 +204,8 @@ export function Shell({ me, accion, atras, children }: {
             {/* El admin entra y sale de su sección desde cualquier pantalla. */}
             {me.role === 'admin' && seccion !== 'admin' && (
               <Link href="/admin"
-                className="rounded-full border border-alamo/30 px-3 py-1.5 text-xs
-                  font-semibold text-alamo">
+                className="rounded-full border border-marca/30 px-3 py-1.5 text-xs
+                  font-semibold text-marca">
                 Admin
               </Link>
             )}
@@ -229,7 +229,7 @@ export function Shell({ me, accion, atras, children }: {
               className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold
                 transition-colors ${
                   esActivo(item.href, path)
-                    ? 'border-alamo text-alamo'
+                    ? 'border-marca text-marca'
                     : 'border-transparent text-ink-soft hover:text-ink'
                 }`}>
               {item.label}

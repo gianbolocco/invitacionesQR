@@ -67,7 +67,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
           )}
 
           {datosListos && (
-            <p role="status" className="text-center text-sm text-alamo">
+            <p role="status" className="text-center text-sm text-marca">
               Listo. El guardia ya tiene tus datos.
             </p>
           )}

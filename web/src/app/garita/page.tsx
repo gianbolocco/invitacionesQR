@@ -47,7 +47,7 @@ export default function GaritaHome() {
       <div className="flex flex-col gap-6">
         {/* El botón es lo primero y lo más grande: es la acción del turno. */}
         <Link href="/garita/escanear"
-          className="flex min-h-20 items-center justify-center gap-3 rounded bg-alamo
+          className="flex min-h-20 items-center justify-center gap-3 rounded bg-marca
             text-2xl font-bold text-surface">
           <span aria-hidden className="text-3xl">⛶</span>
           Escanear QR
@@ -59,7 +59,7 @@ export default function GaritaHome() {
             <input id="q" value={query} onChange={(e) => setQuery(e.target.value)}
               placeholder="Apellido, documento, unidad o patente"
               className="min-h-14 min-w-0 flex-1 rounded border border-line bg-card px-3 text-lg text-ink" />
-            <button className="min-h-14 shrink-0 rounded bg-alamo px-5 font-semibold text-surface">
+            <button className="min-h-14 shrink-0 rounded bg-marca px-5 font-semibold text-surface">
               Buscar
             </button>
           </div>

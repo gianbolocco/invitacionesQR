@@ -35,8 +35,8 @@ type AuditRow = {
  * los otros cuatro ya terminaron o todavía no empezaron.
  */
 const ESTADO: Record<AuditRow['status'], { label: string; clase: string }> = {
-  adentro: { label: 'Adentro', clase: 'text-alamo font-bold' },
-  concluida: { label: 'Concluida', clase: 'text-alamo' },
+  adentro: { label: 'Adentro', clase: 'text-marca font-bold' },
+  concluida: { label: 'Concluida', clase: 'text-marca' },
   esperando: { label: 'Esperando', clase: '' },
   vencida: { label: 'No llegó', clase: 'text-deny-field' },
   anulada: { label: 'Anulada', clase: 'opacity-60' },
@@ -201,7 +201,7 @@ export default function AuditoriaPage() {
               className="tabular min-h-11 rounded border border-line bg-card px-3 text-ink" />
           </label>
           <a href={`${apiBase}/gate/audit.xlsx?${filtros()}`}
-            className="inline-flex min-h-11 items-center rounded bg-alamo px-4 text-sm
+            className="inline-flex min-h-11 items-center rounded bg-marca px-4 text-sm
               font-semibold text-surface">
             Exportar a Excel
           </a>
@@ -219,7 +219,7 @@ export default function AuditoriaPage() {
             <button key={valor} onClick={() => cambiarEstado(valor)}
               aria-pressed={estado === valor}
               className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
-                estado === valor ? 'border-alamo bg-alamo text-surface' : 'border-line'
+                estado === valor ? 'border-marca bg-marca text-surface' : 'border-line'
               }`}>
               {label}
             </button>

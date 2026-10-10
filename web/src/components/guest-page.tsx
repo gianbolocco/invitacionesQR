@@ -41,8 +41,8 @@ export function Cabecera({ inv }: { inv: Publica }) {
           {address && <p className="mt-0.5 text-ink-soft">{address}</p>}
           {mapUrl && (
             <a href={mapUrl} target="_blank" rel="noopener noreferrer"
-              className="mt-1 inline-flex min-h-11 items-center rounded border border-alamo/30
-                px-4 text-sm font-semibold text-alamo">
+              className="mt-1 inline-flex min-h-11 items-center rounded border border-marca/30
+                px-4 text-sm font-semibold text-marca">
               Abrir en el mapa
             </a>
           )}

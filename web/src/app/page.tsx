@@ -64,7 +64,7 @@ export default function HomePage() {
           : undefined}
       accion={mostrandoLista && vigentes.length > 0 ? (
       <Link href="/nueva"
-        className="flex min-h-14 items-center justify-center rounded bg-alamo px-5
+        className="flex min-h-14 items-center justify-center rounded bg-marca px-5
           font-semibold text-surface">
         Nueva invitación
       </Link>
@@ -105,7 +105,7 @@ export default function HomePage() {
             <Vacio titulo="Todavía no invitaste a nadie"
               detalle="Creá una invitación y compartila por WhatsApp.">
               <Link href="/nueva"
-                className="inline-flex min-h-14 items-center justify-center rounded bg-alamo
+                className="inline-flex min-h-14 items-center justify-center rounded bg-marca
                   px-6 font-semibold text-surface">
                 Nueva invitación
               </Link>
@@ -131,7 +131,7 @@ export default function HomePage() {
                         <p className="text-sm text-ink-soft">Creada por {inv.creatorName}</p>
                       )}
                     </div>
-                    <span aria-hidden className="shrink-0 text-2xl text-alamo/40">›</span>
+                    <span aria-hidden className="shrink-0 text-2xl text-marca/40">›</span>
                   </Filete>
                 </button>
               </li>

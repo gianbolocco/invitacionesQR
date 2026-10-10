@@ -25,8 +25,8 @@ export function Button({ variant = 'primary', className = '', ...props }: Button
     'transition-[background-color,border-color,opacity] active:scale-[0.99] ' +
     'disabled:opacity-50 disabled:cursor-not-allowed'
   const look = {
-    primary: 'min-h-14 bg-alamo text-surface hover:bg-alamo-deep',
-    quiet: 'border border-alamo/30 text-alamo hover:bg-alamo/5',
+    primary: 'min-h-14 bg-marca text-surface hover:bg-marca-deep',
+    quiet: 'border border-marca/30 text-marca hover:bg-marca/5',
     peligro: 'min-h-14 bg-deny-field text-deny-ink hover:opacity-90',
   }[variant]
   return <button className={`${base} ${look} ${className}`} {...props} />
@@ -105,7 +105,7 @@ export function TemaToggle({ tema, onTema }: {
           title={o.label} onClick={() => onTema(o.id)}
           className={`flex size-8 items-center justify-center rounded-full text-sm
             transition-colors sm:size-9 ${
-              tema === o.id ? 'bg-alamo text-surface' : 'text-ink-soft'
+              tema === o.id ? 'bg-marca text-surface' : 'text-ink-soft'
             }`}>
           <span aria-hidden>{o.icono}</span>
           <span className="sr-only">{o.label}</span>
@@ -127,7 +127,7 @@ export function Wordmark({ subtitle = 'Barrio cerrado' }: { subtitle?: string })
   return (
     <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
       <span className="truncate font-[family-name:var(--font-playfair)] text-xl
-        italic leading-tight text-alamo sm:text-2xl">
+        italic leading-tight text-marca sm:text-2xl">
         Álamo Alto
       </span>
       <span className="eyebrow truncate">{subtitle}</span>

@@ -35,7 +35,7 @@ function Nueva() {
           <div className="flex flex-col gap-6">
             <h1 className="display text-2xl">Listo</h1>
             <QrShare token={creada.token} guestName={creada.guestName} />
-            <Link href="/" className="text-center text-sm text-alamo underline underline-offset-4">
+            <Link href="/" className="text-center text-sm text-marca underline underline-offset-4">
               Ver mis invitaciones
             </Link>
           </div>

@@ -25,7 +25,7 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
       <figcaption className="flex items-baseline justify-between">
         <Eyebrow>{title}</Eyebrow>
         <button onClick={() => setTabla((v) => !v)}
-          className="text-xs text-alamo underline underline-offset-4">
+          className="text-xs text-marca underline underline-offset-4">
           {tabla ? 'Ver gráfico' : 'Ver tabla'}
         </button>
       </figcaption>
@@ -45,7 +45,7 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
               </div>
               <div
                 className="w-full rounded-t-[4px] bg-[#0f8f52] transition-[height]
-                  group-hover:bg-alamo-deep"
+                  group-hover:bg-marca-deep"
                 style={{ height: `${Math.max(2, (b.total / max) * 100)}%` }}
               />
             </div>

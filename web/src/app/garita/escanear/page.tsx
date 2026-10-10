@@ -47,7 +47,7 @@ export default function EscanearPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col overflow-x-hidden bg-alamo-deep text-alamo-line">
+    <main className="flex min-h-dvh flex-col overflow-x-hidden bg-escaner-fondo text-escaner-texto">
       {/* La misma barra de volver que el resto de la app, arriba a la
           izquierda. El Shell no entra acá: la cámara va a pantalla completa y
           una barra inferior encima del visor le come el encuadre al guardia. */}
@@ -80,7 +80,7 @@ export default function EscanearPage() {
                   Puede que el navegador no tenga permiso, o que la pantalla no esté en HTTPS.
                 </p>
                 <button onClick={salir}
-                  className="min-h-14 rounded bg-alamo-line px-5 font-semibold text-alamo-deep">
+                  className="min-h-14 rounded bg-escaner-texto px-5 font-semibold text-escaner-fondo">
                   Buscar por apellido
                 </button>
               </div>
