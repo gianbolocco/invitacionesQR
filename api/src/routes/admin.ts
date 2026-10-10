@@ -70,6 +70,8 @@ adminRoutes.patch('/neighborhood', async (req, res) => {
     address: z.string().max(200).optional(),
     // Un link, no una API de mapas. Se valida que sea http(s) y nada más.
     mapUrl: z.union([z.string().url().startsWith('http'), z.literal('')]).optional(),
+    // La validación contra la paleta la hace el servicio, que es donde vive.
+    brandColor: z.string().optional(),
   }).parse(req.body)
 
   res.json(await updateNeighborhood(req.person!.neighborhoodId, req.person!.id, body))

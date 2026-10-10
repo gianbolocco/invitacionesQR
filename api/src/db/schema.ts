@@ -10,6 +10,12 @@ export const neighborhoods = pgTable('neighborhood', {
   // admin: sin API de mapas, sin clave, sin embeber nada.
   address: text('address'),
   mapUrl: text('map_url'),
+  // Hex de la paleta. NULL es el verde del producto: así una instalación nueva
+  // no necesita elegir nada para verse bien.
+  brandColor: text('brand_color'),
+  // 'image/png' o 'image/jpeg'. NULL significa que no hay logo y se muestra el
+  // nombre del barrio en itálica.
+  logoMime: text('logo_mime'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

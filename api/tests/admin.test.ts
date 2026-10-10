@@ -208,3 +208,46 @@ describe('alta con un mail que ya existe', () => {
     expect(res.status).toBe(409)
   })
 })
+
+describe('color de marca del barrio', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('arranca sin color propio y ofrece la paleta', async () => {
+    const { cookie } = await loginAs('admin')
+    const res = await request(app).get('/admin/neighborhood').set('Cookie', cookie).expect(200)
+
+    expect(res.body.brandColor).toBeNull()
+    expect(res.body.paleta).toHaveLength(8)
+    expect(res.body.paleta).toContain('#1e6b47')
+  })
+
+  it('guarda un color de la paleta', async () => {
+    const { cookie } = await loginAs('admin')
+    const res = await request(app).patch('/admin/neighborhood')
+      .set('Cookie', cookie).send({ brandColor: '#1d4e89' }).expect(200)
+    expect(res.body.brandColor).toBe('#1d4e89')
+  })
+
+  it('rechaza un color que no está en la paleta', async () => {
+    const { cookie } = await loginAs('admin')
+    // Amarillo: el texto claro sobre este fondo no se lee. Por eso hay paleta.
+    const res = await request(app).patch('/admin/neighborhood')
+      .set('Cookie', cookie).send({ brandColor: '#ffee00' })
+    expect(res.status).toBe(400)
+  })
+
+  it('rechaza cualquier cosa que no sea un hex de la paleta', async () => {
+    const { cookie } = await loginAs('admin')
+    for (const malo of ['rojo', '#fff', 'javascript:alert(1)', '']) {
+      const res = await request(app).patch('/admin/neighborhood')
+        .set('Cookie', cookie).send({ brandColor: malo })
+      expect(res.status).toBe(400)
+    }
+  })
+
+  it('un vecino no puede cambiar el color', async () => {
+    const { cookie } = await loginAs('resident')
+    await request(app).patch('/admin/neighborhood')
+      .set('Cookie', cookie).send({ brandColor: '#1d4e89' }).expect(403)
+  })
+})
