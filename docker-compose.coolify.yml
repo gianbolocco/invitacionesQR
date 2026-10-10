@@ -1,0 +1,95 @@
+# Despliegue en Coolify.
+#
+# Se usa SOLO, no junto al docker-compose.yml de desarrollo: Coolify construye
+# desde el repo y no necesita nada de aquel (puertos publicados al host,
+# contraseña fija de la base).
+#
+# En Coolify: New Resource -> Docker Compose -> este repo, rama feat/v1,
+# y "Docker Compose Location" = /docker-compose.coolify.yml
+#
+# ---------------------------------------------------------------------------
+# Por qué hay un Caddy si Coolify ya trae proxy
+# ---------------------------------------------------------------------------
+# El front llama a la API con la ruta relativa /api, así que los dos tienen que
+# vivir detrás del MISMO origen. Eso trae tres cosas que no son cosméticas: no
+# hay CORS, la cookie de sesión es first-party, y la imagen del front no lleva
+# ningún dominio horneado adentro —sirve igual en cualquier URL—.
+#
+# Caddy hace ese reparto adentro del stack, y a Coolify se le expone un solo
+# servicio. El TLS lo termina el proxy de Coolify, así que acá Caddy sirve HTTP
+# plano (SITIO=':80'); no hay certificados duplicados.
+#
+# Si tu versión de Coolify soporta FQDN con path (https://dominio/api apuntando
+# al servicio api), podés borrar el servicio caddy y mapear web y api por
+# separado. Funciona igual; esto es lo que no depende de la versión.
+# ---------------------------------------------------------------------------
+#
+# Variables a cargar en Coolify (Environment Variables del recurso):
+#
+#   POSTGRES_PASSWORD   generar al azar, p.ej. openssl rand -base64 32
+#   DOMINIO             el dominio público, sin https:// (ej: invitaciones.tudominio.com)
+#   RESEND_API_KEY      opcional. Sin esto los mails se imprimen en el log
+#   MAIL_FROM           opcional, ej: Álamo Alto <invitaciones@tudominio.com>
+#   GOOGLE_CLIENT_ID    opcional
+#   GOOGLE_CLIENT_SECRET opcional
+#
+# El dominio se configura además en la UI, sobre el servicio `caddy`.
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: invitaciones
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+      POSTGRES_DB: invitaciones
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U invitaciones']
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    environment:
+      # 'production' es lo que hace que la cookie de sesión salga con Secure.
+      NODE_ENV: production
+      DATABASE_URL: postgres://invitaciones:${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}@db:5432/invitaciones
+      PORT: 8080
+      # De acá salen los links de los mails de alta y de reset. Es la única
+      # variable que necesita el dominio real.
+      WEB_ORIGIN: https://${DOMINIO:?falta DOMINIO}
+      # El redirect URI que hay que registrar en Google Cloud queda entonces:
+      #   https://$DOMINIO/api/auth/google/callback
+      API_ORIGIN: https://${DOMINIO}/api
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    depends_on:
+      db: { condition: service_healthy }
+
+  web:
+    build:
+      context: ./web
+      args:
+        # Relativo a propósito: ver el comentario de arriba.
+        NEXT_PUBLIC_API_URL: /api
+    restart: unless-stopped
+    depends_on: [api]
+
+  # El único servicio que Coolify expone al exterior.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    expose: ['80']
+    environment:
+      SITIO: ':80'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on: [web, api]
+
+volumes:
+  dbdata:
