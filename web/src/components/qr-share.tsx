@@ -3,16 +3,20 @@ import { useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { Button, Eyebrow } from './ui'
 
-export function QrShare({ token, guestName }: { token: string; guestName: string }) {
+export function QrShare({ token, guestName, barrio }: {
+  token: string
+  guestName: string
+  barrio: string
+}) {
   const [copiado, setCopiado] = useState(false)
   const url = typeof window === 'undefined' ? '' : `${window.location.origin}/i/${token}`
-  const texto = `Hola ${guestName}, te dejo el acceso a Álamo Alto: ${url}`
+  const texto = `Hola ${guestName}, te dejo el acceso a ${barrio}: ${url}`
 
   async function compartir() {
     // Web Share API nativa: abre el selector del sistema, WhatsApp incluido.
     // Sin librería y sin integración con la API de Meta.
     if (navigator.share) {
-      await navigator.share({ title: 'Invitación a Álamo Alto', text: texto, url }).catch(() => {})
+      await navigator.share({ title: `Invitación a ${barrio}`, text: texto, url }).catch(() => {})
       return
     }
     await copiar()

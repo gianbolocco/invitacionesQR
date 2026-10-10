@@ -3,6 +3,7 @@ import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
 import { Button, Eyebrow, Filete } from './ui'
 import { QrShare } from './qr-share'
 import { InvitationForm } from './invitation-form'
+import { useMarca } from '@/lib/marca-cliente'
 
 function Dato({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -32,6 +33,8 @@ export function InvitationDetail({
   onHabilitar?: () => void
   onGuardado: () => void
 }) {
+  const marca = useMarca()
+
   if (editando) {
     return (
       <div className="mx-auto flex max-w-sm flex-col gap-6">
@@ -56,7 +59,7 @@ export function InvitationDetail({
         </p>
       )}
 
-      <QrShare token={inv.token} guestName={inv.guestName} />
+      <QrShare token={inv.token} guestName={inv.guestName} barrio={marca.nombre} />
 
       <Filete className="bg-card px-4 py-2">
         <Dato label="Tipo">{KIND_LABEL[inv.kind]}</Dato>

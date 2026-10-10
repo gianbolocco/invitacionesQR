@@ -8,7 +8,7 @@ import { Button, Field, ErrorNote, Wordmark } from '@/components/ui'
 import { TemaFlotante } from '@/components/tema-flotante'
 
 const ERROR_GOOGLE: Record<string, string> = {
-  not_in_padron: 'Ese mail no está en el padrón de Álamo Alto. Pedile el alta a la administración.',
+  not_in_padron: 'Ese mail no está en el padrón del barrio. Pedile el alta a la administración.',
   email_not_verified: 'Google no confirmó ese mail, así que no podemos vincularlo. Entrá con tu contraseña.',
   // Pasa con una pestaña vieja, o si alguien te mandó un link de vuelta de
   // Google que no arrancó acá. El remedio es el mismo y es concreto: empezar
@@ -59,7 +59,7 @@ function Login() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 p-6">
       <TemaFlotante />
-      <Wordmark />
+      <Wordmark nombre="VisitPass" />
       <form onSubmit={submit} className="flex flex-col gap-5">
         <Field label="Mail" type="email" autoComplete="email" required
                value={email} onChange={(e) => setEmail(e.target.value)} />

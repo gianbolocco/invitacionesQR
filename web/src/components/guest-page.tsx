@@ -29,7 +29,8 @@ export function Cabecera({ inv }: { inv: Publica }) {
   const { address, mapUrl } = inv.neighborhood
   return (
     <div className="flex flex-col gap-4">
-      <Wordmark subtitle={inv.neighborhood.name} />
+      {/* El invitado ya tiene el nombre del barrio en su propia respuesta. */}
+      <Wordmark nombre={inv.neighborhood.name} subtitle="Barrio cerrado" />
       <div>
         <Eyebrow>Te invita</Eyebrow>
         <p className="mt-0.5 text-lg font-semibold">{inv.inviterName}</p>

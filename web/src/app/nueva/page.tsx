@@ -8,12 +8,14 @@ import { Shell } from '@/components/shell'
 import { Button } from '@/components/ui'
 import { InvitationForm } from '@/components/invitation-form'
 import { QrShare } from '@/components/qr-share'
+import { useMarca } from '@/lib/marca-cliente'
 
 type Kind = Invitation['kind']
 const KINDS: Kind[] = ['visita', 'frecuente', 'proveedor']
 
 function Nueva() {
   const me = useMe()
+  const marca = useMarca()
   const params = useSearchParams()
   const [creada, setCreada] = useState<Invitation | null>(null)
 
@@ -34,7 +36,7 @@ function Nueva() {
         {creada ? (
           <div className="flex flex-col gap-6">
             <h1 className="display text-2xl">Listo</h1>
-            <QrShare token={creada.token} guestName={creada.guestName} />
+            <QrShare token={creada.token} guestName={creada.guestName} barrio={marca.nombre} />
             <Link href="/" className="text-center text-sm text-marca underline underline-offset-4">
               Ver mis invitaciones
             </Link>

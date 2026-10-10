@@ -11,9 +11,11 @@ export type Columna = { header: string; key: string; width?: number }
  */
 export async function buildWorkbook(
   hojas: { nombre: string; columnas: Columna[]; filas: Record<string, unknown>[] }[],
+  autor: string,
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Álamo Alto'
+  // El autor es el barrio, no el producto: el archivo es de ellos.
+  wb.creator = autor
   wb.created = new Date()
 
   for (const hoja of hojas) {

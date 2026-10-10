@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Archivo, Playfair_Display } from 'next/font/google'
 import { SCRIPT_ANTI_PARPADEO } from '@/lib/theme'
 import { leerMarca } from '@/lib/marca'
+import { MarcaProvider } from '@/lib/marca-cliente'
 import './globals.css'
 
 // Archivo es variable y trae eje de ancho (wdth). Una sola carga: la jerarquía
@@ -58,7 +59,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             Solo se inyecta la base; las variantes las deriva el CSS. */}
         <style dangerouslySetInnerHTML={{ __html: `:root{--marca-base:${marca.color}}` }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <MarcaProvider marca={marca}>{children}</MarcaProvider>
+      </body>
     </html>
   )
 }

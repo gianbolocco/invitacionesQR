@@ -22,7 +22,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
     return (
       <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 p-6 text-center">
       <TemaFlotante />
-        <Wordmark />
+        <Wordmark nombre="VisitPass" />
         <h1 className="display text-xl">Esta invitación no existe</h1>
         <p className="text-ink-soft">Pedile a quien te invitó que te mande el link de nuevo.</p>
       </main>

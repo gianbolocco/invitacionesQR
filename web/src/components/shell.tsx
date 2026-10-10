@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { logout, type Me } from '@/lib/session'
 import { useTema } from '@/lib/theme'
+import { useMarca } from '@/lib/marca-cliente'
 import { NAV, TOPE_BARRA, esActivo, seccionDe, type ItemNav } from '@/lib/nav'
 import { TemaToggle, Wordmark } from './ui'
 
@@ -166,6 +167,7 @@ export function Shell({ me, accion, atras, children }: {
 }) {
   const path = usePathname()
   const [tema, setTema] = useTema()
+  const marca = useMarca()
   const seccion = seccionDe(path, me.role)
   const nav = NAV[seccion]
   const enBarra = nav.length <= TOPE_BARRA
@@ -197,7 +199,7 @@ export function Shell({ me, accion, atras, children }: {
               <span className="truncate">{atras.label ?? 'Volver'}</span>
             </button>
           ) : (
-            <Wordmark subtitle={subtitulo} />
+            <Wordmark nombre={marca.nombre} tieneLogo={marca.tieneLogo} subtitle={subtitulo} />
           )}
 
           <div className="flex shrink-0 items-center gap-2">

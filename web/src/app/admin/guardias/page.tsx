@@ -94,7 +94,7 @@ export default function GuardiasPage() {
               <Field label="Nombre y apellido" required value={name} placeholder="Carlos Ruiz"
                 onChange={(e) => setName(e.target.value)} />
               <Field label="Usuario (mail)" type="email" required value={email}
-                placeholder="carlos@alamoalto.com"
+                placeholder="carlos@mail.com"
                 hint="Identifica la cuenta. No hace falta que reciba mails."
                 onChange={(e) => setEmail(e.target.value)} />
               <Field label="Contraseña" type="password" required value={password}

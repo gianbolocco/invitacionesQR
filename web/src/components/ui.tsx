@@ -116,20 +116,35 @@ export function TemaToggle({ tema, onTema }: {
 }
 
 /**
- * Lockup del encabezado: la itálica del cartel vive acá y en ningún otro lado.
+ * Lockup del encabezado: la itálica vive acá y en ningún otro lado.
+ *
+ * Es el único componente que conoce la marca del barrio: si hay logo lo
+ * muestra, y si no el nombre en itálica.
  *
  * Se apila abajo de `sm`. En una línea, el nombre más el subtítulo más el
  * toggle de tema más el botón de salir no entran en un teléfono angosto: el
  * encabezado empujaba la página entera y aparecía el scroll horizontal, con el
  * nombre cortado por la izquierda.
  */
-export function Wordmark({ subtitle = 'Barrio cerrado' }: { subtitle?: string }) {
+export function Wordmark({ nombre, tieneLogo = false, subtitle = 'Barrio cerrado' }: {
+  nombre: string
+  tieneLogo?: boolean
+  subtitle?: string
+}) {
   return (
     <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
-      <span className="truncate font-[family-name:var(--font-playfair)] text-xl
-        italic leading-tight text-marca sm:text-2xl">
-        Álamo Alto
-      </span>
+      {tieneLogo ? (
+        // Altura fija y ancho automático: un logo apaisado y uno cuadrado
+        // tienen que convivir sin romper el alto del encabezado.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src="/api/branding/logo" alt={nombre}
+          className="h-8 w-auto max-w-[12rem] object-contain" />
+      ) : (
+        <span className="truncate font-[family-name:var(--font-playfair)] text-xl
+          italic leading-tight text-marca sm:text-2xl">
+          {nombre}
+        </span>
+      )}
       <span className="eyebrow truncate">{subtitle}</span>
     </div>
   )

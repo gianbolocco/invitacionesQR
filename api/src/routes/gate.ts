@@ -10,6 +10,7 @@ import {
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { buildWorkbook, XLSX_MIME } from '../lib/excel.js'
 import { entriesLog } from '../services/reports.js'
+import { getNeighborhood } from '../services/neighborhoods.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
@@ -110,6 +111,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
     entriesLog(req.person!.neighborhoodId, { from: f.from, to: f.to, unitId: f.unitId }),
   ])
 
+  const barrio = await getNeighborhood(req.person!.neighborhoodId)
   const buffer = await buildWorkbook([
     {
       nombre: 'Invitaciones',
@@ -167,7 +169,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
         guardia: e.guardName ?? '',
       })),
     },
-  ])
+  ], barrio.name)
 
   res.type(XLSX_MIME).attachment('alamo-alto-auditoria.xlsx').send(buffer)
 })
