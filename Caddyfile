@@ -7,6 +7,16 @@
 # SITIO define cómo se sirve:
 #   un dominio  -> Caddy saca y renueva el certificado solo (producción)
 #   ":80"       -> HTTP plano, para cuando el TLS lo termina otro (un túnel)
+{
+	servers {
+		# Delante de este Caddy puede haber otro proxy en la red privada (el de
+		# Coolify). Sin esto Caddy pisa su X-Forwarded-For con la IP de ese
+		# proxy, y la API ve a todos los clientes con la misma IP. A un cliente
+		# de internet se le sigue ignorando el header que mande.
+		trusted_proxies static private_ranges
+	}
+}
+
 {$SITIO} {
 	encode zstd gzip
 

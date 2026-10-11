@@ -59,6 +59,35 @@ describe('login con contraseña', () => {
     expect(res.status).toBe(429)
   })
 
+  it('el que prueba desde otra IP no deja afuera al guardia', async () => {
+    await activePerson()
+    for (let i = 0; i < 6; i++) {
+      await request(app).post('/auth/login').set('X-Forwarded-For', '203.0.113.9')
+        .send({ email: 'martin@example.com', password: 'mal-mal-mal' })
+    }
+    const res = await request(app).post('/auth/login').set('X-Forwarded-For', '198.51.100.7')
+      .send({ email: 'martin@example.com', password: PASS })
+    expect(res.status).toBe(200)
+  })
+
+  it('los logins buenos no cuentan para el bloqueo', async () => {
+    await activePerson()
+    for (let i = 0; i < 7; i++) {
+      await request(app).post('/auth/login')
+        .send({ email: 'martin@example.com', password: PASS }).expect(200)
+    }
+  })
+
+  it('corta por IP aunque vaya cambiando de mail', async () => {
+    for (let i = 0; i < 30; i++) {
+      await request(app).post('/auth/login').set('X-Forwarded-For', '203.0.113.9')
+        .send({ email: `nadie${i}@example.com`, password: 'mal-mal-mal' })
+    }
+    const res = await request(app).post('/auth/login').set('X-Forwarded-For', '203.0.113.9')
+      .send({ email: 'otro@example.com', password: 'mal-mal-mal' })
+    expect(res.status).toBe(429)
+  })
+
   it('/auth/me devuelve la persona logueada con sus UF', async () => {
     await activePerson()
     const login = await request(app).post('/auth/login').send({ email: 'martin@example.com', password: PASS })

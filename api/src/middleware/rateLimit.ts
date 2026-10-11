@@ -20,20 +20,41 @@ function barrerVencidos(now: number): void {
 
 // ponytail: contador en memoria, se pierde al reiniciar y no se comparte entre
 // réplicas. Si algún día corre más de una instancia, mover a Postgres o Redis.
-export function rateLimit(opts: { max: number; windowMs: number; key: (req: Request) => string }): RequestHandler {
-  return (req, _res, next) => {
+export function rateLimit(opts: {
+  max: number
+  windowMs: number
+  key: (req: Request) => string
+  /**
+   * Qué respuestas consumen cupo, mirando el status. Sin esto cuenta todas.
+   * El login cuenta solo los 401: que el guardia entre bien en tres celulares
+   * no lo acerca al bloqueo.
+   */
+  cuenta?: (status: number) => boolean
+}): RequestHandler {
+  function sumar(k: string, now: number): void {
+    const bucket = buckets.get(k)
+    if (bucket && bucket.resetAt >= now) {
+      bucket.count++
+      return
+    }
+    if (buckets.size >= TOPE_BALDES) barrerVencidos(now)
+    buckets.set(k, { count: 1, resetAt: now + opts.windowMs })
+  }
+
+  return (req, res, next) => {
     const now = Date.now()
     const k = opts.key(req)
     const bucket = buckets.get(k)
-
-    if (!bucket || bucket.resetAt < now) {
-      if (buckets.size >= TOPE_BALDES) barrerVencidos(now)
-      buckets.set(k, { count: 1, resetAt: now + opts.windowMs })
-      return next()
+    if (bucket && bucket.resetAt >= now && bucket.count >= opts.max) {
+      return next(new AppError(429, 'too_many_requests'))
     }
-    if (bucket.count >= opts.max) return next(new AppError(429, 'too_many_requests'))
 
-    bucket.count++
+    if (opts.cuenta) {
+      const cuenta = opts.cuenta
+      res.on('finish', () => { if (cuenta(res.statusCode)) sumar(k, Date.now()) })
+    } else {
+      sumar(k, now)
+    }
     next()
   }
 }

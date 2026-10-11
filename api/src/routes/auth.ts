@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, type Request } from 'express'
 import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../db/index.js'
@@ -60,13 +60,31 @@ authRoutes.get('/invite/:token/needs-lot', async (req, res) => {
   res.json({ needsLot: await personNeedsLot(row.personId) })
 })
 
-const loginLimiter = rateLimit({
+const mailDe = (req: Request) => String(req.body?.email ?? '').toLowerCase().trim()
+
+/*
+ * Dos límites, y los dos cuentan solo los intentos fallidos.
+ *
+ * Por IP + mail y no por mail solo: si no, cualquiera que supiera el mail del
+ * guardia lo dejaba afuera todo el turno con cinco contraseñas malas cada
+ * quince minutos. Ahora el que se bloquea es el que prueba.
+ *
+ * Por IP sola, para el que prueba una contraseña contra muchos mails.
+ */
+const loginPorMail = rateLimit({
   max: 5,
   windowMs: 15 * 60_000,
-  key: (req) => `login:${String(req.body?.email ?? '').toLowerCase()}`,
+  key: (req) => `login:${req.ip}:${mailDe(req)}`,
+  cuenta: (status) => status === 401,
+})
+const loginPorIp = rateLimit({
+  max: 30,
+  windowMs: 15 * 60_000,
+  key: (req) => `login-ip:${req.ip}`,
+  cuenta: (status) => status === 401,
 })
 
-authRoutes.post('/login', loginLimiter, async (req, res) => {
+authRoutes.post('/login', loginPorIp, loginPorMail, async (req, res) => {
   const { email, password } = z.object({ email: z.string().email(), password: z.string() }).parse(req.body)
 
   const [person] = await db.select().from(people)
@@ -85,7 +103,7 @@ authRoutes.post('/login', loginLimiter, async (req, res) => {
 })
 
 authRoutes.post('/forgot',
-  rateLimit({ max: 3, windowMs: 15 * 60_000, key: (req) => `forgot:${String(req.body?.email ?? '')}` }),
+  rateLimit({ max: 3, windowMs: 15 * 60_000, key: (req) => `forgot:${mailDe(req)}` }),
   async (req, res) => {
     const { email } = z.object({ email: z.string().email() }).parse(req.body)
     // Se ignora el retorno a propósito: la respuesta es idéntica exista o no la cuenta.

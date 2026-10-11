@@ -14,6 +14,15 @@ import { reportRoutes } from './routes/reports.js'
 
 export function buildApp() {
   const app = express()
+  /*
+   * La API vive detrás de Caddy (y en Coolify, además, detrás de su proxy), así
+   * que la IP del socket es la de un proxy. Se confía en los saltos de redes
+   * privadas y req.ip queda en la primera IP pública desde la derecha del
+   * X-Forwarded-For: la del cliente. Lo que el cliente escriba a la izquierda
+   * de esa no se mira. Sin esto, el rate limit veía a todo el barrio como uno.
+   */
+  app.set('trust proxy', 'loopback, linklocal, uniquelocal')
+  app.disable('x-powered-by')
   app.use(express.json())
   app.use(cookieParser())
   app.use(cors({ origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000', credentials: true }))
