@@ -1,6 +1,8 @@
 'use client'
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
+import { claveSesion } from '@/lib/sesion-contexto'
 import { api } from '@/lib/api'
 import { homeFor, type Me } from '@/lib/session'
 import { Button, Field, ErrorNote, Wordmark } from '@/components/ui'
@@ -8,6 +10,7 @@ import { TemaFlotante } from '@/components/tema-flotante'
 
 function Reset() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const token = useSearchParams().get('t') ?? ''
   const [name, setName] = useState<string | null>(null)
   const [fallo, setFallo] = useState(false)
@@ -33,6 +36,7 @@ function Reset() {
     try {
       await api('/auth/reset', { method: 'POST', body: JSON.stringify({ token, password }) })
       const yo = await api<Me>('/auth/me')
+      queryClient.removeQueries({ queryKey: claveSesion })
       router.push(homeFor(yo.role))
     } catch {
       setError('Este link ya se usó o venció. Pedí uno nuevo desde "Olvidé mi contraseña".')

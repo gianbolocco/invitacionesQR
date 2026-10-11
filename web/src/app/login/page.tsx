@@ -2,6 +2,8 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
+import { claveSesion } from '@/lib/sesion-contexto'
 import { api, ApiError, apiBase } from '@/lib/api'
 import { homeFor, type Me } from '@/lib/session'
 import { Button, Field, ErrorNote, Wordmark } from '@/components/ui'
@@ -20,6 +22,7 @@ const ERROR_GOOGLE: Record<string, string> = {
 
 function Login() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const params = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -47,6 +50,7 @@ function Login() {
     try {
       await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })
       const yo = await api<Me>('/auth/me')
+      queryClient.removeQueries({ queryKey: claveSesion })
       router.push(homeFor(yo.role))
     } catch (err) {
       setError(err instanceof ApiError && err.status === 429

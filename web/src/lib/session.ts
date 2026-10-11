@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useContext } from 'react'
 import { api } from './api'
+import { SesionContexto } from './sesion-contexto'
 
 export type Me = {
   id: string
@@ -12,18 +12,12 @@ export type Me = {
   units: { id: string; label: string }[]
 }
 
-/** Resuelve la sesión. Si no hay, manda a /login. */
+/**
+ * La sesión de la sección. Ya no hace un request: la resolvió el layout. Se
+ * mantiene para las pantallas viejas; las nuevas usan `useSesion()`.
+ */
 export function useMe() {
-  const router = useRouter()
-  const [me, setMe] = useState<Me | null>(null)
-
-  useEffect(() => {
-    api<Me>('/auth/me')
-      .then(setMe)
-      .catch(() => router.replace('/login'))
-  }, [router])
-
-  return me
+  return useContext(SesionContexto)
 }
 
 /**
