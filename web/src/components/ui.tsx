@@ -140,8 +140,7 @@ export function Wordmark({ nombre, tieneLogo = false, subtitle = 'Barrio cerrado
         <img src="/api/branding/logo" alt={nombre}
           className="h-8 w-auto max-w-[12rem] object-contain" />
       ) : (
-        <span className="truncate font-[family-name:var(--font-playfair)] text-xl
-          italic leading-tight text-marca sm:text-2xl">
+        <span className="truncate font-display text-xl font-extrabold tracking-tight leading-tight text-marca sm:text-2xl">
           {nombre}
         </span>
       )}

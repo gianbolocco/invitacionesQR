@@ -1,22 +1,14 @@
 import type { Metadata, Viewport } from 'next'
-import { Archivo, Playfair_Display } from 'next/font/google'
+import { Geist, Bricolage_Grotesque } from 'next/font/google'
 import { SCRIPT_ANTI_PARPADEO } from '@/lib/theme'
 import { leerMarca } from '@/lib/marca'
 import { MarcaProvider } from '@/lib/marca-cliente'
 import './globals.css'
 
-// Archivo es variable y trae eje de ancho (wdth). Una sola carga: la jerarquía
-// la da el ancho, no una segunda familia. Importa en la PC de la garita.
-const archivo = Archivo({
-  subsets: ['latin'],
-  axes: ['wdth'],
-  variable: '--font-archivo',
-})
-
-// Solo para el lockup del encabezado. Nunca para texto de interfaz.
-const playfair = Playfair_Display({
-  subsets: ['latin'], style: ['italic'], weight: ['500'], variable: '--font-playfair',
-})
+// Geist para toda la interfaz; Bricolage solo para títulos, el saludo, el
+// nombre en el pase y el veredicto. Dos familias, una para cada voz.
+const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
+const bricolage = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-bricolage' })
 
 /*
  * El layout se renderiza por request, no en el build.
@@ -49,7 +41,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const marca = await leerMarca()
 
   return (
-    <html lang="es-AR" className={`${archivo.variable} ${playfair.variable}`}
+    <html lang="es-AR" className={`${geist.variable} ${bricolage.variable}`}
       suppressHydrationWarning>
       <head>
         {/* Antes de pintar: si no, la pantalla arranca clara y salta a oscura. */}

@@ -1,174 +1,201 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 /*
-  Sistema de VisitPass.
-  La identidad arranca del cartel de un barrio real: verde de chapa vial, doble
-  filete blanco, etiquetas en caja alta espaciada. El color es del barrio y
-  entra por --marca-base; el resto de la forma es del producto.
-  El veredicto de la garita NO usa los colores de marca: se separa por
-  luminancia, que sobrevive al daltonismo y a las pantallas malas.
+  Sistema de VisitPass · "Editorial cálido".
+  Estructura editorial (títulos grandes, filas con línea fina, estados en
+  etiqueta) sobre neutros cálidos. El color es del barrio: entra por
+  --marca-base desde el servidor y todo lo demás se deriva de él.
+  El veredicto de la garita NO usa la marca: se separa por luminancia, que
+  sobrevive al daltonismo y a las pantallas malas.
 */
+
+/*
+  `dark:` sigue al tema elegido (data-theme) y, si no se eligió ninguno, al
+  del sistema. Es la misma regla que los tokens de más abajo: si la variante
+  y los tokens no coincidieran, un componente quedaría claro sobre oscuro.
+*/
+@custom-variant dark {
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme='light']) *) {
+      @slot;
+    }
+  }
+}
+
 @theme {
-  /* Los valores reales viven en :root y en el bloque oscuro de más abajo.
-     Acá solo se declaran los nombres para que Tailwind genere las clases. */
-  --color-marca: var(--marca);
-  --color-marca-deep: var(--marca-deep);
-  --color-marca-line: var(--marca-line);
-
-  --color-escaner-fondo: var(--escaner-fondo);
-  --color-escaner-texto: var(--escaner-texto);
-
   --color-pass-field: #eaf5ec;
   --color-pass-ink: #0d3d28;
   --color-deny-field: #7a1420;
   --color-deny-ink: #fff1f0;
 
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  --shadow-fila: 0 1px 0 rgb(20 19 15 / 0.05), 0 8px 18px -12px rgb(20 19 15 / 0.25);
+  --shadow-flotante: 0 18px 40px -16px rgb(20 19 15 / 0.35);
+
+  --ease-salida: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-brillo: brillo 1.6s ease-in-out infinite;
+  @keyframes brillo {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+}
+
+/* `inline`: las utilidades leen la variable en tiempo de ejecución, así el
+   color del barrio cambia sin recompilar y sin recargar. */
+@theme inline {
+  /* Los nombres que esperan las primitivas de shadcn. */
+  --color-background: var(--surface);
+  --color-foreground: var(--ink);
+  --color-card: var(--card);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--marca);
+  --color-primary-foreground: var(--sobre-marca);
+  --color-secondary: var(--surface-sunk);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-sunk);
+  --color-muted-foreground: var(--ink-soft);
+  --color-accent: var(--surface-sunk);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--peligro);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--marca);
+
+  /* Los nombres propios. */
+  --color-marca: var(--marca);
+  --color-marca-deep: var(--marca-deep);
+  --color-marca-suave: var(--marca-suave);
+  --color-marca-line: var(--marca-line);
+  --color-sobre-marca: var(--sobre-marca);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-surface: var(--surface);
   --color-surface-sunk: var(--surface-sunk);
-  --color-card: var(--card);
   --color-line: var(--line);
+  --color-peligro: var(--peligro);
+  --color-escaner-fondo: var(--escaner-fondo);
+  --color-escaner-texto: var(--escaner-texto);
 
-  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-geist), ui-sans-serif, sans-serif;
 }
 
-/*
-  Tema claro: el default. El oscuro NO es una inversión automática — cada valor
-  está elegido contra su fondo, que es lo único que mantiene el contraste.
-*/
 :root {
   color-scheme: light;
-  /* El servidor pisa esto con el color del barrio. El verde es el default del
-     producto: una instalación nueva se ve bien sin elegir nada. */
+  /* El servidor pisa esto con el color del barrio, y AplicarMarca lo vuelve a
+     pisar en vivo cuando el admin lo cambia. */
   --marca-base: #1e6b47;
 
-  /*
-   * Las variantes se derivan moviendo SOLO la luminosidad, con sintaxis de
-   * color relativa: `oklch(from X L c h)` conserva el croma y el tono.
-   * Con color-mix contra blanco o negro el color se desatura y el verde sale
-   * grisáceo; medido, daba 42 puntos de diferencia contra el valor a mano.
-   */
+  /* Las variantes mueven SOLO la luminosidad: `oklch(from X L c h)` conserva
+     croma y tono. Con color-mix contra blanco el color sale grisáceo. */
   --marca: var(--marca-base);
   --marca-deep: oklch(from var(--marca-base) 0.32 c h);
+  --marca-suave: color-mix(in oklab, var(--marca-base) 10%, var(--surface));
   --marca-line: color-mix(in oklab, var(--marca-base) 8%, white);
+  /* Texto sobre la marca. La paleta cerrada está elegida para que el blanco
+     se lea encima en el tema claro. */
+  --sobre-marca: #ffffff;
 
-  /*
-   * El escáner es un visor de cámara: va oscuro SIEMPRE y no sigue el tema.
-   * Se declara acá y NO se redefine en los bloques oscuros, a propósito.
-   *
-   * Antes usaba --marca-deep y --marca-line, que en tema oscuro se vuelven los
-   * dos claros: medido, el texto quedaba en 1.5 de contraste sobre el fondo.
-   * Ilegible, y justo en el turno nocturno, que es cuando se usa.
-   */
+  --surface: #f6f3ee;
+  --surface-sunk: #ece7df;
+  --card: #ffffff;
+  --line: #e6e0d6;
+  --ink: #14130f;
+  /* 5,3:1 sobre el fondo y 5,9:1 sobre las tarjetas: pasa AA en texto chico. */
+  --ink-soft: #6b645a;
+  --peligro: #a3202f;
+
+  /* El escáner es un visor de cámara: oscuro SIEMPRE, no sigue el tema. */
   --escaner-fondo: oklch(from var(--marca-base) 0.27 c h);
   --escaner-texto: #f2f0e8;
-  --ink: #16211c;
-  --ink-soft: #55635c;
-  --surface: #fbfaf6;
-  --surface-sunk: #f1efe7;
-  --card: #ffffff;
-  --line: #16211c1f;
 }
 
 /*
-  Tema oscuro. El verde de marca (#1e6b47) sobre fondo oscuro no llega a
-  contraste de texto, así que acá el acento es un paso más claro del MISMO tono:
-  la marca se mantiene, cambia qué paso de la escala se usa.
-
-  Va escrito dos veces a propósito — una para la preferencia del sistema y otra
-  para la elección explícita — porque CSS no tiene mixins y encadenar los
-  selectores haría que el toggle no pueda ganarle al sistema.
+  Tema oscuro, escrito dos veces a propósito: una para la elección explícita y
+  otra para la preferencia del sistema. CSS no tiene mixins, y encadenar los
+  selectores haría que el toggle no le pueda ganar al sistema.
+  En oscuro la marca SUBE de luminosidad (el color de la paleta sobre fondo
+  oscuro no llega a contraste) y el texto sobre ella pasa a ser oscuro.
 */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  /* En oscuro la marca SUBE de luminosidad: el verde sobre fondo oscuro no
-     llega a contraste de texto. Y `deep` sube todavía más, al revés que en
-     el tema claro. No se redefine --marca-base: un token no puede derivarse
-     de sí mismo. */
-  --marca: oklch(from var(--marca-base) 0.72 c h);
-  --marca-deep: oklch(from var(--marca-base) 0.83 c h);
+  --marca: oklch(from var(--marca-base) 0.74 c h);
+  --marca-deep: oklch(from var(--marca-base) 0.84 c h);
+  --marca-suave: color-mix(in oklab, var(--marca-base) 22%, var(--surface));
   --marca-line: color-mix(in oklab, var(--marca-base) 6%, white);
-  --ink: #e9efea;
-  --ink-soft: #9fb0a7;
-  --surface: #0b1712;
-  --surface-sunk: #0f1f18;
-  --card: #14261d;
-  --line: #e9efea24;
+  --sobre-marca: #12110e;
+  --surface: #12110e;
+  --surface-sunk: #1c1a16;
+  --card: #201e19;
+  --line: #ffffff1a;
+  --ink: #f2eee6;
+  --ink-soft: #a8a195;
+  --peligro: #f2727e;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    /* En oscuro la marca SUBE de luminosidad: el verde sobre fondo oscuro no
-       llega a contraste de texto. Y `deep` sube todavía más, al revés que en
-       el tema claro. No se redefine --marca-base: un token no puede derivarse
-       de sí mismo. */
-    --marca: oklch(from var(--marca-base) 0.72 c h);
-    --marca-deep: oklch(from var(--marca-base) 0.83 c h);
+    --marca: oklch(from var(--marca-base) 0.74 c h);
+    --marca-deep: oklch(from var(--marca-base) 0.84 c h);
+    --marca-suave: color-mix(in oklab, var(--marca-base) 22%, var(--surface));
     --marca-line: color-mix(in oklab, var(--marca-base) 6%, white);
-    --ink: #e9efea;
-    --ink-soft: #9fb0a7;
-    --surface: #0b1712;
-    --surface-sunk: #0f1f18;
-    --card: #14261d;
-    --line: #e9efea24;
+    --sobre-marca: #12110e;
+    --surface: #12110e;
+    --surface-sunk: #1c1a16;
+    --card: #201e19;
+    --line: #ffffff1a;
+    --ink: #f2eee6;
+    --ink-soft: #a8a195;
+    --peligro: #f2727e;
   }
-}
-
-html {
-  /* 17px de base: el vecino lee esto en la calle, de paso. */
-  font-size: 106.25%;
 }
 
 body {
   background: var(--surface);
   color: var(--ink);
-  transition: background-color 150ms ease, color 150ms ease;
   font-family: var(--font-sans);
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 200ms var(--ease-salida), color 200ms var(--ease-salida);
 }
 
-/*
-  Jerarquía por ancho, no por segunda familia: el eje wdth de Archivo.
-  "PASA" a 72px en wdth 125 es inconfundible a dos metros, y no cuesta
-  una carga de fuente extra en la PC de la garita.
-*/
-.display {
-  font-variation-settings: 'wdth' 125;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
+/* Los inputs van a 16px: con menos, iOS hace zoom al enfocarlos. */
+input, select, textarea { font-size: 16px; }
 
-/* Horas, DNI y patentes en columnas que no bailan. */
-.tabular {
-  font-variant-numeric: tabular-nums;
+/* Títulos display: la única voz grande de la interfaz. La palabra en <em> va
+   en el color del barrio ("Hola, <em>Lucía.</em>"). */
+.titulo-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
 }
+.titulo-display em { font-style: normal; color: var(--marca); }
 
-/* "B A R R I O  C E R R A D O": así se nombra el barrio a sí mismo. */
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
+.tabular { font-variant-numeric: tabular-nums; }
 
-/* El doble filete del cartel, convertido en el marco del sistema. */
-.filete {
-  border: 1px solid color-mix(in srgb, var(--marca) 22%, transparent);
-  border-radius: 4px;
-  padding: 3px;
-  background: var(--card);
+/* Skeleton con brillo que recorre: se lee como "está llegando", no como un
+   bloque gris roto. */
+.skeleton-brillo {
+  background: linear-gradient(90deg,
+    var(--surface-sunk) 0%,
+    color-mix(in oklab, var(--surface-sunk) 55%, var(--card)) 50%,
+    var(--surface-sunk) 100%);
+  background-size: 200% 100%;
+  animation: var(--animate-brillo);
 }
-.filete > * {
-  border: 1px solid color-mix(in srgb, var(--marca) 14%, transparent);
-  border-radius: 2px;
-}
-
-/* El lector mantiene el sombreado de su zona de captura; las esquinas propias
-   de la pantalla de garita reemplazan las esquinas blancas por defecto. */
-#reader #qr-shaded-region > div { display: none !important; }
 
 /* El foco tiene que verse siempre: la garita se opera con teclado. */
 :focus-visible {
@@ -176,48 +203,55 @@ body {
   outline-offset: 2px;
 }
 
-/*
-  Movimiento: una sola apuesta, el veredicto de la garita. Todo lo demás es
-  invisible — el contenido aparece, no "entra con efecto".
-*/
+/* ------------------------------------------------------------------------
+   Legado: lo que usan las pantallas viejas. Se borra en la fase 5, cuando ya
+   no quede ninguna.
+   ------------------------------------------------------------------------ */
+.display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.filete {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+.filete > * { border-radius: var(--radius-lg); }
+
+#reader #qr-shaded-region > div { display: none !important; }
+
 @keyframes surgir {
   from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: none; }
+  to { opacity: 1; transform: none; }
 }
-
-/* El sello del veredicto: rápido y seco, como estampar. Es el único lugar
-   donde la animación se nota a propósito. */
 @keyframes sello {
-  0%   { opacity: 0; transform: scale(1.12); }
-  60%  { opacity: 1; transform: scale(0.98); }
+  0% { opacity: 0; transform: scale(1.12); }
+  60% { opacity: 1; transform: scale(0.98); }
   100% { opacity: 1; transform: none; }
 }
-
 .surgir { animation: surgir 200ms ease-out both; }
-.sello  { animation: sello 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
-
-/* Listas que escalonan apenas: da orden de lectura sin que parezca una demo. */
+.sello { animation: sello 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
 .escalonar > * { animation: surgir 200ms ease-out both; }
-.escalonar > *:nth-child(1) { animation-delay: 0ms }
 .escalonar > *:nth-child(2) { animation-delay: 40ms }
 .escalonar > *:nth-child(3) { animation-delay: 80ms }
 .escalonar > *:nth-child(4) { animation-delay: 120ms }
 .escalonar > *:nth-child(n+5) { animation-delay: 160ms }
-
-@keyframes latir {
-  50% { opacity: 0.45 }
-}
+@keyframes latir { 50% { opacity: 0.45 } }
 .skeleton {
   animation: latir 1.4s ease-in-out infinite;
   background: color-mix(in srgb, var(--ink) 14%, transparent);
   border-radius: 4px;
 }
-
-/* Ni la barra inferior ni el botón de acción pueden taparle el último ítem de
-   la lista: el alto que ocupan se descuenta como padding del contenido. */
 .con-barra-inferior { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)); }
-.con-accion         { padding-bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px)); }
-
+.con-accion { padding-bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px)); }
 @media (min-width: 640px) {
   .con-barra-inferior, .con-accion { padding-bottom: 0; }
 }
