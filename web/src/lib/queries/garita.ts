@@ -1,4 +1,5 @@
 'use client'
+import { useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -62,7 +63,10 @@ export function useVeredicto(id: string) {
  */
 export function usePrecargarVeredicto() {
   const qc = useQueryClient()
-  return (id: string, resultado: Resultado) => qc.setQueryData(claves.veredicto(id), resultado)
+  // useCallback: esto se usa como dependencia de un efecto en la pantalla
+  // de escanear. Sin memoizar, una función nueva en cada render reinicia la
+  // cámara en cada render.
+  return useCallback((id: string, resultado: Resultado) => qc.setQueryData(claves.veredicto(id), resultado), [qc])
 }
 
 function invalidarGarita(qc: QueryClient): Promise<void> {
