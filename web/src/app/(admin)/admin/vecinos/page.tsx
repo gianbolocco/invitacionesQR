@@ -7,7 +7,6 @@ import {
 } from '@/lib/queries/admin'
 import { ESTADO, normalizarBusqueda, type Person } from '@/lib/admin'
 import { fechaConAnio } from '@/lib/fechas'
-import { ChromeAdmin } from '@/components/admin/chrome'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { SheetAlta } from '@/components/admin/sheet-alta'
 import { MenuFila, type AccionFila } from '@/components/admin/menu-fila'
@@ -163,7 +162,7 @@ export default function VecinosPage() {
   }
 
   return (
-    <ChromeAdmin>
+    <>
       <div className="flex flex-col gap-6">
         <EncabezadoPagina antetitulo={personas.data ? `${vecinos.length} en el padrón` : undefined}
           titulo="Vecinos"
@@ -210,6 +209,6 @@ export default function VecinosPage() {
 
       <DialogLote persona={corrigiendo} onCerrar={() => setCorrigiendo(null)} />
       <DialogBaja persona={porDarDeBaja} onCerrar={() => setPorDarDeBaja(null)} />
-    </ChromeAdmin>
+    </>
   )
 }

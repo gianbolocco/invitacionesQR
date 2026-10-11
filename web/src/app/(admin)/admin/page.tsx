@@ -1,5 +1,4 @@
 'use client'
-import { ChromeAdmin } from '@/components/admin/chrome'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { Kpi } from '@/components/dominio/kpi'
 import { Fila } from '@/components/dominio/fila'
@@ -46,7 +45,6 @@ export default function TableroPage() {
   const hayAtencion = k && (k.unitsWithoutResidents > 0 || k.staleInside > 0 || k.invitedNeverLoggedIn > 0)
 
   return (
-    <ChromeAdmin>
       <div className="flex flex-col gap-8">
         <EncabezadoPagina antetitulo="Administración" titulo="Tablero" />
 
@@ -109,6 +107,5 @@ export default function TableroPage() {
           </section>
         </div>
       </div>
-    </ChromeAdmin>
   )
 }
