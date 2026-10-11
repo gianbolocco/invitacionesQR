@@ -66,8 +66,4 @@ export const registrarEgreso = (invitationId: string) =>
 export const deshacer = (entryId: string) =>
   api<{ deshecho: 'ingreso' | 'egreso' }>(`/gate/entries/${entryId}/undo`, { method: 'POST' })
 
-export function hora(iso: string): string {
-  return new Intl.DateTimeFormat('es-AR', {
-    timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(new Date(iso))
-}
+export { hora } from './fechas'

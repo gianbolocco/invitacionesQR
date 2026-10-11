@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import { hoyISO } from '@/lib/invitations'
+import { hoyISO, hora, sumarDias, tituloDia } from '@/lib/fechas'
 import { Estado } from './ui'
 
 export type AgendaRow = {
@@ -17,27 +17,6 @@ export type AgendaRow = {
   lastEntryAt: string | null
   lastExitAt: string | null
   adentro: boolean
-}
-
-function hora(iso: string): string {
-  return new Intl.DateTimeFormat('es-AR', {
-    timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(new Date(iso))
-}
-
-function corrido(dias: number): string {
-  const d = new Date(`${hoyISO()}T12:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + dias)
-  return d.toISOString().slice(0, 10)
-}
-
-function titulo(fecha: string): string {
-  if (fecha === hoyISO()) return 'Hoy'
-  if (fecha === corrido(1)) return 'Mañana'
-  if (fecha === corrido(-1)) return 'Ayer'
-  const [y, m, d] = fecha.split('-').map(Number)
-  return new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
-    .format(new Date(y, m - 1, d))
 }
 
 function Fila({ r, tenue, onAbrir }: {
@@ -121,24 +100,26 @@ export function Agenda({ onAbrir }: { onAbrir: (r: AgendaRow) => void }) {
   const todas = filas ?? []
   const frecuentes = todas.filter((r) => r.kind === 'frecuente')
   const personas = todas.filter((r) => r.kind !== 'frecuente')
-  const esperando = personas.filter((r) => r.enteredCount === 0)
-  const entraron = personas.filter((r) => r.enteredCount > 0)
+  // `adentro` primero, igual que la etiqueta de cada fila: quien entró ayer y
+  // sigue adentro tiene enteredCount 0 hoy y no es alguien que falta.
+  const esperando = personas.filter((r) => !r.adentro && r.enteredCount === 0)
+  const entraron = personas.filter((r) => r.adentro || r.enteredCount > 0)
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={() => setFecha(corrido(-1))}
+        <button onClick={() => setFecha((f) => sumarDias(f, -1))}
           className="min-h-11 rounded border border-line px-3 text-sm">‹ Ayer</button>
         <button onClick={() => setFecha(hoyISO())}
           className="min-h-11 rounded border border-line px-4 text-sm font-semibold">Hoy</button>
-        <button onClick={() => setFecha(corrido(1))}
+        <button onClick={() => setFecha((f) => sumarDias(f, 1))}
           className="min-h-11 rounded border border-line px-3 text-sm">Mañana ›</button>
         <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value || hoyISO())}
           aria-label="Otra fecha"
           className="tabular min-h-11 rounded border border-line bg-card px-3 text-sm text-ink" />
       </div>
 
-      <h2 className="display text-2xl capitalize">{titulo(fecha)}</h2>
+      <h2 className="display text-2xl capitalize">{tituloDia(fecha)}</h2>
 
       {filas === null && <p className="opacity-70">Cargando…</p>}
       {filas !== null && todas.length === 0 && (

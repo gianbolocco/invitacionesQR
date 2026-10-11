@@ -1,3 +1,6 @@
+import { hoyISO, fechaCorta } from './fechas'
+export { hoyISO, fechaCorta } from './fechas'
+
 export type Invitation = {
   id: string
   kind: 'visita' | 'frecuente' | 'proveedor'
@@ -25,21 +28,6 @@ export const KIND_LABEL: Record<Invitation['kind'], string> = {
 }
 
 export const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-
-/** 'YYYY-MM-DD' de hoy en Buenos Aires, igual que en la API. */
-export function hoyISO(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Argentina/Buenos_Aires',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(new Date())
-}
-
-/** "14 sep" — corto, para tarjetas. */
-export function fechaCorta(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' })
-    .format(new Date(y, m - 1, d))
-}
 
 export function vigencia(inv: Invitation): string {
   if (inv.validFrom === inv.validTo) {

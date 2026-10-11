@@ -4,7 +4,8 @@ import { api } from '@/lib/api'
 import { KIND_LABEL, hoyISO } from '@/lib/invitations'
 import { Eyebrow, Wordmark } from '@/components/ui'
 import { TemaFlotante } from '@/components/tema-flotante'
-import { Cabecera, Qr, FormularioDatos, fechaCorta, type Publica } from '@/components/guest-page'
+import { Cabecera, Qr, FormularioDatos, type Publica } from '@/components/guest-page'
+import { fechaCorta } from '@/lib/fechas'
 
 export default function InvitacionPublica({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)

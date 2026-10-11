@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { hora } from '@/lib/gate'
-import { hoyISO } from '@/lib/invitations'
+import { hoyISO, sumarDias, fechaNumerica } from '@/lib/fechas'
 import { Shell } from '@/components/shell'
 import { Tabla, type Columna } from '@/components/ui'
 import { SkeletonFilas, Cargando } from '@/components/feedback'
@@ -42,18 +42,6 @@ const ESTADO: Record<AuditRow['status'], { label: string; clase: string }> = {
   anulada: { label: 'Anulada', clase: 'opacity-60' },
 }
 
-function haceDias(n: number): string {
-  const d = new Date(`${hoyISO()}T12:00:00Z`)
-  d.setUTCDate(d.getUTCDate() - n)
-  return d.toISOString().slice(0, 10)
-}
-
-function fechaCorta(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit' })
-    .format(new Date(y, m - 1, d))
-}
-
 type Movimiento = {
   id: string
   enteredAt: string
@@ -76,7 +64,7 @@ const PAGE_SIZE = 25
 
 export default function AuditoriaPage() {
   const me = useMe()
-  const [from, setFrom] = useState(haceDias(30))
+  const [from, setFrom] = useState(sumarDias(hoyISO(), -30))
   const [to, setTo] = useState(hoyISO())
   const [estado, setEstado] = useState<'todos' | AuditRow['status']>('todos')
   const [pagina, setPagina] = useState<Pagina | null>(null)
@@ -145,8 +133,8 @@ export default function AuditoriaPage() {
       celda: (r) => (
         <span className="tabular">
           {r.validFrom === r.validTo
-            ? fechaCorta(r.validFrom)
-            : `${fechaCorta(r.validFrom)}–${fechaCorta(r.validTo)}`}
+            ? fechaNumerica(r.validFrom)
+            : `${fechaNumerica(r.validFrom)}–${fechaNumerica(r.validTo)}`}
         </span>
       ),
     },
@@ -242,7 +230,7 @@ export default function AuditoriaPage() {
                 <ul className="flex flex-col gap-1">
                   {movimientos?.map((m) => (
                     <li key={m.id} className="tabular">
-                      {fechaCorta(m.enteredAt.slice(0, 10))} {hora(m.enteredAt)}
+                      {fechaNumerica(m.enteredAt.slice(0, 10))} {hora(m.enteredAt)}
                       {' · '}<span className="font-semibold">{m.guestName}</span>
                       {m.guestDoc && ` · ${m.guestDoc}`}
                       {m.plate && ` · ${m.plate}`}

@@ -1,5 +1,6 @@
 'use client'
 import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
+import { cupoTexto } from '@/lib/fechas'
 import { Button, Eyebrow, Filete } from './ui'
 import { QrShare } from './qr-share'
 import { InvitationForm } from './invitation-form'
@@ -66,7 +67,7 @@ export function InvitationDetail({
         <Dato label="Vigencia">{vigencia(inv)}</Dato>
         {inv.guestDoc && <Dato label="Documento">{inv.guestDoc}</Dato>}
         {inv.plate && <Dato label="Patente">{inv.plate}</Dato>}
-        {inv.capacity > 1 && <Dato label="Entraron">{inv.usedCount} de {inv.capacity}</Dato>}
+        {cupoTexto(inv) && <Dato label="Ingresos">{cupoTexto(inv)}</Dato>}
         <Dato label="Unidad">{inv.unitLabel}</Dato>
       </Filete>
 

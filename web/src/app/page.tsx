@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useMe, homeFor } from '@/lib/session'
 import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
+import { cupoTexto } from '@/lib/fechas'
 import { Shell } from '@/components/shell'
 import { Eyebrow, Filete, Vacio } from '@/components/ui'
 import { SkeletonTarjetas, Cargando, Confirmar } from '@/components/feedback'
@@ -124,7 +125,7 @@ export default function HomePage() {
                       <p className="display truncate text-lg">{inv.guestName}</p>
                       <p className="text-sm text-ink-soft tabular">
                         {vigencia(inv)}
-                        {inv.capacity > 1 && ` · ${inv.usedCount} de ${inv.capacity} entraron`}
+                        {cupoTexto(inv) && ` · ${cupoTexto(inv)}`}
                         {me.units.length > 1 && ` · ${inv.unitLabel}`}
                       </p>
                       {inv.createdBy !== me.id && (

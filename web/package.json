@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check": "node src/lib/nav.check.ts"
+    "check": "node src/lib/nav.check.ts && node src/lib/fechas.check.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",

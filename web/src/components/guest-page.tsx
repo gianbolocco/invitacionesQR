@@ -18,12 +18,6 @@ export type Publica = {
   frozen: boolean
 }
 
-export function fechaCorta(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' })
-    .format(new Date(y, m - 1, d))
-}
-
 /** Quién invita, a qué unidad y cómo llegar. Va arriba de todo, siempre. */
 export function Cabecera({ inv }: { inv: Publica }) {
   const { address, mapUrl } = inv.neighborhood
