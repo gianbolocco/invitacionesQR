@@ -12,6 +12,18 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: 'unknown' }))
+    /*
+     * 'forbidden' lo da solo el chequeo de rol de la API: la sesión no es la
+     * que esta pantalla cree. Pasa cuando en otra pestaña se entró con otra
+     * cuenta (el alta de un vecino abre sesión y pisa la cookie del admin), o
+     * cuando alguien escribe /admin a mano. La raíz relee la sesión y lleva a
+     * la casa del rol que sea. Los otros 403 (not_your_unit) no entran acá.
+     */
+    if (res.status === 403 && body.error === 'forbidden' && typeof window !== 'undefined') {
+      // Recarga dura, no router: el `me` viejo que tiene en memoria tiene que irse.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = '/'
+    }
     throw new ApiError(res.status, body.error ?? 'unknown')
   }
   return res.status === 204 ? (undefined as T) : res.json()
