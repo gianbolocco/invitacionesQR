@@ -162,7 +162,7 @@ export default function UsuariosPage() {
       {porDarDeBaja && (
         <Confirmar
           titulo={`¿Dar de baja a ${porDarDeBaja.name}?`}
-          detalle="No va a poder entrar ni crear invitaciones. Se puede reactivar después."
+          detalle="No va a poder entrar, y las invitaciones vigentes que creó quedan anuladas. Se puede reactivar después."
           accion="Dar de baja"
           onConfirmar={() => deshabilitar(porDarDeBaja)}
           onCancelar={() => setPorDarDeBaja(null)}

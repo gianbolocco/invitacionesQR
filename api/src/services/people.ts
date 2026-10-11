@@ -1,11 +1,12 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, gte, isNull } from 'drizzle-orm'
 import { db } from '../db/index.js'
-import { people, unitMembers, authTokens, units } from '../db/schema.js'
+import { people, unitMembers, authTokens, units, invitations } from '../db/schema.js'
 import { randomToken, sha256, hashPassword } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
 import { sendMail } from '../lib/mail.js'
 import { revokeAllSessions } from './sessions.js'
 import { AppError } from '../lib/errors.js'
+import { todayInBuenosAires } from '../lib/dates.js'
 
 const INVITE_DAYS = 7
 
@@ -145,7 +146,26 @@ export async function disablePerson(personId: string, actorId: string, neighborh
   // el admin le reenvía uno nuevo.
   await db.update(authTokens).set({ usedAt: new Date() })
     .where(and(eq(authTokens.personId, personId), isNull(authTokens.usedAt)))
-  await audit(actorId, neighborhoodId, 'person.disabled', 'person', personId)
+
+  /*
+   * Y se anulan las invitaciones vigentes que creó: si no, la frecuente de la
+   * empleada de una familia que se mudó seguía abriendo la barrera por meses.
+   *
+   * Solo las vigentes: anular una vencida o ya usada reescribiría la
+   * auditoría. Solo las suyas: las del otro vecino de la misma casa siguen.
+   * Si la baja fue un error, se deshace la anulación como cualquier otra.
+   */
+  const anuladas = await db.update(invitations).set({ revokedAt: new Date() })
+    .where(and(
+      eq(invitations.createdBy, personId),
+      isNull(invitations.revokedAt),
+      gte(invitations.validTo, todayInBuenosAires()),
+    ))
+    .returning({ id: invitations.id })
+
+  await audit(actorId, neighborhoodId, 'person.disabled', 'person', personId, {
+    invitacionesAnuladas: anuladas.length,
+  })
 }
 
 export async function resendInvite(personId: string, actorId: string, neighborhoodId: string): Promise<void> {
