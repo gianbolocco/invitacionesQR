@@ -165,7 +165,7 @@ export default function UsuariosPage() {
           </div>
           <div className="relative w-full sm:max-w-sm">
             <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-            <Input type="search" value={busqueda} placeholder="Buscar por nombre o lote"
+            <Input type="text" value={busqueda} placeholder="Buscar por nombre o lote"
               aria-label="Buscar vecinos por nombre o lote"
               className="h-11 pl-9 pr-10"
               onChange={(e) => setBusqueda(e.target.value)} />
