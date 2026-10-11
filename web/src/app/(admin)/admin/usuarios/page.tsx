@@ -6,6 +6,7 @@ import { Shell } from '@/components/shell'
 import { ESTADO, fecha, useAdminData, type Person } from '@/lib/admin'
 import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
 import { SkeletonTarjetas, Cargando, Aviso, useAviso, Confirmar } from '@/components/feedback'
+import { ImportarVecinos } from '@/components/importar-vecinos'
 
 export default function UsuariosPage() {
   const me = useMe()
@@ -110,6 +111,8 @@ export default function UsuariosPage() {
             <Button type="submit" className="self-start">Dar de alta y enviar invitación</Button>
           </form>
         </Filete>
+
+        <ImportarVecinos onImported={cargar} />
 
         {people === null && <Cargando><SkeletonTarjetas cantidad={4} /></Cargando>}
 

@@ -7,6 +7,7 @@ import { createUnit, listUnits, labelForLot, setPersonLot } from '../services/un
 import {
   createPerson, listPeople, disablePerson, enablePerson, resendInvite, setGuardPassword,
 } from '../services/people.js'
+import { importPeopleRows, previewPeopleCsv } from '../services/people-import.js'
 import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
 import { guardarLogo, borrarLogo } from '../services/branding.js'
 import { AppError } from '../lib/errors.js'
@@ -27,6 +28,23 @@ adminRoutes.post('/units', async (req, res) => {
 
 adminRoutes.get('/people', async (req, res) => {
   res.json(await listPeople(req.person!.neighborhoodId))
+})
+
+const importRowSchema = z.object({
+  line: z.number().int().min(2),
+  name: z.string().trim().min(1).max(160),
+  email: z.string().trim().email().max(254),
+  lot: z.number().int().min(1).max(99999).nullable(),
+})
+
+adminRoutes.post('/people/import/preview', express.text({ type: 'text/csv', limit: '1mb' }), async (req, res) => {
+  if (typeof req.body !== 'string') throw new AppError(400, 'csv_requerido')
+  res.json(await previewPeopleCsv(req.body, req.person!.neighborhoodId))
+})
+
+adminRoutes.post('/people/import', async (req, res) => {
+  const { rows } = z.object({ rows: z.array(importRowSchema).min(1).max(20) }).parse(req.body)
+  res.json({ results: await importPeopleRows(rows, req.person!.neighborhoodId, req.person!.id) })
 })
 
 adminRoutes.post('/people', async (req, res) => {
