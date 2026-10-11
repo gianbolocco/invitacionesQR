@@ -1,11 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { api, ApiError } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { Shell } from '@/components/shell'
 import { ESTADO, fecha, useAdminData, type Person } from '@/lib/admin'
 import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
-import { SkeletonTarjetas, Cargando, Aviso, useAviso, Confirmar } from '@/components/feedback'
+import { SkeletonFilas, Cargando, Aviso, useAviso, Confirmar } from '@/components/feedback'
 import { ImportarVecinos } from '@/components/importar-vecinos'
 
 export default function UsuariosPage() {
@@ -84,6 +84,52 @@ export default function UsuariosPage() {
     cargar()
   }
 
+  function acciones(p: Person) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {p.status === 'invited' && (
+          <Button type="button" variant="quiet" className="min-h-9 px-3 text-xs" onClick={() => reenviar(p)}>
+            Reenviar
+          </Button>
+        )}
+        {p.role === 'resident' && (
+          <Button type="button" variant="quiet" className="min-h-9 px-3 text-xs"
+            onClick={() => { setCorrigiendo(p); setNuevoLote('') }}>
+            Cambiar lote
+          </Button>
+        )}
+        {p.status !== 'disabled' && p.id !== me?.id && (
+          <Button type="button" variant="quiet" className="min-h-9 px-3 text-xs" onClick={() => setPorDarDeBaja(p)}>
+            Dar de baja
+          </Button>
+        )}
+        {p.status === 'disabled' && (
+          <Button type="button" variant="quiet" className="min-h-9 px-3 text-xs" onClick={() => reactivar(p)}>
+            Reactivar
+          </Button>
+        )}
+      </div>
+    )
+  }
+
+  function editorLote(p: Person) {
+    if (corrigiendo?.id !== p.id) return null
+    return (
+      <form onSubmit={corregirLote} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <Field label="Número de lote" autoFocus value={nuevoLote} className="tabular"
+            inputMode="numeric" pattern="[0-9]*" placeholder="142"
+            hint="Lo saca de su lote actual y lo pasa a este."
+            onChange={(e) => setNuevoLote(e.target.value.replace(/\D/g, ''))} />
+        </div>
+        <Button type="submit">Guardar</Button>
+        <Button variant="quiet" type="button" onClick={() => setCorrigiendo(null)}>
+          Cancelar
+        </Button>
+      </form>
+    )
+  }
+
   if (!me) return <main className="p-6 text-ink-soft">Cargando…</main>
 
   const vecinos = (people ?? []).filter((p) => p.role !== 'guard')
@@ -114,58 +160,70 @@ export default function UsuariosPage() {
 
         <ImportarVecinos onImported={cargar} />
 
-        {people === null && <Cargando><SkeletonTarjetas cantidad={4} /></Cargando>}
+        {people === null && (
+          <Cargando>
+            <div className="overflow-x-auto rounded-md border border-line p-4">
+              <SkeletonFilas cantidad={4} columnas={6} />
+            </div>
+          </Cargando>
+        )}
 
-        <ul className="flex flex-col gap-2">
+        <div className="hidden overflow-x-auto rounded-md border border-line md:block">
+          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <thead className="bg-surface-sunk">
+              <tr className="border-b border-line">
+                <th className="px-3 py-2"><Eyebrow>Vecino</Eyebrow></th>
+                <th className="px-3 py-2"><Eyebrow>Mail</Eyebrow></th>
+                <th className="px-3 py-2"><Eyebrow>Lote</Eyebrow></th>
+                <th className="px-3 py-2"><Eyebrow>Estado</Eyebrow></th>
+                <th className="px-3 py-2"><Eyebrow>Último acceso</Eyebrow></th>
+                <th className="px-3 py-2"><Eyebrow>Acciones</Eyebrow></th>
+              </tr>
+            </thead>
+            <tbody>
+              {vecinos.map((p) => (
+                <Fragment key={p.id}>
+                  <tr className={`border-b border-line ${p.status === 'disabled' ? 'opacity-50' : ''}`}>
+                    <td className="px-3 py-3 font-semibold">
+                      {p.name}{p.role === 'admin' && <span className="eyebrow ml-2">Admin</span>}
+                    </td>
+                    <td className="px-3 py-3">{p.email}</td>
+                    <td className="px-3 py-3 text-ink-soft">
+                      {p.units.map((u) => u.label).join(' · ') || 'Sin asignar'}
+                    </td>
+                    <td className="px-3 py-3">{ESTADO[p.status]}</td>
+                    <td className="px-3 py-3 tabular text-ink-soft">{fecha(p.lastLoginAt)}</td>
+                    <td className="px-3 py-3">{acciones(p)}</td>
+                  </tr>
+                  {corrigiendo?.id === p.id && (
+                    <tr className="border-b border-line bg-surface-sunk/60">
+                      <td colSpan={6} className="px-4 py-3">{editorLote(p)}</td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <ul className="divide-y divide-line md:hidden">
           {vecinos.map((p) => (
-            <li key={p.id}>
-              <Filete className={`flex flex-wrap items-center justify-between gap-3 bg-card px-4 py-3
-                ${p.status === 'disabled' ? 'opacity-50' : ''}`}>
+            <li key={p.id} className={`py-4 ${p.status === 'disabled' ? 'opacity-50' : ''}`}>
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold">
-                    {p.name}
-                    {p.role === 'admin' && <span className="eyebrow ml-2">Admin</span>}
+                  <p className="truncate font-semibold">
+                    {p.name}{p.role === 'admin' && <span className="eyebrow ml-2">Admin</span>}
                   </p>
                   <p className="truncate text-sm text-ink-soft">{p.email}</p>
-                  <p className="text-sm text-ink-soft tabular">
-                    {p.units.map((u) => u.label).join(' · ') || 'Todavía no cargó su lote'}
-                    {' · '}{ESTADO[p.status]}
-                    {p.lastLoginAt && ` · entró ${fecha(p.lastLoginAt)}`}
-                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {p.status === 'invited' && (
-                    <Button variant="quiet" onClick={() => reenviar(p)}>Reenviar</Button>
-                  )}
-                  {p.role === 'resident' && (
-                    <Button variant="quiet"
-                      onClick={() => { setCorrigiendo(p); setNuevoLote('') }}>
-                      Cambiar lote
-                    </Button>
-                  )}
-                  {p.status !== 'disabled' && p.id !== me.id && (
-                    <Button variant="quiet" onClick={() => setPorDarDeBaja(p)}>Dar de baja</Button>
-                  )}
-                  {p.status === 'disabled' && (
-                    <Button variant="quiet" onClick={() => reactivar(p)}>Reactivar</Button>
-                  )}
-                </div>
-              </Filete>
-
-              {corrigiendo?.id === p.id && (
-                <form onSubmit={corregirLote} className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <Field label="Número de lote" autoFocus value={nuevoLote} className="tabular"
-                      inputMode="numeric" pattern="[0-9]*" placeholder="142"
-                      hint="Lo saca de su lote actual y lo pasa a este."
-                      onChange={(e) => setNuevoLote(e.target.value.replace(/\D/g, ''))} />
-                  </div>
-                  <Button type="submit">Guardar</Button>
-                  <Button variant="quiet" type="button" onClick={() => setCorrigiendo(null)}>
-                    Cancelar
-                  </Button>
-                </form>
-              )}
+                <span className="shrink-0 rounded-full border border-line px-2 py-1 text-xs">{ESTADO[p.status]}</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-soft">
+                <span>{p.units.map((u) => u.label).join(' · ') || 'Lote sin asignar'}</span>
+                {p.lastLoginAt && <span>Último acceso: {fecha(p.lastLoginAt)}</span>}
+              </div>
+              <div className="mt-3">{acciones(p)}</div>
+              {corrigiendo?.id === p.id && <div className="mt-3 border-t border-line pt-3">{editorLote(p)}</div>}
             </li>
           ))}
         </ul>
