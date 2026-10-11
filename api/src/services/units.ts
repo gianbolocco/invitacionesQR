@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { units, unitMembers, people } from '../db/schema.js'
 import { audit } from '../lib/audit.js'
+import { violates } from '../lib/errors.js'
 
 export async function createUnit(neighborhoodId: string, label: string, actorId: string) {
   const [unit] = await db.insert(units).values({ neighborhoodId, label: label.trim() }).returning()
@@ -36,6 +37,12 @@ export function labelForLot(lot: number): string {
 /**
  * Busca la unidad de ese lote o la crea. El vecino la elige una sola vez, al
  * entrar; corregirla después es cosa del admin.
+ *
+ * Dos personas declarando el mismo lote nuevo a la vez (típico: dos vecinos
+ * de la misma casa aceptando la invitación juntos) pueden pasar el SELECT
+ * las dos antes de que cualquiera inserte. A la que pierde la carrera el
+ * INSERT le viola `unit_label_uq`: se atrapa y se devuelve la fila que ganó,
+ * en vez de un 500.
  */
 export async function findOrCreateLot(neighborhoodId: string, lot: number) {
   const label = labelForLot(lot)
@@ -46,6 +53,14 @@ export async function findOrCreateLot(neighborhoodId: string, lot: number) {
   if (existente) return existente
 
   const [nueva] = await db.insert(units).values({ neighborhoodId, label }).returning()
+    .catch(async (err: unknown) => {
+      if (!violates(err, 'unit_label_uq')) throw err
+      const [ganadora] = await db.select().from(units)
+        .where(and(eq(units.neighborhoodId, neighborhoodId), eq(units.label, label)))
+        .limit(1)
+      if (!ganadora) throw err
+      return [ganadora]
+    })
   return nueva
 }
 

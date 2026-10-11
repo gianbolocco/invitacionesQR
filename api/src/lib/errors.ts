@@ -6,6 +6,16 @@ export class AppError extends Error {
   }
 }
 
+/**
+ * Si el error viene de violar esa constraint.
+ *
+ * Drizzle envuelve los errores de pg: el mensaje es "Failed query: …" y el
+ * nombre de la constraint vive en `cause.constraint`.
+ */
+export function violates(err: unknown, constraint: string): boolean {
+  return (err as { cause?: { constraint?: string } })?.cause?.constraint === constraint
+}
+
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof AppError) {
     res.status(err.status).json({ error: err.code })

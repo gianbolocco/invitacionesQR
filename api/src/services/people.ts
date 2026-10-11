@@ -4,22 +4,12 @@ import { people, unitMembers, authTokens, units, invitations } from '../db/schem
 import { randomToken, sha256, hashPassword } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
 import { revokeAllSessions } from './sessions.js'
-import { AppError } from '../lib/errors.js'
+import { AppError, violates } from '../lib/errors.js'
 import { todayInBuenosAires } from '../lib/dates.js'
 import { findOrCreateLot } from './units.js'
 import { sendInvitationEmail } from './emails.js'
 
 const INVITE_DAYS = 7
-
-/**
- * Si el error viene de violar esa constraint.
- *
- * Drizzle envuelve los errores de pg: el mensaje es "Failed query: …" y el
- * nombre de la constraint vive en `cause.constraint`.
- */
-function violates(err: unknown, constraint: string): boolean {
-  return (err as { cause?: { constraint?: string } })?.cause?.constraint === constraint
-}
 
 export type CreatePersonInput = {
   neighborhoodId: string
