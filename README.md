@@ -107,9 +107,27 @@ El stack de producción agrega, sobre el de desarrollo: `NODE_ENV=production`
 de Postgres desde el entorno, los puertos de la base y de la API sin publicar
 —solo salen 80 y 443, por Caddy— y `restart: unless-stopped`.
 
+### En Coolify
+
+La base va en un recurso propio y la app en otro: así los backups de Coolify
+la cubren y rehacer la app nunca toca los datos. Ver el encabezado de
+[`docker-compose.coolify.yml`](docker-compose.coolify.yml).
+
+1. **New Resource → Database → PostgreSQL.** Levantarla y copiar su
+   *Postgres URL (internal)*.
+2. En la base, pestaña **Backups**: programar uno diario y apuntarlo a un S3
+   (Settings → S3 Storages). Probar una restauración una vez.
+3. **New Resource → Docker Compose** con este repo, rama `main`,
+   *Docker Compose Location* = `/docker-compose.coolify.yml`.
+4. En ese recurso, activar **Connect To Predefined Network** (si no, la API no
+   alcanza la base) y cargar las variables: `DATABASE_URL` (la del paso 1),
+   `DOMINIO`, `RESEND_API_KEY`, `MAIL_FROM`, `BARRIO_NOMBRE`, `ADMIN_EMAIL`.
+5. Asignar el dominio al servicio `caddy` y desplegar.
+
 ### Backup
 
-Todo el estado vive en el volumen `dbdata`:
+Todo el estado vive en la base, el logo incluido. En Coolify lo cubre el
+backup programado del recurso de base de datos. Con el stack de VPS:
 
 ```bash
 docker compose exec -T db pg_dump -U invitaciones invitaciones | gzip > backup-$(date +%F).sql.gz

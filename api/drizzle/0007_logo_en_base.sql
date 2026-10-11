@@ -1,0 +1,1 @@
+ALTER TABLE "neighborhood" ADD COLUMN "logo" "bytea";

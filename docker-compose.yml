@@ -26,10 +26,7 @@ services:
       BARRIO_MAPA: ${BARRIO_MAPA:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_NOMBRE: ${ADMIN_NOMBRE:-}
-      LOGO_DIR: /data/branding
     ports: ['8080:8080']
-    volumes:
-      - logos:/data/branding
     depends_on:
       db: { condition: service_healthy }
 
@@ -48,4 +45,3 @@ services:
 
 volumes:
   dbdata:
-  logos:

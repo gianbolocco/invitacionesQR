@@ -1,7 +1,11 @@
 import {
   pgTable, uuid, text, timestamp, integer, smallint, jsonb, date, primaryKey, index, uniqueIndex, check,
+  customType,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
+
+// Drizzle no trae bytea. pg ya lo convierte a Buffer y de vuelta.
+const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' })
 
 export const neighborhoods = pgTable('neighborhood', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -16,6 +20,9 @@ export const neighborhoods = pgTable('neighborhood', {
   // 'image/png' o 'image/jpeg'. NULL significa que no hay logo y se muestra el
   // nombre del barrio en itálica.
   logoMime: text('logo_mime'),
+  // Los bytes del logo, en la base y no en un volumen: pesa 500 KB como mucho,
+  // y así un solo backup de la base cubre todo el barrio.
+  logo: bytea('logo'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

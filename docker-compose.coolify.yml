@@ -24,9 +24,23 @@
 # separado. Funciona igual; esto es lo que no depende de la versión.
 # ---------------------------------------------------------------------------
 #
+# ---------------------------------------------------------------------------
+# La base va aparte
+# ---------------------------------------------------------------------------
+# Postgres NO está en este compose: es un recurso de base de datos propio de
+# Coolify (New Resource -> Database -> PostgreSQL). Dos razones:
+#   - Los backups programados a S3 de Coolify son para esos recursos.
+#   - Rehacer o borrar este recurso no puede llevarse los datos del barrio.
+# La base no guarda nada fuera de sí misma (el logo vive en una columna), así
+# que su backup es el backup de toda la instalación.
+#
+# Para que la API la alcance, este recurso tiene que estar en la misma red:
+# activar "Connect To Predefined Network" en su configuración.
+# ---------------------------------------------------------------------------
+#
 # Variables a cargar en Coolify (Environment Variables del recurso):
 #
-#   POSTGRES_PASSWORD   generar al azar, p.ej. openssl rand -base64 32
+#   DATABASE_URL        la "Postgres URL (internal)" del recurso de base de datos
 #   DOMINIO             el dominio público, sin https:// (ej: invitaciones.tudominio.com)
 #   RESEND_API_KEY      obligatoria: sin ella la API no arranca (los links de
 #                       alta y reset terminarían impresos en el log)
@@ -37,27 +51,14 @@
 # El dominio se configura además en la UI, sobre el servicio `caddy`.
 
 services:
-  db:
-    image: postgres:16
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: invitaciones
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
-      POSTGRES_DB: invitaciones
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U invitaciones']
-      interval: 5s
-      retries: 10
-
   api:
     build: ./api
     restart: unless-stopped
     environment:
       # 'production' es lo que hace que la cookie de sesión salga con Secure.
       NODE_ENV: production
-      DATABASE_URL: postgres://invitaciones:${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}@db:5432/invitaciones
+      # La base es otro recurso de Coolify: ver "La base va aparte" arriba.
+      DATABASE_URL: ${DATABASE_URL:?falta DATABASE_URL}
       PORT: 8080
       # De acá salen los links de los mails de alta y de reset. Es la única
       # variable que necesita el dominio real.
@@ -76,11 +77,6 @@ services:
       BARRIO_MAPA: ${BARRIO_MAPA:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?falta ADMIN_EMAIL}
       ADMIN_NOMBRE: ${ADMIN_NOMBRE:-}
-      LOGO_DIR: /data/branding
-    volumes:
-      - logos:/data/branding
-    depends_on:
-      db: { condition: service_healthy }
     # /health chequea app y base. node -e con fetch porque node:24-slim no
     # trae curl ni wget. start_period: al arrancar corre migración y siembra.
     healthcheck:
@@ -125,6 +121,3 @@ services:
       SITIO: ':80'
     depends_on: [web, api]
 
-volumes:
-  dbdata:
-  logos:
