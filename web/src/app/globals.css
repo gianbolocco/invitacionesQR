@@ -166,6 +166,10 @@ body {
   border-radius: 2px;
 }
 
+/* El lector mantiene el sombreado de su zona de captura; las esquinas propias
+   de la pantalla de garita reemplazan las esquinas blancas por defecto. */
+#reader #qr-shaded-region > div { display: none !important; }
+
 /* El foco tiene que verse siempre: la garita se opera con teclado. */
 :focus-visible {
   outline: 3px solid var(--marca);
