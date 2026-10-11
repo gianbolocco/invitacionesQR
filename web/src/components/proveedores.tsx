@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MotionConfig } from 'motion/react'
 import { ApiError } from '@/lib/api'
 import { AplicarMarca, MarcaProvider } from '@/lib/marca-cliente'
 import type { Marca } from '@/lib/marca'
@@ -43,11 +44,14 @@ export function Proveedores({ marca, children }: { marca: Marca; children: React
   const [cliente] = useState(crearCliente)
   return (
     <QueryClientProvider client={cliente}>
-      <MarcaProvider marca={marca}>
-        <AplicarMarca />
-        {children}
-        <Toaster />
-      </MarcaProvider>
+      {/* Con "reducir movimiento" en el sistema, motion deja solo los fundidos: nada se desplaza. */}
+      <MotionConfig reducedMotion="user">
+        <MarcaProvider marca={marca}>
+          <AplicarMarca />
+          {children}
+          <Toaster />
+        </MarcaProvider>
+      </MotionConfig>
     </QueryClientProvider>
   )
 }

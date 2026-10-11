@@ -14,7 +14,7 @@ function Pastilla({ activa, children, onClick, grupo }: {
   return (
     <button type="button" onClick={onClick} aria-pressed={activa}
       className={cn(
-        'relative inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold',
+        'relative inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold',
         'transition-colors duration-150',
         activa ? 'text-sobre-marca' : 'text-ink-soft hover:text-ink',
       )}>
@@ -68,7 +68,7 @@ export function ChipsMultiples<T extends string>({ opciones, valores, onCambio, 
           <button key={o.valor} type="button" aria-pressed={activa}
             onClick={() => onCambio(activa ? valores.filter((v) => v !== o.valor) : [...valores, o.valor])}
             className={cn(
-              'inline-flex h-10 min-w-11 items-center justify-center rounded-full border px-3 text-sm font-semibold',
+              'inline-flex h-11 min-w-11 items-center justify-center rounded-full border px-3 text-sm font-semibold',
               'transition-colors duration-150',
               activa ? 'border-marca bg-marca text-sobre-marca' : 'border-line bg-card text-ink-soft hover:text-ink',
             )}>
