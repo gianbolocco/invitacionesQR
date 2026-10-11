@@ -10,6 +10,11 @@ import { Vacio } from '@/components/dominio/vacio'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { Chips, ChipsMultiples } from '@/components/dominio/chips'
 import { SkeletonPantalla } from '@/components/dominio/skeleton-pantalla'
+import { Kpi } from '@/components/dominio/kpi'
+import { CampoFecha } from '@/components/dominio/campo-fecha'
+import { RangoFechas } from '@/components/dominio/rango-fechas'
+import { Pase } from '@/components/dominio/pase'
+import { hoyISO } from '@/lib/fechas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -142,6 +147,26 @@ export function Kit() {
       <Bloque titulo="Skeleton de pantalla">
         <div className="w-full rounded-lg border border-line"><SkeletonPantalla filas={3} /></div>
       </Bloque>
+      <Bloque titulo="Indicadores">
+        <div className="grid w-full gap-3 sm:grid-cols-3">
+          <Kpi etiqueta="Ingresos hoy" valor={23} variacion={{ texto: '18% vs. el sábado pasado', tono: 'sube' }} serie={[3, 5, 4, 8, 6, 9, 12]} />
+          <Kpi etiqueta="Adentro ahora" valor={7} variacion={{ texto: '2 sin salida hace más de 12 h', tono: 'neutro' }} />
+          <Kpi etiqueta="Atención" valor={3} tono="atencion" variacion={{ texto: 'unidades sin vecinos', tono: 'neutro' }} />
+        </div>
+      </Bloque>
+
+      <Bloque titulo="Fechas">
+        <FechasDemo />
+      </Bloque>
+
+      <Bloque titulo="Pase">
+        <Pase qr="https://visitpass.quest/i/demo" datos={{
+          tipo: 'Visita', vigencia: 'Hoy', invitado: 'Sofía Ledesma', unidad: 'Lote 142', invita: 'Lucía F.',
+        }} />
+        <Pase qr="https://visitpass.quest/i/demo" apagado sello="Anulada" datos={{
+          tipo: 'Frecuente', vigencia: 'Hasta 9 ene', invitado: 'Rosa Benítez', unidad: 'Lote 142', invita: 'Lucía F.',
+        }} />
+      </Bloque>
     </main>
   )
 }
@@ -158,6 +183,17 @@ function ChipsDemo() {
       ]} />
       <ChipsMultiples etiqueta="Días" valores={dias} onCambio={setDias}
         opciones={['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => ({ valor: String(i), etiqueta: d }))} />
+    </div>
+  )
+}
+
+function FechasDemo() {
+  const [dia, setDia] = useState(hoyISO())
+  const [rango, setRango] = useState({ desde: hoyISO(), hasta: hoyISO() })
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="w-64"><CampoFecha valor={dia} onCambio={setDia} /></div>
+      <RangoFechas desde={rango.desde} hasta={rango.hasta} onCambio={setRango} />
     </div>
   )
 }
