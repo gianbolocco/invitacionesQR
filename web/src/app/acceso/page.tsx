@@ -49,7 +49,8 @@ function Acceso() {
         body: JSON.stringify({ token, password, lot: needsLot ? Number(lot) : undefined }),
       })
       const yo = await api<Me>('/auth/me')
-      queryClient.removeQueries({ queryKey: claveSesion })
+      // La sesión fresca va directo al caché: el layout no refetchea ni lee un error viejo.
+      queryClient.setQueryData(claveSesion, yo)
       router.push(homeFor(yo.role))
     } catch {
       setError('Este link ya se usó o venció. Pedile a la administración que te lo reenvíe.')

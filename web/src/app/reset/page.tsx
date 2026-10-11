@@ -36,7 +36,8 @@ function Reset() {
     try {
       await api('/auth/reset', { method: 'POST', body: JSON.stringify({ token, password }) })
       const yo = await api<Me>('/auth/me')
-      queryClient.removeQueries({ queryKey: claveSesion })
+      // La sesión fresca va directo al caché: el layout no refetchea ni lee un error viejo.
+      queryClient.setQueryData(claveSesion, yo)
       router.push(homeFor(yo.role))
     } catch {
       setError('Este link ya se usó o venció. Pedí uno nuevo desde "Olvidé mi contraseña".')

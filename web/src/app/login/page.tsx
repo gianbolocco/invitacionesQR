@@ -50,7 +50,8 @@ function Login() {
     try {
       await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })
       const yo = await api<Me>('/auth/me')
-      queryClient.removeQueries({ queryKey: claveSesion })
+      // La sesión fresca va directo al caché: el layout no refetchea ni lee un error viejo.
+      queryClient.setQueryData(claveSesion, yo)
       router.push(homeFor(yo.role))
     } catch (err) {
       setError(err instanceof ApiError && err.status === 429

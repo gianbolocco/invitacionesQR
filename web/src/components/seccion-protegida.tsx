@@ -11,10 +11,12 @@ import { ErrorConReintento } from './dominio/error-con-reintento'
 /**
  * Resuelve la sesión y verifica el rol de la sección, en un solo lugar.
  *
- * - Sin sesión (401) → login.
- * - Otro error (red caída, API reiniciándose) → error con reintentar. NO
- *   desloguea: antes cualquier falla de /auth/me mandaba al login, y el
- *   guardia con mala señal terminaba ahí con un auto esperando.
+ * - 401 firme (y sin pedido en curso) → login, aunque haya datos: una sesión
+ *   revocada en pleno uso también sale. Un 401 viejo en caché no decide nada
+ *   mientras se vuelve a pedir.
+ * - Otro error (red caída, API reiniciándose): si ya hay sesión válida, la
+ *   página sigue como está (no se pierde su estado, p. ej. el escáner); si no
+ *   hay, error con reintentar. NUNCA desloguea.
  * - Rol que no corresponde → la casa de su rol.
  */
 export function SeccionProtegida({ roles, children }: {
@@ -29,17 +31,17 @@ export function SeccionProtegida({ roles, children }: {
     retry: (fallos, error) => !(error instanceof ApiError && error.status === 401) && fallos < 2,
   })
 
-  const sinSesion = sesion.error instanceof ApiError && sesion.error.status === 401
-  const rolAjeno = sesion.data && !roles.includes(sesion.data.role)
+  const sinSesion = sesion.error instanceof ApiError && sesion.error.status === 401 && !sesion.isFetching
+  const rolAjeno = !!sesion.data && !roles.includes(sesion.data.role)
 
   useEffect(() => {
     if (sinSesion) router.replace('/login')
     else if (rolAjeno && sesion.data) router.replace(homeFor(sesion.data.role))
   }, [sinSesion, rolAjeno, sesion.data, router])
 
-  // Mientras se vuelve a pedir, un error viejo en caché no decide nada.
-  if (sesion.isPending || (sesion.isFetching && !sesion.data)) return <Arranque />
   if (sinSesion || rolAjeno) return <Arranque />
+  // Con sesión válida en mano, un refetch fallido no tira la página.
+  if (sesion.data) return <SesionContexto.Provider value={sesion.data}>{children}</SesionContexto.Provider>
   if (sesion.isError) {
     return (
       <main className="grid min-h-dvh place-items-center">
@@ -52,5 +54,5 @@ export function SeccionProtegida({ roles, children }: {
     )
   }
 
-  return <SesionContexto.Provider value={sesion.data}>{children}</SesionContexto.Provider>
+  return <Arranque />
 }
