@@ -4,7 +4,7 @@
 # desde el repo y no necesita nada de aquel (puertos publicados al host,
 # contraseña fija de la base).
 #
-# En Coolify: New Resource -> Docker Compose -> este repo, rama feat/v1,
+# En Coolify: New Resource -> Docker Compose -> este repo, rama main,
 # y "Docker Compose Location" = /docker-compose.coolify.yml
 #
 # ---------------------------------------------------------------------------
