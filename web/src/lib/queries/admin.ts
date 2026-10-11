@@ -1,0 +1,265 @@
+'use client'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { api, apiBase, ApiError } from '@/lib/api'
+import { claveMarca } from '@/lib/marca-cliente'
+import type { Person, Unit } from '@/lib/admin'
+
+export const claves = {
+  personas: ['admin', 'personas'] as const,
+  unidades: ['admin', 'unidades'] as const,
+  kpis: ['admin', 'kpis'] as const,
+  entradasPorDia: ['admin', 'entradas-dia'] as const,
+  entradasPorHora: ['admin', 'entradas-hora'] as const,
+  invitacionesPorPersona: ['admin', 'invitaciones-persona'] as const,
+  actividadPorGuardia: ['admin', 'actividad-guardia'] as const,
+  barrio: ['admin', 'barrio'] as const,
+}
+
+function invalidarPersonas(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: claves.personas })
+}
+
+export function usePersonas() {
+  return useQuery({ queryKey: claves.personas, queryFn: ({ signal }) => api<Person[]>('/admin/people', { signal }) })
+}
+
+export function useUnidades() {
+  return useQuery({ queryKey: claves.unidades, queryFn: ({ signal }) => api<Unit[]>('/admin/units', { signal }) })
+}
+
+export type Kpis = {
+  entriesToday: number
+  entriesWeek: number
+  entriesMonth: number
+  activeInvitations: number
+  enabledResidents: number
+  activeResidents30d: number
+  unitsWithoutResidents: number
+  insideNow: number
+  staleInside: number
+  entriesSameDayLastWeek: number
+  invitedNeverLoggedIn: number
+}
+export type PorDia = { day: string; total: number }
+export type PorHora = { hour: number; total: number }
+export type PorPersona = { id: string; name: string; unitLabel: string; total: number }
+export type PorGuardia = { id: string | null; name: string | null; total: number; lastAt: string | null }
+
+export function useKpis() {
+  return useQuery({ queryKey: claves.kpis, queryFn: ({ signal }) => api<Kpis>('/reports/kpis', { signal }) })
+}
+export function useEntradasPorDia() {
+  return useQuery({
+    queryKey: claves.entradasPorDia,
+    queryFn: ({ signal }) => api<PorDia[]>('/reports/entries-by-day', { signal }),
+  })
+}
+export function useEntradasPorHora() {
+  return useQuery({
+    queryKey: claves.entradasPorHora,
+    queryFn: ({ signal }) => api<PorHora[]>('/reports/entries-by-hour', { signal }),
+  })
+}
+export function useInvitacionesPorPersona() {
+  return useQuery({
+    queryKey: claves.invitacionesPorPersona,
+    queryFn: ({ signal }) => api<PorPersona[]>('/reports/invitations-by-person', { signal }),
+  })
+}
+export function useActividadPorGuardia() {
+  return useQuery({
+    queryKey: claves.actividadPorGuardia,
+    queryFn: ({ signal }) => api<PorGuardia[]>('/reports/activity-by-guard', { signal }),
+  })
+}
+
+export function useAltaVecino() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (datos: { name: string; email: string; lot?: number }) =>
+      api<{ id: string; email: string; status: string; mailEnviado: boolean }>('/admin/people', {
+        method: 'POST', body: JSON.stringify({ ...datos, role: 'resident' }),
+      }),
+    // El alta queda hecha igual si el mail falla: se avisa para que se
+    // reenvíe desde la lista, no se bloquea el cierre del sheet.
+    onSuccess: (r) => {
+      if (!r.mailEnviado) toast.error(`Dimos de alta a ${r.email}, pero el mail no salió. Probá "Reenviar" en la lista.`)
+    },
+    onSettled: () => invalidarPersonas(qc),
+  })
+}
+
+/*
+ * El alta de un guardia son dos requests: persona + contraseña. Si la
+ * segunda falla, antes quedaba una cuenta sin clave que nadie podía usar
+ * y el admin ni se enteraba. Ahora, si falla, se da de baja lo recién
+ * creado y se informa — mejor nada que una cuenta fantasma.
+ */
+export function useAltaGuardia() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (datos: { name: string; email: string; password: string }) => {
+      const creado = await api<{ id: string; email: string }>('/admin/people', {
+        method: 'POST', body: JSON.stringify({ name: datos.name, email: datos.email, role: 'guard' }),
+      })
+      try {
+        await api(`/admin/people/${creado.id}/password`, {
+          method: 'POST', body: JSON.stringify({ password: datos.password }),
+        })
+      } catch (err) {
+        await api(`/admin/people/${creado.id}/disable`, { method: 'POST' }).catch(() => {})
+        throw err
+      }
+      return creado
+    },
+    onError: () => toast.error('No se pudo crear el guardia. Probá de nuevo.'),
+    onSettled: () => invalidarPersonas(qc),
+  })
+}
+
+export function useReenviarInvitacion() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (p: Pick<Person, 'id' | 'email'>) => api(`/admin/people/${p.id}/resend`, { method: 'POST' }),
+    onSuccess: (_d, p) => toast.success(`Reenviamos la invitación a ${p.email}.`),
+    onError: (_e, p) => toast.error(`No pudimos mandarle el mail a ${p.email}. Probá de nuevo en un rato.`),
+    onSettled: () => invalidarPersonas(qc),
+  })
+}
+
+export function useReactivarPersona() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (p: Pick<Person, 'id'>) => api(`/admin/people/${p.id}/enable`, { method: 'POST' }),
+    onError: () => toast.error('No se pudo reactivar. Probá de nuevo.'),
+    onSettled: () => invalidarPersonas(qc),
+  })
+}
+
+export function useDeshabilitarPersona() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (p: Pick<Person, 'id'>) => api(`/admin/people/${p.id}/disable`, { method: 'POST' }),
+    onError: () => toast.error('No se pudo dar de baja. Probá de nuevo.'),
+    onSettled: () => invalidarPersonas(qc),
+  })
+}
+
+export function useCambiarLote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ personId, lot }: { personId: string; lot: number }) =>
+      api(`/admin/people/${personId}/lot`, { method: 'POST', body: JSON.stringify({ lot }) }),
+    onError: () => toast.error('No se pudo cambiar el lote. Probá de nuevo.'),
+    onSettled: () => invalidarPersonas(qc),
+  })
+}
+
+export function useCambiarContrasenaGuardia() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ personId, password }: { personId: string; password: string }) =>
+      api(`/admin/people/${personId}/password`, { method: 'POST', body: JSON.stringify({ password }) }),
+    onError: () => toast.error('No se pudo cambiar la contraseña. Probá de nuevo.'),
+    onSettled: () => invalidarPersonas(qc),
+  })
+}
+
+export function useAltaUnidad() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (lot: number) => api<Unit>('/admin/units', { method: 'POST', body: JSON.stringify({ lot }) }),
+    onError: () => toast.error('No se pudo crear. Puede que ese lote ya esté cargado.'),
+    onSettled: () => qc.invalidateQueries({ queryKey: claves.unidades }),
+  })
+}
+
+export type Barrio = {
+  id: string
+  name: string
+  address: string | null
+  mapUrl: string | null
+  brandColor: string | null
+  paleta: string[]
+}
+
+export function useBarrio() {
+  return useQuery({ queryKey: claves.barrio, queryFn: ({ signal }) => api<Barrio>('/admin/neighborhood', { signal }) })
+}
+
+export function useGuardarBarrio() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (datos: { address: string; mapUrl: string; brandColor?: string }) =>
+      api<Barrio>('/admin/neighborhood', { method: 'PATCH', body: JSON.stringify(datos) }),
+    onSuccess: (b) => {
+      qc.setQueryData(claves.barrio, b)
+      qc.invalidateQueries({ queryKey: claveMarca })
+    },
+    onError: () => toast.error('El link de mapas tiene que empezar con http. Copialo desde Google Maps con "Compartir".'),
+  })
+}
+
+export function useSubirLogo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (file: File) => {
+      // fetch directo y no api(): este manda un binario con su propio
+      // Content-Type, y el helper fuerza application/json.
+      const res = await fetch(`${apiBase}/admin/branding/logo`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': file.type }, body: file,
+      })
+      if (!res.ok) throw new Error(String(res.status))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
+    onError: () => toast.error('No se pudo subir. Tiene que ser un PNG o un JPG de menos de 500 KB.'),
+  })
+}
+
+export function useQuitarLogo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api('/admin/branding/logo', { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
+  })
+}
+
+export type FilaPreview = {
+  line: number
+  name: string
+  email: string
+  lot: number | null
+  status: 'ready' | 'invalid' | 'duplicate_file' | 'existing'
+  errors: string[]
+}
+export type Preview = {
+  rows: FilaPreview[]
+  summary: { total: number; ready: number; duplicates: number; invalid: number }
+}
+export type ResultadoFila = {
+  line: number
+  name: string
+  email: string
+  lot: number | null
+  status: 'created' | 'mail_failed' | 'existing' | 'failed'
+}
+
+export function usePreviewCsv() {
+  return useMutation({
+    mutationFn: (csv: string) => api<Preview>('/admin/people/import/preview', {
+      method: 'POST', headers: { 'Content-Type': 'text/csv' }, body: csv,
+    }),
+  })
+}
+
+export function useImportarTanda() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (rows: Pick<ResultadoFila, 'line' | 'name' | 'email' | 'lot'>[]) =>
+      api<{ results: ResultadoFila[] }>('/admin/people/import', { method: 'POST', body: JSON.stringify({ rows }) }),
+    onSettled: () => invalidarPersonas(qc),
+  })
+}
+
+export { ApiError }
