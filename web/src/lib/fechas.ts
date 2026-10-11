@@ -85,3 +85,10 @@ export function cupoTexto(inv: { kind: string; capacity: number; usedCount: numb
   if (inv.capacity > 1) return `${inv.usedCount} de ${inv.capacity} entraron`
   return null
 }
+
+/** "11/10/2026": con año, para accesos que pueden ser de hace mucho. */
+export function fechaConAnio(iso: string): string {
+  return new Intl.DateTimeFormat('es-AR', {
+    timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric',
+  }).format(new Date(iso))
+}

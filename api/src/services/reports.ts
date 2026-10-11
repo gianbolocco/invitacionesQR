@@ -18,6 +18,10 @@ export type Kpis = {
   enabledResidents: number
   activeResidents30d: number
   unitsWithoutResidents: number
+  insideNow: number
+  staleInside: number
+  entriesSameDayLastWeek: number
+  invitedNeverLoggedIn: number
 }
 
 export async function dashboardKpis(neighborhoodId: string): Promise<Kpis> {
@@ -45,7 +49,21 @@ export async function dashboardKpis(neighborhoodId: string): Promise<Kpis> {
       (select count(*) from unit u
         where u.neighborhood_id = ${neighborhoodId}
           and not exists (select 1 from unit_member m where m.unit_id = u.id))::int
-        as "unitsWithoutResidents"
+        as "unitsWithoutResidents",
+      (select count(*) from entry_log e join unit u on u.id = e.unit_id
+        where u.neighborhood_id = ${neighborhoodId} and e.exited_at is null)::int as "insideNow",
+      (select count(*) from entry_log e join unit u on u.id = e.unit_id
+        where u.neighborhood_id = ${neighborhoodId} and e.exited_at is null
+          and e.entered_at < now() - interval '12 hours')::int as "staleInside",
+      (select count(*) from entry_log e join unit u on u.id = e.unit_id, local
+        where u.neighborhood_id = ${neighborhoodId}
+          and (e.entered_at at time zone ${TZ})::date = local.today - 7)::int as "entriesSameDayLastWeek",
+      (select count(*) from person p, local
+        where p.neighborhood_id = ${neighborhoodId} and p.role = 'resident' and p.status = 'invited'
+          and not exists (
+            select 1 from auth_token t
+            where t.person_id = p.id and t.purpose = 'invite' and t.used_at is null and t.expires_at > now()
+          ))::int as "invitedNeverLoggedIn"
   `)
   return rows[0] as unknown as Kpis
 }

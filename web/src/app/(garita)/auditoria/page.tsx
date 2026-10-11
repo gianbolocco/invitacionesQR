@@ -1,12 +1,18 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronDown, Inbox } from 'lucide-react'
 import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { hora } from '@/lib/gate'
 import { hoyISO, sumarDias, fechaNumerica } from '@/lib/fechas'
-import { Shell } from '@/components/shell'
-import { Tabla, type Columna } from '@/components/ui'
-import { SkeletonFilas, Cargando } from '@/components/feedback'
+import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
+import { CampoFecha } from '@/components/dominio/campo-fecha'
+import { Chips } from '@/components/dominio/chips'
+import { Vacio } from '@/components/dominio/vacio'
+import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
+import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
+import { Button } from '@/components/ui/button'
 
 type AuditRow = {
   id: string
@@ -26,19 +32,11 @@ type AuditRow = {
   exitGuardName: string | null
 }
 
-/*
- * El ciclo de vida de una invitación. "Entró" se partió en dos al aparecer los
- * egresos: mezclaba al que sigue adentro con el que ya se fue, y esa es
- * justamente la diferencia que el admin necesita ver.
- *
- * "Adentro" va en negrita porque es el único estado que todavía está pasando;
- * los otros cuatro ya terminaron o todavía no empezaron.
- */
 const ESTADO: Record<AuditRow['status'], { label: string; clase: string }> = {
   adentro: { label: 'Adentro', clase: 'text-marca font-bold' },
   concluida: { label: 'Concluida', clase: 'text-marca' },
   esperando: { label: 'Esperando', clase: '' },
-  vencida: { label: 'No llegó', clase: 'text-deny-field' },
+  vencida: { label: 'No llegó', clase: 'text-peligro' },
   anulada: { label: 'Anulada', clase: 'opacity-60' },
 }
 
@@ -61,19 +59,21 @@ type Pagina = {
 }
 
 const PAGE_SIZE = 25
+const ATAJOS = [
+  { valor: 'hoy', etiqueta: 'Hoy' },
+  { valor: '7', etiqueta: '7 días' },
+  { valor: '30', etiqueta: '30 días' },
+] as const
 
 export default function AuditoriaPage() {
   const me = useMe()
-  const [from, setFrom] = useState(sumarDias(hoyISO(), -30))
+  const [from, setFrom] = useState(sumarDias(hoyISO(), -7))
   const [to, setTo] = useState(hoyISO())
   const [estado, setEstado] = useState<'todos' | AuditRow['status']>('todos')
-  const [pagina, setPagina] = useState<Pagina | null>(null)
   const [page, setPage] = useState(1)
   const [abierta, setAbierta] = useState<string | null>(null)
   const [movimientos, setMovimientos] = useState<Movimiento[] | null>(null)
 
-  // Los movimientos se piden al desplegar, no con la tabla: una invitación
-  // frecuente puede tener decenas y casi nunca se miran.
   async function desplegar(id: string) {
     if (abierta === id) { setAbierta(null); return }
     setAbierta(id)
@@ -81,193 +81,163 @@ export default function AuditoriaPage() {
     setMovimientos(await api<Movimiento[]>(`/gate/audit/${id}/entries`).catch(() => []))
   }
 
-
+  // Sin page/pageSize: la usa también el link de exportar, que trae todo el rango.
   const filtros = useCallback(() => {
     const p = new URLSearchParams({ from, to })
     if (estado !== 'todos') p.set('status', estado)
     return p
   }, [from, to, estado])
 
-  useEffect(() => {
-    if (!me) return
-    const p = filtros()
-    p.set('page', String(page))
-    p.set('pageSize', String(PAGE_SIZE))
-    api<Pagina>(`/gate/audit?${p}`).then(setPagina).catch(() => setPagina(null))
-  }, [me, filtros, page])
+  // TanStack Query, no un efecto a mano: antes, cambiar de filtro rápido
+  // podía pintar una respuesta vieja encima de una más nueva si llegaban
+  // desordenadas. Query cancela la consulta anterior sola.
+  const consulta = useQuery({
+    queryKey: ['auditoria', from, to, estado, page],
+    enabled: Boolean(me),
+    queryFn: ({ signal }) => {
+      const p = filtros()
+      p.set('page', String(page))
+      p.set('pageSize', String(PAGE_SIZE))
+      return api<Pagina>(`/gate/audit?${p}`, { signal })
+    },
+  })
 
-  // Cambiar un filtro vuelve a la primera página: quedarse en la 4 de una lista
-  // que ahora tiene 2 muestra una tabla vacía sin explicar por qué.
-  function filtrar<T>(set: (v: T) => void) {
-    return (v: T) => { set(v); setPage(1); setAbierta(null) }
+  function aplicarAtajo(valor: typeof ATAJOS[number]['valor']) {
+    setTo(hoyISO())
+    setFrom(valor === 'hoy' ? hoyISO() : sumarDias(hoyISO(), -Number(valor)))
+    setPage(1)
+    setAbierta(null)
   }
-  const cambiarDesde = filtrar(setFrom)
-  const cambiarHasta = filtrar(setTo)
-  const cambiarEstado = filtrar<'todos' | AuditRow['status']>(setEstado)
 
   if (!me) return <main className="p-6">Cargando…</main>
-
   if (me.role !== 'guard' && me.role !== 'admin') {
     return <main className="p-6"><p>La auditoría es de la guardia y la administración.</p></main>
   }
 
-  const lista = pagina?.rows ?? []
-  const counts = pagina?.counts
-  const total = pagina?.total ?? 0
+  const lista = consulta.data?.rows ?? []
+  const counts = consulta.data?.counts
+  const total = consulta.data?.total ?? 0
   const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const todos = counts
-    ? Object.values(counts).reduce((a, b) => a + b, 0)
-    : 0
-
-  // El invitado va primero: es el título de la tarjeta en mobile.
-  const COLUMNAS: Columna<AuditRow>[] = [
-    {
-      key: 'invitado', label: 'Invitado',
-      celda: (r) => <span className="font-semibold">{r.guestName}</span>,
-    },
-    { key: 'doc', label: 'Documento', celda: (r) => <span className="tabular">{r.guestDoc ?? '—'}</span> },
-    { key: 'unidad', label: 'Unidad', celda: (r) => <span className="tabular">{r.unitLabel}</span> },
-    { key: 'invito', label: 'Invitó', celda: (r) => r.inviterName },
-    {
-      key: 'fecha', label: 'Fecha',
-      celda: (r) => (
-        <span className="tabular">
-          {r.validFrom === r.validTo
-            ? fechaNumerica(r.validFrom)
-            : `${fechaNumerica(r.validFrom)}–${fechaNumerica(r.validTo)}`}
-        </span>
-      ),
-    },
-    {
-      key: 'estado', label: 'Estado',
-      celda: (r) => (
-        <span className={`font-semibold ${ESTADO[r.status].clase}`}>{ESTADO[r.status].label}</span>
-      ),
-    },
-    {
-      key: 'ingreso', label: 'Ingreso',
-      celda: (r) => r.enteredCount === 0 ? <span className="tabular">—</span> : (
-        <button onClick={() => desplegar(r.id)} aria-expanded={abierta === r.id}
-          className="tabular underline underline-offset-4">
-          {hora(r.enteredAt!)}{r.enteredCount > 1 && ` ×${r.enteredCount}`}
-        </button>
-      ),
-    },
-    {
-      key: 'salida', label: 'Salida',
-      celda: (r) => <span className="tabular">{r.exitedAt ? hora(r.exitedAt) : '—'}</span>,
-    },
-    {
-      key: 'guardia', label: 'Guardia',
-      celda: (r) => (
-        <>
-          <span>{r.guardName ?? '—'}</span>
-          {/* Solo si son distintos: en un cambio de turno entra con uno y sale
-              con otro, y ese es justo el caso que hay que poder ver. */}
-          {r.exitGuardName && r.exitGuardName !== r.guardName && (
-            <span className="block text-xs opacity-70">salió con {r.exitGuardName}</span>
-          )}
-        </>
-      ),
-    },
-  ]
+  const todos = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0
 
   return (
-    <Shell me={me}>
-      <div className="flex flex-col gap-5">
-        <h1 className="display text-2xl">Auditoría</h1>
+    <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 sm:py-8">
+      <EncabezadoPagina titulo="Auditoría" />
 
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Desde
-            <input type="date" value={from} onChange={(e) => cambiarDesde(e.target.value)}
-              className="tabular min-h-11 rounded border border-line bg-card px-3 text-ink" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Hasta
-            <input type="date" value={to} onChange={(e) => cambiarHasta(e.target.value)}
-              className="tabular min-h-11 rounded border border-line bg-card px-3 text-ink" />
-          </label>
-          <a href={`${apiBase}/gate/audit.xlsx?${filtros()}`}
-            className="inline-flex min-h-11 items-center rounded bg-marca px-4 text-sm
-              font-semibold text-surface">
-            Exportar a Excel
-          </a>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {([
-            ['todos', `Todos (${todos})`],
-            ['adentro', `Adentro (${counts?.adentro ?? 0})`],
-            ['concluida', `Concluidas (${counts?.concluida ?? 0})`],
-            ['esperando', `Esperando (${counts?.esperando ?? 0})`],
-            ['vencida', `No llegaron (${counts?.vencida ?? 0})`],
-            ['anulada', `Anuladas (${counts?.anulada ?? 0})`],
-          ] as const).map(([valor, label]) => (
-            <button key={valor} onClick={() => cambiarEstado(valor)}
-              aria-pressed={estado === valor}
-              className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
-                estado === valor ? 'border-marca bg-marca text-surface' : 'border-line'
-              }`}>
-              {label}
-            </button>
+      <div className="flex flex-wrap items-end gap-3">
+        {/* Botones sueltos, no Chips: un atajo es una acción de un solo toque,
+            no un filtro con una selección que se mantiene — nada en el rango
+            de fechas dice "cuál de los tres tocaste por última vez". */}
+        <div role="group" aria-label="Rango rápido" className="flex gap-1.5">
+          {ATAJOS.map((a) => (
+            <Button key={a.valor} type="button" variant="outline" size="sm" onClick={() => aplicarAtajo(a.valor)}>
+              {a.etiqueta}
+            </Button>
           ))}
         </div>
-
-        {pagina === null && <Cargando><SkeletonFilas /></Cargando>}
-        {pagina !== null && lista.length === 0 && (
-          <p className="opacity-70">No hay invitaciones en ese rango.</p>
-        )}
-
-        {lista.length > 0 && (
-          <Tabla columnas={COLUMNAS} filas={lista} claveDe={(r) => r.id}
-            detalle={(r) => abierta !== r.id ? null : (
-              // Lo que antes vivía en la bitácora: cada movimiento con su hora
-              // y su guardia, desplegable desde la fila que lo resume.
-              <>
-                {movimientos === null && <Cargando><SkeletonFilas cantidad={2} columnas={4} /></Cargando>}
-                {movimientos?.length === 0 && <p className="opacity-70">Sin movimientos.</p>}
-                <ul className="flex flex-col gap-1">
-                  {movimientos?.map((m) => (
-                    <li key={m.id} className="tabular">
-                      {fechaNumerica(m.enteredAt.slice(0, 10))} {hora(m.enteredAt)}
-                      {' · '}<span className="font-semibold">{m.guestName}</span>
-                      {m.guestDoc && ` · ${m.guestDoc}`}
-                      {m.plate && ` · ${m.plate}`}
-                      {' · lo dejó pasar '}{m.guardName ?? '(sin registrar)'}
-                      {m.exitedAt
-                        ? <> · salió {hora(m.exitedAt)}</>
-                        : <> · sin salida registrada</>}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )} />
-        )}
-
-        {total > PAGE_SIZE && (
-          <nav aria-label="Paginación" className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm opacity-70 tabular">
-              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total}
-            </p>
-            <div className="flex gap-2">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                className="min-h-11 rounded border border-line px-4 text-sm font-semibold
-                  disabled:opacity-40">
-                ‹ Anterior
-              </button>
-              <span className="flex min-h-11 items-center px-2 text-sm tabular">
-                {page} de {paginas}
-              </span>
-              <button onClick={() => setPage((p) => Math.min(paginas, p + 1))} disabled={page >= paginas}
-                className="min-h-11 rounded border border-line px-4 text-sm font-semibold
-                  disabled:opacity-40">
-                Siguiente ›
-              </button>
-            </div>
-          </nav>
-        )}
+        <CampoFecha id="desde" valor={from} onCambio={(v) => { setFrom(v); setPage(1) }} className="w-40" />
+        <CampoFecha id="hasta" valor={to} onCambio={(v) => { setTo(v); setPage(1) }} className="w-40" />
+        <a href={`${apiBase}/gate/audit.xlsx?${filtros()}`}
+          className="inline-flex min-h-11 items-center rounded-md bg-marca px-4 text-sm font-semibold text-sobre-marca">
+          Exportar a Excel
+        </a>
       </div>
-    </Shell>
+
+      <Chips etiqueta="Estado" valor={estado} onCambio={(v) => { setEstado(v); setPage(1); setAbierta(null) }}
+        opciones={[
+          { valor: 'todos', etiqueta: 'Todos', contador: todos },
+          { valor: 'adentro', etiqueta: 'Adentro', contador: counts?.adentro ?? 0 },
+          { valor: 'concluida', etiqueta: 'Concluidas', contador: counts?.concluida ?? 0 },
+          { valor: 'esperando', etiqueta: 'Esperando', contador: counts?.esperando ?? 0 },
+          { valor: 'vencida', etiqueta: 'No llegaron', contador: counts?.vencida ?? 0 },
+          { valor: 'anulada', etiqueta: 'Anuladas', contador: counts?.anulada ?? 0 },
+        ]} />
+
+      {consulta.isPending ? (
+        <SkeletonFilas filas={6} />
+      ) : consulta.isError ? (
+        <ErrorConReintento onReintentar={() => consulta.refetch()} reintentando={consulta.isFetching} />
+      ) : lista.length === 0 ? (
+        <Vacio icono={Inbox} titulo="No hay invitaciones en ese rango" />
+      ) : (
+        <div className="overflow-x-auto rounded-md border border-line">
+          <table className="w-full min-w-[860px] table-fixed border-collapse text-left text-sm">
+            <thead className="bg-surface-sunk">
+              <tr className="border-b border-line">
+                <th className="w-[22%] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Invitado</th>
+                <th className="w-[12%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Unidad</th>
+                <th className="w-[14%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Fecha</th>
+                <th className="w-[12%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Estado</th>
+                <th className="w-[12%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Ingreso</th>
+                <th className="w-[12%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Salida</th>
+                <th className="w-[16%] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Guardia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map((r) => (
+                <Fragment key={r.id}>
+                  <tr className="border-b border-line">
+                    <td className="px-4 py-3 font-semibold">{r.guestName}</td>
+                    <td className="px-3 py-3 tabular">{r.unitLabel}</td>
+                    <td className="px-3 py-3 tabular">
+                      {r.validFrom === r.validTo ? fechaNumerica(r.validFrom) : `${fechaNumerica(r.validFrom)}–${fechaNumerica(r.validTo)}`}
+                    </td>
+                    <td className={`px-3 py-3 font-semibold ${ESTADO[r.status].clase}`}>{ESTADO[r.status].label}</td>
+                    <td className="px-3 py-3">
+                      {r.enteredCount === 0 ? <span className="tabular">—</span> : (
+                        <button onClick={() => desplegar(r.id)} aria-expanded={abierta === r.id}
+                          className="flex items-center gap-1 tabular underline underline-offset-4">
+                          {hora(r.enteredAt!)}{r.enteredCount > 1 && ` ×${r.enteredCount}`}
+                          <ChevronDown className={`size-3.5 transition-transform ${abierta === r.id ? 'rotate-180' : ''}`} aria-hidden />
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 tabular">{r.exitedAt ? hora(r.exitedAt) : '—'}</td>
+                    <td className="px-4 py-3">
+                      {r.guardName ?? '—'}
+                      {r.exitGuardName && r.exitGuardName !== r.guardName && (
+                        <span className="block text-xs opacity-70">salió con {r.exitGuardName}</span>
+                      )}
+                    </td>
+                  </tr>
+                  {abierta === r.id && (
+                    <tr className="border-b border-line bg-surface-sunk/60">
+                      <td colSpan={7} className="px-4 py-3">
+                        {movimientos === null ? <SkeletonFilas filas={2} /> : movimientos.length === 0 ? (
+                          <p className="text-sm text-ink-soft">Sin movimientos.</p>
+                        ) : (
+                          <ul className="flex flex-col gap-1">
+                            {movimientos.map((m) => (
+                              <li key={m.id} className="tabular text-sm">
+                                {fechaNumerica(m.enteredAt.slice(0, 10))} {hora(m.enteredAt)}
+                                {' · '}<span className="font-semibold">{m.guestName}</span>
+                                {m.guestDoc && ` · ${m.guestDoc}`}{m.plate && ` · ${m.plate}`}
+                                {' · lo dejó pasar '}{m.guardName ?? '(sin registrar)'}
+                                {m.exitedAt ? <> · salió {hora(m.exitedAt)}</> : <> · sin salida registrada</>}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {total > PAGE_SIZE && (
+        <nav aria-label="Paginación" className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-ink-soft tabular">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total}</p>
+          <div className="flex gap-2">
+            <Button variant="outline" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>‹ Anterior</Button>
+            <span className="flex min-h-11 items-center px-2 text-sm tabular">{page} de {paginas}</span>
+            <Button variant="outline" disabled={page >= paginas} onClick={() => setPage((p) => Math.min(paginas, p + 1))}>Siguiente ›</Button>
+          </div>
+        </nav>
+      )}
+    </div>
   )
 }

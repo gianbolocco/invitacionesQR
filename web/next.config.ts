@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
       { source: '/garita/auditoria', destination: '/auditoria', permanent: true },
       // "Nueva" pasó a colgar de /invitaciones. La query (Volver a invitar) se conserva sola.
       { source: '/nueva', destination: '/invitaciones/nueva', permanent: true },
+      { source: '/admin/usuarios', destination: '/admin/vecinos', permanent: true },
     ]
   },
 };

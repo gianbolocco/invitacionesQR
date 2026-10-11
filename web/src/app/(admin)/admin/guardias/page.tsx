@@ -1,180 +1,179 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { api, ApiError } from '@/lib/api'
-import { useMe } from '@/lib/session'
-import { Shell } from '@/components/shell'
-import { ESTADO, fecha, useAdminData, type Person } from '@/lib/admin'
-import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
-import { SkeletonTarjetas, Cargando, Aviso, useAviso, Confirmar } from '@/components/feedback'
+import { useState } from 'react'
+import { ShieldCheck } from 'lucide-react'
+import {
+  usePersonas, useAltaGuardia, useReactivarPersona, useDeshabilitarPersona, useCambiarContrasenaGuardia, ApiError,
+} from '@/lib/queries/admin'
+import { ESTADO, type Person } from '@/lib/admin'
+import { fechaConAnio } from '@/lib/fechas'
+import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
+import { SheetAlta } from '@/components/admin/sheet-alta'
+import { MenuFila, type AccionFila } from '@/components/admin/menu-fila'
+import { Fila } from '@/components/dominio/fila'
+import { Vacio } from '@/components/dominio/vacio'
+import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
+import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
+import { Campo } from '@/components/dominio/campo'
+import { Nota } from '@/components/dominio/nota'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 
-export default function GuardiasPage() {
-  const me = useMe()
-  const { people, cargar } = useAdminData()
+function AltaGuardia({ abierto, onAbiertoChange }: { abierto: boolean; onAbiertoChange: (v: boolean) => void }) {
+  const alta = useAltaGuardia()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [aviso, setAviso] = useAviso()
-  const [porDarDeBaja, setPorDarDeBaja] = useState<Person | null>(null)
-  const [reseteando, setReseteando] = useState<Person | null>(null)
-  const [nuevaClave, setNuevaClave] = useState('')
 
-  useEffect(() => { if (me) cargar() }, [me]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Mismo motivo que en AltaVecino: limpiar al cerrar por cualquier
+  // camino, no solo al mandarlo.
+  function cambiarAbierto(v: boolean) {
+    if (!v) { setName(''); setEmail(''); setPassword(''); setError(null) }
+    onAbiertoChange(v)
+  }
 
-  async function alta(e: React.FormEvent) {
+  async function enviar(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setAviso(null)
-    if (password.length < 10) {
-      setError('La contraseña necesita al menos 10 caracteres.')
-      return
-    }
+    if (password.length < 10) { setError('La contraseña necesita al menos 10 caracteres.'); return }
     try {
-      const creado = await api<{ id: string }>('/admin/people', {
-        method: 'POST',
-        body: JSON.stringify({ email, name, role: 'guard', unitIds: [] }),
-      })
-      await api(`/admin/people/${creado.id}/password`, {
-        method: 'POST', body: JSON.stringify({ password }),
-      })
-      setAviso(`${name} ya puede entrar. Anotá la contraseña: no se puede volver a ver.`)
-      setName(''); setEmail(''); setPassword('')
-      cargar()
+      await alta.mutateAsync({ name, email, password })
+      cambiarAbierto(false)
     } catch (err) {
       setError(err instanceof ApiError && err.code === 'mail_repetido'
-        ? `${email} ya está en el padrón. Buscalo en la lista de abajo.`
+        ? `${email} ya está en el padrón. Buscalo en la lista.`
         : 'No se pudo crear. Revisá el mail y probá de nuevo.')
     }
   }
 
-  async function resetear(e: React.FormEvent) {
+  return (
+    <SheetAlta etiqueta="Dar de alta" titulo="Dar de alta un guardia"
+      descripcion="Cada guardia entra con su propio usuario: los ingresos que registra quedan a su nombre."
+      abierto={abierto} onAbiertoChange={cambiarAbierto}>
+      <form onSubmit={enviar} className="flex flex-col gap-4">
+        <Campo id="nombre-g" etiqueta="Nombre y apellido">
+          <Input id="nombre-g" required placeholder="Carlos Ruiz" value={name} onChange={(e) => setName(e.target.value)} />
+        </Campo>
+        <Campo id="mail-g" etiqueta="Usuario (mail)" ayuda="Identifica la cuenta. No hace falta que reciba mails.">
+          <Input id="mail-g" type="email" required placeholder="carlos@mail.com" value={email}
+            onChange={(e) => setEmail(e.target.value)} />
+        </Campo>
+        <Campo id="pass-g" etiqueta="Contraseña" ayuda="Mínimo 10 caracteres. Se la das vos en mano.">
+          <Input id="pass-g" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Campo>
+        {error && <Nota tono="error">{error}</Nota>}
+        <Button type="submit" disabled={alta.isPending}>{alta.isPending ? 'Creando…' : 'Dar de alta'}</Button>
+      </form>
+    </SheetAlta>
+  )
+}
+
+function DialogContrasena({ persona, onCerrar }: { persona: Person | null; onCerrar: () => void }) {
+  const cambiar = useCambiarContrasenaGuardia()
+  const [password, setPassword] = useState('')
+
+  async function enviar(e: React.FormEvent) {
     e.preventDefault()
-    if (!reseteando || nuevaClave.length < 10) return
-    await api(`/admin/people/${reseteando.id}/password`, {
-      method: 'POST', body: JSON.stringify({ password: nuevaClave }),
-    })
-    setAviso(`Contraseña de ${reseteando.name} cambiada. Si estaba adentro, quedó deslogueado.`)
-    setReseteando(null)
-    setNuevaClave('')
-    cargar()
+    if (!persona || password.length < 10) return
+    await cambiar.mutateAsync({ personId: persona.id, password })
+    setPassword('')
+    onCerrar()
   }
-
-  async function reactivar(g: Person) {
-    await api(`/admin/people/${g.id}/enable`, { method: 'POST' })
-    setAviso(`${g.name} vuelve a poder entrar.`)
-    cargar()
-  }
-
-  async function deshabilitar(g: Person) {
-    setPorDarDeBaja(null)
-    await api(`/admin/people/${g.id}/disable`, { method: 'POST' })
-    setAviso(`${g.name} quedó dado de baja.`)
-    cargar()
-  }
-
-  if (!me) return <main className="p-6 text-ink-soft">Cargando…</main>
-
-  const guardias = (people ?? []).filter((p) => p.role === 'guard')
 
   return (
-    <Shell me={me}>
+    <Dialog open={persona !== null} onOpenChange={(v) => { if (!v) { setPassword(''); onCerrar() } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Cambiar la contraseña de {persona?.name}</DialogTitle>
+          <DialogDescription>
+            Si {persona?.name} está usando la garita ahora, la contraseña nueva lo deja afuera en el acto.
+          </DialogDescription>
+        </DialogHeader>
+        <form id="form-contrasena" onSubmit={enviar}>
+          <Campo id="nueva-clave" etiqueta="Contraseña nueva">
+            <Input id="nueva-clave" type="password" autoFocus required value={password}
+              onChange={(e) => setPassword(e.target.value)} />
+          </Campo>
+        </form>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCerrar}>Cancelar</Button>
+          <Button type="submit" form="form-contrasena" disabled={cambiar.isPending || password.length < 10}>
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DialogBaja({ persona, onCerrar }: { persona: Person | null; onCerrar: () => void }) {
+  const deshabilitar = useDeshabilitarPersona()
+  return (
+    <Dialog open={persona !== null} onOpenChange={(v) => { if (!v) onCerrar() }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>¿Dar de baja a {persona?.name}?</DialogTitle>
+          <DialogDescription>No va a poder entrar a la garita. Los ingresos que ya registró quedan igual.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCerrar}>Cancelar</Button>
+          <Button variant="destructive" disabled={deshabilitar.isPending}
+            onClick={async () => { if (persona) await deshabilitar.mutateAsync(persona); onCerrar() }}>
+            Dar de baja
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export default function GuardiasPage() {
+  const personas = usePersonas()
+  const reactivar = useReactivarPersona()
+  const [altaAbierta, setAltaAbierta] = useState(false)
+  const [reseteando, setReseteando] = useState<Person | null>(null)
+  const [porDarDeBaja, setPorDarDeBaja] = useState<Person | null>(null)
+
+  const guardias = (personas.data ?? []).filter((p) => p.role === 'guard')
+
+  function accionesDe(g: Person): AccionFila[] {
+    const acciones: AccionFila[] = [{ etiqueta: 'Cambiar contraseña', onClick: () => setReseteando(g) }]
+    if (g.status === 'disabled') acciones.push({ etiqueta: 'Reactivar', onClick: () => reactivar.mutate(g) })
+    else acciones.push({ etiqueta: 'Dar de baja', destructiva: true, onClick: () => setPorDarDeBaja(g) })
+    return acciones
+  }
+
+  return (
+    <>
       <div className="flex flex-col gap-6">
-        <div>
-          <h1 className="display text-2xl">Guardias</h1>
-          <p className="mt-1 text-ink-soft">
-            Cada guardia entra con su propio usuario. Los ingresos que registra quedan a su
-            nombre, así que la contraseña no se comparte entre turnos.
-          </p>
-        </div>
+        <EncabezadoPagina titulo="Guardias"
+          subtitulo="Cada guardia entra con su propio usuario. La contraseña no se comparte entre turnos."
+          acciones={<AltaGuardia abierto={altaAbierta} onAbiertoChange={setAltaAbierta} />} />
 
-        <Filete className="bg-card p-5">
-          <Eyebrow>Dar de alta un guardia</Eyebrow>
-          <form onSubmit={alta} className="mt-4 flex flex-col gap-4">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Nombre y apellido" required value={name} placeholder="Carlos Ruiz"
-                onChange={(e) => setName(e.target.value)} />
-              <Field label="Usuario (mail)" type="email" required value={email}
-                placeholder="carlos@mail.com"
-                hint="Identifica la cuenta. No hace falta que reciba mails."
-                onChange={(e) => setEmail(e.target.value)} />
-              <Field label="Contraseña" type="password" required value={password}
-                hint="Mínimo 10 caracteres. Se la das vos en mano."
-                onChange={(e) => setPassword(e.target.value)} />
-            </div>
-            {error && <ErrorNote>{error}</ErrorNote>}
-            {aviso && <Aviso>{aviso}</Aviso>}
-            <Button type="submit" className="self-start">Dar de alta</Button>
-          </form>
-        </Filete>
-
-        {people === null && <Cargando><SkeletonTarjetas cantidad={2} /></Cargando>}
-        {people !== null && guardias.length === 0 && (
-          <Filete className="bg-card px-5 py-8 text-center">
-            <p className="text-ink-soft">
-              Todavía no hay guardias cargados.<br />
-              Sin al menos uno, nadie puede escanear en la barrera.
-            </p>
-          </Filete>
+        {personas.isPending ? (
+          <SkeletonFilas filas={3} />
+        ) : personas.isError ? (
+          <ErrorConReintento onReintentar={() => personas.refetch()} reintentando={personas.isFetching} />
+        ) : guardias.length === 0 ? (
+          <Vacio icono={ShieldCheck} titulo="Todavía no hay guardias cargados"
+            detalle="Sin al menos uno, nadie puede escanear en la barrera." />
+        ) : (
+          <div>
+            {guardias.map((g) => (
+              <Fila key={g.id} titulo={g.name}
+                meta={[ESTADO[g.status], g.lastLoginAt ? `último ingreso ${fechaConAnio(g.lastLoginAt)}` : 'nunca entró'].join(' · ')}
+                extremo={<MenuFila acciones={accionesDe(g)} />}
+                className={g.status === 'disabled' ? 'opacity-50' : undefined} />
+            ))}
+          </div>
         )}
-
-        <ul className="flex flex-col gap-2">
-          {guardias.map((g) => (
-            <li key={g.id}>
-              <Filete className={`flex flex-wrap items-center justify-between gap-3 bg-card px-4 py-3
-                ${g.status === 'disabled' ? 'opacity-50' : ''}`}>
-                <div className="min-w-0">
-                  <p className="font-semibold">{g.name}</p>
-                  <p className="truncate text-sm text-ink-soft">{g.email}</p>
-                  <p className="text-sm text-ink-soft tabular">
-                    {ESTADO[g.status]}
-                    {g.lastLoginAt ? ` · último ingreso ${fecha(g.lastLoginAt)}` : ' · nunca entró'}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="quiet" onClick={() => { setReseteando(g); setNuevaClave('') }}>
-                    Cambiar contraseña
-                  </Button>
-                  {g.status !== 'disabled' ? (
-                    <Button variant="quiet" onClick={() => setPorDarDeBaja(g)}>Dar de baja</Button>
-                  ) : (
-                    <Button variant="quiet" onClick={() => reactivar(g)}>Reactivar</Button>
-                  )}
-                </div>
-              </Filete>
-              {reseteando?.id === g.id && (
-                <form onSubmit={resetear} className="mt-2 flex flex-col gap-3">
-                  {/* Cambiar la contraseña cierra las sesiones abiertas. Si el
-                      guardia está en la barrera, se queda afuera al instante:
-                      el admin tiene que saberlo ANTES de tocar el botón. */}
-                  <p className="rounded border-l-4 border-marca/40 bg-marca/5 px-3 py-2 text-sm">
-                    Si {g.name} está usando la garita ahora, la contraseña nueva lo
-                    deja afuera en el acto y va a tener que volver a entrar.
-                  </p>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <Field label="Contraseña nueva" type="password" autoFocus value={nuevaClave}
-                      onChange={(e) => setNuevaClave(e.target.value)} />
-                  </div>
-                  <Button type="submit">Guardar</Button>
-                  <Button variant="quiet" type="button" onClick={() => setReseteando(null)}>
-                    Cancelar
-                  </Button>
-                  </div>
-                </form>
-              )}
-            </li>
-          ))}
-        </ul>
       </div>
-      {porDarDeBaja && (
-        <Confirmar
-          titulo={`¿Dar de baja a ${porDarDeBaja.name}?`}
-          detalle="No va a poder entrar a la garita. Los ingresos que ya registró quedan igual."
-          accion="Dar de baja"
-          onConfirmar={() => deshabilitar(porDarDeBaja)}
-          onCancelar={() => setPorDarDeBaja(null)}
-        />
-      )}
-    </Shell>
+
+      <DialogContrasena persona={reseteando} onCerrar={() => setReseteando(null)} />
+      <DialogBaja persona={porDarDeBaja} onCerrar={() => setPorDarDeBaja(null)} />
+    </>
   )
 }

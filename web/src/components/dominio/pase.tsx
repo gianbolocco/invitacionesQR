@@ -1,6 +1,7 @@
 'use client'
 import { QRCodeSVG } from 'qrcode.react'
 import { useMarca } from '@/lib/marca-cliente'
+import type { Marca as DatosMarca } from '@/lib/marca'
 import { cn } from '@/lib/utils'
 
 export type DatosPase = {
@@ -28,18 +29,25 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
  * El cuerpo es claro en los DOS temas a propósito: un QR sobre fondo oscuro
  * no lo lee ningún lector. Por eso usa colores fijos y no los tokens.
  */
-export function Pase({ datos, qr, apagado = false, sello, className }: {
+export function Pase({ datos, qr, apagado = false, sello, className, marcaOverride }: {
   datos: DatosPase
   qr: string
   apagado?: boolean
   sello?: string
   className?: string
+  marcaOverride?: DatosMarca
 }) {
-  const marca = useMarca()
+  const marcaReal = useMarca()
+  const marca = marcaOverride ?? marcaReal
   return (
     <article className={cn('relative w-full max-w-sm overflow-hidden rounded-xl bg-white text-[#14130f] shadow-flotante',
       apagado && 'opacity-70 grayscale', className)}>
-      <header className="flex items-center justify-between bg-marca px-5 py-4 text-sobre-marca">
+      {/* bg-marca es el token global: refleja la marca guardada, no la que
+          se está editando. La vista previa de /admin/barrio necesita ver el
+          color antes de guardar, así que con marcaOverride se fuerza por
+          estilo en vez de depender de la clase. */}
+      <header className={cn('flex items-center justify-between px-5 py-4 text-sobre-marca', !marcaOverride && 'bg-marca')}
+        style={marcaOverride ? { backgroundColor: marcaOverride.color } : undefined}>
         <div className="min-w-0">
           <p className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] opacity-80">
             {datos.barrio ?? marca.nombre}
