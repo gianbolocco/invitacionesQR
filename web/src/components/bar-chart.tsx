@@ -7,7 +7,7 @@ export type Barra = { label: string; total: number; hint?: string }
 /**
  * Barras de una sola serie. Sin librería: son 24 o 30 valores y un div por barra.
  *
- * El color de dato NO es el verde de marca (#1e6b47): ese tiene croma 0.095 y
+ * El color de dato NO es el verde de marca (el de la paleta): ese tiene croma 0.095 y
  * como relleno lee gris. Usamos el mismo tono con más saturación, validado
  * contra la superficie clara.
  */
@@ -44,7 +44,7 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
                 <span className="tabular">{b.hint ?? b.label}: {b.total}</span>
               </div>
               <div
-                className="w-full rounded-t-[4px] bg-[#0f8f52] transition-[height]
+                className="w-full rounded-t-[4px] bg-marca transition-[height]
                   group-hover:bg-marca-deep"
                 style={{ height: `${Math.max(2, (b.total / max) * 100)}%` }}
               />

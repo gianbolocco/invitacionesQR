@@ -125,7 +125,7 @@ export default function HistorialPage() {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={soloMias}
               onChange={(e) => filtrar(() => setSoloMias(e.target.checked))}
-              className="size-5 accent-[#1e6b47]" />
+              className="size-5 accent-marca" />
             Solo las mías
           </label>
         </div>
