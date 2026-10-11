@@ -190,7 +190,10 @@ export function ImportarVecinos({ onImported }: { onImported: () => void }) {
         {leyendo && <p role="status" className="mt-4 text-sm text-muted-foreground">Validando archivo…</p>}
         {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
 
-        {preview && !confirmado && (
+        {/* Una vez que empiezan a llegar resultados, la tabla de preview deja
+            paso a la de resultados: mostrar las dos a la vez confundía sobre
+            cuál reflejaba el estado real. */}
+        {preview && resultados.length === 0 && (
           <div className="mt-5 flex flex-col gap-4 border-t border-border pt-4">
             <div>
               <h2 className="font-semibold">Confirmá antes de dar las altas</h2>
@@ -231,12 +234,6 @@ export function ImportarVecinos({ onImported }: { onImported: () => void }) {
               </table>
             </div>
 
-            {importando && (
-              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
-                Importando {progreso} de {preview.summary.ready}. No cierres esta página.
-              </p>
-            )}
-
             <div className="flex flex-wrap gap-2">
               <Button type="button" disabled={importando || preview.summary.ready === 0}
                 onClick={confirmarImportacion}>
@@ -250,9 +247,19 @@ export function ImportarVecinos({ onImported }: { onImported: () => void }) {
           </div>
         )}
 
-        {confirmado && (
+        {/* Se arma apenas llega la primera tanda, no recién al terminar: si
+            una tanda de más adelante falla, lo ya importado queda visible en
+            vez de perderse detrás del mensaje de error genérico. */}
+        {resultados.length > 0 && (
           <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4">
-            <h2 className="font-semibold">Importación terminada</h2>
+            <h2 className="font-semibold">
+              {importando ? 'Importando…' : confirmado ? 'Importación terminada' : 'Importación interrumpida'}
+            </h2>
+            {importando && preview && (
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                {progreso} de {preview.summary.ready}. No cierres esta página.
+              </p>
+            )}
             <div className="max-h-64 overflow-auto rounded-md border border-border">
               <table className="w-full min-w-[30rem] border-collapse text-left text-sm">
                 <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
@@ -273,6 +280,12 @@ export function ImportarVecinos({ onImported }: { onImported: () => void }) {
             <p className="text-xs text-muted-foreground">
               Si un correo falló, el vecino ya quedó en el padrón y podés usar Reenviar desde su ficha.
             </p>
+            {!importando && (
+              <Button type="button" variant="quiet" className="self-start"
+                onClick={() => { setPreview(null); setResultados([]); setError(null); setConfirmado(false) }}>
+                {confirmado ? 'Importar otro archivo' : 'Cerrar'}
+              </Button>
+            )}
           </div>
         )}
           </div>
