@@ -124,6 +124,10 @@ la cubren y rehacer la app nunca toca los datos. Ver el encabezado de
    `DOMINIO`, `RESEND_API_KEY`, `MAIL_FROM`, `BARRIO_NOMBRE`, `ADMIN_EMAIL`.
 5. Asignar el dominio al servicio `caddy` y desplegar.
 
+Para probar cambios antes de producción, usá una segunda aplicación Coolify con
+la rama `qa` y una base de datos de pruebas separada. El webhook despliega solo
+la rama configurada en cada aplicación; `main` queda como la versión estable.
+
 ### Backup
 
 Todo el estado vive en la base, el logo incluido. En Coolify lo cubre el
