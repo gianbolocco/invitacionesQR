@@ -3,10 +3,10 @@ import request from 'supertest'
 import { eq } from 'drizzle-orm'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
-import { neighborhoods, units, people, unitMembers, invitations } from '../src/db/schema.js'
+import { neighborhoods, units, people, unitMembers, invitations, entryLogs, authTokens } from '../src/db/schema.js'
 import { hashPassword, randomToken } from '../src/lib/crypto.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
-import { registerEntry } from '../src/services/entries.js'
+import { registerEntry, registerExit } from '../src/services/entries.js'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
 
@@ -34,7 +34,7 @@ async function scenario() {
   }).returning()
 
   const login = await request(app).post('/auth/login').send({ email: 'admin@example.com', password: PASS })
-  return { cookie: login.headers['set-cookie'], inv, admin, vecino }
+  return { cookie: login.headers['set-cookie'], inv, admin, vecino, n }
 }
 
 describe('reportes', () => {
@@ -70,10 +70,59 @@ describe('reportes', () => {
     expect(res.body[0]).toMatchObject({ name: 'Martín', total: 1 })
   })
 
-  
-  
-  
-  
+  it('cuenta quién está adentro ahora y quién hace más de 12 horas', async () => {
+    const { cookie, inv, admin } = await scenario()
+    const entrada = await registerEntry(inv.id, admin.id, { guestName: 'Juan Pérez' })
+
+    let res = await request(app).get('/reports/kpis').set('Cookie', cookie)
+    expect(res.body.insideNow).toBe(1)
+    expect(res.body.staleInside).toBe(0)
+
+    await db.update(entryLogs).set({ enteredAt: new Date(Date.now() - 13 * 60 * 60 * 1000) })
+      .where(eq(entryLogs.id, entrada.id))
+    res = await request(app).get('/reports/kpis').set('Cookie', cookie)
+    expect(res.body.insideNow).toBe(1)
+    expect(res.body.staleInside).toBe(1)
+
+    await registerExit(inv.id, admin.id)
+    res = await request(app).get('/reports/kpis').set('Cookie', cookie)
+    expect(res.body.insideNow).toBe(0)
+    expect(res.body.staleInside).toBe(0)
+  })
+
+  it('cuenta los ingresos del mismo día, la semana pasada', async () => {
+    const { cookie, inv, admin } = await scenario()
+    const entrada = await registerEntry(inv.id, admin.id, { guestName: 'Juan Pérez' })
+    await db.update(entryLogs).set({ enteredAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) })
+      .where(eq(entryLogs.id, entrada.id))
+
+    const res = await request(app).get('/reports/kpis').set('Cookie', cookie)
+    expect(res.body.entriesSameDayLastWeek).toBe(1)
+    expect(res.body.entriesToday).toBe(0)
+  })
+
+  it('cuenta a los invitados cuyo alta venció sin que entraran nunca', async () => {
+    const { cookie, n } = await scenario()
+    const [invitado] = await db.insert(people).values({
+      neighborhoodId: n.id, email: 'nuevo@example.com', name: 'Nuevo', role: 'resident', status: 'invited',
+    }).returning()
+    await db.insert(authTokens).values({
+      personId: invitado.id, tokenHash: 'vencido-1', purpose: 'invite',
+      expiresAt: new Date(Date.now() - 1000),
+    })
+
+    let res = await request(app).get('/reports/kpis').set('Cookie', cookie)
+    expect(res.body.invitedNeverLoggedIn).toBe(1)
+
+    // Si lo reinvitan con un link fresco, deja de contar hasta que ese venza.
+    await db.insert(authTokens).values({
+      personId: invitado.id, tokenHash: 'fresco-1', purpose: 'invite',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    })
+    res = await request(app).get('/reports/kpis').set('Cookie', cookie)
+    expect(res.body.invitedNeverLoggedIn).toBe(0)
+  })
+
   it('un vecino no puede ver los reportes', async () => {
     await scenario()
     await db.update(people).set({ passwordHash: await hashPassword(PASS) })
