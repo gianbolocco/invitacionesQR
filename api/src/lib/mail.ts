@@ -11,5 +11,10 @@ export async function sendMail(to: string, subject: string, body: string): Promi
     console.log(`\n-- MAIL a ${to} --\n${subject}\n${body}\n--\n`)
     return
   }
-  await resend.emails.send({ from, to, subject, html: body })
+  const { data, error } = await resend.emails.send({ from, to, subject, html: body })
+  if (error) {
+    console.error(`Resend rechazó el mail a ${to}:`, error)
+    throw new Error(`Resend rechazó el mail: ${error.message}`)
+  }
+  console.log(`Resend aceptó el mail a ${to} (${data.id})`)
 }
