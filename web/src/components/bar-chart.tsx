@@ -1,14 +1,11 @@
 'use client'
 import { useState } from 'react'
-import { Eyebrow } from './ui'
 
 export type Barra = { label: string; total: number; hint?: string }
 
 /**
  * Barras de una sola serie. Sin librería: son 24 o 30 valores y un div por barra.
- *
  * Las barras usan el color de marca (bg-marca), así el gráfico sigue a cada barrio.
- * La fase 4 reemplaza este gráfico.
  */
 export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: {
   title: string
@@ -22,7 +19,7 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
   return (
     <figure className="m-0 flex flex-col gap-3">
       <figcaption className="flex items-baseline justify-between">
-        <Eyebrow>{title}</Eyebrow>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">{title}</p>
         <button onClick={() => setTabla((v) => !v)}
           className="text-xs text-marca underline underline-offset-4">
           {tabla ? 'Ver gráfico' : 'Ver tabla'}
@@ -67,8 +64,8 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line">
-              <th className="py-1"><Eyebrow>Tramo</Eyebrow></th>
-              <th className="py-1"><Eyebrow>Ingresos</Eyebrow></th>
+              <th className="py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Tramo</th>
+              <th className="py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Ingresos</th>
             </tr>
           </thead>
           <tbody>
