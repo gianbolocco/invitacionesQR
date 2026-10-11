@@ -4,8 +4,8 @@ import { useRouter } from 'next/navigation'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useMe } from '@/lib/session'
 import { ApiError } from '@/lib/api'
-import { porToken, type Resultado } from '@/lib/gate'
-import { Verdict } from '@/components/verdict'
+import { porToken } from '@/lib/gate'
+import { usePrecargarVeredicto } from '@/lib/queries/garita'
 
 function tokenDelQr(texto: string): string | null {
   try {
@@ -28,7 +28,7 @@ function mensajeDeError(error: unknown): string {
 export default function EscanearPage() {
   const me = useMe()
   const router = useRouter()
-  const [resultado, setResultado] = useState<Resultado | null>(null)
+  const precargarVeredicto = usePrecargarVeredicto()
   const [estado, setEstado] = useState<'abriendo' | 'listo' | 'sin_camara'>('abriendo')
   const [error, setError] = useState<string | null>(null)
   const [validando, setValidando] = useState(false)
@@ -37,7 +37,7 @@ export default function EscanearPage() {
   const procesando = useRef(false)
 
   useEffect(() => {
-    if (!me || resultado) return
+    if (!me) return
     const scanner = new Html5Qrcode('reader', { verbose: false })
     let vivo = true
 
@@ -70,11 +70,16 @@ export default function EscanearPage() {
 
         try {
           const r = await porToken(token)
-          if (vivo) setResultado(r)
+          if (vivo) {
+            precargarVeredicto(r.invitation.id, r)
+            router.push(`/garita/invitacion/${r.invitation.id}`)
+          }
         } catch (e) {
-          if (vivo) setError(mensajeDeError(e))
+          if (vivo) {
+            setError(mensajeDeError(e))
+            setValidando(false)
+          }
         } finally {
-          if (vivo) setValidando(false)
           procesando.current = false
         }
       },
@@ -87,26 +92,15 @@ export default function EscanearPage() {
       vivo = false
       scanner.stop().catch(() => {})
     }
-  }, [me, resultado])
+  }, [me, router, precargarVeredicto])
 
   const salir = useCallback(() => router.push('/garita'), [router])
-  const siguiente = useCallback(() => {
-    ultimoQr.current = null
-    // El efecto vuelve a abrir la cámara al limpiarse el resultado.
-    setEstado('abriendo')
-    setError(null)
-    setResultado(null)
-  }, [])
   const reintentar = useCallback(() => {
     ultimoQr.current = null
     setError(null)
   }, [])
 
   if (!me) return <main className="p-6">Cargando…</main>
-
-  if (resultado) {
-    return <Verdict resultado={resultado} onSalir={siguiente} />
-  }
 
   const camaraLista = estado === 'listo'
 
