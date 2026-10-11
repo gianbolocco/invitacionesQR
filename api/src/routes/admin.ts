@@ -34,8 +34,13 @@ adminRoutes.post('/people', async (req, res) => {
     email: z.string().email(),
     name: z.string().min(1),
     role: z.enum(['resident', 'guard', 'admin']),
-    // Sin unitIds: el lote lo declara el vecino al entrar.
+    lot: z.coerce.number().int().min(1).max(99999).optional(),
+    // Si el admin no lo asigna, el vecino lo declara al aceptar la invitación.
   }).parse(req.body)
+
+  if (body.lot !== undefined && body.role !== 'resident') {
+    throw new AppError(400, 'lote_solo_vecino')
+  }
 
   const { person, mailEnviado } = await createPerson({
     ...body,

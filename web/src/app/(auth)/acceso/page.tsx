@@ -24,6 +24,7 @@ function Acceso() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [lot, setLot] = useState('')
+  const [lotAsignado, setLotAsignado] = useState<string | null>(null)
   const [needsLot, setNeedsLot] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -32,12 +33,13 @@ function Acceso() {
   // consume nada y la invitación sigue sirviendo.
   useEffect(() => {
     if (!token) return
-    api<{ name: string }>(`/auth/invite/${token}`)
-      .then((r) => setName(r.name))
+    api<{ name: string; needsLot: boolean; lot: string | null }>(`/auth/invite/${token}`)
+      .then((r) => {
+        setName(r.name)
+        setNeedsLot(r.needsLot)
+        setLotAsignado(r.lot)
+      })
       .catch(() => setFallo(true))
-    api<{ needsLot: boolean }>(`/auth/invite/${token}/needs-lot`)
-      .then((r) => setNeedsLot(r.needsLot))
-      .catch(() => {})
   }, [token])
 
   async function submit(e: React.FormEvent) {
@@ -88,15 +90,22 @@ function Acceso() {
         <p className="mt-1 text-sm text-ink-soft">
           {needsLot
             ? 'Decinos tu lote y elegí una contraseña. Con eso ya podés invitar.'
-            : 'Elegí una contraseña y ya podés gestionar las visitas de tu casa.'}
+            : lotAsignado
+              ? `La administración asignó el Lote ${lotAsignado}. Elegí una contraseña para entrar.`
+              : 'Elegí una contraseña y ya podés gestionar las visitas de tu casa.'}
         </p>
       </div>
       <form onSubmit={submit} className="flex flex-col gap-5">
-        {needsLot && (
-          <Campo id="lote" etiqueta="Número de lote" ayuda="Solo el número. Después solo la administración puede cambiarlo.">
-            <Input id="lote" required value={lot} inputMode="numeric" pattern="[0-9]*" placeholder="142"
-              className="tabular" aria-describedby="lote-nota"
-              onChange={(e) => setLot(e.target.value.replace(/\D/g, ''))} />
+        {(needsLot || lotAsignado !== null) && (
+          <Campo id="lote" etiqueta="Número de lote"
+            ayuda={needsLot
+              ? 'Solo el número. Después solo la administración puede cambiarlo.'
+              : 'Asignado por la administración. Solo ella puede cambiarlo.'}>
+            <Input id="lote" required={needsLot} disabled={!needsLot}
+              value={needsLot ? lot : lotAsignado ?? ''} inputMode="numeric" pattern="[0-9]*" placeholder="142"
+              className={`tabular ${!needsLot ? 'bg-muted text-muted-foreground' : ''}`}
+              aria-describedby="lote-nota" aria-readonly={!needsLot || undefined}
+              onChange={needsLot ? (e) => setLot(e.target.value.replace(/\D/g, '')) : undefined} />
           </Campo>
         )}
         <Campo id="clave" etiqueta="Contraseña">

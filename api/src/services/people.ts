@@ -7,6 +7,7 @@ import { sendMail } from '../lib/mail.js'
 import { revokeAllSessions } from './sessions.js'
 import { AppError } from '../lib/errors.js'
 import { todayInBuenosAires } from '../lib/dates.js'
+import { findOrCreateLot } from './units.js'
 
 const INVITE_DAYS = 7
 
@@ -26,6 +27,7 @@ export type CreatePersonInput = {
   name: string
   role: 'resident' | 'guard' | 'admin'
   unitIds: string[]
+  lot?: number
   actorId: string | null
 }
 
@@ -46,13 +48,21 @@ export async function createPerson(input: CreatePersonInput) {
     throw err
   })
 
-  if (input.unitIds.length) {
-    await db.insert(unitMembers).values(input.unitIds.map((unitId) => ({ unitId, personId: person.id })))
+  const unitIds = [...input.unitIds]
+  if (input.role === 'resident' && input.lot !== undefined) {
+    const unit = await findOrCreateLot(input.neighborhoodId, input.lot)
+    unitIds.push(unit.id)
+  }
+  if (unitIds.length) {
+    await db.insert(unitMembers).values([...new Set(unitIds)].map((unitId) => ({ unitId, personId: person.id })))
   }
 
   const inviteToken = await issueInviteToken(person.id)
 
-  await audit(input.actorId, input.neighborhoodId, 'person.created', 'person', person.id, { role: input.role })
+  await audit(input.actorId, input.neighborhoodId, 'person.created', 'person', person.id, {
+    role: input.role,
+    ...(input.lot === undefined ? {} : { lot: input.lot }),
+  })
 
   /*
    * El mail va al final y su falla no deshace el alta: la persona ya existe, y

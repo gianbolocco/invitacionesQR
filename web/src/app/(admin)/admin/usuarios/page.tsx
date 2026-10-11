@@ -12,6 +12,7 @@ export default function UsuariosPage() {
   const { people, cargar } = useAdminData()
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
+  const [lot, setLot] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useAviso()
   const [porDarDeBaja, setPorDarDeBaja] = useState<Person | null>(null)
@@ -25,15 +26,18 @@ export default function UsuariosPage() {
     setError(null)
     setAviso(null)
     try {
-      // Sin unidad: el lote lo declara el vecino cuando abre el link.
       const { mailEnviado } = await api<{ mailEnviado: boolean }>('/admin/people', {
         method: 'POST',
-        body: JSON.stringify({ email, name, role: 'resident' }),
+        body: JSON.stringify({ email, name, role: 'resident', lot: lot ? Number(lot) : undefined }),
       })
       // El alta quedó hecha igual: si el mail no salió, se reenvía desde la lista.
-      if (mailEnviado) setAviso(`Le mandamos la invitación a ${email}. Él carga su lote al entrar.`)
+      if (mailEnviado) {
+        setAviso(lot
+          ? `Le mandamos la invitación a ${email}. El Lote ${lot} ya está asignado.`
+          : `Le mandamos la invitación a ${email}. Él carga su lote al entrar.`)
+      }
       else setError(`Dimos de alta a ${email}, pero el mail no salió. Probá "Reenviar" en la lista.`)
-      setEmail(''); setName('')
+      setEmail(''); setName(''); setLot('')
       cargar()
     } catch (err) {
       // La API ahora distingue el caso, así que el mensaje puede afirmar en vez
@@ -91,11 +95,15 @@ export default function UsuariosPage() {
         <Filete className="bg-card p-5">
           <Eyebrow>Dar de alta un vecino</Eyebrow>
           <form onSubmit={alta} className="mt-4 flex flex-col gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="Nombre" required value={name} onChange={(e) => setName(e.target.value)} />
               <Field label="Mail" type="email" required value={email}
-                hint="Le llega un link para entrar, cargar su lote y crear su contraseña."
+                hint="Le llega un link para activar su cuenta."
                 onChange={(e) => setEmail(e.target.value)} />
+              <Field label="Lote (opcional)" value={lot} maxLength={5} className="tabular"
+                inputMode="numeric" pattern="[0-9]*" placeholder="142"
+                hint="Si lo dejás vacío, lo completa al entrar."
+                onChange={(e) => setLot(e.target.value.replace(/\D/g, ''))} />
             </div>
             {error && <ErrorNote>{error}</ErrorNote>}
             {aviso && <Aviso>{aviso}</Aviso>}

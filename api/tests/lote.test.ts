@@ -76,6 +76,41 @@ describe('el vecino declara su lote al entrar', () => {
     expect(await db.select().from(units)).toHaveLength(1)
   })
 
+  it('el alta del admin puede asignar un lote opcional al vecino', async () => {
+    const cookie = await loginAdmin()
+    const creado = await request(app).post('/admin/people').set('Cookie', cookie).send({
+      email: 'martin@example.com', name: 'Martín', role: 'resident', lot: 142,
+    }).expect(201)
+
+    const [unidad] = await unitsOfPerson(creado.body.id)
+    expect(unidad.label).toBe('Lote 142')
+  })
+
+  it('el link informa el lote asignado y no permite cambiarlo al aceptar', async () => {
+    const n = await barrio()
+    const { person, inviteToken } = await createPerson({
+      neighborhoodId: n.id, email: 'martin@example.com', name: 'Martín',
+      role: 'resident', unitIds: [], lot: 142, actorId: null,
+    })
+
+    const info = await request(app).get(`/auth/invite/${inviteToken}`).expect(200)
+    expect(info.body).toMatchObject({ needsLot: false, lot: '142' })
+
+    await request(app).post('/auth/invite')
+      .send({ token: inviteToken, password: PASS, lot: 999 }).expect(200)
+    expect((await unitsOfPerson(person.id))[0].label).toBe('Lote 142')
+  })
+
+  it('el API exige lote si el admin no lo asignó y no consume el link al rechazar', async () => {
+    const { inviteToken } = await invitar('martin@example.com')
+
+    await request(app).post('/auth/invite')
+      .send({ token: inviteToken, password: PASS }).expect(400)
+    await request(app).get(`/auth/invite/${inviteToken}`).expect(200)
+    await request(app).post('/auth/invite')
+      .send({ token: inviteToken, password: PASS, lot: 142 }).expect(200)
+  })
+
   it('el lote es numérico: un texto se rechaza', async () => {
     const { inviteToken } = await invitar('martin@example.com')
     const res = await request(app).post('/auth/invite')
@@ -102,6 +137,7 @@ describe('el vecino declara su lote al entrar', () => {
     const { inviteToken } = await invitar('martin@example.com')
     const res = await request(app).get(`/auth/invite/${inviteToken}/needs-lot`)
     expect(res.body.needsLot).toBe(true)
+    expect(res.body.lot).toBeNull()
   })
 
   it('a un guardia no se le pide lote', async () => {
@@ -112,6 +148,7 @@ describe('el vecino declara su lote al entrar', () => {
     })
     const res = await request(app).get(`/auth/invite/${inviteToken}/needs-lot`)
     expect(res.body.needsLot).toBe(false)
+    expect(res.body.lot).toBeNull()
   })
 })
 

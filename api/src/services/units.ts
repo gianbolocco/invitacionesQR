@@ -74,9 +74,16 @@ export async function setPersonLot(
   return unidad
 }
 
-/** Un vecino sin unidad asignada tiene que declarar su lote al entrar. */
-export async function personNeedsLot(personId: string): Promise<boolean> {
+/** Devuelve el lote prefijado o indica si el vecino debe declararlo al entrar. */
+export async function lotInfoForPerson(personId: string): Promise<{
+  needsLot: boolean
+  lot: string | null
+}> {
   const [person] = await db.select().from(people).where(eq(people.id, personId)).limit(1)
-  if (!person || person.role !== 'resident') return false
-  return (await unitsOfPerson(personId)).length === 0
+  if (!person || person.role !== 'resident') return { needsLot: false, lot: null }
+
+  const [unit] = await unitsOfPerson(personId)
+  if (!unit) return { needsLot: true, lot: null }
+
+  return { needsLot: false, lot: unit.label.replace(/^Lote\s+/i, '') }
 }
