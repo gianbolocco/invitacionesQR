@@ -72,9 +72,10 @@ export function Pase({ datos, qr, apagado = false, sello, className }: {
           title={`Código de acceso de ${datos.invitado}`} />
       </div>
 
+      {/* Rojo fijo: el cuerpo del pase es claro en los dos temas, y el token peligro se aclara en oscuro. */}
       {sello && (
-        <span className="absolute right-4 top-24 rotate-[-12deg] rounded-md border-[3px] border-peligro px-3 py-1
-          font-display text-xl font-extrabold uppercase tracking-wide text-peligro">
+        <span className="absolute right-4 top-24 rotate-[-12deg] rounded-md border-[3px] border-[#a3202f] px-3 py-1
+          font-display text-xl font-extrabold uppercase tracking-wide text-[#a3202f]">
           {sello}
         </span>
       )}

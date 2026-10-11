@@ -51,7 +51,10 @@ export function Kpi({ etiqueta, valor, variacion, serie, tono = 'normal' }: {
         {etiqueta}
       </p>
       <p className="titulo-display mt-1.5 text-[32px] tabular">
-        <span ref={ref}>{valor.toLocaleString('es-AR')}</span>
+        <span ref={ref} aria-label={`${etiqueta}: ${valor}`}>
+          {/* Con movimiento arranca en 0 y el efecto lo sube: así no parpadea el valor final. */}
+          {quieto ? valor.toLocaleString('es-AR') : '0'}
+        </span>
       </p>
       {variacion && (
         <p className={cn('mt-1 text-xs font-semibold', {

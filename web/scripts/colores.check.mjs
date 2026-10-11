@@ -7,9 +7,11 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const RAIZ = new URL('../src/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
+const RAIZ = fileURLToPath(new URL('../src/', import.meta.url))
 const PERMITIDOS = new Set(['app/globals.css', 'lib/marca.ts'])
+// Tiene que coincidir con PALETA en api/src/lib/marca.ts.
 // La paleta de api/src/lib/marca.ts y el verde de datos que usaba el tablero.
 const PROHIBIDOS = ['#1e6b47', '#14565c', '#1d4e89', '#3b3b7a', '#5b3a75', '#7a1f3d', '#8a3c1e', '#36454f', '#0f8f52']
 

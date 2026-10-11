@@ -25,6 +25,17 @@ function local(iso: string): Date {
   return new Date(y, m - 1, d)
 }
 
+/** 'YYYY-MM-DD' → Date local a medianoche (para el calendario). */
+export function aFecha(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+/** Date local → 'YYYY-MM-DD' con los campos locales, no UTC. */
+export function aISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** "14 sept": corto, para filas y tarjetas. */
 export function fechaCorta(iso: string): string {
   return new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' })

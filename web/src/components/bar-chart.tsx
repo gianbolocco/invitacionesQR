@@ -7,9 +7,8 @@ export type Barra = { label: string; total: number; hint?: string }
 /**
  * Barras de una sola serie. Sin librería: son 24 o 30 valores y un div por barra.
  *
- * El color de dato NO es el verde de marca (el de la paleta): ese tiene croma 0.095 y
- * como relleno lee gris. Usamos el mismo tono con más saturación, validado
- * contra la superficie clara.
+ * Las barras usan el color de marca (bg-marca), así el gráfico sigue a cada barrio.
+ * La fase 4 reemplaza este gráfico.
  */
 export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: {
   title: string

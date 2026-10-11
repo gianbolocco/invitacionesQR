@@ -22,7 +22,6 @@ test('el guardia entra a la garita y la home lo devuelve ahí', async ({ page })
 
 test('el admin llega al tablero y a la auditoría', async ({ page }) => {
   await entrar(page, 'admin')
-  await expect(page).toHaveURL(/\/$/) // esperar a que termine el login antes de navegar
   await page.goto('/admin')
   await expect(page).toHaveURL(/\/admin$/)
   await page.goto('/auditoria')

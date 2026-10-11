@@ -37,6 +37,8 @@ function Reset() {
       await api('/auth/reset', { method: 'POST', body: JSON.stringify({ token, password }) })
       const yo = await api<Me>('/auth/me')
       // La sesión fresca va directo al caché: el layout no refetchea ni lee un error viejo.
+      // Nada de lo cacheado en una sesión anterior sobrevive al login.
+      queryClient.clear()
       queryClient.setQueryData(claveSesion, yo)
       router.push(homeFor(yo.role))
     } catch {

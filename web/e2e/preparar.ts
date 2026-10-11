@@ -15,8 +15,8 @@ insert into unit (neighborhood_id, label)
   on conflict do nothing;
 
 insert into person (neighborhood_id, email, name, role, status, password_hash)
-  select id, v.email, v.name, v.role, 'active', '${HASH}'
-  from neighborhood, (values
+  select n.id, v.email, v.name, v.role, 'active', '${HASH}'
+  from (select id from neighborhood limit 1) n, (values
     ('e2e.admin@visitpass.test', 'Admin E2E', 'admin'),
     ('e2e.vecino@visitpass.test', 'Vecina E2E', 'resident'),
     ('e2e.guardia@visitpass.test', 'Guardia E2E', 'guard')
@@ -31,7 +31,7 @@ insert into unit_member (unit_id, person_id)
 `
 
 export default function preparar() {
-  const raiz = resolve(process.cwd(), '..') // npm run e2e corre desde web/
+  const raiz = resolve(__dirname, '..', '..') // Playwright carga este archivo como CommonJS
   execFileSync('docker', ['compose', 'exec', '-T', 'db', 'psql', '-U', 'invitaciones', '-v', 'ON_ERROR_STOP=1'], {
     cwd: raiz, input: SQL, stdio: ['pipe', 'inherit', 'inherit'],
   })

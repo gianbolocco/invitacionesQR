@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, apiBase } from './api'
 import { MARCA_DEFAULT, type Marca } from './marca'
@@ -53,7 +53,12 @@ export function AplicarMarca() {
       .forEach((m) => { m.content = marca.color })
   }, [marca.color])
 
-  useEffect(() => { document.title = marca.nombre }, [marca.nombre])
+  // generateMetadata ya fija el título inicial; solo se toca si el nombre cambia
+  // después, para no pisar los títulos propios de cada página.
+  const nombreInicial = useRef(marca.nombre)
+  useEffect(() => {
+    if (marca.nombre !== nombreInicial.current) document.title = marca.nombre
+  }, [marca.nombre])
 
   return null
 }

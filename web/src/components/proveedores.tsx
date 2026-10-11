@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MotionConfig } from 'motion/react'
 import { ApiError } from '@/lib/api'
 import { AplicarMarca, MarcaProvider } from '@/lib/marca-cliente'
@@ -8,6 +8,10 @@ import type { Marca } from '@/lib/marca'
 import { Toaster } from '@/components/ui/sonner'
 
 const SESION_VENCIDA = new Set(['no_session', 'invalid_session'])
+
+function esSesionVencida(error: unknown) {
+  return error instanceof ApiError && error.status === 401 && SESION_VENCIDA.has(error.code)
+}
 
 /*
  * Un solo cliente de datos para toda la app.
@@ -22,8 +26,17 @@ function crearCliente() {
     queryCache: new QueryCache({
       onError: (error, query) => {
         if (query.queryKey[0] === 'sesion') return
-        if (error instanceof ApiError && error.status === 401 && SESION_VENCIDA.has(error.code)) {
+        if (esSesionVencida(error)) {
           // Navegación completa a propósito: descarta toda la caché de datos.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          window.location.href = '/login'
+        }
+      },
+    }),
+    // Igual política para las acciones: guardar con la sesión vencida también sale al login.
+    mutationCache: new MutationCache({
+      onError: (error) => {
+        if (esSesionVencida(error)) {
           // eslint-disable-next-line @next/next/no-location-assign-relative-destination
           window.location.href = '/login'
         }

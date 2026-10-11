@@ -13,4 +13,6 @@ export async function entrar(page: Page, quien: keyof typeof CUENTAS) {
   await page.getByLabel('Mail').fill(CUENTAS[quien])
   await page.getByLabel('Contraseña').fill(PASS)
   await page.getByRole('button', { name: 'Entrar' }).click()
+  // Esperar a que el login termine: si no, el próximo goto lo corta a la mitad.
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'))
 }

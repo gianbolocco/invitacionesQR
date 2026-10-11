@@ -35,14 +35,20 @@ export function SeccionProtegida({ roles, children }: {
   const rolAjeno = !!sesion.data && !roles.includes(sesion.data.role)
 
   useEffect(() => {
-    if (sinSesion) router.replace('/login')
+    if (sinSesion) {
+      // Carga completa a propósito: descarta la caché del usuario anterior, que
+      // con router.replace sobreviviría y la vería quien entre después.
+      window.location.replace('/login')
+    }
     else if (rolAjeno && sesion.data) router.replace(homeFor(sesion.data.role))
   }, [sinSesion, rolAjeno, sesion.data, router])
 
   if (sinSesion || rolAjeno) return <Arranque />
   // Con sesión válida en mano, un refetch fallido no tira la página.
   if (sesion.data) return <SesionContexto.Provider value={sesion.data}>{children}</SesionContexto.Provider>
-  if (sesion.isError) {
+  // Un 401 viejo en caché mientras se vuelve a pedir no es "sin conexión":
+  // cae al arranque en vez de mostrar el error un instante.
+  if (sesion.isError && !(sesion.error instanceof ApiError && sesion.error.status === 401)) {
     return (
       <main className="grid min-h-dvh place-items-center">
         <ErrorConReintento

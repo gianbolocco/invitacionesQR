@@ -6,8 +6,7 @@ import { CalendarRange } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { Button } from '@/components/ui/button'
-import { hoyISO, sumarDias, fechaCorta } from '@/lib/fechas'
-import { aFecha, aISO } from './campo-fecha'
+import { hoyISO, sumarDias, fechaCorta, aFecha, aISO } from '@/lib/fechas'
 
 const ATAJOS = [
   { etiqueta: 'Hoy', dias: 0 },
