@@ -5,7 +5,7 @@ import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
 import { neighborhoods, units, people, authTokens } from '../src/db/schema.js'
 import { resetDb } from './helpers/db.js'
-import { createPerson } from '../src/services/people.js'
+import { createPerson, disablePerson, resendInvite } from '../src/services/people.js'
 
 const app = buildApp()
 
@@ -54,6 +54,34 @@ describe('alta por magic link', () => {
     expect(row.status).toBe('active')
     expect(row.passwordHash).not.toBeNull()
     expect(row.lastLoginAt).not.toBeNull()
+  })
+
+  it('a alguien dado de baja, un link de alta viejo no lo reactiva', async () => {
+    const { person, inviteToken } = await invitedPerson()
+    await disablePerson(person.id, person.id, person.neighborhoodId)
+
+    await request(app).get(`/auth/invite/${inviteToken}`).expect(400)
+    await request(app).post('/auth/invite')
+      .send({ token: inviteToken, password: 'una-contrasena-larga' }).expect(400)
+
+    const [row] = await db.select().from(people).where(eq(people.id, person.id))
+    expect(row.status).toBe('disabled')
+  })
+
+  it('aunque lo reactiven, el link que tenía antes de la baja ya no sirve', async () => {
+    const { person, inviteToken } = await invitedPerson()
+    await disablePerson(person.id, person.id, person.neighborhoodId)
+    await db.update(people).set({ status: 'invited' }).where(eq(people.id, person.id))
+
+    await request(app).post('/auth/invite')
+      .send({ token: inviteToken, password: 'una-contrasena-larga' }).expect(400)
+  })
+
+  it('no se le reenvía el alta a alguien dado de baja', async () => {
+    const { person } = await invitedPerson()
+    await disablePerson(person.id, person.id, person.neighborhoodId)
+    await expect(resendInvite(person.id, person.id, person.neighborhoodId))
+      .rejects.toMatchObject({ status: 409, code: 'deshabilitada' })
   })
 
   it('el token es de un solo uso', async () => {

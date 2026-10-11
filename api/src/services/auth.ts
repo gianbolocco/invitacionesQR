@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, ne } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { authTokens, people } from '../db/schema.js'
 import { sha256, randomToken } from '../lib/crypto.js'
@@ -18,6 +18,7 @@ export async function peekToken(token: string, purpose: TokenPurpose) {
       eq(authTokens.purpose, purpose),
       isNull(authTokens.usedAt),
       gt(authTokens.expiresAt, new Date()),
+      ne(people.status, 'disabled'),
     ))
     .limit(1)
   return row ?? null
@@ -26,6 +27,9 @@ export async function peekToken(token: string, purpose: TokenPurpose) {
 /**
  * Consume el token de forma atómica: el UPDATE condicional con RETURNING hace
  * que, ante dos requests simultáneos con el mismo token, solo uno reciba fila.
+ *
+ * El token de alguien deshabilitado no sirve: el alta pone la cuenta en
+ * 'active', y un link viejo le devolvía el acceso a quien el admin dio de baja.
  */
 export async function consumeToken(token: string, purpose: TokenPurpose): Promise<string> {
   const updated = await db
@@ -36,6 +40,8 @@ export async function consumeToken(token: string, purpose: TokenPurpose): Promis
       eq(authTokens.purpose, purpose),
       isNull(authTokens.usedAt),
       gt(authTokens.expiresAt, new Date()),
+      inArray(authTokens.personId,
+        db.select({ id: people.id }).from(people).where(ne(people.status, 'disabled'))),
     ))
     .returning({ personId: authTokens.personId })
 
@@ -67,10 +73,17 @@ export async function requestPasswordReset(email: string): Promise<string | null
   })
 
   const url = `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/reset?t=${token}`
-  await sendMail(person.email, 'Restablecer tu contraseña',
+  /*
+   * Sin await, a propósito. Si la respuesta esperara al mail, un mail que
+   * existe tardaría lo que tarda Resend y uno que no, nada; y si Resend falla,
+   * el que existe daría 500. Las dos cosas dicen quién está en el padrón. El
+   * error igual queda en el log: sendMail lo registra.
+   */
+  void sendMail(person.email, 'Restablecer tu contraseña',
     `<p>Hola ${person.name}, para elegir una contraseña nueva entrá acá:</p>
      <p><a href="${url}">Restablecer contraseña</a></p>
      <p>El link vence en ${RESET_MINUTES} minutos. Si no lo pediste, ignorá este mail.</p>`)
+    .catch(() => {})
 
   return token
 }

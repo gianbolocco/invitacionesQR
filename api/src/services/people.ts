@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { people, unitMembers, authTokens, units } from '../db/schema.js'
 import { randomToken, sha256, hashPassword } from '../lib/crypto.js'
@@ -52,9 +52,16 @@ export async function createPerson(input: CreatePersonInput) {
   const inviteToken = await issueInviteToken(person.id)
 
   await audit(input.actorId, input.neighborhoodId, 'person.created', 'person', person.id, { role: input.role })
-  await sendInviteMail(person.email, person.name, inviteToken)
 
-  return { person, inviteToken }
+  /*
+   * El mail va al final y su falla no deshace el alta: la persona ya existe, y
+   * tirar un 500 acá hacía que el admin reintentara y chocara con
+   * "mail_repetido" sin que nadie hubiera recibido nada. Se le avisa y reenvía.
+   */
+  const mailEnviado = await sendInviteMail(person.email, person.name, inviteToken)
+    .then(() => true, () => false)
+
+  return { person, inviteToken, mailEnviado }
 }
 
 async function issueInviteToken(personId: string): Promise<string> {
@@ -134,15 +141,25 @@ export async function listPeople(neighborhoodId: string) {
  */
 export async function disablePerson(personId: string, actorId: string, neighborhoodId: string): Promise<void> {
   await db.update(people).set({ status: 'disabled' }).where(eq(people.id, personId))
+  // Los links pendientes (alta, reset) mueren con la baja. Si se la reactiva,
+  // el admin le reenvía uno nuevo.
+  await db.update(authTokens).set({ usedAt: new Date() })
+    .where(and(eq(authTokens.personId, personId), isNull(authTokens.usedAt)))
   await audit(actorId, neighborhoodId, 'person.disabled', 'person', personId)
 }
 
 export async function resendInvite(personId: string, actorId: string, neighborhoodId: string): Promise<void> {
   const [person] = await db.select().from(people).where(eq(people.id, personId)).limit(1)
   if (!person) throw new AppError(404, 'not_found')
+  // A alguien dado de baja primero se lo reactiva: el link no puede ser la
+  // puerta trasera de la baja.
+  if (person.status === 'disabled') throw new AppError(409, 'deshabilitada')
 
   const token = await issueInviteToken(personId)
-  await sendInviteMail(person.email, person.name, token)
+  // Acá el mail ES la acción: si no salió, el admin lo tiene que saber.
+  await sendInviteMail(person.email, person.name, token).catch(() => {
+    throw new AppError(502, 'mail_no_enviado')
+  })
   await audit(actorId, neighborhoodId, 'person.reinvited', 'person', personId)
 }
 

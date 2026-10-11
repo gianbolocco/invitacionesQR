@@ -26,11 +26,13 @@ export default function UsuariosPage() {
     setAviso(null)
     try {
       // Sin unidad: el lote lo declara el vecino cuando abre el link.
-      await api('/admin/people', {
+      const { mailEnviado } = await api<{ mailEnviado: boolean }>('/admin/people', {
         method: 'POST',
         body: JSON.stringify({ email, name, role: 'resident' }),
       })
-      setAviso(`Le mandamos la invitación a ${email}. Él carga su lote al entrar.`)
+      // El alta quedó hecha igual: si el mail no salió, se reenvía desde la lista.
+      if (mailEnviado) setAviso(`Le mandamos la invitación a ${email}. Él carga su lote al entrar.`)
+      else setError(`Dimos de alta a ${email}, pero el mail no salió. Probá "Reenviar" en la lista.`)
       setEmail(''); setName('')
       cargar()
     } catch (err) {
@@ -55,8 +57,13 @@ export default function UsuariosPage() {
   }
 
   async function reenviar(p: Person) {
-    await api(`/admin/people/${p.id}/resend`, { method: 'POST' })
-    setAviso(`Reenviamos la invitación a ${p.email}.`)
+    setError(null)
+    try {
+      await api(`/admin/people/${p.id}/resend`, { method: 'POST' })
+      setAviso(`Reenviamos la invitación a ${p.email}.`)
+    } catch {
+      setError(`No pudimos mandarle el mail a ${p.email}. Probá de nuevo en un rato.`)
+    }
   }
 
   async function reactivar(p: Person) {

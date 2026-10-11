@@ -37,13 +37,13 @@ adminRoutes.post('/people', async (req, res) => {
     // Sin unitIds: el lote lo declara el vecino al entrar.
   }).parse(req.body)
 
-  const { person } = await createPerson({
+  const { person, mailEnviado } = await createPerson({
     ...body,
     unitIds: [],
     neighborhoodId: req.person!.neighborhoodId,
     actorId: req.person!.id,
   })
-  res.status(201).json({ id: person.id, email: person.email, status: person.status })
+  res.status(201).json({ id: person.id, email: person.email, status: person.status, mailEnviado })
 })
 
 adminRoutes.post('/people/:id/disable', async (req, res) => {
