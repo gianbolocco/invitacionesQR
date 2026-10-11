@@ -2,8 +2,8 @@ import { and, eq, gt, inArray, isNull, ne } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { authTokens, people } from '../db/schema.js'
 import { sha256, randomToken } from '../lib/crypto.js'
-import { sendMail } from '../lib/mail.js'
 import { AppError } from '../lib/errors.js'
+import { sendPasswordResetEmail } from './emails.js'
 
 export type TokenPurpose = 'invite' | 'reset'
 
@@ -79,10 +79,7 @@ export async function requestPasswordReset(email: string): Promise<string | null
    * el que existe daría 500. Las dos cosas dicen quién está en el padrón. El
    * error igual queda en el log: sendMail lo registra.
    */
-  void sendMail(person.email, 'Restablecer tu contraseña',
-    `<p>Hola ${person.name}, para elegir una contraseña nueva entrá acá:</p>
-     <p><a href="${url}">Restablecer contraseña</a></p>
-     <p>El link vence en ${RESET_MINUTES} minutos. Si no lo pediste, ignorá este mail.</p>`)
+  void sendPasswordResetEmail(person.email, person.name, url, RESET_MINUTES)
     .catch(() => {})
 
   return token

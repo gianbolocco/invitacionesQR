@@ -3,11 +3,11 @@ import { db } from '../db/index.js'
 import { people, unitMembers, authTokens, units, invitations } from '../db/schema.js'
 import { randomToken, sha256, hashPassword } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
-import { sendMail } from '../lib/mail.js'
 import { revokeAllSessions } from './sessions.js'
 import { AppError } from '../lib/errors.js'
 import { todayInBuenosAires } from '../lib/dates.js'
 import { findOrCreateLot } from './units.js'
+import { sendInvitationEmail } from './emails.js'
 
 const INVITE_DAYS = 7
 
@@ -88,13 +88,7 @@ async function issueInviteToken(personId: string): Promise<string> {
 
 export async function sendInviteMail(email: string, name: string, token: string): Promise<void> {
   const url = `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/acceso?t=${token}`
-  await sendMail(
-    email,
-    'Ya podés gestionar las visitas de tu casa',
-    `<p>Hola ${name}, la administración te dio de alta en el sistema de invitaciones.</p>
-     <p><a href="${url}">Entrar y crear mi contraseña</a></p>
-     <p>El link vence en ${INVITE_DAYS} días.</p>`,
-  )
+  await sendInvitationEmail(email, name, url, INVITE_DAYS)
 }
 
 /**
