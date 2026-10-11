@@ -46,6 +46,46 @@ export async function createInvitation(input: CreateInvitationInput) {
   return inv
 }
 
+/*
+ * Las columnas de una invitación tal como las ve el vecino. Las usan la home,
+ * el historial y el detalle: una sola definición para que las tres pantallas
+ * no se desfasen. Requiere el join con people, units y entry_log y el group by
+ * de abajo.
+ */
+const adentroSql = sql<boolean>`coalesce(bool_or(${entryLogs.id} is not null and ${entryLogs.exitedAt} is null), false)`
+
+const columnas = {
+  id: invitations.id,
+  kind: invitations.kind,
+  guestName: invitations.guestName,
+  guestDoc: invitations.guestDoc,
+  plate: invitations.plate,
+  validFrom: invitations.validFrom,
+  validTo: invitations.validTo,
+  weekdays: invitations.weekdays,
+  capacity: invitations.capacity,
+  token: invitations.token,
+  revokedAt: invitations.revokedAt,
+  createdAt: invitations.createdAt,
+  createdBy: invitations.createdBy,
+  creatorName: people.name,
+  unitId: invitations.unitId,
+  unitLabel: units.label,
+  usedCount: count(entryLogs.id),
+  // Hay un ingreso sin salida: la persona está en el barrio ahora.
+  adentro: adentroSql,
+  ultimoIngreso: sql<Date | null>`max(${entryLogs.enteredAt})`,
+}
+
+function consultaInvitaciones() {
+  return db.select(columnas)
+    .from(invitations)
+    .innerJoin(people, eq(people.id, invitations.createdBy))
+    .innerJoin(units, eq(units.id, invitations.unitId))
+    .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
+    .$dynamic()
+}
+
 /**
  * Las invitaciones VIGENTES de las UF indicadas, con cuántas veces se usó cada
  * una. Es lo que muestra la home del vecino; el pasado vive en el historial.
@@ -54,44 +94,24 @@ export async function createInvitation(input: CreateInvitationInput) {
  * invitaciones que la unidad tuvo en su vida —50 filas y 23 KB para mostrar 12,
  * en una base de unas semanas— y solo empeora con el tiempo.
  *
- * "Vigente" es: no anulada, todavía dentro de la ventana, y con cupo libre. El
- * día de la semana NO entra: una frecuente de lunes y miércoles sigue siendo
- * una invitación vigente un martes.
+ * "Vigente" es: no anulada, todavía dentro de la ventana, y con cupo libre O
+ * con alguien adentro ahora mismo. El día de la semana NO entra: una frecuente
+ * de lunes y miércoles sigue siendo una invitación vigente un martes.
  */
 export async function listForUnits(unitIds: string[]) {
   if (!unitIds.length) return []
   const hoy = todayInBuenosAires()
-  return db.select({
-    id: invitations.id,
-    kind: invitations.kind,
-    guestName: invitations.guestName,
-    guestDoc: invitations.guestDoc,
-    plate: invitations.plate,
-    validFrom: invitations.validFrom,
-    validTo: invitations.validTo,
-    weekdays: invitations.weekdays,
-    capacity: invitations.capacity,
-    token: invitations.token,
-    revokedAt: invitations.revokedAt,
-    createdAt: invitations.createdAt,
-    createdBy: invitations.createdBy,
-    creatorName: people.name,
-    unitId: invitations.unitId,
-    unitLabel: units.label,
-    usedCount: count(entryLogs.id),
-  })
-    .from(invitations)
-    .innerJoin(people, eq(people.id, invitations.createdBy))
-    .innerJoin(units, eq(units.id, invitations.unitId))
-    .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
+  return consultaInvitaciones()
     .where(and(
       inArray(invitations.unitId, unitIds),
       isNull(invitations.revokedAt),
       gte(invitations.validTo, hoy),
     ))
     .groupBy(invitations.id, people.name, units.label)
-    // El cupo se mide sobre el count de ingresos, así que va en HAVING.
-    .having(sql`count(${entryLogs.id}) < ${invitations.capacity}`)
+    // El cupo se mide sobre el count de ingresos, así que va en HAVING. Quien
+    // está adentro sigue en la home aunque haya agotado el cupo: es justo lo
+    // que el vecino quiere ver ("ya llegó").
+    .having(sql`count(${entryLogs.id}) < ${invitations.capacity} or ${adentroSql}`)
     .orderBy(desc(invitations.createdAt))
 }
 
@@ -150,29 +170,7 @@ export async function searchInvitations(
   )
 
   const [rows, [conteo]] = await Promise.all([
-    db.select({
-      id: invitations.id,
-      kind: invitations.kind,
-      guestName: invitations.guestName,
-      guestDoc: invitations.guestDoc,
-      plate: invitations.plate,
-      validFrom: invitations.validFrom,
-      validTo: invitations.validTo,
-      weekdays: invitations.weekdays,
-      capacity: invitations.capacity,
-      token: invitations.token,
-      revokedAt: invitations.revokedAt,
-      createdAt: invitations.createdAt,
-      createdBy: invitations.createdBy,
-      creatorName: people.name,
-      unitId: invitations.unitId,
-      unitLabel: units.label,
-      usedCount: count(entryLogs.id),
-    })
-      .from(invitations)
-      .innerJoin(people, eq(people.id, invitations.createdBy))
-      .innerJoin(units, eq(units.id, invitations.unitId))
-      .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
+    consultaInvitaciones()
       .where(donde)
       .groupBy(invitations.id, people.name, units.label)
       .orderBy(desc(invitations.createdAt))
@@ -184,6 +182,21 @@ export async function searchInvitations(
   ])
 
   return { rows, total: conteo?.n ?? 0, page, pageSize }
+}
+
+/**
+ * Una invitación, con lo mismo que muestra la lista. Cualquier estado: el
+ * detalle se abre también desde el historial (anuladas, vencidas, usadas).
+ * Solo para quien es de la unidad.
+ */
+export async function getInvitation(id: string, personId: string) {
+  const [row] = await consultaInvitaciones()
+    .where(eq(invitations.id, id))
+    .groupBy(invitations.id, people.name, units.label)
+    .limit(1)
+  if (!row) throw new AppError(404, 'not_found')
+  await assertMemberOfUnit(personId, row.unitId)
+  return row
 }
 
 export async function revokeInvitation(id: string, personId: string, neighborhoodId: string): Promise<void> {

@@ -338,7 +338,19 @@ describe('la home del vecino pide solo lo vigente', () => {
     return d.toISOString().slice(0, 10)
   }
 
-  it('deja afuera las vencidas, las anuladas y las que ya se usaron', async () => {
+  /** Un guardia logueado, para registrar ingresos y salidas. Devuelve su cookie. */
+  async function guardia() {
+    const barrio = await neighborhood()
+    await db.insert(people).values({
+      neighborhoodId: barrio.id, email: 'guardia@example.com', name: 'Guardia',
+      role: 'guard', status: 'active', passwordHash: await hashPassword(PASS),
+    }).onConflictDoNothing()
+    const g = await request(app).post('/auth/login')
+      .send({ email: 'guardia@example.com', password: PASS })
+    return g.headers['set-cookie']
+  }
+
+  it('deja afuera las vencidas, las anuladas y las que ya se usaron y salieron', async () => {
     const { cookie, unitId } = await resident('martin@example.com', 'Lote 142')
     const crear = (guestName: string, over: Record<string, unknown> = {}) =>
       request(app).post('/invitations').set('Cookie', cookie).send({
@@ -351,24 +363,38 @@ describe('la home del vecino pide solo lo vigente', () => {
     await request(app).post(`/invitations/${anulada.id}/revoke`).set('Cookie', cookie).expect(200)
     const usada = await crear('Ya entró')
 
-    // Un guardia le registra el ingreso: agota su cupo de 1.
-    const barrio = await neighborhood()
-    await db.insert(people).values({
-      neighborhoodId: barrio.id, email: 'guardia@example.com', name: 'Guardia',
-      role: 'guard', status: 'active', passwordHash: await hashPassword(PASS),
-    })
-    const g = await request(app).post('/auth/login')
-      .send({ email: 'guardia@example.com', password: PASS })
-    await request(app).post('/gate/entries').set('Cookie', g.headers['set-cookie'])
+    const g = await guardia()
+    await request(app).post('/gate/entries').set('Cookie', g)
       .send({ invitationId: usada.id, guestName: 'Ya entró' }).expect(201)
+    await request(app).post('/gate/exits').set('Cookie', g)
+      .send({ invitationId: usada.id }).expect(201)
 
     const res = await request(app).get('/invitations').set('Cookie', cookie).expect(200)
     expect(res.body.map((i: { guestName: string }) => i.guestName)).toEqual(['Vigente'])
     expect(res.body[0].id).toBe(viva.id)
+    expect(res.body[0].adentro).toBe(false)
+    expect(res.body[0].ultimoIngreso).toBeNull()
 
     // Pero el historial las sigue teniendo todas.
     const hist = await request(app).get('/invitations/historial').set('Cookie', cookie).expect(200)
     expect(hist.body.total).toBe(4)
+  })
+
+  it('quien está adentro sigue en la home aunque haya agotado el cupo', async () => {
+    const { cookie, unitId } = await resident('martin@example.com', 'Lote 142')
+    const inv = await request(app).post('/invitations').set('Cookie', cookie).send({
+      unitId, kind: 'visita', guestName: 'Adentro', validFrom: HOY, validTo: HOY, capacity: 1,
+    }).expect(201).then((r) => r.body)
+
+    const g = await guardia()
+    await request(app).post('/gate/entries').set('Cookie', g)
+      .send({ invitationId: inv.id, guestName: 'Adentro' }).expect(201)
+
+    const res = await request(app).get('/invitations').set('Cookie', cookie).expect(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].adentro).toBe(true)
+    expect(typeof res.body[0].ultimoIngreso).toBe('string')
+    expect(res.body[0].usedCount).toBe(1)
   })
 
   it('una frecuente de todo el año sigue vigente aunque haya entrado muchas veces', async () => {
@@ -380,5 +406,50 @@ describe('la home del vecino pide solo lo vigente', () => {
 
     const res = await request(app).get('/invitations').set('Cookie', cookie).expect(200)
     expect(res.body.map((i: { guestName: string }) => i.guestName)).toEqual(['Mucama'])
+  })
+})
+
+describe('detalle de una invitación', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('devuelve la invitación con sus datos de lista', async () => {
+    const { cookie, unitId } = await resident('martin@example.com', 'Lote 142')
+    const inv = await request(app).post('/invitations').set('Cookie', cookie).send({
+      unitId, kind: 'visita', guestName: 'Juan', validFrom: DIA, validTo: DIA, capacity: 1,
+    }).expect(201).then((r) => r.body)
+
+    const res = await request(app).get(`/invitations/${inv.id}`).set('Cookie', cookie).expect(200)
+    expect(res.body.guestName).toBe('Juan')
+    expect(res.body.unitLabel).toBe('Lote 142')
+    expect(res.body.creatorName).toBe('martin')
+    expect(res.body.usedCount).toBe(0)
+    expect(res.body.adentro).toBe(false)
+  })
+
+  it('también devuelve una anulada: el detalle no es solo de las vigentes', async () => {
+    const { cookie, unitId } = await resident('martin@example.com', 'Lote 142')
+    const inv = await request(app).post('/invitations').set('Cookie', cookie).send({
+      unitId, kind: 'visita', guestName: 'Juan', validFrom: DIA, validTo: DIA, capacity: 1,
+    }).expect(201).then((r) => r.body)
+    await request(app).post(`/invitations/${inv.id}/revoke`).set('Cookie', cookie).expect(200)
+
+    const res = await request(app).get(`/invitations/${inv.id}`).set('Cookie', cookie).expect(200)
+    expect(res.body.revokedAt).not.toBeNull()
+  })
+
+  it('un vecino de otra UF no la puede ver', async () => {
+    const a = await resident('martin@example.com', 'Lote 142')
+    const b = await resident('ana@example.com', 'Lote 7')
+    const inv = await request(app).post('/invitations').set('Cookie', a.cookie).send({
+      unitId: a.unitId, kind: 'visita', guestName: 'Juan', validFrom: DIA, validTo: DIA, capacity: 1,
+    }).expect(201).then((r) => r.body)
+
+    await request(app).get(`/invitations/${inv.id}`).set('Cookie', b.cookie).expect(403)
+  })
+
+  it('una que no existe da 404', async () => {
+    const { cookie } = await resident('martin@example.com', 'Lote 142')
+    await request(app).get('/invitations/00000000-0000-4000-8000-000000000000')
+      .set('Cookie', cookie).expect(404)
   })
 })

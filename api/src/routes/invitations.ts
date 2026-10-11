@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import {
   createInvitation, listForUnits, revokeInvitation, findPublicByToken,
-  fillGuestDetails, editInvitation, restoreInvitation, searchInvitations,
+  fillGuestDetails, editInvitation, restoreInvitation, searchInvitations, getInvitation,
 } from '../services/invitations.js'
 import { unitsOfPerson } from '../services/units.js'
 import { rateLimit } from '../middleware/rateLimit.js'
@@ -86,6 +86,11 @@ invitationRoutes.get('/historial', async (req, res) => {
     ...f,
     createdBy: soloMias ? req.person!.id : undefined,
   }))
+})
+
+/** El detalle de una invitación, para la pantalla del pase. */
+invitationRoutes.get('/:id', async (req, res) => {
+  res.json(await getInvitation(req.params.id, req.person!.id))
 })
 
 invitationRoutes.post('/:id/revoke', async (req, res) => {
