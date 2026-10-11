@@ -13,14 +13,18 @@ assert.equal(sumarDias('2026-10-01', -1), '2026-09-30')
 assert.equal(sumarDias('2026-12-31', 1), '2027-01-01')
 
 assert.equal(fechaCorta('2026-09-14'), '14 sept')
-assert.equal(fechaNumerica('2026-09-04'), '4/9')
+assert.equal(fechaNumerica('2026-09-04'), '04/09')
 assert.equal(hora('2026-10-11T17:02:00Z'), '14:02')
+assert.equal(hora('2026-10-11T12:05:00Z'), '09:05')
+assert.equal(hora('2026-10-11T03:00:00Z'), '00:00')
 assert.equal(fechaHora('2026-10-11T17:02:00Z'), '11/10, 14:02')
+assert.equal(fechaHora('2026-10-04T17:02:00Z'), '04/10, 14:02')
 
 assert.equal(tituloDia('2026-10-11', '2026-10-11'), 'Hoy')
 assert.equal(tituloDia('2026-10-12', '2026-10-11'), 'Mañana')
 assert.equal(tituloDia('2026-10-10', '2026-10-11'), 'Ayer')
-assert.equal(tituloDia('2026-10-14', '2026-10-11'), 'miércoles, 14 de octubre')
+// El coma depende de la versión de CLDR: se acepta con y sin él.
+assert.match(tituloDia('2026-10-14', '2026-10-11'), /^miércoles,? 14 de octubre$/)
 
 // Bug: una frecuente mostraba "0 de 999 entraron". 999 es un centinela, no
 // un cupo: para las frecuentes se cuentan ingresos.

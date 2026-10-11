@@ -31,26 +31,27 @@ export function fechaCorta(iso: string): string {
     .format(local(iso)).replace('.', '')
 }
 
-/** "04/09": para tablas, donde las columnas no tienen que bailar. */
+/** "04/09": para tablas, donde las columnas no tienen que bailar. Se arma a
+ *  mano: el relleno con cero de Intl depende de la versión de ICU. */
 export function fechaNumerica(iso: string): string {
-  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit' }).format(local(iso))
+  const [, m, d] = iso.split('-')
+  return `${d}/${m}`
 }
 
-/** "14:02" de un instante, en Buenos Aires. */
+/** "09:05" de un instante, en Buenos Aires. en-GB con h23 siempre rellena y
+ *  nunca escribe "24:05" a la medianoche. */
 export function hora(instante: string): string {
-  return new Intl.DateTimeFormat('es-AR', {
-    timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false,
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).format(new Date(instante))
 }
 
-/** "11/10, 14:02". */
+/** "04/10, 14:02". */
 export function fechaHora(instante: string): string {
-  return new Intl.DateTimeFormat('es-AR', {
-    timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(new Date(instante))
+  return `${fechaNumerica(hoyISO(new Date(instante)))}, ${hora(instante)}`
 }
 
-/** "Hoy", "Mañana", "Ayer" o "miércoles 14 de octubre". */
+/** "Hoy", "Mañana", "Ayer" o "miércoles, 14 de octubre". */
 export function tituloDia(iso: string, hoy: string = hoyISO()): string {
   if (iso === hoy) return 'Hoy'
   if (iso === sumarDias(hoy, 1)) return 'Mañana'
