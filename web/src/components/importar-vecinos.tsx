@@ -1,7 +1,11 @@
 'use client'
 import { useState } from 'react'
+import { Upload } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
-import { Button, ErrorNote, Filete, Eyebrow } from '@/components/ui'
+import { Button, ErrorNote, Eyebrow } from '@/components/ui'
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 
 type FilaPreview = {
   line: number
@@ -27,7 +31,7 @@ type ResultadoFila = {
 
 const TAMANO_MAXIMO = 1_000_000
 const TAMANO_TANDA = 20
-const PLANTILLA = '\uFEFFnombre,email,lote\r\n"Ana Pérez",ana@gmail.com,142\r\n"Juan Gómez",juan@gmail.com,\r\n'
+const PLANTILLA = '\uFEFFnombre;email;lote\r\n"Ana Pérez";ana@gmail.com;142\r\n"Juan Gómez";juan@gmail.com;\r\n'
 
 function descargarPlantilla() {
   const archivo = new Blob([PLANTILLA], { type: 'text/csv;charset=utf-8' })
@@ -54,6 +58,7 @@ function estadoResultado(row: ResultadoFila): string {
 }
 
 export function ImportarVecinos({ onImported }: { onImported: () => void }) {
+  const [open, setOpen] = useState(false)
   const [archivo, setArchivo] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
   const [resultados, setResultados] = useState<ResultadoFila[]>([])
@@ -142,120 +147,137 @@ export function ImportarVecinos({ onImported }: { onImported: () => void }) {
   }
 
   return (
-    <Filete className="bg-card p-5">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div>
-          <Eyebrow>Importación masiva</Eyebrow>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Cargá varios vecinos de una vez. El rol será vecino; el lote es opcional.
-          </p>
-        </div>
-        <Button type="button" variant="quiet" onClick={descargarPlantilla}>
-          Descargar plantilla CSV
-        </Button>
-      </div>
-
-      <label className="mt-4 flex flex-col gap-1.5 text-sm font-medium">
-        Archivo CSV
-        <input type="file" accept=".csv,text/csv" disabled={leyendo || importando}
-          onChange={seleccionarArchivo}
-          className="min-h-12 w-full rounded-md border border-input bg-card px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:font-semibold disabled:opacity-50" />
-      </label>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Columnas: <code>nombre,email,lote</code>. El lote se puede dejar vacío. Máximo 1 MB y 1000 filas.
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        El proveedor de correo puede aplicar límites diarios. Si algún envío falla, el vecino queda cargado y podés reenviar desde el padrón.
-      </p>
-
-      {leyendo && <p role="status" className="mt-4 text-sm text-muted-foreground">Validando archivo…</p>}
-      {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
-
-      {preview && !confirmado && (
-        <div className="mt-5 flex flex-col gap-4 border-t border-border pt-4">
+    <>
+      <Button type="button" variant="quiet" className="min-h-10 self-start px-3 text-sm"
+        onClick={() => setOpen(true)}>
+        <Upload aria-hidden className="mr-2 size-4" />
+        Importar desde CSV
+      </Button>
+      <Dialog open={open} onOpenChange={(next) => { if (!importando || next) setOpen(next) }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Importar vecinos desde CSV</DialogTitle>
+            <DialogDescription>
+              Subí el padrón, revisá los datos y confirmá las altas. No se envía nada antes de confirmar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div>
-            <h2 className="font-semibold">Confirmá antes de dar las altas</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{archivo} · {preview.summary.total} filas</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-            <p className="rounded-md bg-muted px-3 py-2"><strong>{preview.summary.ready}</strong> nuevas</p>
-            <p className="rounded-md bg-muted px-3 py-2"><strong>{preview.summary.duplicates}</strong> duplicadas/existentes</p>
-            <p className="rounded-md bg-muted px-3 py-2"><strong>{preview.summary.invalid}</strong> con errores</p>
-            <p className="rounded-md bg-muted px-3 py-2"><strong>{preview.summary.total}</strong> total</p>
-          </div>
-
-          <div className="max-h-80 overflow-auto rounded-md border border-border">
-            <table className="w-full min-w-[38rem] border-collapse text-left text-sm">
-              <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Fila</th>
-                  <th className="px-3 py-2">Nombre</th>
-                  <th className="px-3 py-2">Mail</th>
-                  <th className="px-3 py-2">Lote</th>
-                  <th className="px-3 py-2">Resultado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {preview.rows.map((row) => (
-                  <tr key={`${row.line}-${row.email}`} className="border-t border-border align-top">
-                    <td className="px-3 py-2 tabular-nums">{row.line}</td>
-                    <td className="px-3 py-2">{row.name || '—'}</td>
-                    <td className="px-3 py-2">{row.email || '—'}</td>
-                    <td className="px-3 py-2 tabular-nums">{row.lot ?? '—'}</td>
-                    <td className={`px-3 py-2 ${row.status === 'ready' ? 'text-foreground' : 'text-destructive'}`}>
-                      {estadoPreview(row)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {importando && (
-            <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
-              Importando {progreso} de {preview.summary.ready}. No cierres esta página.
+            <Eyebrow>Importación masiva</Eyebrow>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cargá varios vecinos de una vez. El rol será vecino; el lote es opcional.
             </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={importando || preview.summary.ready === 0}
-              onClick={confirmarImportacion}>
-              {importando ? 'Importando…' : `Confirmar e invitar ${preview.summary.ready}`}
-            </Button>
-            <Button type="button" variant="quiet" disabled={importando}
-              onClick={() => { setPreview(null); setResultados([]); setError(null); setConfirmado(false) }}>
-              Cancelar
-            </Button>
           </div>
+          <Button type="button" variant="quiet" onClick={descargarPlantilla}>
+            Descargar plantilla CSV
+          </Button>
         </div>
-      )}
 
-      {confirmado && (
-        <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4">
-          <h2 className="font-semibold">Importación terminada</h2>
-          <div className="max-h-64 overflow-auto rounded-md border border-border">
-            <table className="w-full min-w-[30rem] border-collapse text-left text-sm">
-              <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
-                <tr><th className="px-3 py-2">Fila</th><th className="px-3 py-2">Vecino</th><th className="px-3 py-2">Mail</th><th className="px-3 py-2">Estado</th></tr>
-              </thead>
-              <tbody>
-                {resultados.map((row) => (
-                  <tr key={`${row.line}-${row.email}`} className="border-t border-border">
-                    <td className="px-3 py-2 tabular-nums">{row.line}</td>
-                    <td className="px-3 py-2">{row.name}</td>
-                    <td className="px-3 py-2">{row.email}</td>
-                    <td className="px-3 py-2">{estadoResultado(row)}</td>
+        <label className="mt-4 flex flex-col gap-1.5 text-sm font-medium">
+          Archivo CSV
+          <input type="file" accept=".csv,text/csv" disabled={leyendo || importando}
+            onChange={seleccionarArchivo}
+            className="min-h-12 w-full rounded-md border border-input bg-card px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:font-semibold disabled:opacity-50" />
+        </label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Columnas: <code>nombre;email;lote</code>. El lote se puede dejar vacío. Máximo 1 MB y 1000 filas.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          El proveedor de correo puede aplicar límites diarios. Si algún envío falla, el vecino queda cargado y podés reenviar desde el padrón.
+        </p>
+
+        {leyendo && <p role="status" className="mt-4 text-sm text-muted-foreground">Validando archivo…</p>}
+        {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
+
+        {preview && !confirmado && (
+          <div className="mt-5 flex flex-col gap-4 border-t border-border pt-4">
+            <div>
+              <h2 className="font-semibold">Confirmá antes de dar las altas</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{archivo} · {preview.summary.total} filas</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+              <p className="rounded-md bg-muted px-3 py-2"><strong>{preview.summary.ready}</strong> nuevas</p>
+              <p className="rounded-md bg-muted px-3 py-2"><strong>{preview.summary.duplicates}</strong> duplicadas/existentes</p>
+              <p className="rounded-md bg-muted px-3 py-2"><strong>{preview.summary.invalid}</strong> con errores</p>
+              <p className="rounded-md bg-muted px-3 py-2"><strong>{preview.summary.total}</strong> total</p>
+            </div>
+
+            <div className="max-h-80 overflow-auto rounded-md border border-border">
+              <table className="w-full min-w-[38rem] border-collapse text-left text-sm">
+                <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Fila</th>
+                    <th className="px-3 py-2">Nombre</th>
+                    <th className="px-3 py-2">Mail</th>
+                    <th className="px-3 py-2">Lote</th>
+                    <th className="px-3 py-2">Resultado</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {preview.rows.map((row) => (
+                    <tr key={`${row.line}-${row.email}`} className="border-t border-border align-top">
+                      <td className="px-3 py-2 tabular-nums">{row.line}</td>
+                      <td className="px-3 py-2">{row.name || '—'}</td>
+                      <td className="px-3 py-2">{row.email || '—'}</td>
+                      <td className="px-3 py-2 tabular-nums">{row.lot ?? '—'}</td>
+                      <td className={`px-3 py-2 ${row.status === 'ready' ? 'text-foreground' : 'text-destructive'}`}>
+                        {estadoPreview(row)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {importando && (
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                Importando {progreso} de {preview.summary.ready}. No cierres esta página.
+              </p>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" disabled={importando || preview.summary.ready === 0}
+                onClick={confirmarImportacion}>
+                {importando ? 'Importando…' : `Confirmar e invitar ${preview.summary.ready}`}
+              </Button>
+              <Button type="button" variant="quiet" disabled={importando}
+                onClick={() => { setPreview(null); setResultados([]); setError(null); setConfirmado(false) }}>
+                Cancelar
+              </Button>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Si un correo falló, el vecino ya quedó en el padrón y podés usar Reenviar desde su ficha.
-          </p>
-        </div>
-      )}
-    </Filete>
+        )}
+
+        {confirmado && (
+          <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4">
+            <h2 className="font-semibold">Importación terminada</h2>
+            <div className="max-h-64 overflow-auto rounded-md border border-border">
+              <table className="w-full min-w-[30rem] border-collapse text-left text-sm">
+                <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
+                  <tr><th className="px-3 py-2">Fila</th><th className="px-3 py-2">Vecino</th><th className="px-3 py-2">Mail</th><th className="px-3 py-2">Estado</th></tr>
+                </thead>
+                <tbody>
+                  {resultados.map((row) => (
+                    <tr key={`${row.line}-${row.email}`} className="border-t border-border">
+                      <td className="px-3 py-2 tabular-nums">{row.line}</td>
+                      <td className="px-3 py-2">{row.name}</td>
+                      <td className="px-3 py-2">{row.email}</td>
+                      <td className="px-3 py-2">{estadoResultado(row)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Si un correo falló, el vecino ya quedó en el padrón y podés usar Reenviar desde su ficha.
+            </p>
+          </div>
+        )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
