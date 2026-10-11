@@ -64,7 +64,14 @@ export function InvitationForm({ units, defaults, invitacion, onCreated }: {
           method: 'PATCH', body: JSON.stringify(cuerpo),
         })
         : await api<Invitation>('/invitations', {
-          method: 'POST', body: JSON.stringify({ ...cuerpo, unitId, kind }),
+          method: 'POST', body: JSON.stringify({
+            ...cuerpo,
+            guestDoc: guestDoc || undefined,
+            plate: plate || undefined,
+            weekdays: esFrecuente && weekdays.length ? weekdays : undefined,
+            unitId,
+            kind,
+          }),
         })
       onCreated(inv)
     } catch {
