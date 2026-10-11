@@ -1,9 +1,12 @@
-# Invitaciones — Álamo Alto
+# VisitPass
 
-Gestión de invitaciones y control de acceso para un barrio cerrado. Reemplaza
-el "avisá a la guardia por WhatsApp": el vecino genera una invitación, el
-invitado carga sus datos desde un link y se lleva un QR, y el guardia lo escanea
-en la barrera.
+Invitaciones y control de acceso para barrios cerrados. Reemplaza el "avisá a la
+guardia por WhatsApp": el vecino genera una invitación, el invitado carga sus
+datos desde un link y se lleva un QR, y el guardia lo escanea en la barrera.
+
+**Un despliegue es un barrio.** El nombre, la dirección, el color y el logo son
+configuración de la instalación, no código. Instalar un barrio nuevo es levantar
+el stack con otras cuatro variables de entorno.
 
 ## Cómo funciona
 
@@ -40,15 +43,30 @@ docker compose up -d --build
 # api  http://localhost:8080
 ```
 
-La API corre las migraciones al arrancar. Para crear el primer admin:
-
-```bash
-docker compose exec api node dist/seed-admin.js
-```
+La API corre las migraciones y siembra el barrio al arrancar.
 
 Sin `RESEND_API_KEY` los mails no se envían: **se imprimen en el log del
 contenedor**. El alta de un vecino y el "olvidé mi contraseña" se prueban
 enteros sin cuenta de mail, copiando el link de `docker compose logs api`.
+
+### Instalar un barrio
+
+```
+BARRIO_NOMBRE=Los Aromos
+BARRIO_DIRECCION=Ruta 8 km 62, Pilar
+BARRIO_MAPA=https://maps.app.goo.gl/...
+ADMIN_EMAIL=admin@losaromos.com.ar
+ADMIN_NOMBRE=Nombre del administrador
+```
+
+Al primer arranque se crean el barrio y su admin, y el link de alta sale por el
+log del contenedor (o por mail, si hay `RESEND_API_KEY`). El admin elige su
+contraseña con ese link, igual que cualquier vecino. Si la base ya tiene un
+barrio no se hace nada: cambiar estos valores después **no renombra nada**.
+
+El color y el logo se cargan desde *Administración → Barrio*. El color sale de
+una paleta cerrada de ocho: son los que mantienen legible el texto que va
+encima, en tema claro y oscuro.
 
 ### Sin Docker
 
@@ -75,7 +93,7 @@ escáner usa `getUserMedia` y los navegadores solo dan acceso a la cámara en
 va a poder escanear nunca.
 
 ```bash
-cp .env.prod.example .env    # completar DOMINIO y DB_PASSWORD
+cp .env.prod.example .env    # completar DOMINIO, DB_PASSWORD y el barrio
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
@@ -119,7 +137,8 @@ justo cuando más gente entra al barrio.
 | [`api/src/services/entries.ts`](api/src/services/entries.ts) | Registro de ingresos, agenda del día, búsqueda y auditoría. El `FOR UPDATE` sobre la invitación es lo que serializa el cupo: sin él, dos escaneos simultáneos del mismo QR leen el mismo contador y los dos entran. |
 | [`api/src/services/invitations.ts`](api/src/services/invitations.ts) | Alta, edición, anulación y la página pública del invitado. |
 | [`web/src/components/shell.tsx`](web/src/components/shell.tsx) | El marco de las tres secciones. Qué menú va lo decide [`web/src/lib/nav.ts`](web/src/lib/nav.ts). |
-| [`web/src/app/globals.css`](web/src/app/globals.css) | Los tokens del tema. Claro y oscuro son valores de variables CSS: ningún componente sabe en qué tema está. |
+| [`web/src/app/globals.css`](web/src/app/globals.css) | Los tokens del tema. Claro y oscuro son valores de variables CSS: ningún componente sabe en qué tema está. El color del barrio entra por una sola, `--marca-base`, y el resto se deriva con `oklch(from …)`. |
+| [`api/src/lib/marca.ts`](api/src/lib/marca.ts) | La paleta de ocho y el sniffing del logo por bytes. Lo único que sabe qué colores existen. |
 
 El diseño sale del cartel de entrada del barrio: la itálica del nombre, el doble
 filete, y los veredictos distinguidos por **luminancia y no por tono**, para que
@@ -127,11 +146,6 @@ se lean en escala de grises y con daltonismo.
 
 ## Pendiente
 
-- **Aislamiento entre barrios.** Los servicios reciben el barrio de quien pide
-  pero no filtran por él. Con un solo barrio el impacto es cero. El arreglo está
-  escrito y salteado en
-  [`api/tests/aislamiento-barrios.test.ts`](api/tests/aislamiento-barrios.test.ts):
-  sacar el `.skip` y hacerlos pasar.
 - **Ley 25.326.** Falta decidir cuánto se guardan los ingresos con documento y
   patente, y el job de anonimización.
 - **Aviso al vecino** cuando su invitado llega a la barrera.

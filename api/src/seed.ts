@@ -15,15 +15,18 @@ import { createPerson } from './services/people.js'
  * log del contenedor.
  */
 export async function sembrar(): Promise<'sembrado' | 'ya_existe' | 'sin_configurar'> {
+  // La base primero y el entorno después: una instalación hecha pide "ya
+  // existe", aunque las variables ya no estén. Al revés, el barrio que se
+  // configuró a mano gritaría "sin configurar" en cada arranque y alguien iría
+  // a buscar un problema que no hay.
+  const [existente] = await db.select().from(neighborhoods).limit(1)
+  if (existente) return 'ya_existe'
+
   const nombre = process.env.BARRIO_NOMBRE?.trim()
   const email = process.env.ADMIN_EMAIL?.trim()
 
-  // Faltando cualquiera de las dos no se siembra: es el caso de una base que se
-  // configuró a mano, y adivinar sería peor.
+  // Faltando cualquiera de las dos no se siembra: adivinar sería peor.
   if (!nombre || !email) return 'sin_configurar'
-
-  const [existente] = await db.select().from(neighborhoods).limit(1)
-  if (existente) return 'ya_existe'
 
   const [barrio] = await db.insert(neighborhoods).values({
     name: nombre,

@@ -10,10 +10,9 @@ import { audit } from '../lib/audit.js'
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 /*
- * PENDIENTE: no filtra por barrio, así que checkById, checkByToken y
- * registerEntry aceptan invitaciones de cualquier barrio de la base. Un guardia
- * ajeno puede registrar un ingreso que no le corresponde. Con un solo barrio el
- * impacto es cero; ver tests/aislamiento-barrios.test.ts.
+ * Busca por id o por token y no filtra por barrio, a propósito: un despliegue
+ * es un barrio y toda invitación de la base es suya. Ver la nota larga en
+ * people.ts.
  */
 async function loadForCheck(where: SQL) {
   const [row] = await db.select({

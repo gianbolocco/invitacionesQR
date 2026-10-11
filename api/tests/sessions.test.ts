@@ -86,9 +86,8 @@ describe('cambiar la contraseña cierra todas las sesiones', () => {
     const cookie = enLaGarita.headers['set-cookie']
     await request(app).get('/auth/me').set('Cookie', cookie).expect(200)
 
-    // OJO: un segundo seedBasics() acá crea otra persona con el MISMO mail en
-    // otro barrio, y el login —que busca solo por mail— puede agarrar esa. Es
-    // el bug del login ambiguo, anotado en tests/aislamiento-barrios.test.ts.
+    // El mail es único en toda la base y no por barrio, justamente para que el
+    // login —que busca solo por mail— nunca pueda agarrar otra persona.
     await setGuardPassword(personId, NUEVA, personId, neighborhoodId)
 
     // El guardia que estaba en la barrera queda afuera.

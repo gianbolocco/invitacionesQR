@@ -124,11 +124,13 @@ export async function listPeople(neighborhoodId: string) {
 }
 
 /*
- * PENDIENTE: estas funciones reciben neighborhoodId pero solo lo usan para el
- * audit log — buscan la persona por id y nada más. Un admin de otro barrio
- * puede operar sobre cualquier cuenta de la base. Con un solo barrio el impacto
- * es cero; el arreglo está especificado en tests/aislamiento-barrios.test.ts,
- * salteado hasta que se decida si la app maneja más de un barrio.
+ * Estas funciones reciben neighborhoodId y solo lo usan para el audit log:
+ * buscan la persona por id y nada más. Es deliberado. Un despliegue es un
+ * barrio, así que hay una sola fila en `neighborhood` y toda persona pertenece
+ * a ella; filtrar por barrio no cambiaría ningún resultado.
+ *
+ * Si alguna vez varios barrios comparten una base, esto SÍ hay que filtrarlo, y
+ * lo mismo en units.ts (setPersonLot) y entries.ts (loadForCheck).
  */
 export async function disablePerson(personId: string, actorId: string, neighborhoodId: string): Promise<void> {
   await db.update(people).set({ status: 'disabled' }).where(eq(people.id, personId))

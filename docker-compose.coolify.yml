@@ -29,7 +29,7 @@
 #   POSTGRES_PASSWORD   generar al azar, p.ej. openssl rand -base64 32
 #   DOMINIO             el dominio público, sin https:// (ej: invitaciones.tudominio.com)
 #   RESEND_API_KEY      opcional. Sin esto los mails se imprimen en el log
-#   MAIL_FROM           opcional, ej: Álamo Alto <invitaciones@tudominio.com>
+#   MAIL_FROM           opcional, ej: Los Aromos <invitaciones@tudominio.com>
 #   GOOGLE_CLIENT_ID    opcional
 #   GOOGLE_CLIENT_SECRET opcional
 #

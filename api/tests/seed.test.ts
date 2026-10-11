@@ -57,6 +57,15 @@ describe('sembrar el barrio al instalar', () => {
     expect(await db.select().from(people)).toHaveLength(1)
   })
 
+  // Es el barrio que se configuró a mano, o aquel al que le sacaron las
+  // variables después de instalarlo: está sembrado, y el arranque tiene que
+  // decir eso y no "sin configurar".
+  it('con el barrio ya hecho, no mira el entorno', async () => {
+    expect(await sembrar()).toBe('sembrado')
+    configurar({ BARRIO_NOMBRE: undefined, ADMIN_EMAIL: undefined })
+    expect(await sembrar()).toBe('ya_existe')
+  })
+
   it('sin BARRIO_NOMBRE no siembra, y no revienta', async () => {
     configurar({ BARRIO_NOMBRE: undefined })
     expect(await sembrar()).toBe('sin_configurar')

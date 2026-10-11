@@ -57,9 +57,9 @@ export async function joinUnit(unitId: string, personId: string): Promise<void> 
 /**
  * El admin corrige el lote de alguien: saca los anteriores y pone este.
  *
- * PENDIENTE: no verifica que la persona sea del barrio del admin, y el delete
- * borra TODAS sus membresías, no solo las de este barrio. Ver
- * tests/aislamiento-barrios.test.ts.
+ * Borra TODAS sus membresías y no filtra por barrio, a propósito: un despliegue
+ * es un barrio y todas sus unidades son de ese barrio. Ver la nota larga en
+ * people.ts.
  */
 export async function setPersonLot(
   neighborhoodId: string,
