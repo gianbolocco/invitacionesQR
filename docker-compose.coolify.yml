@@ -120,4 +120,13 @@ services:
     environment:
       SITIO: ':80'
     depends_on: [web, api]
+    # Es el servicio que Coolify expone, así que es el que reporta el estado del
+    # recurso. Pega a /api/health A TRAVÉS de Caddy: un solo chequeo cubre el
+    # proxy, la API y la base. wget porque la imagen alpine lo trae y curl no.
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
