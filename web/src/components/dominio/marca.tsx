@@ -1,5 +1,6 @@
 'use client'
 import { logoUrl, useMarca } from '@/lib/marca-cliente'
+import type { Marca as DatosMarca } from '@/lib/marca'
 import { cn } from '@/lib/utils'
 
 /**
@@ -10,12 +11,17 @@ import { cn } from '@/lib/utils'
  * - banda: sobre la banda de color; el logo va en una pastilla blanca para
  *   que uno oscuro no desaparezca sobre el fondo.
  * - grande: arranque y pantallas de acceso.
+ *
+ * `marcaOverride` la usa la vista previa de /admin/barrio: en vez de leer
+ * la marca guardada, muestra la que se está editando, antes de guardar.
  */
-export function Marca({ variante = 'normal', className }: {
+export function Marca({ variante = 'normal', className, marcaOverride }: {
   variante?: 'normal' | 'banda' | 'grande'
   className?: string
+  marcaOverride?: DatosMarca
 }) {
-  const marca = useMarca()
+  const marcaReal = useMarca()
+  const marca = marcaOverride ?? marcaReal
   const url = logoUrl(marca)
 
   if (url) {

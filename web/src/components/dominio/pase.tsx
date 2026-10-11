@@ -1,6 +1,7 @@
 'use client'
 import { QRCodeSVG } from 'qrcode.react'
 import { useMarca } from '@/lib/marca-cliente'
+import type { Marca as DatosMarca } from '@/lib/marca'
 import { cn } from '@/lib/utils'
 
 export type DatosPase = {
@@ -28,14 +29,16 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
  * El cuerpo es claro en los DOS temas a propósito: un QR sobre fondo oscuro
  * no lo lee ningún lector. Por eso usa colores fijos y no los tokens.
  */
-export function Pase({ datos, qr, apagado = false, sello, className }: {
+export function Pase({ datos, qr, apagado = false, sello, className, marcaOverride }: {
   datos: DatosPase
   qr: string
   apagado?: boolean
   sello?: string
   className?: string
+  marcaOverride?: DatosMarca
 }) {
-  const marca = useMarca()
+  const marcaReal = useMarca()
+  const marca = marcaOverride ?? marcaReal
   return (
     <article className={cn('relative w-full max-w-sm overflow-hidden rounded-xl bg-white text-[#14130f] shadow-flotante',
       apagado && 'opacity-70 grayscale', className)}>
