@@ -21,6 +21,7 @@ function Reset() {
   const [name, setName] = useState<string | null>(null)
   const [fallo, setFallo] = useState(false)
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -35,6 +36,7 @@ function Reset() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (password.length < 10) { setError('La contraseña necesita al menos 10 caracteres.'); return }
+    if (password !== confirmPassword) { setError('Las contraseñas no coinciden.'); return }
     setBusy(true)
     setError(null)
     try {
@@ -73,6 +75,10 @@ function Reset() {
         <Campo id="clave" etiqueta="Contraseña">
           <CampoContrasena id="clave" autoComplete="new-password" medidor required
             value={password} onChange={setPassword} />
+        </Campo>
+        <Campo id="confirmar-clave" etiqueta="Confirmar contraseña">
+          <CampoContrasena id="confirmar-clave" autoComplete="new-password" required
+            value={confirmPassword} onChange={setConfirmPassword} />
         </Campo>
         {error && <Nota tono="error">{error}</Nota>}
         <Button type="submit" size="lg" disabled={busy}>
