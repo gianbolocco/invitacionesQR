@@ -1,0 +1,7 @@
+# La imagen de Caddy de esta instalación.
+#
+# Existe solo para meter el Caddyfile adentro sin montarlo con un bind del
+# repo: en Coolify el repo no vive en el host, y un bind de archivo que no
+# está lo resuelve Docker creando un directorio vacío ("not a directory").
+FROM caddy:2-alpine
+COPY Caddyfile /etc/caddy/Caddyfile

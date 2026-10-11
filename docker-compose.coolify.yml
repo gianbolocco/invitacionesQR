@@ -94,14 +94,18 @@ services:
     depends_on: [api]
 
   # El único servicio que Coolify expone al exterior.
+  #
+  # El Caddyfile va horneado en la imagen (ver Dockerfile.caddy) y no montado
+  # con un bind: en Coolify el repo no vive en el host, y Docker resuelve un
+  # bind de archivo inexistente creando un directorio vacío ("not a directory").
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
     restart: unless-stopped
     expose: ['80']
     environment:
       SITIO: ':80'
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on: [web, api]
 
 volumes:
