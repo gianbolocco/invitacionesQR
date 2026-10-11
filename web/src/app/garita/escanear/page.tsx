@@ -40,7 +40,6 @@ export default function EscanearPage() {
     if (!me || resultado) return
     const scanner = new Html5Qrcode('reader', { verbose: false })
     let vivo = true
-    setEstado('abriendo')
 
     scanner.start(
       { facingMode: 'environment' },
@@ -93,6 +92,8 @@ export default function EscanearPage() {
   const salir = useCallback(() => router.push('/garita'), [router])
   const siguiente = useCallback(() => {
     ultimoQr.current = null
+    // El efecto vuelve a abrir la cámara al limpiarse el resultado.
+    setEstado('abriendo')
     setError(null)
     setResultado(null)
   }, [])
