@@ -48,6 +48,8 @@ La API corre las migraciones y siembra el barrio al arrancar.
 Sin `RESEND_API_KEY` los mails no se envían: **se imprimen en el log del
 contenedor**. El alta de un vecino y el "olvidé mi contraseña" se prueban
 enteros sin cuenta de mail, copiando el link de `docker compose logs api`.
+Esto vale solo en desarrollo: con `NODE_ENV=production` la API no arranca sin
+`RESEND_API_KEY` y `MAIL_FROM`.
 
 ### Instalar un barrio
 

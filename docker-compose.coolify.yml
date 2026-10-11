@@ -28,8 +28,9 @@
 #
 #   POSTGRES_PASSWORD   generar al azar, p.ej. openssl rand -base64 32
 #   DOMINIO             el dominio público, sin https:// (ej: invitaciones.tudominio.com)
-#   RESEND_API_KEY      opcional. Sin esto los mails se imprimen en el log
-#   MAIL_FROM           opcional, ej: Los Aromos <invitaciones@tudominio.com>
+#   RESEND_API_KEY      obligatoria: sin ella la API no arranca (los links de
+#                       alta y reset terminarían impresos en el log)
+#   MAIL_FROM           obligatoria, ej: Los Aromos <invitaciones@tudominio.com>
 #   GOOGLE_CLIENT_ID    opcional
 #   GOOGLE_CLIENT_SECRET opcional
 #
@@ -64,8 +65,8 @@ services:
       # El redirect URI que hay que registrar en Google Cloud queda entonces:
       #   https://$DOMINIO/api/auth/google/callback
       API_ORIGIN: https://${DOMINIO}/api
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      MAIL_FROM: ${MAIL_FROM:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:?falta RESEND_API_KEY}
+      MAIL_FROM: ${MAIL_FROM:?falta MAIL_FROM}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       # El barrio de esta instalación. Se siembra al primer arranque; si la

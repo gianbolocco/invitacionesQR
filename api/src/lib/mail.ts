@@ -4,6 +4,15 @@ const key = process.env.RESEND_API_KEY
 const from = process.env.MAIL_FROM ?? 'Invitaciones <noreply@example.com>'
 const resend = key ? new Resend(key) : null
 
+/*
+ * En producción, sin Resend no se arranca. El fallback de consola imprime el
+ * mail entero, links de alta y de reset incluidos: en un server real eso deja
+ * cualquier cuenta a un `docker logs` de distancia.
+ */
+if (process.env.NODE_ENV === 'production' && (!key || !process.env.MAIL_FROM)) {
+  throw new Error('En producción hacen falta RESEND_API_KEY y MAIL_FROM')
+}
+
 /** Sin RESEND_API_KEY el mail se imprime en consola: el flujo completo se puede
  *  probar en dev sin cuenta de Resend y sin mockear nada. */
 export async function sendMail(to: string, subject: string, body: string): Promise<void> {
