@@ -1,25 +1,59 @@
 'use client'
-import { createContext, useContext } from 'react'
-import type { Marca } from './marca'
+import { createContext, useContext, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { api, apiBase } from './api'
+import { MARCA_DEFAULT, type Marca } from './marca'
 
-/**
- * La marca, bajada desde el layout a los componentes cliente.
- *
- * El layout ya la lee en el servidor, así que pasarla por contexto sale gratis:
- * sin requests extra y sin que el nombre del barrio aparezca vacío un instante
- * mientras llega. Si cada componente la pidiera por su cuenta serían tres
- * llamadas por carga de página y tres parpadeos.
+export const claveMarca = ['marca'] as const
+
+/*
+ * La marca llega ya resuelta desde el layout del servidor y entra como dato
+ * inicial de la query: la primera pintada no espera ningún request. Después,
+ * cuando el admin guarda un cambio, se invalida ['marca'] y toda la app la
+ * vuelve a leer sin recargar.
  */
-const Contexto = createContext<Marca>({
-  nombre: 'VisitPass',
-  color: '#1e6b47',
-  tieneLogo: false,
-})
+const Inicial = createContext<Marca>(MARCA_DEFAULT)
 
 export function MarcaProvider({ marca, children }: { marca: Marca; children: React.ReactNode }) {
-  return <Contexto.Provider value={marca}>{children}</Contexto.Provider>
+  return <Inicial.Provider value={marca}>{children}</Inicial.Provider>
 }
 
 export function useMarca(): Marca {
-  return useContext(Contexto)
+  const inicial = useContext(Inicial)
+  const { data } = useQuery({
+    queryKey: claveMarca,
+    queryFn: ({ signal }) => api<Marca>('/branding', { signal }),
+    initialData: inicial,
+    staleTime: 5 * 60_000,
+  })
+  return data
+}
+
+/**
+ * La URL del logo, con su versión. La respuesta se cachea una hora: sin la
+ * versión, reemplazar el logo seguía mostrando el anterior. Es el único lugar
+ * que arma esta URL.
+ */
+export function logoUrl(m: Marca): string | null {
+  return m.tieneLogo ? `${apiBase}/branding/logo?v=${m.logoVersion ?? 0}` : null
+}
+
+/**
+ * Lleva la marca al documento: el color como variable CSS (todo lo demás se
+ * deriva de ella), el color de la barra del navegador y el título. No dibuja
+ * nada.
+ */
+export function AplicarMarca() {
+  const marca = useMarca()
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--marca-base', marca.color)
+    document
+      .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"][media="(prefers-color-scheme: light)"]')
+      .forEach((m) => { m.content = marca.color })
+  }, [marca.color])
+
+  useEffect(() => { document.title = marca.nombre }, [marca.nombre])
+
+  return null
 }

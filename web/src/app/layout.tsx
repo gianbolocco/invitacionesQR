@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Bricolage_Grotesque } from 'next/font/google'
 import { SCRIPT_ANTI_PARPADEO } from '@/lib/theme'
 import { leerMarca } from '@/lib/marca'
-import { MarcaProvider } from '@/lib/marca-cliente'
+import { Proveedores } from '@/components/proveedores'
 import './globals.css'
 
 // Geist para toda la interfaz; Bricolage solo para títulos, el saludo, el
@@ -22,19 +22,28 @@ const bricolage = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-br
  */
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
-  title: 'VisitPass',
-  description: 'Invitaciones y control de acceso para barrios cerrados',
+export async function generateMetadata(): Promise<Metadata> {
+  const marca = await leerMarca()
+  return {
+    title: marca.nombre,
+    description: 'Invitaciones y control de acceso para barrios cerrados',
+    applicationName: marca.nombre,
+    appleWebApp: { capable: true, title: marca.nombre, statusBarStyle: 'default' },
+  }
 }
 
-export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#1e6b47' },
-    { media: '(prefers-color-scheme: dark)', color: '#0b1712' },
-  ],
-  width: 'device-width',
-  initialScale: 1,
-  // Sin maximumScale: el vecino tiene que poder hacer zoom.
+export async function generateViewport(): Promise<Viewport> {
+  const marca = await leerMarca()
+  return {
+    // El claro lleva el color del barrio; AplicarMarca lo actualiza en vivo.
+    themeColor: [
+      { media: '(prefers-color-scheme: light)', color: marca.color },
+      { media: '(prefers-color-scheme: dark)', color: '#12110e' },
+    ],
+    width: 'device-width',
+    initialScale: 1,
+    // Sin maximumScale: el vecino tiene que poder hacer zoom.
+  }
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -52,7 +61,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <style dangerouslySetInnerHTML={{ __html: `:root{--marca-base:${marca.color}}` }} />
       </head>
       <body>
-        <MarcaProvider marca={marca}>{children}</MarcaProvider>
+        <Proveedores marca={marca}>{children}</Proveedores>
       </body>
     </html>
   )

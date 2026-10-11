@@ -13,7 +13,6 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Toaster } from '@/components/ui/sonner'
 
 function Bloque({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
@@ -28,7 +27,6 @@ export function Kit() {
   const [on, setOn] = useState(true)
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-8 p-6">
-      <Toaster />
       <h1 className="titulo-display text-[40px]">Kit <em>VisitPass.</em></h1>
 
       <Bloque titulo="Botones">

@@ -1,7 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
+import { claveMarca, logoUrl, useMarca } from '@/lib/marca-cliente'
 import { Shell } from '@/components/shell'
 import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
 
@@ -16,11 +18,12 @@ type Barrio = {
 
 export default function BarrioPage() {
   const me = useMe()
+  const queryClient = useQueryClient()
+  const marca = useMarca()
   const [barrio, setBarrio] = useState<Barrio | null>(null)
   const [address, setAddress] = useState('')
   const [mapUrl, setMapUrl] = useState('')
   const [color, setColor] = useState<string | null>(null)
-  const [tieneLogo, setTieneLogo] = useState(false)
   const [subiendo, setSubiendo] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -33,9 +36,6 @@ export default function BarrioPage() {
       setMapUrl(b.mapUrl ?? '')
       setColor(b.brandColor)
     }).catch(() => {})
-    api<{ tieneLogo: boolean }>('/branding')
-      .then((m) => setTieneLogo(m.tieneLogo))
-      .catch(() => {})
   }, [me])
 
   async function guardar(e: React.FormEvent) {
@@ -48,7 +48,8 @@ export default function BarrioPage() {
         body: JSON.stringify({ address, mapUrl, ...(color ? { brandColor: color } : {}) }),
       })
       setBarrio(b)
-      setAviso('Guardado. Recargá la página para ver el color nuevo.')
+      await queryClient.invalidateQueries({ queryKey: claveMarca })
+      setAviso('Guardado.')
     } catch {
       setError('El link de mapas tiene que empezar con http. Copialo desde Google Maps con "Compartir".')
     }
@@ -100,11 +101,11 @@ export default function BarrioPage() {
 
         <Filete className="flex flex-col items-start gap-3 bg-card p-5">
           <Eyebrow>Logo</Eyebrow>
-          {tieneLogo ? (
+          {marca.tieneLogo ? (
             // La query evita que el navegador siga mostrando el anterior desde
             // su caché después de reemplazarlo.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={`${apiBase}/branding/logo?v=${barrio?.id ?? ''}`} alt="Logo del barrio"
+            <img src={logoUrl(marca) ?? ''} alt="Logo del barrio"
               className="h-16 w-auto max-w-[16rem] object-contain" />
           ) : (
             <p className="text-ink-soft">
@@ -130,8 +131,8 @@ export default function BarrioPage() {
                   body: file,
                 })
                 if (!res.ok) throw new Error(String(res.status))
-                setTieneLogo(true)
-                setAviso('Logo actualizado. Recargá para verlo en el encabezado.')
+                await queryClient.invalidateQueries({ queryKey: claveMarca })
+                setAviso('Logo actualizado.')
               } catch {
                 setError('No se pudo subir. Tiene que ser un PNG o un JPG de menos de 500 KB.')
               }
@@ -139,11 +140,11 @@ export default function BarrioPage() {
               e.target.value = ''
             }} />
 
-          {tieneLogo && (
+          {marca.tieneLogo && (
             <Button variant="quiet" type="button" onClick={async () => {
               await api('/admin/branding/logo', { method: 'DELETE' })
-              setTieneLogo(false)
-              setAviso('Logo quitado. Recargá para ver el nombre en su lugar.')
+              await queryClient.invalidateQueries({ queryKey: claveMarca })
+              setAviso('Logo quitado.')
             }}>
               Quitar el logo
             </Button>

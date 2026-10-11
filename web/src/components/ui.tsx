@@ -1,4 +1,6 @@
+'use client'
 import { Fragment } from 'react'
+import { logoUrl, useMarca } from '@/lib/marca-cliente'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, Ref } from 'react'
 
 /** El doble filete del cartel de entrada. Envuelve paneles y tarjetas. */
@@ -131,13 +133,14 @@ export function Wordmark({ nombre, tieneLogo = false, subtitle = 'Barrio cerrado
   tieneLogo?: boolean
   subtitle?: string
 }) {
+  const marca = useMarca()
   return (
     <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
       {tieneLogo ? (
         // Altura fija y ancho automático: un logo apaisado y uno cuadrado
         // tienen que convivir sin romper el alto del encabezado.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src="/api/branding/logo" alt={nombre}
+        <img src={logoUrl(marca) ?? ''} alt={nombre}
           className="h-8 w-auto max-w-[12rem] object-contain" />
       ) : (
         <span className="truncate font-display text-xl font-extrabold tracking-tight leading-tight text-marca sm:text-2xl">
