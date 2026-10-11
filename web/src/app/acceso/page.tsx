@@ -60,7 +60,7 @@ function Acceso() {
     return (
       <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 p-6">
       <TemaFlotante />
-        <Wordmark nombre="VisitPass" />
+        <Wordmark />
         <h1 className="display text-xl font-bold">
           Este link no sirve
         </h1>
@@ -76,7 +76,7 @@ function Acceso() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 p-6">
       <TemaFlotante />
-      <Wordmark nombre="VisitPass" />
+      <Wordmark />
       <div>
         <h1 className="display text-2xl font-bold">
           Hola {name}

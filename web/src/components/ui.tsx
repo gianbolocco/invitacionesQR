@@ -1,6 +1,6 @@
 'use client'
 import { Fragment } from 'react'
-import { logoUrl, useMarca } from '@/lib/marca-cliente'
+import { Marca } from './dominio/marca'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, Ref } from 'react'
 
 /** El doble filete del cartel de entrada. Envuelve paneles y tarjetas. */
@@ -118,35 +118,14 @@ export function TemaToggle({ tema, onTema }: {
 }
 
 /**
- * Lockup del encabezado: la itálica vive acá y en ningún otro lado.
- *
- * Es el único componente que conoce la marca del barrio: si hay logo lo
- * muestra, y si no el nombre en itálica.
- *
- * Se apila abajo de `sm`. En una línea, el nombre más el subtítulo más el
- * toggle de tema más el botón de salir no entran en un teléfono angosto: el
- * encabezado empujaba la página entera y aparecía el scroll horizontal, con el
- * nombre cortado por la izquierda.
+ * Lockup del encabezado viejo. La marca la pinta `Marca`; acá solo se suma el
+ * subtítulo. Ya no recibe el nombre: lo lee de la marca del barrio, así las
+ * pantallas de acceso dejan de decir "VisitPass".
  */
-export function Wordmark({ nombre, tieneLogo = false, subtitle = 'Barrio cerrado' }: {
-  nombre: string
-  tieneLogo?: boolean
-  subtitle?: string
-}) {
-  const marca = useMarca()
+export function Wordmark({ subtitle = 'Barrio cerrado' }: { subtitle?: string }) {
   return (
     <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
-      {tieneLogo ? (
-        // Altura fija y ancho automático: un logo apaisado y uno cuadrado
-        // tienen que convivir sin romper el alto del encabezado.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={logoUrl(marca) ?? ''} alt={nombre}
-          className="h-8 w-auto max-w-[12rem] object-contain" />
-      ) : (
-        <span className="truncate font-display text-xl font-extrabold tracking-tight leading-tight text-marca sm:text-2xl">
-          {nombre}
-        </span>
-      )}
+      <Marca />
       <span className="eyebrow truncate">{subtitle}</span>
     </div>
   )

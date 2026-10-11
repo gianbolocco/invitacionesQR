@@ -59,7 +59,7 @@ function Login() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 p-6">
       <TemaFlotante />
-      <Wordmark nombre="VisitPass" />
+      <Wordmark />
       <form onSubmit={submit} className="flex flex-col gap-5">
         <Field label="Mail" type="email" autoComplete="email" required
                value={email} onChange={(e) => setEmail(e.target.value)} />

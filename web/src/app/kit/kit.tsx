@@ -1,7 +1,15 @@
 'use client'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, Trash2 } from 'lucide-react'
+import { Inbox, Plus, Trash2 } from 'lucide-react'
+import { Marca } from '@/components/dominio/marca'
+import { EstadoTag } from '@/components/dominio/estado-tag'
+import { Fila } from '@/components/dominio/fila'
+import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
+import { Vacio } from '@/components/dominio/vacio'
+import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
+import { Chips, ChipsMultiples } from '@/components/dominio/chips'
+import { SkeletonPantalla } from '@/components/dominio/skeleton-pantalla'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -95,6 +103,61 @@ export function Kit() {
           action: { label: 'Deshacer', onClick: () => toast('Restaurada') },
         })}>Toast</Button>
       </Bloque>
+
+      <Bloque titulo="Marca">
+        <Marca />
+        <span className="rounded-lg bg-marca px-4 py-3"><Marca variante="banda" /></span>
+        <Marca variante="grande" />
+      </Bloque>
+
+      <Bloque titulo="Estados">
+        {(['esperando', 'adentro', 'salio', 'concluida', 'anulada', 'vencida', 'invitado', 'activo', 'deshabilitado'] as const)
+          .map((e) => <EstadoTag key={e} estado={e} detalle={e === 'adentro' ? '14:02' : undefined} />)}
+      </Bloque>
+
+      <Bloque titulo="Encabezado y filas">
+        <div className="w-full max-w-md">
+          <EncabezadoPagina antetitulo="Lote 142" titulo={<>Hola, <em>Lucía.</em></>} />
+          <div className="mt-4">
+            <Fila titulo="Martín Gómez" meta="Visita · entró 14:02" extremo={<EstadoTag estado="adentro" />} onClick={() => {}} />
+            <Fila titulo="Sofía Ledesma" meta="Visita · hoy" extremo={<EstadoTag estado="esperando" />} href="/kit" />
+            <Fila titulo="Rosa Benítez" meta="Frecuente · Lun Mié Vie" extremo={<EstadoTag estado="esperando" />} />
+          </div>
+        </div>
+      </Bloque>
+
+      <Bloque titulo="Chips">
+        <ChipsDemo />
+      </Bloque>
+
+      <Bloque titulo="Vacío y error">
+        <div className="w-80 rounded-lg border border-line bg-card">
+          <Vacio icono={Inbox} titulo="Todavía no invitaste a nadie" detalle="Creá una invitación y compartila por WhatsApp." accion={<Button>Nueva invitación</Button>} />
+        </div>
+        <div className="w-80 rounded-lg border border-line bg-card">
+          <ErrorConReintento onReintentar={() => toast('Reintentando')} />
+        </div>
+      </Bloque>
+
+      <Bloque titulo="Skeleton de pantalla">
+        <div className="w-full rounded-lg border border-line"><SkeletonPantalla filas={3} /></div>
+      </Bloque>
     </main>
+  )
+}
+
+function ChipsDemo() {
+  const [tipo, setTipo] = useState<'visita' | 'frecuente' | 'proveedor'>('visita')
+  const [dias, setDias] = useState<string[]>(['1', '3'])
+  return (
+    <div className="flex flex-col gap-3">
+      <Chips etiqueta="Tipo" valor={tipo} onCambio={setTipo} opciones={[
+        { valor: 'visita', etiqueta: 'Visita' },
+        { valor: 'frecuente', etiqueta: 'Frecuente' },
+        { valor: 'proveedor', etiqueta: 'Proveedor', contador: 3 },
+      ]} />
+      <ChipsMultiples etiqueta="Días" valores={dias} onCambio={setDias}
+        opciones={['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => ({ valor: String(i), etiqueta: d }))} />
+    </div>
   )
 }
