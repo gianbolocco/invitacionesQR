@@ -8,6 +8,7 @@ import {
   auditInvitations, auditAll,
 } from '../services/entries.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
+import { slug } from '../lib/slug.js'
 import { buildWorkbook, XLSX_MIME } from '../lib/excel.js'
 import { entriesLog } from '../services/reports.js'
 import { getNeighborhood } from '../services/neighborhoods.js'
@@ -171,7 +172,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
     },
   ], barrio.name)
 
-  res.type(XLSX_MIME).attachment('alamo-alto-auditoria.xlsx').send(buffer)
+  res.type(XLSX_MIME).attachment(`${slug(barrio.name) || 'barrio'}-auditoria.xlsx`).send(buffer)
 })
 
 /**

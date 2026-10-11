@@ -1,0 +1,1 @@
+ALTER TABLE "neighborhood" ADD COLUMN "logo_updated_at" timestamp with time zone;

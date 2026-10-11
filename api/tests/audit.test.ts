@@ -128,6 +128,13 @@ describe('auditoría de invitaciones', () => {
     expect(ing.getRow(2).getCell(colIng('Guardia')).value).toBe('Rulo')
   })
 
+  it('el Excel se llama como el barrio, no como el de la demo', async () => {
+    const ctx = await base()
+    await db.update(neighborhoods).set({ name: 'Los Aromos' })
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+    expect(res.headers['content-disposition']).toContain('los-aromos-auditoria.xlsx')
+  })
+
   it('el export trae todo, no solo la página que se está viendo', async () => {
     const ctx = await base()
     for (let n = 0; n < 7; n++) await inv(ctx, { guestName: `Invitado ${n}` })

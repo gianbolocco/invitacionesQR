@@ -19,6 +19,7 @@ export async function getBranding() {
     name: neighborhoods.name,
     brandColor: neighborhoods.brandColor,
     logoMime: neighborhoods.logoMime,
+    logoUpdatedAt: neighborhoods.logoUpdatedAt,
   }).from(neighborhoods).limit(1)
 
   return {
@@ -27,6 +28,7 @@ export async function getBranding() {
     nombre: row?.name ?? 'VisitPass',
     color: row?.brandColor ?? COLOR_DEFAULT,
     tieneLogo: Boolean(row?.logoMime),
+    logoVersion: row?.logoMime && row.logoUpdatedAt ? row.logoUpdatedAt.getTime() : null,
   }
 }
 
@@ -41,7 +43,7 @@ export async function guardarLogo(bytes: Buffer, actorId: string) {
   if (!mime) throw new AppError(400, 'formato_no_soportado')
 
   const id = await idDelBarrio()
-  await db.update(neighborhoods).set({ logo: bytes, logoMime: mime }).where(eq(neighborhoods.id, id))
+  await db.update(neighborhoods).set({ logo: bytes, logoMime: mime, logoUpdatedAt: new Date() }).where(eq(neighborhoods.id, id))
 
   await audit(actorId, id, 'branding.logo_updated', 'neighborhood', id, { mime })
   return { mime }
@@ -56,6 +58,6 @@ export async function leerLogo(): Promise<{ bytes: Buffer; mime: string } | null
 
 export async function borrarLogo(actorId: string) {
   const id = await idDelBarrio()
-  await db.update(neighborhoods).set({ logo: null, logoMime: null }).where(eq(neighborhoods.id, id))
+  await db.update(neighborhoods).set({ logo: null, logoMime: null, logoUpdatedAt: null }).where(eq(neighborhoods.id, id))
   await audit(actorId, id, 'branding.logo_removed', 'neighborhood', id)
 }

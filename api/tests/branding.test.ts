@@ -155,4 +155,24 @@ describe('el logo del barrio', () => {
     await subir(cookie, PNG).expect(403)
     await request(app).delete('/admin/branding/logo').set('Cookie', cookie).expect(403)
   })
+
+  it('la marca informa una versión del logo que cambia al reemplazarlo', async () => {
+    await barrio()
+    const { cookie } = await admin()
+    expect((await request(app).get('/branding')).body.logoVersion).toBeNull()
+
+    await subir(cookie, PNG).expect(200)
+    const v1 = (await request(app).get('/branding')).body.logoVersion
+    expect(typeof v1).toBe('number')
+
+    // Sin esto el navegador sigue mostrando el logo viejo durante la hora de
+    // caché: la versión va en la URL y tiene que moverse.
+    await new Promise((r) => setTimeout(r, 5))
+    await subir(cookie, JPEG, 'image/jpeg').expect(200)
+    const v2 = (await request(app).get('/branding')).body.logoVersion
+    expect(v2).toBeGreaterThan(v1)
+
+    await request(app).delete('/admin/branding/logo').set('Cookie', cookie).expect(200)
+    expect((await request(app).get('/branding')).body.logoVersion).toBeNull()
+  })
 })

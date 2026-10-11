@@ -23,6 +23,9 @@ export const neighborhoods = pgTable('neighborhood', {
   // Los bytes del logo, en la base y no en un volumen: pesa 500 KB como mucho,
   // y así un solo backup de la base cubre todo el barrio.
   logo: bytea('logo'),
+  // Cuándo se cambió el logo por última vez. Viaja como versión en la URL del
+  // logo: la respuesta se cachea una hora y sin esto se vería el anterior.
+  logoUpdatedAt: timestamp('logo_updated_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
