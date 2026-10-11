@@ -1,199 +1,121 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
-import { api } from '@/lib/api'
-import { useMe } from '@/lib/session'
-import { KIND_LABEL, fechaCorta, vigencia, type Invitation } from '@/lib/invitations'
-import { Shell } from '@/components/shell'
-import { Button, Eyebrow, Filete, Vacio } from '@/components/ui'
-import { SkeletonTarjetas, Cargando } from '@/components/feedback'
+import { useEffect, useRef, useState } from 'react'
+import { History, Loader2, Search, SlidersHorizontal, X } from 'lucide-react'
+import { useHistorial, type FiltrosHistorial } from '@/lib/queries/invitaciones'
+import { useDemora } from '@/lib/use-demora'
+import { useSesion } from '@/lib/sesion-contexto'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
+import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
+import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
+import { Vacio } from '@/components/dominio/vacio'
+import { FilaInvitacion } from '@/components/vecino/fila-invitacion'
+import { FiltrosHistorialPanel } from '@/components/vecino/filtros-historial'
+import { cn } from '@/lib/utils'
 
-type Pagina = { rows: Invitation[]; total: number; page: number; pageSize: number }
-
-const TIPOS = [
-  { id: '', label: 'Todos' },
-  ...Object.entries(KIND_LABEL).map(([id, label]) => ({ id, label })),
-]
-
-const ESTADOS = [
-  { id: '', label: 'Todas' },
-  { id: 'entro', label: 'Entró' },
-  { id: 'no_entro', label: 'No entró' },
-  { id: 'anulada', label: 'Anuladas' },
-]
-
-const POR_PAGINA = 20
-
-function Chips({ opciones, valor, onElegir, etiqueta }: {
-  opciones: { id: string; label: string }[]
-  valor: string
-  onElegir: (v: string) => void
-  etiqueta: string
-}) {
-  return (
-    <fieldset>
-      <legend className="eyebrow mb-1.5">{etiqueta}</legend>
-      <div className="flex flex-wrap gap-1.5">
-        {opciones.map((o) => (
-          <button key={o.id} type="button" onClick={() => onElegir(o.id)}
-            aria-pressed={valor === o.id}
-            className={`min-h-10 rounded-full border px-4 text-sm font-semibold ${
-              valor === o.id
-                ? 'border-marca bg-marca text-surface'
-                : 'border-line bg-card text-ink-soft'
-            }`}>
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </fieldset>
-  )
-}
+const SIN_FILTROS: Omit<FiltrosHistorial, 'q'> = { kind: '', estado: '', soloMias: false }
 
 export default function HistorialPage() {
-  const me = useMe()
+  const me = useSesion()
   const [q, setQ] = useState('')
-  const [kind, setKind] = useState('')
-  const [estado, setEstado] = useState('')
-  const [soloMias, setSoloMias] = useState(false)
-  const [page, setPage] = useState(1)
-  const [data, setData] = useState<Pagina | null>(null)
-  const [cargando, setCargando] = useState(false)
+  const [filtros, setFiltros] = useState(SIN_FILTROS)
+  const qDemorada = useDemora(q)
+  const h = useHistorial({ q: qDemorada, ...filtros })
+  const centinela = useRef<HTMLDivElement>(null)
 
-  const buscar = useCallback((senal: AbortSignal) => {
-    const p = new URLSearchParams({ page: String(page), pageSize: String(POR_PAGINA) })
-    if (q.trim()) p.set('q', q.trim())
-    if (kind) p.set('kind', kind)
-    if (estado) p.set('estado', estado)
-    if (soloMias) p.set('soloMias', 'true')
+  const filas = h.data?.pages.flatMap((p) => p.rows) ?? []
+  const total = h.data?.pages[0]?.total ?? 0
+  const activos = Number(Boolean(filtros.kind)) + Number(Boolean(filtros.estado)) + Number(filtros.soloMias)
+  const hayFiltro = Boolean(q.trim()) || activos > 0
 
-    setCargando(true)
-    api<Pagina>(`/invitations/historial?${p}`, { signal: senal })
-      .then((r) => { setData(r); setCargando(false) })
-      .catch((e: unknown) => {
-        if ((e as Error).name === 'AbortError') return
-        setData({ rows: [], total: 0, page: 1, pageSize: POR_PAGINA })
-        setCargando(false)
-      })
-  }, [q, kind, estado, soloMias, page])
-
-  /*
-   * 300ms de espera antes de pedir: el vecino tipea "martin" y eso son seis
-   * teclas, no seis búsquedas. El abort corta la anterior para que una
-   * respuesta lenta no llegue tarde y pise el resultado de la última.
-   */
+  // Cargar más al llegar al final, sin botón. El botón queda para quien no
+  // hace scroll (teclado, lector de pantalla).
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = h
   useEffect(() => {
-    if (!me) return
-    const ac = new AbortController()
-    const t = setTimeout(() => buscar(ac.signal), 300)
-    return () => { clearTimeout(t); ac.abort() }
-  }, [me, buscar])
+    const el = centinela.current
+    if (!el || !hasNextPage) return
+    const obs = new IntersectionObserver(([e]) => {
+      if (e?.isIntersecting && !isFetchingNextPage) fetchNextPage()
+    }, { rootMargin: '200px' })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  if (!me) return <main className="p-6 text-ink-soft">Cargando…</main>
-
-  // Cualquier cambio de filtro vuelve a la primera página: quedarse en la
-  // página 4 de un resultado que ahora tiene 5 filas muestra una lista vacía.
-  function filtrar(aplicar: () => void) {
-    aplicar()
-    setPage(1)
-  }
-
-  const total = data?.total ?? 0
-  const paginas = Math.max(1, Math.ceil(total / POR_PAGINA))
-  const hayFiltro = Boolean(q.trim() || kind || estado || soloMias)
+  function limpiar() { setQ(''); setFiltros(SIN_FILTROS) }
 
   return (
-    <Shell me={me}>
-      <div className="flex flex-col gap-5">
-        <h1 className="display text-2xl">Historial</h1>
+    <div className="flex flex-col gap-6">
+      <EncabezadoPagina antetitulo="Todo lo que invitaste" titulo="Historial" />
 
-        <div className="flex flex-col gap-4">
-          <input
-            type="search"
-            value={q}
-            onChange={(e) => filtrar(() => setQ(e.target.value))}
-            placeholder="Buscar por nombre, documento o patente"
-            aria-label="Buscar en el historial"
-            className="min-h-12 w-full rounded border border-line bg-card px-3"
-          />
-
-          <Chips etiqueta="Tipo" opciones={TIPOS} valor={kind}
-            onElegir={(v) => filtrar(() => setKind(v))} />
-          <Chips etiqueta="Estado" opciones={ESTADOS} valor={estado}
-            onElegir={(v) => filtrar(() => setEstado(v))} />
-
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={soloMias}
-              onChange={(e) => filtrar(() => setSoloMias(e.target.checked))}
-              className="size-5 accent-marca" />
-            Solo las mías
-          </label>
+      {/* El buscador queda pegado arriba al hacer scroll: es lo que más se usa. */}
+      <div className="sticky top-14 z-20 -mx-4 flex gap-2 bg-surface/90 px-4 py-3 backdrop-blur">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" aria-hidden />
+          <Input type="search" value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder="Nombre, documento o patente" aria-label="Buscar en el historial" className="pl-10" />
         </div>
-
-        <p className="eyebrow tabular" aria-live="polite">
-          {data === null
-            ? 'Buscando…'
-            : `${total} ${total === 1 ? 'invitación' : 'invitaciones'}`}
-        </p>
-
-        {data === null && <Cargando><SkeletonTarjetas cantidad={4} /></Cargando>}
-
-        {data !== null && data.rows.length === 0 && (
-          <Vacio
-            titulo={hayFiltro ? 'No hay resultados' : 'Todavía no hay invitaciones'}
-            detalle={hayFiltro
-              ? 'Probá con otro nombre o sacá algún filtro.'
-              : 'Las invitaciones que crees van a quedar acá.'} />
-        )}
-
-        {/* La lista se atenúa mientras llega la página nueva en vez de
-            desaparecer: el salto al esqueleto en cada tecla marea. */}
-        <ul className={`flex flex-col gap-3 transition-opacity ${cargando ? 'opacity-50' : ''}`}>
-          {data?.rows.map((inv) => (
-            <li key={inv.id}>
-              <Filete className="flex flex-wrap items-center justify-between gap-3 bg-card px-4 py-3.5">
-                <div className="min-w-0">
-                  <Eyebrow>{KIND_LABEL[inv.kind]} · {fechaCorta(inv.createdAt.slice(0, 10))}</Eyebrow>
-                  <p className="display truncate text-lg">{inv.guestName}</p>
-                  <p className="text-sm text-ink-soft tabular">
-                    {vigencia(inv)}
-                    {inv.createdBy !== me.id && ` · por ${inv.creatorName}`}
-                  </p>
-                  <p className="mt-0.5 text-sm">
-                    {inv.revokedAt
-                      ? <span className="text-deny-field">Anulada</span>
-                      : inv.usedCount === 0
-                        ? <span className="text-ink-soft">No entró</span>
-                        : <span className="text-marca tabular">
-                            {inv.usedCount === 1 ? 'Entró' : `${inv.usedCount} ingresos`}
-                          </span>}
-                  </p>
-                </div>
-                <Link
-                  href={`/nueva?kind=${inv.kind}&guestName=${encodeURIComponent(inv.guestName)}` +
-                    `&guestDoc=${encodeURIComponent(inv.guestDoc ?? '')}` +
-                    `&plate=${encodeURIComponent(inv.plate ?? '')}`}
-                  className="inline-flex min-h-12 items-center rounded border border-marca/30 px-4
-                    text-sm font-semibold text-marca">
-                  Volver a invitar
-                </Link>
-              </Filete>
-            </li>
-          ))}
-        </ul>
-
-        {paginas > 1 && (
-          <nav aria-label="Páginas" className="flex items-center justify-between gap-3">
-            <Button variant="quiet" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
-              Anteriores
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="sm:hidden" aria-label={`Filtros${activos ? ` (${activos} activos)` : ''}`}>
+              <SlidersHorizontal aria-hidden />
+              {activos > 0 && <span className="grid size-5 place-items-center rounded-full bg-marca text-[11px] text-sobre-marca">{activos}</span>}
             </Button>
-            <span className="eyebrow tabular">{page} de {paginas}</span>
-            <Button variant="quiet" disabled={page >= paginas} onClick={() => setPage((n) => n + 1)}>
-              Siguientes
-            </Button>
-          </nav>
-        )}
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-xl">
+            <SheetHeader><SheetTitle>Filtros</SheetTitle></SheetHeader>
+            <div className="px-4 pb-8"><FiltrosHistorialPanel valor={filtros} onCambio={setFiltros} /></div>
+          </SheetContent>
+        </Sheet>
       </div>
-    </Shell>
+
+      <div className="grid gap-8 sm:grid-cols-[1fr_15rem]">
+        <section className="min-w-0">
+          <div className="flex items-center justify-between pb-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft tabular" aria-live="polite">
+              {h.isPending ? 'Buscando…' : `${total} ${total === 1 ? 'invitación' : 'invitaciones'}`}
+            </p>
+            {hayFiltro && (
+              <Button variant="ghost" size="sm" onClick={limpiar}><X aria-hidden />Limpiar</Button>
+            )}
+          </div>
+
+          {h.isPending ? (
+            <SkeletonFilas filas={6} />
+          ) : h.isError ? (
+            <ErrorConReintento onReintentar={() => h.refetch()} reintentando={h.isFetching} />
+          ) : filas.length === 0 ? (
+            <Vacio icono={History}
+              titulo={hayFiltro ? 'No encontramos nada' : 'Todavía no hay invitaciones'}
+              detalle={hayFiltro ? 'Probá con otro nombre o sacá algún filtro.' : 'Las invitaciones que crees van a quedar acá.'}
+              accion={hayFiltro ? <Button variant="outline" onClick={limpiar}>Limpiar filtros</Button> : undefined} />
+          ) : (
+            // Al cambiar un filtro, la lista anterior queda atenuada mientras
+            // llega la nueva: el salto al skeleton en cada tecla marea.
+            <ul className={cn('transition-opacity duration-200', h.isPlaceholderData && 'opacity-50')}>
+              {filas.map((inv) => (
+                <li key={inv.id}>
+                  <FilaInvitacion inv={inv} mostrarUnidad={me.units.length > 1}
+                    mostrarCreador={inv.createdBy !== me.id} />
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div ref={centinela} />
+          {hasNextPage && (
+            <Button variant="outline" className="mt-4 w-full" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>
+              {isFetchingNextPage && <Loader2 className="animate-spin" aria-hidden />}
+              {isFetchingNextPage ? 'Cargando…' : 'Cargar más'}
+            </Button>
+          )}
+        </section>
+
+        <aside className="hidden sm:block">
+          <div className="sticky top-32"><FiltrosHistorialPanel valor={filtros} onCambio={setFiltros} /></div>
+        </aside>
+      </div>
+    </div>
   )
 }
