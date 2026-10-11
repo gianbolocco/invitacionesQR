@@ -1,163 +1,150 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { api, apiBase } from '@/lib/api'
-import { useMe } from '@/lib/session'
-import { claveMarca, logoUrl, useMarca } from '@/lib/marca-cliente'
-import { Shell } from '@/components/shell'
-import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
-
-type Barrio = {
-  id: string
-  name: string
-  address: string | null
-  mapUrl: string | null
-  brandColor: string | null
-  paleta: string[]
-}
+import { useRef, useState } from 'react'
+import { Upload, X } from 'lucide-react'
+import { useBarrio, useGuardarBarrio, useSubirLogo, useQuitarLogo } from '@/lib/queries/admin'
+import { logoUrl, useMarca } from '@/lib/marca-cliente'
+import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
+import { VistaPreviaMarca } from '@/components/admin/vista-previa-marca'
+import { Campo } from '@/components/dominio/campo'
+import { Nota } from '@/components/dominio/nota'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 export default function BarrioPage() {
-  const me = useMe()
-  const queryClient = useQueryClient()
-  const marca = useMarca()
-  const [barrio, setBarrio] = useState<Barrio | null>(null)
+  const barrio = useBarrio()
+  const marcaReal = useMarca()
+  const guardar = useGuardarBarrio()
+  const subirLogo = useSubirLogo()
+  const quitarLogo = useQuitarLogo()
+
   const [address, setAddress] = useState('')
   const [mapUrl, setMapUrl] = useState('')
   const [color, setColor] = useState<string | null>(null)
-  const [subiendo, setSubiendo] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [aviso, setAviso] = useState<string | null>(null)
+  const [arrastrando, setArrastrando] = useState(false)
+  const [errorLogo, setErrorLogo] = useState<string | null>(null)
+  const [cargado, setCargado] = useState(false)
+  const inputArchivo = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (!me) return
-    api<Barrio>('/admin/neighborhood').then((b) => {
-      setBarrio(b)
-      setAddress(b.address ?? '')
-      setMapUrl(b.mapUrl ?? '')
-      setColor(b.brandColor)
-    }).catch(() => {})
-  }, [me])
-
-  async function guardar(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setAviso(null)
-    try {
-      const b = await api<Barrio>('/admin/neighborhood', {
-        method: 'PATCH',
-        body: JSON.stringify({ address, mapUrl, ...(color ? { brandColor: color } : {}) }),
-      })
-      setBarrio(b)
-      await queryClient.invalidateQueries({ queryKey: claveMarca })
-      setAviso('Guardado.')
-    } catch {
-      setError('El link de mapas tiene que empezar con http. Copialo desde Google Maps con "Compartir".')
-    }
+  // Se precarga una sola vez, cuando llegan los datos: después el admin
+  // manda sobre lo que escribe, la query no le pisa el formulario. Se
+  // ajusta durante el render (patrón oficial de React para esto) en vez
+  // de en un efecto, para no disparar un ciclo de render de más.
+  if (barrio.data && !cargado) {
+    setCargado(true)
+    setAddress(barrio.data.address ?? '')
+    setMapUrl(barrio.data.mapUrl ?? '')
+    setColor(barrio.data.brandColor)
   }
 
-  if (!me) return <main className="p-6 text-ink-soft">Cargando…</main>
+  const marcaPreview = { ...marcaReal, nombre: barrio.data?.name ?? marcaReal.nombre, color: color ?? marcaReal.color }
+
+  async function guardarForm(e: React.FormEvent) {
+    e.preventDefault()
+    await guardar.mutateAsync({ address, mapUrl, ...(color ? { brandColor: color } : {}) })
+  }
+
+  async function subir(file: File) {
+    setErrorLogo(null)
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      setErrorLogo('Tiene que ser un PNG o un JPG.')
+      return
+    }
+    if (file.size > 500_000) {
+      setErrorLogo('El archivo tiene que pesar menos de 500 KB.')
+      return
+    }
+    await subirLogo.mutateAsync(file).catch(() => setErrorLogo('No se pudo subir. Probá de nuevo.'))
+  }
+
+  if (barrio.isPending) return <p className="text-ink-soft">Cargando…</p>
 
   return (
-    <Shell me={me}>
-      <div className="flex max-w-xl flex-col gap-6">
-        <div>
-          <h1 className="display text-2xl">{barrio?.name ?? 'Barrio'}</h1>
-          <p className="mt-1 text-ink-soft">
-            Esto aparece en el link que recibe el invitado, abajo de quién lo invitó.
-          </p>
-        </div>
+    <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
+      <div className="flex flex-col gap-6">
+        <EncabezadoPagina titulo={barrio.data?.name ?? 'Barrio'}
+          subtitulo="Esto aparece en el link que recibe el invitado, abajo de quién lo invitó." />
 
-        <Filete className="bg-card p-5">
-          <Eyebrow>Cómo llegar</Eyebrow>
-          <form onSubmit={guardar} className="mt-4 flex flex-col gap-4">
-            <Field label="Dirección" value={address} placeholder="Ruta 8 km 62, Pilar"
+        <form onSubmit={guardarForm} className="flex flex-col gap-4 rounded-lg border border-line bg-card p-5">
+          <Campo id="direccion" etiqueta="Dirección">
+            <Input id="direccion" value={address} placeholder="Ruta 8 km 62, Pilar"
               onChange={(e) => setAddress(e.target.value)} />
-            <Field label="Link de Google Maps" value={mapUrl} type="url"
-              placeholder="https://maps.app.goo.gl/…"
-              hint='En Google Maps, buscá la entrada del barrio y tocá "Compartir" → "Copiar vínculo".'
+          </Campo>
+          <Campo id="mapas" etiqueta="Link de Google Maps"
+            ayuda='En Google Maps, buscá la entrada del barrio y tocá "Compartir" → "Copiar vínculo".'>
+            <Input id="mapas" type="url" value={mapUrl} placeholder="https://maps.app.goo.gl/…"
               onChange={(e) => setMapUrl(e.target.value)} />
-            <fieldset className="border-t border-line pt-4">
-              <legend className="eyebrow mb-2">Color del barrio</legend>
-              <div className="flex flex-wrap gap-2">
-                {(barrio?.paleta ?? []).map((c) => (
-                  <button key={c} type="button" onClick={() => setColor(c)}
-                    aria-label={`Color ${c}`} aria-pressed={color === c}
-                    style={{ backgroundColor: c }}
-                    className={`size-11 rounded-full border-2 ${
-                      color === c ? 'border-ink' : 'border-transparent'
-                    }`} />
-                ))}
-              </div>
-              <p className="mt-1.5 text-sm text-ink-soft">
-                Es una lista cerrada a propósito: son los colores con los que el
-                texto encima se lee bien, de día y de noche.
-              </p>
-            </fieldset>
-            {error && <ErrorNote>{error}</ErrorNote>}
-            {aviso && <p role="status" className="text-sm text-marca">{aviso}</p>}
-            <Button type="submit" className="self-start">Guardar</Button>
-          </form>
-        </Filete>
+          </Campo>
 
-        <Filete className="flex flex-col items-start gap-3 bg-card p-5">
-          <Eyebrow>Logo</Eyebrow>
-          {marca.tieneLogo ? (
-            // La query evita que el navegador siga mostrando el anterior desde
-            // su caché después de reemplazarlo.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl(marca) ?? ''} alt="Logo del barrio"
-              className="h-16 w-auto max-w-[16rem] object-contain" />
-          ) : (
-            <p className="text-ink-soft">
-              Sin logo se muestra el nombre del barrio en itálica.
+          <fieldset className="border-t border-line pt-4">
+            <legend className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Color del barrio</legend>
+            <div className="flex flex-wrap gap-2">
+              {(barrio.data?.paleta ?? []).map((c) => (
+                <button key={c} type="button" onClick={() => setColor(c)}
+                  aria-label={`Color ${c}`} aria-pressed={color === c} style={{ backgroundColor: c }}
+                  className={`size-11 rounded-full border-2 ${color === c ? 'border-ink' : 'border-transparent'}`} />
+              ))}
+            </div>
+            <p className="mt-1.5 text-sm text-ink-soft">
+              Lista cerrada a propósito: son los colores con los que el texto encima se lee bien, de día y de noche.
             </p>
+          </fieldset>
+
+          {guardar.isError && <Nota tono="error">El link de mapas tiene que empezar con http. Copialo desde Google Maps con &quot;Compartir&quot;.</Nota>}
+          {guardar.isSuccess && <Nota tono="exito">Guardado.</Nota>}
+          <Button type="submit" className="self-start" disabled={guardar.isPending}>
+            {guardar.isPending ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </form>
+
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-line bg-card p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Logo</p>
+          {marcaReal.tieneLogo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl(marcaReal) ?? ''} alt="Logo del barrio" className="h-16 w-auto max-w-[16rem] object-contain" />
+          ) : (
+            <p className="text-ink-soft">Sin logo se muestra el nombre del barrio en itálica.</p>
           )}
 
-          <input type="file" accept="image/png,image/jpeg" disabled={subiendo}
-            className="text-sm"
-            onChange={async (e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-              setSubiendo(true)
-              setError(null)
-              setAviso(null)
-              try {
-                // fetch directo y no el helper api(): este manda un binario con
-                // su propio Content-Type, y el helper fuerza application/json.
-                const res = await fetch(`${apiBase}/admin/branding/logo`, {
-                  method: 'PUT',
-                  credentials: 'include',
-                  headers: { 'Content-Type': file.type },
-                  body: file,
-                })
-                if (!res.ok) throw new Error(String(res.status))
-                await queryClient.invalidateQueries({ queryKey: claveMarca })
-                setAviso('Logo actualizado.')
-              } catch {
-                setError('No se pudo subir. Tiene que ser un PNG o un JPG de menos de 500 KB.')
-              }
-              setSubiendo(false)
-              e.target.value = ''
-            }} />
+          <button type="button"
+            onClick={() => inputArchivo.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setArrastrando(true) }}
+            onDragLeave={() => setArrastrando(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setArrastrando(false)
+              const file = e.dataTransfer.files[0]
+              if (file) subir(file)
+            }}
+            disabled={subirLogo.isPending}
+            className={`flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 text-center text-sm
+              ${arrastrando ? 'border-marca bg-marca-suave' : 'border-line'} disabled:opacity-50`}>
+            <Upload className="size-5 text-ink-soft" aria-hidden />
+            <span>{subirLogo.isPending ? 'Subiendo…' : 'Arrastrá un PNG o JPG, o tocá para elegirlo'}</span>
+            <span className="text-xs text-ink-soft">Hasta 500 KB</span>
+          </button>
+          <input ref={inputArchivo} type="file" accept="image/png,image/jpeg" className="sr-only"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(f); e.target.value = '' }} />
 
-          {marca.tieneLogo && (
-            <Button variant="quiet" type="button" onClick={async () => {
-              await api('/admin/branding/logo', { method: 'DELETE' })
-              await queryClient.invalidateQueries({ queryKey: claveMarca })
-              setAviso('Logo quitado.')
-            }}>
-              Quitar el logo
+          {errorLogo && <Nota tono="error">{errorLogo}</Nota>}
+
+          {marcaReal.tieneLogo && (
+            <Button variant="outline" onClick={() => quitarLogo.mutate()} disabled={quitarLogo.isPending}>
+              <X aria-hidden />Quitar el logo
             </Button>
           )}
-        </Filete>
+        </div>
 
-        {barrio?.mapUrl && (
-          <a href={barrio.mapUrl} target="_blank" rel="noopener noreferrer"
+        {barrio.data?.mapUrl && (
+          <a href={barrio.data.mapUrl} target="_blank" rel="noopener noreferrer"
             className="text-sm text-marca underline underline-offset-4">
             Probar el link de mapas
           </a>
         )}
       </div>
-    </Shell>
+
+      <aside className="lg:sticky lg:top-20 lg:self-start">
+        <VistaPreviaMarca marca={marcaPreview} />
+      </aside>
+    </div>
   )
 }
