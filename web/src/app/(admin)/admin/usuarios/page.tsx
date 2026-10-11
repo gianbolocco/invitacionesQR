@@ -7,6 +7,12 @@ import { ESTADO, fecha, useAdminData, type Person } from '@/lib/admin'
 import { Button, Field, ErrorNote, Filete, Eyebrow } from '@/components/ui'
 import { SkeletonFilas, Cargando, Aviso, useAviso, Confirmar } from '@/components/feedback'
 import { ImportarVecinos } from '@/components/importar-vecinos'
+import { Input } from '@/components/ui/input'
+import { Search, X } from 'lucide-react'
+
+function normalizarBusqueda(value: string): string {
+  return value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
 
 export default function UsuariosPage() {
   const me = useMe()
@@ -14,6 +20,7 @@ export default function UsuariosPage() {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [lot, setLot] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useAviso()
   const [porDarDeBaja, setPorDarDeBaja] = useState<Person | null>(null)
@@ -133,11 +140,43 @@ export default function UsuariosPage() {
   if (!me) return <main className="p-6 text-ink-soft">Cargando…</main>
 
   const vecinos = (people ?? []).filter((p) => p.role !== 'guard')
+  const consulta = normalizarBusqueda(busqueda)
+  const vecinosFiltrados = consulta
+    ? vecinos.filter((person) => (
+      normalizarBusqueda(person.name).includes(consulta)
+      || person.units.some((unit) => (
+        normalizarBusqueda(unit.label).includes(consulta)
+        || normalizarBusqueda(unit.label.replace(/^lote\s*/i, '')).includes(consulta)
+      ))
+    ))
+    : vecinos
 
   return (
     <Shell me={me}>
       <div className="flex flex-col gap-6">
-        <h1 className="display text-2xl">Vecinos</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="display text-2xl">Vecinos</h1>
+            {people !== null && (
+              <p className="mt-1 text-sm text-ink-soft">
+                {consulta ? `${vecinosFiltrados.length} de ${vecinos.length}` : vecinos.length} en el padrón
+              </p>
+            )}
+          </div>
+          <div className="relative w-full sm:max-w-sm">
+            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+            <Input type="search" value={busqueda} placeholder="Buscar por nombre o lote"
+              aria-label="Buscar vecinos por nombre o lote"
+              className="h-11 pl-9 pr-10"
+              onChange={(e) => setBusqueda(e.target.value)} />
+            {busqueda && (
+              <button type="button" aria-label="Limpiar búsqueda" onClick={() => setBusqueda('')}
+                className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded text-ink-soft hover:bg-surface-sunk hover:text-ink">
+                <X aria-hidden className="size-4" />
+              </button>
+            )}
+          </div>
+        </div>
 
         <Filete className="bg-card p-5">
           <Eyebrow>Dar de alta un vecino</Eyebrow>
@@ -162,42 +201,46 @@ export default function UsuariosPage() {
 
         {people === null && (
           <Cargando>
-            <div className="overflow-x-auto rounded-md border border-line p-4">
-              <SkeletonFilas cantidad={4} columnas={6} />
+            <div className="overflow-x-auto rounded-md border border-line p-4 lg:block">
+              <SkeletonFilas cantidad={4} columnas={4} />
             </div>
           </Cargando>
         )}
 
-        <div className="hidden overflow-x-auto rounded-md border border-line md:block">
-          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+        <div className="hidden overflow-x-auto rounded-md border border-line lg:block">
+          <table className="w-full min-w-[860px] table-fixed border-collapse text-left text-sm">
             <thead className="bg-surface-sunk">
               <tr className="border-b border-line">
-                <th className="px-3 py-2"><Eyebrow>Vecino</Eyebrow></th>
-                <th className="px-3 py-2"><Eyebrow>Mail</Eyebrow></th>
-                <th className="px-3 py-2"><Eyebrow>Lote</Eyebrow></th>
-                <th className="px-3 py-2"><Eyebrow>Estado</Eyebrow></th>
-                <th className="px-3 py-2"><Eyebrow>Último acceso</Eyebrow></th>
-                <th className="px-3 py-2"><Eyebrow>Acciones</Eyebrow></th>
+                <th className="w-[26%] px-4 py-2"><Eyebrow>Vecino</Eyebrow></th>
+                <th className="w-[14%] px-3 py-2"><Eyebrow>Lote</Eyebrow></th>
+                <th className="w-[22%] px-3 py-2"><Eyebrow>Estado</Eyebrow></th>
+                <th className="w-[38%] px-4 py-2"><Eyebrow>Acciones</Eyebrow></th>
               </tr>
             </thead>
             <tbody>
-              {vecinos.map((p) => (
+              {vecinosFiltrados.map((p) => (
                 <Fragment key={p.id}>
                   <tr className={`border-b border-line ${p.status === 'disabled' ? 'opacity-50' : ''}`}>
-                    <td className="px-3 py-3 font-semibold">
-                      {p.name}{p.role === 'admin' && <span className="eyebrow ml-2">Admin</span>}
+                    <td className="px-4 py-3">
+                      <p className="font-semibold">
+                        {p.name}{p.role === 'admin' && <span className="eyebrow ml-2">Admin</span>}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-ink-soft">{p.email}</p>
                     </td>
-                    <td className="px-3 py-3">{p.email}</td>
                     <td className="px-3 py-3 text-ink-soft">
-                      {p.units.map((u) => u.label).join(' · ') || 'Sin asignar'}
+                      {p.units.map((u) => u.label).join(' · ') || (p.role === 'resident' ? 'Sin asignar' : '—')}
                     </td>
-                    <td className="px-3 py-3">{ESTADO[p.status]}</td>
-                    <td className="px-3 py-3 tabular text-ink-soft">{fecha(p.lastLoginAt)}</td>
-                    <td className="px-3 py-3">{acciones(p)}</td>
+                    <td className="px-3 py-3">
+                      <p>{ESTADO[p.status]}</p>
+                      <p className="mt-0.5 text-xs text-ink-soft tabular">
+                        {p.lastLoginAt ? `Último acceso: ${fecha(p.lastLoginAt)}` : 'Sin ingresos'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3">{acciones(p)}</td>
                   </tr>
                   {corrigiendo?.id === p.id && (
                     <tr className="border-b border-line bg-surface-sunk/60">
-                      <td colSpan={6} className="px-4 py-3">{editorLote(p)}</td>
+                      <td colSpan={4} className="px-4 py-3">{editorLote(p)}</td>
                     </tr>
                   )}
                 </Fragment>
@@ -206,8 +249,8 @@ export default function UsuariosPage() {
           </table>
         </div>
 
-        <ul className="divide-y divide-line md:hidden">
-          {vecinos.map((p) => (
+        <ul className="divide-y divide-line lg:hidden">
+          {vecinosFiltrados.map((p) => (
             <li key={p.id} className={`py-4 ${p.status === 'disabled' ? 'opacity-50' : ''}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -219,7 +262,7 @@ export default function UsuariosPage() {
                 <span className="shrink-0 rounded-full border border-line px-2 py-1 text-xs">{ESTADO[p.status]}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-soft">
-                <span>{p.units.map((u) => u.label).join(' · ') || 'Lote sin asignar'}</span>
+                <span>{p.units.map((u) => u.label).join(' · ') || (p.role === 'resident' ? 'Lote sin asignar' : 'Sin lote')}</span>
                 {p.lastLoginAt && <span>Último acceso: {fecha(p.lastLoginAt)}</span>}
               </div>
               <div className="mt-3">{acciones(p)}</div>
@@ -227,6 +270,11 @@ export default function UsuariosPage() {
             </li>
           ))}
         </ul>
+        {people !== null && vecinosFiltrados.length === 0 && (
+          <p className="rounded-md border border-dashed border-line px-4 py-8 text-center text-sm text-ink-soft">
+            {consulta ? 'No encontramos vecinos con ese nombre o lote.' : 'Todavía no hay vecinos en el padrón.'}
+          </p>
+        )}
       </div>
       {porDarDeBaja && (
         <Confirmar
