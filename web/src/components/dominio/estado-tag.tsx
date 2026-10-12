@@ -24,7 +24,7 @@ const LOOK: Record<Estado, string> = {
 
 const ETIQUETA: Record<Estado, string> = {
   adentro: 'Adentro', activo: 'Activo', esperando: 'Pendiente', invitado: 'Invitado',
-  concluida: 'Concluida', salio: 'Salió', vencida: 'No llegó',
+  concluida: 'Concluida', salio: 'Salió', vencida: 'Vencida',
   deshabilitado: 'De baja', anulada: 'Anulada',
 }
 
