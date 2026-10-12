@@ -5,7 +5,7 @@ import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import { createUnit, listUnits, labelForLot, setPersonLot } from '../services/units.js'
 import {
-  createPerson, listPeople, disablePerson, enablePerson, resendInvite, setGuardPassword,
+  createPerson, createGuard, listPeople, disablePerson, enablePerson, resendInvite, setGuardPassword,
 } from '../services/people.js'
 import { importPeopleRows, previewPeopleCsv } from '../services/people-import.js'
 import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
@@ -28,6 +28,21 @@ adminRoutes.post('/units', async (req, res) => {
 
 adminRoutes.get('/people', async (req, res) => {
   res.json(await listPeople(req.person!.neighborhoodId))
+})
+
+adminRoutes.post('/guards', async (req, res) => {
+  const body = z.object({
+    name: z.string().trim().min(1).max(160),
+    username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}$/),
+    password: z.string().min(10),
+  }).parse(req.body)
+
+  const guard = await createGuard({
+    ...body,
+    neighborhoodId: req.person!.neighborhoodId,
+    actorId: req.person!.id,
+  })
+  res.status(201).json({ id: guard.id, username: guard.username, status: guard.status })
 })
 
 const importRowSchema = z.object({
@@ -66,7 +81,7 @@ adminRoutes.post('/people', async (req, res) => {
     neighborhoodId: req.person!.neighborhoodId,
     actorId: req.person!.id,
   })
-  res.status(201).json({ id: person.id, email: person.email, status: person.status, mailEnviado })
+  res.status(201).json({ id: person.id, email: person.email ?? body.email, status: person.status, mailEnviado })
 })
 
 adminRoutes.post('/people/:id/disable', async (req, res) => {

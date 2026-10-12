@@ -62,7 +62,7 @@ export async function requestPasswordReset(email: string): Promise<string | null
     .where(and(eq(people.email, email.toLowerCase().trim()), eq(people.status, 'active')))
     .limit(1)
 
-  if (!person) return null
+  if (!person?.email) return null
 
   const token = randomToken()
   await db.insert(authTokens).values({

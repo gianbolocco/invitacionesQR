@@ -33,7 +33,9 @@ export default function OlvidePage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-2xl font-extrabold tracking-[-0.02em]">Restablecer contraseña</h1>
-        <p className="mt-1 text-sm text-ink-soft">Te mandamos un link al mail que tenés en el padrón.</p>
+        <p className="mt-1 text-sm text-ink-soft">
+          Te mandamos un link al mail que tenés en el padrón. Si sos guardia y entrás con usuario, pedile el cambio a la administración.
+        </p>
       </div>
       <form onSubmit={submit} className="flex flex-col gap-5">
         <Campo id="mail" etiqueta="Mail">

@@ -22,6 +22,7 @@ export type CreatePersonInput = {
 }
 
 export async function createPerson(input: CreatePersonInput) {
+  const email = input.email.toLowerCase().trim()
   /*
    * El mail es único en todo el sistema, no por barrio. Se deja que la base lo
    * rechace en vez de consultar antes: un SELECT previo no cierra la ventana
@@ -29,7 +30,7 @@ export async function createPerson(input: CreatePersonInput) {
    */
   const [person] = await db.insert(people).values({
     neighborhoodId: input.neighborhoodId,
-    email: input.email.toLowerCase().trim(),
+    email,
     name: input.name.trim(),
     role: input.role,
     status: 'invited',
@@ -59,10 +60,38 @@ export async function createPerson(input: CreatePersonInput) {
    * tirar un 500 acá hacía que el admin reintentara y chocara con
    * "mail_repetido" sin que nadie hubiera recibido nada. Se le avisa y reenvía.
    */
-  const mailEnviado = await sendInviteMail(person.email, person.name, inviteToken)
+  const mailEnviado = await sendInviteMail(email, person.name, inviteToken)
     .then(() => true, () => false)
 
   return { person, inviteToken, mailEnviado }
+}
+
+export async function createGuard(input: {
+  neighborhoodId: string
+  actorId: string
+  name: string
+  username: string
+  password: string
+}) {
+  const username = input.username.trim().toLowerCase()
+  const [person] = await db.insert(people).values({
+    neighborhoodId: input.neighborhoodId,
+    email: null,
+    username,
+    name: input.name.trim(),
+    role: 'guard',
+    status: 'active',
+    passwordHash: await hashPassword(input.password),
+  }).returning().catch((err: unknown) => {
+    if (violates(err, 'person_username_uq')) throw new AppError(409, 'usuario_repetido')
+    throw err
+  })
+
+  await audit(input.actorId, input.neighborhoodId, 'person.created', 'person', person.id, {
+    role: 'guard',
+    username,
+  })
+  return person
 }
 
 async function issueInviteToken(personId: string): Promise<string> {
@@ -98,7 +127,7 @@ export async function setPassword(personId: string, plain: string): Promise<void
 
 export async function listPeople(neighborhoodId: string) {
   const rows = await db.select({
-    id: people.id, email: people.email, name: people.name, role: people.role,
+    id: people.id, email: people.email, username: people.username, name: people.name, role: people.role,
     status: people.status, lastLoginAt: people.lastLoginAt,
     unitId: units.id, unitLabel: units.label,
   })
@@ -110,13 +139,13 @@ export async function listPeople(neighborhoodId: string) {
   // Una fila por (persona, UF) -> se agrupa en memoria. El padrón de un barrio
   // entra de sobra en RAM; no justifica un json_agg.
   const byId = new Map<string, {
-    id: string; email: string; name: string; role: string; status: string
+    id: string; email: string | null; username: string | null; name: string; role: string; status: string
     lastLoginAt: Date | null; units: { id: string; label: string }[]
   }>()
 
   for (const r of rows) {
     const current = byId.get(r.id) ?? {
-      id: r.id, email: r.email, name: r.name, role: r.role,
+      id: r.id, email: r.email, username: r.username, name: r.name, role: r.role,
       status: r.status, lastLoginAt: r.lastLoginAt, units: [],
     }
     if (r.unitId && r.unitLabel) current.units.push({ id: r.unitId, label: r.unitLabel })
@@ -165,6 +194,7 @@ export async function disablePerson(personId: string, actorId: string, neighborh
 export async function resendInvite(personId: string, actorId: string, neighborhoodId: string): Promise<void> {
   const [person] = await db.select().from(people).where(eq(people.id, personId)).limit(1)
   if (!person) throw new AppError(404, 'not_found')
+  if (!person.email) throw new AppError(409, 'sin_email')
   // A alguien dado de baja primero se lo reactiva: el link no puede ser la
   // puerta trasera de la baja.
   if (person.status === 'disabled') throw new AppError(409, 'deshabilitada')

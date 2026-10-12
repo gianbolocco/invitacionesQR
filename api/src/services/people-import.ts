@@ -181,7 +181,7 @@ export async function importPeopleRows(
       })
       results.push({
         ...row,
-        email: person.email,
+        email: person.email ?? email,
         name: person.name,
         status: mailEnviado ? 'created' : 'mail_failed',
       })

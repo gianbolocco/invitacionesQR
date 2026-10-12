@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express'
 import { z } from 'zod'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, or } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { people } from '../db/schema.js'
 import { peekToken, consumeToken, requestPasswordReset } from '../services/auth.js'
@@ -66,20 +66,22 @@ authRoutes.get('/invite/:token/needs-lot', async (req, res) => {
 })
 
 const mailDe = (req: Request) => String(req.body?.email ?? '').toLowerCase().trim()
+const identificadorDe = (req: Request) =>
+  String(req.body?.identifier ?? req.body?.email ?? '').toLowerCase().trim()
 
 /*
  * Dos límites, y los dos cuentan solo los intentos fallidos.
  *
- * Por IP + mail y no por mail solo: si no, cualquiera que supiera el mail del
+ * Por IP + identificador y no por identificador solo: si no, cualquiera que supiera el
  * guardia lo dejaba afuera todo el turno con cinco contraseñas malas cada
  * quince minutos. Ahora el que se bloquea es el que prueba.
  *
  * Por IP sola, para el que prueba una contraseña contra muchos mails.
  */
-const loginPorMail = rateLimit({
+const loginPorIdentificador = rateLimit({
   max: 5,
   windowMs: 15 * 60_000,
-  key: (req) => `login:${req.ip}:${mailDe(req)}`,
+  key: (req) => `login:${req.ip}:${identificadorDe(req)}`,
   cuenta: (status) => status === 401,
 })
 const loginPorIp = rateLimit({
@@ -89,15 +91,20 @@ const loginPorIp = rateLimit({
   cuenta: (status) => status === 401,
 })
 
-authRoutes.post('/login', loginPorIp, loginPorMail, async (req, res) => {
-  const { email, password } = z.object({ email: z.string().email(), password: z.string() }).parse(req.body)
+authRoutes.post('/login', loginPorIp, loginPorIdentificador, async (req, res) => {
+  const { identifier, email, password } = z.object({
+    identifier: z.string().trim().min(1).max(254).optional(),
+    // Se conserva `email` para pestañas con la versión anterior del front.
+    email: z.string().trim().min(1).max(254).optional(),
+    password: z.string(),
+  }).refine((body) => body.identifier || body.email, { path: ['identifier'] }).parse(req.body)
+  const login = (identifier ?? email!).toLowerCase().trim()
 
   const [person] = await db.select().from(people)
-    .where(and(eq(people.email, email.toLowerCase().trim()), eq(people.status, 'active')))
+    .where(and(or(eq(people.email, login), eq(people.username, login)), eq(people.status, 'active')))
     .limit(1)
 
-  // Mismo error en los tres casos (no existe, sin contraseña, contraseña mala):
-  // no se filtra si el mail está en el padrón.
+  // Mismo error en los tres casos: no se filtra si el mail/usuario está en el padrón.
   if (!person?.passwordHash || !(await verifyPassword(person.passwordHash, password))) {
     throw new AppError(401, 'invalid_credentials')
   }

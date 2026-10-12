@@ -64,6 +64,13 @@
       "when": 1791697150720,
       "tag": "0008_logo_version",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791765750141,
+      "tag": "0009_username_guardias",
+      "breakpoints": true
     }
   ]
 }

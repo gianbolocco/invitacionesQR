@@ -7,7 +7,8 @@ export type Me = {
   id: string
   neighborhoodId: string
   name: string
-  email: string
+  email: string | null
+  username: string | null
   role: 'resident' | 'guard' | 'admin'
   units: { id: string; label: string }[]
 }

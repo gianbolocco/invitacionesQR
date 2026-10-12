@@ -18,7 +18,8 @@ export type AuthedPerson = {
   id: string
   neighborhoodId: string
   name: string
-  email: string
+  email: string | null
+  username: string | null
   role: 'resident' | 'guard' | 'admin'
 }
 
@@ -33,7 +34,7 @@ export async function resolveSession(token: string): Promise<AuthedPerson | null
   const [row] = await db
     .select({
       id: people.id, neighborhoodId: people.neighborhoodId, name: people.name,
-      email: people.email, role: people.role, status: people.status,
+      email: people.email, username: people.username, role: people.role, status: people.status,
       sessionId: sessions.id, lastSeenAt: sessions.lastSeenAt,
     })
     .from(sessions)
@@ -54,7 +55,7 @@ export async function resolveSession(token: string): Promise<AuthedPerson | null
 
   return {
     id: row.id, neighborhoodId: row.neighborhoodId, name: row.name,
-    email: row.email, role: row.role as AuthedPerson['role'],
+    email: row.email, username: row.username, role: row.role as AuthedPerson['role'],
   }
 }
 

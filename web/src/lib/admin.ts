@@ -2,7 +2,8 @@ export type Unit = { id: string; label: string }
 
 export type Person = {
   id: string
-  email: string
+  email: string | null
+  username: string | null
   name: string
   role: 'resident' | 'guard' | 'admin'
   status: 'invited' | 'active' | 'disabled'

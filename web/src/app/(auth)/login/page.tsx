@@ -39,7 +39,7 @@ function Login() {
   const router = useRouter()
   const qc = useQueryClient()
   const params = useSearchParams()
-  const [email, setEmail] = useState('')
+  const [identificador, setIdentificador] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -60,14 +60,14 @@ function Login() {
     setBusy(true)
     setError(null)
     try {
-      await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+      await api('/auth/login', { method: 'POST', body: JSON.stringify({ identifier: identificador, password }) })
       const yo = await api<Me>('/auth/me')
       abrirSesion(qc, yo)
       router.push(homeFor(yo.role))
     } catch (err) {
       setError(err instanceof ApiError && err.status === 429
         ? 'Demasiados intentos. Esperá 15 minutos o restablecé tu contraseña.'
-        : 'El mail o la contraseña no coinciden. Revisalos e intentá de nuevo.')
+        : 'El email/usuario o la contraseña no coinciden. Revisalos e intentá de nuevo.')
       setBusy(false)
     }
   }
@@ -76,13 +76,14 @@ function Login() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-2xl font-extrabold tracking-[-0.02em]">Entrá a tu barrio</h1>
-        <p className="mt-1 text-sm text-ink-soft">Con el mail con el que te dieron de alta.</p>
+        <p className="mt-1 text-sm text-ink-soft">Vecinos y admins entran con su email; guardias, con el usuario que les asignó la administración.</p>
       </div>
 
       <form onSubmit={submit} className="flex flex-col gap-5">
-        <Campo id="mail" etiqueta="Mail">
-          <Input id="mail" type="email" autoComplete="email" required value={email}
-            onChange={(e) => setEmail(e.target.value)} />
+        <Campo id="identificador" etiqueta="Email o usuario">
+          <Input id="identificador" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false}
+            required value={identificador} placeholder="tu@email.com o cruiz"
+            onChange={(e) => setIdentificador(e.target.value)} />
         </Campo>
         <Campo id="clave" etiqueta="Contraseña"
           accesorio={<Link href="/olvide" className="text-sm font-medium text-marca hover:underline">¿La olvidaste?</Link>}>
@@ -95,6 +96,9 @@ function Login() {
           {busy ? 'Entrando…' : 'Entrar'}
         </Button>
       </form>
+      <p className="-mt-3 text-xs text-ink-soft">
+        Si sos guardia y no tenés email, pedile a la administración que te restablezca la contraseña.
+      </p>
 
       {google && (
         <>

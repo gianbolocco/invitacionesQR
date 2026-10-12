@@ -38,7 +38,8 @@ export const units = pgTable('unit', {
 export const people = pgTable('person', {
   id: uuid('id').primaryKey().defaultRandom(),
   neighborhoodId: uuid('neighborhood_id').notNull().references(() => neighborhoods.id),
-  email: text('email').notNull(),
+  email: text('email'),
+  username: text('username'),
   name: text('name').notNull(),
   role: text('role').notNull(),
   status: text('status').notNull().default('invited'),
@@ -48,11 +49,18 @@ export const people = pgTable('person', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   // Global, no por barrio. Con (neighborhood_id, email) el mismo mail podía
-  // existir en dos barrios, y el login —que busca solo por mail— entraba a uno
-  // arbitrario. Se impide el estado en vez de adivinar cuál era.
+  // existir en dos barrios, y el login —que busca por email/usuario— entraba a
+  // uno arbitrario. Se impide el estado en vez de adivinar cuál era.
   uniqueIndex('person_email_uq').on(t.email),
+  uniqueIndex('person_username_uq').on(t.username),
   check('person_role_ck', sql`${t.role} in ('resident','guard','admin')`),
   check('person_status_ck', sql`${t.status} in ('invited','active','disabled')`),
+  check('person_login_identifier_ck', sql`(
+    (${t.role} = 'guard' and (${t.email} is not null or ${t.username} is not null))
+    or (${t.role} <> 'guard' and ${t.email} is not null)
+  )`),
+  check('person_username_role_ck', sql`${t.username} is null or ${t.role} = 'guard'`),
+  check('person_username_format_ck', sql`${t.username} is null or ${t.username} ~ '^[a-z0-9][a-z0-9._-]{2,31}$'`),
 ])
 
 export const unitMembers = pgTable('unit_member', {

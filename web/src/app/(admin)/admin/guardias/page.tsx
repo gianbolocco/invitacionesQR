@@ -24,14 +24,14 @@ import {
 function AltaGuardia({ abierto, onAbiertoChange }: { abierto: boolean; onAbiertoChange: (v: boolean) => void }) {
   const alta = useAltaGuardia()
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   // Mismo motivo que en AltaVecino: limpiar al cerrar por cualquier
   // camino, no solo al mandarlo.
   function cambiarAbierto(v: boolean) {
-    if (!v) { setName(''); setEmail(''); setPassword(''); setError(null) }
+    if (!v) { setName(''); setUsername(''); setPassword(''); setError(null) }
     onAbiertoChange(v)
   }
 
@@ -39,13 +39,18 @@ function AltaGuardia({ abierto, onAbiertoChange }: { abierto: boolean; onAbierto
     e.preventDefault()
     setError(null)
     if (password.length < 10) { setError('La contraseña necesita al menos 10 caracteres.'); return }
+    const usuarioNormalizado = username.trim().toLowerCase()
+    if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(usuarioNormalizado)) {
+      setError('El usuario debe tener 3 a 32 caracteres: letras, números, punto, guion o guion bajo.')
+      return
+    }
     try {
-      await alta.mutateAsync({ name, email, password })
+      await alta.mutateAsync({ name, username: usuarioNormalizado, password })
       cambiarAbierto(false)
     } catch (err) {
-      setError(err instanceof ApiError && err.code === 'mail_repetido'
-        ? `${email} ya está en el padrón. Buscalo en la lista.`
-        : 'No se pudo crear. Revisá el mail y probá de nuevo.')
+      setError(err instanceof ApiError && err.code === 'usuario_repetido'
+        ? `El usuario ${usuarioNormalizado} ya está en uso. Elegí otro.`
+        : 'No se pudo crear el guardia. Revisá los datos y probá de nuevo.')
     }
   }
 
@@ -57,9 +62,11 @@ function AltaGuardia({ abierto, onAbiertoChange }: { abierto: boolean; onAbierto
         <Campo id="nombre-g" etiqueta="Nombre y apellido">
           <Input id="nombre-g" required placeholder="Carlos Ruiz" value={name} onChange={(e) => setName(e.target.value)} />
         </Campo>
-        <Campo id="mail-g" etiqueta="Usuario (mail)" ayuda="Identifica la cuenta. No hace falta que reciba mails.">
-          <Input id="mail-g" type="email" required placeholder="carlos@mail.com" value={email}
-            onChange={(e) => setEmail(e.target.value)} />
+        <Campo id="usuario-g" etiqueta="Usuario"
+          ayuda="3–32 caracteres: letras, números, punto, guion o guion bajo. No requiere mail.">
+          <Input id="usuario-g" autoComplete="username" autoCapitalize="none" spellCheck={false}
+            required placeholder="cruiz" value={username}
+            onChange={(e) => setUsername(e.target.value)} />
         </Campo>
         <Campo id="pass-g" etiqueta="Contraseña" ayuda="Mínimo 10 caracteres. Se la das vos en mano.">
           <Input id="pass-g" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -164,7 +171,11 @@ export default function GuardiasPage() {
           <div>
             {guardias.map((g) => (
               <Fila key={g.id} titulo={g.name}
-                meta={[ESTADO[g.status], g.lastLoginAt ? `último ingreso ${fechaConAnio(g.lastLoginAt)}` : 'nunca entró'].join(' · ')}
+                meta={[
+                  g.username ? `usuario ${g.username}` : g.email ?? 'sin usuario',
+                  ESTADO[g.status],
+                  g.lastLoginAt ? `último ingreso ${fechaConAnio(g.lastLoginAt)}` : 'nunca entró',
+                ].join(' · ')}
                 extremo={<MenuFila acciones={accionesDe(g)} />}
                 className={g.status === 'disabled' ? 'opacity-50' : undefined} />
             ))}

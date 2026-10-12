@@ -20,7 +20,7 @@ export default function PerfilPage() {
   const me = useSesion()
   return (
     <div className="flex flex-col gap-8">
-      <EncabezadoPagina antetitulo="Tu cuenta" titulo={me.name} subtitulo={me.email} />
+      <EncabezadoPagina antetitulo="Tu cuenta" titulo={me.name} subtitulo={me.email ?? me.username ?? ''} />
 
       <Seccion titulo="Tus unidades">
         {me.units.length === 0 ? (

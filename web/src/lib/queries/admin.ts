@@ -90,30 +90,13 @@ export function useAltaVecino() {
   })
 }
 
-/*
- * El alta de un guardia son dos requests: persona + contraseña. Si la
- * segunda falla, antes quedaba una cuenta sin clave que nadie podía usar
- * y el admin ni se enteraba. Ahora, si falla, se da de baja lo recién
- * creado y se informa — mejor nada que una cuenta fantasma.
- */
 export function useAltaGuardia() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (datos: { name: string; email: string; password: string }) => {
-      const creado = await api<{ id: string; email: string }>('/admin/people', {
-        method: 'POST', body: JSON.stringify({ name: datos.name, email: datos.email, role: 'guard' }),
-      })
-      try {
-        await api(`/admin/people/${creado.id}/password`, {
-          method: 'POST', body: JSON.stringify({ password: datos.password }),
-        })
-      } catch (err) {
-        await api(`/admin/people/${creado.id}/disable`, { method: 'POST' }).catch(() => {})
-        throw err
-      }
-      return creado
-    },
-    onError: () => toast.error('No se pudo crear el guardia. Probá de nuevo.'),
+    mutationFn: (datos: { name: string; username: string; password: string }) =>
+      api<{ id: string; username: string; status: string }>('/admin/guards', {
+        method: 'POST', body: JSON.stringify(datos),
+      }),
     onSettled: () => invalidarPersonas(qc),
   })
 }
@@ -121,9 +104,9 @@ export function useAltaGuardia() {
 export function useReenviarInvitacion() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (p: Pick<Person, 'id' | 'email'>) => api(`/admin/people/${p.id}/resend`, { method: 'POST' }),
-    onSuccess: (_d, p) => toast.success(`Reenviamos la invitación a ${p.email}.`),
-    onError: (_e, p) => toast.error(`No pudimos mandarle el mail a ${p.email}. Probá de nuevo en un rato.`),
+    mutationFn: (p: Pick<Person, 'id' | 'email' | 'username'>) => api(`/admin/people/${p.id}/resend`, { method: 'POST' }),
+    onSuccess: (_d, p) => toast.success(`Reenviamos la invitación a ${p.email ?? p.username ?? 'la persona'}.`),
+    onError: (_e, p) => toast.error(`No pudimos mandarle el mail a ${p.email ?? p.username ?? 'la persona'}. Probá de nuevo en un rato.`),
     onSettled: () => invalidarPersonas(qc),
   })
 }

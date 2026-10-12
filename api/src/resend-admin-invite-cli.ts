@@ -16,6 +16,7 @@ async function resendAdminInvite(): Promise<void> {
   )).limit(1)
 
   if (!admin) throw new Error(`No hay un admin invitado pendiente para ${email}`)
+  if (!admin.email) throw new Error(`El admin ${email} no tiene un email para recibir la invitación`)
 
   const token = randomToken()
   await db.update(authTokens).set({ usedAt: new Date() }).where(and(
