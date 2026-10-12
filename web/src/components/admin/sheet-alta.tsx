@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
+  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet'
 
 /**
@@ -20,17 +20,19 @@ export function SheetAlta({ etiqueta, titulo, descripcion, abierto, onAbiertoCha
   children: ReactNode
 }) {
   return (
-    <>
-      <Button onClick={() => onAbiertoChange(true)}><Plus aria-hidden />{etiqueta}</Button>
-      <Sheet open={abierto} onOpenChange={onAbiertoChange}>
-        <SheetContent className="overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{titulo}</SheetTitle>
-            {descripcion && <SheetDescription>{descripcion}</SheetDescription>}
-          </SheetHeader>
-          <div className="flex flex-col gap-4 px-4 pb-8">{children}</div>
-        </SheetContent>
-      </Sheet>
-    </>
+    <Sheet open={abierto} onOpenChange={onAbiertoChange}>
+      {/* SheetTrigger, no un Button suelto con onClick: así Radix sabe a
+          quién devolverle el foco cuando el sheet se cierra. */}
+      <SheetTrigger asChild>
+        <Button><Plus aria-hidden />{etiqueta}</Button>
+      </SheetTrigger>
+      <SheetContent className="overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{titulo}</SheetTitle>
+          {descripcion && <SheetDescription>{descripcion}</SheetDescription>}
+        </SheetHeader>
+        <div className="flex flex-col gap-4 px-4 pb-8">{children}</div>
+      </SheetContent>
+    </Sheet>
   )
 }

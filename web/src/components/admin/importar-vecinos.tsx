@@ -5,7 +5,7 @@ import { ApiError, usePreviewCsv, useImportarTanda, type FilaPreview, type Previ
 import { Button } from '@/components/ui/button'
 import { Nota } from '@/components/dominio/nota'
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
 
 const TAMANO_MAXIMO = 1_000_000
@@ -116,12 +116,15 @@ export function ImportarVecinos({ onImported }: { onImported: () => void }) {
   }
 
   return (
-    <>
-      <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-        <Upload aria-hidden />Importar desde CSV
-      </Button>
-      <Dialog open={open} onOpenChange={(next) => { if (!importando || next) setOpen(next) }}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
+    <Dialog open={open} onOpenChange={(next) => { if (!importando || next) setOpen(next) }}>
+      {/* DialogTrigger, no un Button suelto con onClick: así Radix sabe a
+          quién devolverle el foco cuando el diálogo se cierra. */}
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline">
+          <Upload aria-hidden />Importar desde CSV
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Importar vecinos desde CSV</DialogTitle>
             <DialogDescription>
@@ -257,7 +260,6 @@ export function ImportarVecinos({ onImported }: { onImported: () => void }) {
             )}
           </div>
         </DialogContent>
-      </Dialog>
-    </>
+    </Dialog>
   )
 }

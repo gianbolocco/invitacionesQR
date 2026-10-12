@@ -78,7 +78,9 @@ function AltaVecino({ abierto, onAbiertoChange }: { abierto: boolean; onAbiertoC
   )
 }
 
-function DialogLote({ persona, onCerrar }: { persona: Person | null; onCerrar: () => void }) {
+function DialogLote({ persona, disparador, onCerrar }: {
+  persona: Person | null; disparador: HTMLButtonElement | null; onCerrar: () => void
+}) {
   const cambiar = useCambiarLote()
   const [lot, setLot] = useState('')
 
@@ -92,7 +94,9 @@ function DialogLote({ persona, onCerrar }: { persona: Person | null; onCerrar: (
 
   return (
     <Dialog open={persona !== null} onOpenChange={(v) => { if (!v) { setLot(''); onCerrar() } }}>
-      <DialogContent>
+      {/* Lo abre el menú ⋯ de la fila, no un DialogTrigger: sin esto, Radix
+          no sabe a quién devolverle el foco al cerrar y lo manda al body. */}
+      <DialogContent onCloseAutoFocus={(e) => { e.preventDefault(); disparador?.focus() }}>
         <DialogHeader>
           <DialogTitle>Cambiar el lote de {persona?.name}</DialogTitle>
           <DialogDescription>Lo saca de su lote actual y lo pasa a este.</DialogDescription>
@@ -112,11 +116,13 @@ function DialogLote({ persona, onCerrar }: { persona: Person | null; onCerrar: (
   )
 }
 
-function DialogBaja({ persona, onCerrar }: { persona: Person | null; onCerrar: () => void }) {
+function DialogBaja({ persona, disparador, onCerrar }: {
+  persona: Person | null; disparador: HTMLButtonElement | null; onCerrar: () => void
+}) {
   const deshabilitar = useDeshabilitarPersona()
   return (
     <Dialog open={persona !== null} onOpenChange={(v) => { if (!v) onCerrar() }}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={(e) => { e.preventDefault(); disparador?.focus() }}>
         <DialogHeader>
           <DialogTitle>¿Dar de baja a {persona?.name}?</DialogTitle>
           <DialogDescription>
@@ -143,6 +149,7 @@ export default function VecinosPage() {
   const [altaAbierta, setAltaAbierta] = useState(false)
   const [corrigiendo, setCorrigiendo] = useState<Person | null>(null)
   const [porDarDeBaja, setPorDarDeBaja] = useState<Person | null>(null)
+  const [disparador, setDisparador] = useState<HTMLButtonElement | null>(null)
 
   const vecinos = (personas.data ?? []).filter((p) => p.role !== 'guard')
   const consulta = normalizarBusqueda(busqueda)
@@ -155,9 +162,12 @@ export default function VecinosPage() {
   function accionesDe(p: Person): AccionFila[] {
     const acciones: AccionFila[] = []
     if (p.status === 'invited') acciones.push({ etiqueta: 'Reenviar invitación', onClick: () => reenviar.mutate(p) })
-    acciones.push({ etiqueta: 'Cambiar lote', onClick: () => setCorrigiendo(p) })
+    acciones.push({ etiqueta: 'Cambiar lote', onClick: (btn) => { setDisparador(btn); setCorrigiendo(p) } })
     if (p.status === 'disabled') acciones.push({ etiqueta: 'Reactivar', onClick: () => reactivar.mutate(p) })
-    else acciones.push({ etiqueta: 'Dar de baja', destructiva: true, onClick: () => setPorDarDeBaja(p) })
+    else acciones.push({
+      etiqueta: 'Dar de baja', destructiva: true,
+      onClick: (btn) => { setDisparador(btn); setPorDarDeBaja(p) },
+    })
     return acciones
   }
 
@@ -207,8 +217,8 @@ export default function VecinosPage() {
         )}
       </div>
 
-      <DialogLote persona={corrigiendo} onCerrar={() => setCorrigiendo(null)} />
-      <DialogBaja persona={porDarDeBaja} onCerrar={() => setPorDarDeBaja(null)} />
+      <DialogLote persona={corrigiendo} disparador={disparador} onCerrar={() => setCorrigiendo(null)} />
+      <DialogBaja persona={porDarDeBaja} disparador={disparador} onCerrar={() => setPorDarDeBaja(null)} />
     </>
   )
 }
