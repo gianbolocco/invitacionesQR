@@ -67,7 +67,7 @@ export const registrarEgreso = (invitationId: string) =>
 
 export const buscarUnidades = (q: string) => api<UnidadHit[]>(`/gate/units?q=${encodeURIComponent(q)}`)
 
-export const altaExpres = (datos: { unitId: string; guestName: string; plate?: string }) =>
+export const altaExpres = (datos: { unitId: string; guestName: string; guestDoc?: string; plate?: string }) =>
   api<{ id: string }>('/gate/invitations', { method: 'POST', body: JSON.stringify(datos) })
 
 export const deshacer = (entryId: string) =>

@@ -43,6 +43,7 @@ gateRoutes.post('/invitations', async (req, res) => {
   const body = z.object({
     unitId: z.string().uuid(),
     guestName: z.string().min(1),
+    guestDoc: z.string().optional(),
     plate: z.string().optional(),
   }).parse(req.body)
 

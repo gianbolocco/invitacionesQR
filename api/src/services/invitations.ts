@@ -36,6 +36,7 @@ export async function assertUnitInNeighborhood(unitId: string, neighborhoodId: s
 export type CreateExpressInvitationInput = {
   unitId: string
   guestName: string
+  guestDoc?: string
   plate?: string
   createdBy: string
   neighborhoodId: string
@@ -48,9 +49,9 @@ export type CreateExpressInvitationInput = {
  * mismo barrio.
  *
  * Nada de lo que normalmente se elige: es de hoy, una vez, una persona —
- * los mismos defaults que ya tendría una visita de un solo día. Sin
- * documento: lo va a pedir el veredicto apenas se cree, no hace falta
- * duplicar ese campo acá.
+ * los mismos defaults que ya tendría una visita de un solo día. El
+ * documento es opcional acá: si no lo carga ahora, el veredicto lo va a
+ * exigir igual antes de poder registrar el ingreso.
  */
 export async function createExpressInvitation(input: CreateExpressInvitationInput) {
   await assertUnitInNeighborhood(input.unitId, input.neighborhoodId)
@@ -61,6 +62,7 @@ export async function createExpressInvitation(input: CreateExpressInvitationInpu
     createdBy: input.createdBy,
     kind: 'visita',
     guestName: input.guestName.trim(),
+    guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
     validFrom: hoy,
     validTo: hoy,

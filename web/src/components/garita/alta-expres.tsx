@@ -25,20 +25,23 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
   const [guestName, setGuestName] = useState('')
   const [unidad, setUnidad] = useState<UnidadHit | null>(null)
   const [qUnidad, setQUnidad] = useState('')
+  const [guestDoc, setGuestDoc] = useState('')
   const [plate, setPlate] = useState('')
   const qDemorada = useDemora(qUnidad)
   const unidades = useBuscarUnidades(unidad ? '' : qDemorada.trim())
   const alta = useAltaExpres()
 
   function cerrar(v: boolean) {
-    if (!v) { setGuestName(''); setUnidad(null); setQUnidad(''); setPlate('') }
+    if (!v) { setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate('') }
     onAbiertoChange(v)
   }
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
     if (!unidad) return
-    const inv = await alta.mutateAsync({ unitId: unidad.unitId, guestName, plate: plate || undefined })
+    const inv = await alta.mutateAsync({
+      unitId: unidad.unitId, guestName, guestDoc: guestDoc || undefined, plate: plate || undefined,
+    })
     cerrar(false)
     onCreada(inv.id)
   }
@@ -50,9 +53,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
       <SheetContent onCloseAutoFocus={(e) => { e.preventDefault(); disparador?.focus() }}>
         <SheetHeader>
           <SheetTitle>Autorizar sin invitación</SheetTitle>
-          <SheetDescription>
-            Para cuando el vecino aprobó por teléfono. Vale solo por hoy. El documento se pide en el próximo paso.
-          </SheetDescription>
+          <SheetDescription>Para cuando el vecino aprobó por teléfono. Vale solo por hoy.</SheetDescription>
         </SheetHeader>
         <form onSubmit={enviar} className="flex flex-col gap-4 px-4 pb-8">
           <Campo id="nombre-expres" etiqueta="Nombre del invitado">
@@ -82,6 +83,11 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
                 )}
               </>
             )}
+          </Campo>
+
+          <Campo id="doc-expres" etiqueta="Documento (opcional)" ayuda="Si no lo cargás acá, se pide al registrar el ingreso.">
+            <Input id="doc-expres" value={guestDoc} className="tabular" placeholder="30.123.456"
+              onChange={(e) => setGuestDoc(e.target.value)} />
           </Campo>
 
           <Campo id="patente-expres" etiqueta="Patente (opcional)">

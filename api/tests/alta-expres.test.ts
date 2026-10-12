@@ -96,6 +96,13 @@ describe('alta exprés de invitación', () => {
     expect(res.body.plate).toBe('AB123CD')
   })
 
+  it('acepta el documento opcional, si el guardia ya lo tiene', async () => {
+    const { cookie, unit142 } = await escenario()
+    const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
+      .send({ unitId: unit142.id, guestName: 'Con doc', guestDoc: '30123456' }).expect(201)
+    expect(res.body.guestDoc).toBe('30123456')
+  })
+
   it('rechaza una unidad de otro barrio', async () => {
     const { cookie } = await escenario()
     const [otroBarrio] = await db.insert(neighborhoods).values({ name: 'Lejano' }).returning()
