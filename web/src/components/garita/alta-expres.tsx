@@ -50,7 +50,9 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
       <SheetContent onCloseAutoFocus={(e) => { e.preventDefault(); disparador?.focus() }}>
         <SheetHeader>
           <SheetTitle>Autorizar sin invitación</SheetTitle>
-          <SheetDescription>Para cuando el vecino aprobó por teléfono. Vale solo por hoy.</SheetDescription>
+          <SheetDescription>
+            Para cuando el vecino aprobó por teléfono. Vale solo por hoy. El documento se pide en el próximo paso.
+          </SheetDescription>
         </SheetHeader>
         <form onSubmit={enviar} className="flex flex-col gap-4 px-4 pb-8">
           <Campo id="nombre-expres" etiqueta="Nombre del invitado">
@@ -68,7 +70,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
                 <Input id="lote-expres" value={qUnidad} placeholder="Lote o apellido del vecino"
                   onChange={(e) => setQUnidad(e.target.value)} />
                 {unidades.data && unidades.data.length > 0 && (
-                  <div className="mt-1 max-h-48 overflow-auto rounded-md border border-border">
+                  <div className="mt-1 max-h-48 overflow-auto rounded-md border border-border p-2 [&>*:last-child]:border-b-0">
                     {unidades.data.map((u) => (
                       <Fila key={`${u.unitId}-${u.residentName}`} titulo={u.residentName} meta={u.unitLabel}
                         onClick={() => { setUnidad(u); setQUnidad('') }} />
