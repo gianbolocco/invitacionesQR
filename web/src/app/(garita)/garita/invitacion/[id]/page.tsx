@@ -10,7 +10,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 
-/** Segundos que la confirmación espera antes de volver sola al escáner. */
+/** Segundos que la confirmación espera antes de volver sola a la pantalla anterior. */
 const SEGUNDOS_CONFIRMACION = 8
 
 const SALIDA = [0.2, 0.8, 0.2, 1] as const
@@ -30,7 +30,7 @@ function AccionesRegistrado({ onListo, onDeshacer, deshaciendo }: {
 
   useEffect(() => {
     siguienteRef.current?.focus()
-    const t = setInterval(() => setRestan((n) => n - 1), 1000)
+    const t = setInterval(() => setRestan((n) => Math.max(0, n - 1)), 1000)
     return () => clearInterval(t)
   }, [])
   useEffect(() => { if (restan <= 0) onListo() }, [restan, onListo])
@@ -96,7 +96,17 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     setPlate(q.data.invitation.plate ?? '')
   }
 
-  const salir = () => router.push('/garita/escanear')
+  // Vuelve a donde estaba: el escáner, la búsqueda, la agenda o el alta
+  // exprés. Una sola vez: el contador, Deshacer y Escape pueden coincidir, y
+  // dos back() seguidos retrocederían dos pantallas. Abierto directo (link o
+  // pestaña nueva) no hay a dónde volver, y va a la garita.
+  const saliendo = useRef(false)
+  function salir() {
+    if (saliendo.current) return
+    saliendo.current = true
+    if (window.history.length > 1) router.back()
+    else router.push('/garita')
+  }
 
   // El foco cae en el botón de acción recién cuando deja de cargar: Enter
   // registra sin tocar el mouse.
