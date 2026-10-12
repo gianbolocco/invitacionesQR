@@ -65,3 +65,42 @@ test('una invitación anulada no pasa', async ({ page, browser }) => {
   await expect(g.getByText('La anularon')).toBeVisible()
   await guardia.close()
 })
+
+test('el guardia registra el ingreso y después el egreso del mismo invitado', async ({ page, browser }) => {
+  const nombre = `Egreso E2E ${Date.now()}`
+  await entrar(page, 'vecino')
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await expect(page).toHaveURL(/\/invitaciones\/[0-9a-f-]{36}\?creada=1$/)
+
+  const guardia = await browser.newContext()
+  const g = await guardia.newPage()
+  await entrar(g, 'guardia')
+
+  // Ingreso.
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).click()
+  await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
+  await g.getByRole('button', { name: 'Registrar ingreso' }).click()
+  await expect(g.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
+
+  // Vuelve a "Hoy" y busca al mismo invitado: ahora tiene que ofrecer el egreso.
+  // .first(): la agenda, debajo del buscador, ya lo muestra en "Ya entraron"
+  // desde el ingreso, así que el nombre aparece dos veces en la página; el
+  // resultado del buscador es el primero en el DOM.
+  await g.goto('/garita')
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).first().click()
+  await expect(g.getByText('EGRESO', { exact: true })).toBeVisible()
+  await g.getByRole('button', { name: 'Registrar egreso' }).click()
+  await expect(g.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
+
+  // La agenda lo deja afuera, en "ya entraron". .first(): en escritorio,
+  // "Últimos movimientos" también nombra al invitado, aparte de la agenda.
+  await g.goto('/garita')
+  await expect(g.getByText(/^Ya entraron/)).toBeVisible()
+  await expect(g.getByText(nombre).first()).toBeVisible()
+
+  await guardia.close()
+})
