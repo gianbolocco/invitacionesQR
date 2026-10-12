@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Html5Qrcode } from 'html5-qrcode'
+import { motion, useReducedMotion } from 'motion/react'
+import { ArrowLeft, CameraOff, Loader2 } from 'lucide-react'
 import { useMe } from '@/lib/session'
 import { ApiError } from '@/lib/api'
 import { porToken } from '@/lib/gate'
@@ -20,21 +22,50 @@ function mensajeDeError(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) return 'La sesión venció. Volvé a iniciar sesión.'
     if (error.status === 403) return 'Esta cuenta no tiene permiso para usar la garita.'
-    if (error.status === 404) return 'El QR no corresponde a una invitación válida.'
+    if (error.status === 404) return 'Ese QR no es de una invitación válida.'
   }
-  return 'No se pudo validar el QR. Revisá la conexión e intentá de nuevo.'
+  return 'No se pudo validar el QR. Revisá la conexión y probá de nuevo.'
 }
 
+type Estado = 'abriendo' | 'listo' | 'sin_camara'
+
+const ESTADO_PILL: Record<Estado, { texto: string; punto: string }> = {
+  abriendo: { texto: 'Conectando', punto: 'bg-[#e5c879]' },
+  listo: { texto: 'Lector activo', punto: 'bg-escaner-acento' },
+  sin_camara: { texto: 'Sin cámara', punto: 'bg-[#ff8b82]' },
+}
+
+/** Las cuatro esquinas del marco. Un solo SVG: escala con el marco y no hay que alinear spans. */
+function Esquinas() {
+  const d = 'M2 22 V10 A8 8 0 0 1 10 2 H22'
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden className="absolute inset-0 size-full overflow-visible">
+      {[0, 90, 180, 270].map((r) => (
+        <path key={r} d={d} transform={`rotate(${r} 50 50)`} fill="none" stroke="currentColor"
+          strokeWidth="3.2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      ))}
+    </svg>
+  )
+}
+
+/**
+ * El escáner es un visor de cámara: la cámara es la pantalla, y lo único que
+ * se mueve es el marco. Respira mientras espera y se cierra sobre el QR
+ * cuando lo agarra, así el guardia sabe que leyó antes de que cambie la
+ * pantalla.
+ */
 export default function EscanearPage() {
   const me = useMe()
   const router = useRouter()
+  const reducir = useReducedMotion()
   const precargarVeredicto = usePrecargarVeredicto()
-  const [estado, setEstado] = useState<'abriendo' | 'listo' | 'sin_camara'>('abriendo')
+  const [estado, setEstado] = useState<Estado>('abriendo')
   const [error, setError] = useState<string | null>(null)
   const [validando, setValidando] = useState(false)
   const [marco, setMarco] = useState(240)
   const ultimoQr = useRef<string | null>(null)
   const procesando = useRef(false)
+  const visorRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     if (!me) return
@@ -45,8 +76,12 @@ export default function EscanearPage() {
       { facingMode: 'environment' },
       {
         fps: 12,
+        // Proporcional a lo que se VE (el visor), no al video, que puede ser
+        // más alto y quedar recortado. Sin tope fijo: en una PC el video va a
+        // todo el ancho y un QR a distancia normal no entraría en 300px.
         qrbox: (ancho, alto) => {
-          const size = Math.floor(Math.min(280, ancho * 0.76, alto * 0.68))
+          const visible = Math.min(alto, visorRef.current?.clientHeight ?? alto)
+          const size = Math.floor(Math.min(ancho * 0.72, visible * 0.66))
           setMarco(size)
           return { width: size, height: size }
         },
@@ -61,7 +96,7 @@ export default function EscanearPage() {
         const token = tokenDelQr(texto)
         if (!token) {
           if (vivo) {
-            setError('No reconozco este código. Enfocá una invitación de VisitPass dentro del marco.')
+            setError('Ese código no es de VisitPass. Enfocá el QR de la invitación.')
             setValidando(false)
           }
           procesando.current = false
@@ -100,96 +135,102 @@ export default function EscanearPage() {
     setError(null)
   }, [])
 
-  if (!me) return <main className="p-6">Cargando…</main>
+  if (!me) {
+    return (
+      <main className="grid h-dvh place-items-center bg-escaner-fondo text-escaner-texto">
+        <Loader2 className="size-8 animate-spin" aria-hidden />
+      </main>
+    )
+  }
 
-  const camaraLista = estado === 'listo'
+  const pill = ESTADO_PILL[estado]
+  // Esperando: respira. Leyendo: se cierra y se queda quieto. Error: quieto.
+  const marcoAnim = validando
+    ? { scale: 0.9, opacity: 1 }
+    : estado === 'listo' && !error && !reducir
+      ? { scale: [1, 1.025, 1], opacity: [0.7, 1, 0.7] }
+      : { scale: 1, opacity: 0.85 }
+  const marcoTrans = validando
+    ? { type: 'spring' as const, stiffness: 420, damping: 22 }
+    : { duration: 2.6, ease: 'easeInOut' as const, repeat: Infinity }
 
   return (
-    <main className="flex h-dvh min-h-[32rem] flex-col overflow-hidden bg-escaner-fondo text-escaner-texto">
-      <header className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 pb-3 pt-[calc(0.7rem+env(safe-area-inset-top,0px))] sm:px-6">
+    <main className="flex h-dvh min-h-[30rem] flex-col overflow-hidden bg-escaner-fondo text-escaner-texto">
+      <header className="flex shrink-0 items-center gap-3 px-3 pb-2 pt-[calc(0.6rem+env(safe-area-inset-top,0px))] sm:px-5">
         <button onClick={salir} aria-label="Volver a garita"
-          className="grid size-11 shrink-0 place-items-center rounded-full border border-white/15 bg-white/5">
-          <svg viewBox="0 0 24 24" aria-hidden className="size-5" fill="none"
-            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 5l-7 7 7 7" />
-          </svg>
+          className="grid size-11 shrink-0 place-items-center rounded-full transition-colors hover:bg-white/10">
+          <ArrowLeft className="size-5" aria-hidden />
         </button>
-        <div className="min-w-0 flex-1">
-          <p className="eyebrow" style={{ color: 'inherit', opacity: 0.56 }}>Control de acceso</p>
-          <p className="display text-lg leading-tight">Garita</p>
-        </div>
-        <div className="flex h-9 items-center gap-2 rounded-full border border-white/10 bg-black/15 px-3 text-[0.65rem] font-semibold tracking-[0.12em]">
-          <span className={`size-2 rounded-full ${camaraLista ? 'bg-[#88dda2]' : estado === 'sin_camara' ? 'bg-[#ff8b82]' : 'bg-[#e5c879]'}`} />
-          {camaraLista ? 'LECTOR ACTIVO' : estado === 'sin_camara' ? 'SIN CÁMARA' : 'CONECTANDO'}
-        </div>
+        <h1 className="font-display min-w-0 flex-1 truncate text-xl font-extrabold tracking-[-0.02em]">Escanear</h1>
+        <p role="status" className="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white/[0.07] px-3 text-xs font-semibold">
+          <span aria-hidden className={`size-2 rounded-full transition-colors duration-500 ${pill.punto}`} />
+          {pill.texto}
+        </p>
       </header>
 
-      <section className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-4 sm:px-6 sm:pt-5">
-        <div className="flex shrink-0 items-end justify-between gap-3">
-          <div>
-            <p className="eyebrow" style={{ color: 'inherit', opacity: 0.58 }}>Lector QR</p>
-            <h1 className="display mt-1 text-[1.7rem] leading-tight sm:text-3xl">Escanear invitación</h1>
+      <section ref={visorRef} className="relative mx-2 min-h-0 flex-1 overflow-hidden rounded-[1.75rem] bg-black sm:mx-5">
+        {/* El video va en su proporción natural y centrado, nunca estirado:
+            la librería traduce el marco a coordenadas del video suponiendo
+            que lo ve entero (con object-cover una webcam horizontal leería
+            una región deformada). Si es más alto que el visor, se recorta
+            parejo arriba y abajo, y el centro sigue coincidiendo. */}
+        <div id="reader" aria-label="Vista de cámara para leer el código QR"
+          className="!absolute inset-x-0 top-1/2 -translate-y-1/2 [&_video]:!h-auto [&_video]:!w-full" />
+
+        {/* Viñeta: oscurece todo lo que no es el marco, sin tapar la cámara. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
+          <div className="relative rounded-[1.4rem] shadow-[0_0_0_100vmax_rgb(0_0_0/0.42)] transition-[width,height] duration-300"
+            style={{ width: marco, height: marco }}>
+            <motion.div className="absolute -inset-1 text-escaner-acento drop-shadow-[0_0_10px_var(--escaner-acento)]"
+              animate={marcoAnim} transition={marcoTrans}>
+              <Esquinas />
+            </motion.div>
           </div>
-          <span className="mb-1 hidden rounded-full border border-white/15 px-3 py-1.5 text-[0.65rem] font-semibold tracking-[0.12em] opacity-70 sm:inline-flex">
-            AUTOMÁTICO
-          </span>
         </div>
 
-        <div className="relative mt-4 min-h-0 flex-1 overflow-hidden rounded-[1.35rem] border border-white/15 bg-[#07100c] shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
-          <div id="reader" aria-label="Vista de cámara para leer el código QR"
-            className="absolute inset-0 overflow-hidden [&_video]:size-full [&_video]:object-cover" />
-
-          <div aria-hidden className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
-            <div className="relative rounded-xl" style={{ width: marco, height: marco }}>
-              <span className="absolute left-0 top-0 size-9 rounded-tl-xl border-l-[3px] border-t-[3px] border-[#d8f6df] shadow-[0_0_14px_rgba(150,255,180,0.3)]" />
-              <span className="absolute right-0 top-0 size-9 rounded-tr-xl border-r-[3px] border-t-[3px] border-[#d8f6df] shadow-[0_0_14px_rgba(150,255,180,0.3)]" />
-              <span className="absolute bottom-0 left-0 size-9 rounded-bl-xl border-b-[3px] border-l-[3px] border-[#d8f6df] shadow-[0_0_14px_rgba(150,255,180,0.3)]" />
-              <span className="absolute bottom-0 right-0 size-9 rounded-br-xl border-b-[3px] border-r-[3px] border-[#d8f6df] shadow-[0_0_14px_rgba(150,255,180,0.3)]" />
-            </div>
+        {estado === 'abriendo' && (
+          <div className="absolute inset-0 z-20 grid place-items-center">
+            <Loader2 className="size-7 animate-spin opacity-70" aria-label="Abriendo la cámara" />
           </div>
+        )}
 
-          {estado === 'abriendo' && (
-            <div className="absolute inset-0 z-20 grid place-items-center bg-black/55 px-6 text-center">
-              <p className="rounded-full border border-white/15 bg-black/30 px-4 py-2 text-sm">Abriendo la cámara…</p>
-            </div>
-          )}
-
-          {estado === 'sin_camara' && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-[#07100c]/95 px-8 text-center">
-              <p className="display text-2xl">No se pudo abrir la cámara</p>
-              <p className="max-w-sm text-sm leading-relaxed text-white/70">
-                Revisá el permiso de cámara del navegador y que estés entrando por HTTPS.
-              </p>
-              <button onClick={salir} className="mt-2 min-h-12 rounded-full border border-white/20 px-5 text-sm font-semibold">
-                Volver a garita
-              </button>
-            </div>
-          )}
-
-          {validando && (
-            <div role="status" className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-white/15 bg-[#07100c]/85 px-4 py-2 text-sm font-semibold shadow-lg backdrop-blur">
-              Validando invitación…
-            </div>
-          )}
-        </div>
-
-        <footer aria-live="polite" className="mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3">
-          <div aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-lg">
-            {error ? '!' : '⌗'}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{error ? 'No se pudo leer la invitación' : 'Escaneo automático'}</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-white/65">
-              {error ?? 'Centrala dentro del marco y subí el brillo de la pantalla del invitado.'}
+        {estado === 'sin_camara' && (
+          <div className="absolute inset-0 z-20 flex flex-col items-start justify-end gap-3 bg-escaner-fondo p-6 sm:p-8">
+            <CameraOff className="size-8 opacity-60" aria-hidden />
+            <p className="font-display text-3xl font-extrabold leading-tight tracking-[-0.02em]">No se pudo abrir la cámara</p>
+            <p className="max-w-sm text-sm leading-relaxed opacity-70">
+              Dale permiso de cámara al navegador y entrá por HTTPS. Mientras tanto, buscá al invitado por nombre.
             </p>
+            <button onClick={salir}
+              className="mt-2 min-h-12 rounded-full bg-escaner-texto px-5 text-sm font-bold text-escaner-fondo">
+              Buscar por nombre
+            </button>
           </div>
-          {error && (
-            <button onClick={reintentar} className="min-h-10 shrink-0 rounded-full border border-white/20 px-3 text-xs font-semibold">
+        )}
+
+        {validando && (
+          <motion.p role="status" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            className="absolute inset-x-0 bottom-5 z-20 mx-auto flex w-fit items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm font-semibold backdrop-blur">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Validando invitación
+          </motion.p>
+        )}
+      </section>
+
+      <footer aria-live="polite"
+        className="flex min-h-16 shrink-0 items-center gap-3 px-5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3 sm:px-7">
+        {error ? (
+          <>
+            <p className="min-w-0 flex-1 text-sm font-semibold text-[#ffb4ad]">{error}</p>
+            <button onClick={reintentar}
+              className="min-h-10 shrink-0 rounded-full bg-white/10 px-4 text-sm font-semibold transition-colors hover:bg-white/15">
               Reintentar
             </button>
-          )}
-        </footer>
-      </section>
+          </>
+        ) : (
+          <p className="text-sm opacity-65">Centrá el QR en el marco. Si cuesta, que el invitado suba el brillo.</p>
+        )}
+      </footer>
     </main>
   )
 }
