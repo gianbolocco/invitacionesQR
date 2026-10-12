@@ -21,6 +21,7 @@ test('el guardia busca un invitado, registra el ingreso y lo deshace', async ({ 
   await expect(g).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
   await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
 
+  await g.getByLabel('Documento').fill('30111222')
   await g.getByRole('button', { name: 'Registrar ingreso' }).click()
   await expect(g.getByText('Deshacer')).toBeVisible()
 
@@ -82,6 +83,7 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await g.getByLabel('Buscar invitado').fill(nombre)
   await g.getByText(nombre).click()
   await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
+  await g.getByLabel('Documento').fill('30111222')
   await g.getByRole('button', { name: 'Registrar ingreso' }).click()
   await expect(g.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
 
@@ -103,4 +105,31 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await expect(g.getByText(nombre).first()).toBeVisible()
 
   await guardia.close()
+})
+
+test('el guardia da de alta una invitación exprés y el ingreso exige documento', async ({ page }) => {
+  const nombre = `Exprés E2E ${Date.now()}`
+  await entrar(page, 'guardia')
+  await page.goto('/garita')
+
+  await page.getByLabel('Buscar invitado').fill(nombre)
+  await expect(page.getByText('Sin resultados.', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: '¿No tiene invitación? Autorizar ahora' }).click()
+
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByLabel('Lote').fill('900')
+  // Acotado al sheet: la agenda de atrás puede tener su propia fila "invita
+  // Vecina E2E" de otros tests, y el nombre quedaría ambiguo sin esto.
+  await page.getByRole('dialog').getByText('Vecina E2E').click()
+  await page.getByRole('button', { name: 'Autorizar ingreso' }).click()
+
+  await expect(page).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
+  await expect(page.getByText('INGRESO', { exact: true })).toBeVisible()
+
+  // Sin documento, el botón no deja avanzar.
+  await expect(page.getByRole('button', { name: 'Registrar ingreso' })).toBeDisabled()
+
+  await page.getByLabel('Documento').fill('30999888')
+  await page.getByRole('button', { name: 'Registrar ingreso' }).click()
+  await expect(page.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
 })

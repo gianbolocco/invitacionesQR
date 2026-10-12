@@ -208,7 +208,11 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               </label>
             </div>
           )}
-          <button ref={accionRef} onClick={registrar} disabled={registrando}
+          {/* Nadie entra sin documento: si la invitación no lo traía, se carga acá. */}
+          {!esEgreso && !doc.trim() && (
+            <p className="text-sm font-semibold opacity-80">Hace falta el documento para registrar el ingreso.</p>
+          )}
+          <button ref={accionRef} onClick={registrar} disabled={registrando || (!esEgreso && !doc.trim())}
             className="min-h-16 rounded bg-pass-ink text-xl font-bold text-pass-field disabled:opacity-60">
             {registrando ? 'Registrando…' : esEgreso ? 'Registrar egreso' : 'Registrar ingreso'}
           </button>

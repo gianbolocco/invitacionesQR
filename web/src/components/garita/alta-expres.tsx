@@ -1,0 +1,97 @@
+'use client'
+import { useState } from 'react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Campo } from '@/components/dominio/campo'
+import { Fila } from '@/components/dominio/fila'
+import { useDemora } from '@/lib/use-demora'
+import { useBuscarUnidades, useAltaExpres } from '@/lib/queries/garita'
+import type { UnidadHit } from '@/lib/gate'
+import {
+  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
+} from '@/components/ui/sheet'
+
+/**
+ * El alta exprés: nombre + lote nada más. Tipo, ventana y cupo quedan fijos
+ * (visita, solo hoy, una persona) — es alguien parado en la puerta ahora, no
+ * una invitación a futuro.
+ */
+export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
+  abierto: boolean
+  onAbiertoChange: (v: boolean) => void
+  disparador: HTMLButtonElement | null
+  onCreada: (id: string) => void
+}) {
+  const [guestName, setGuestName] = useState('')
+  const [unidad, setUnidad] = useState<UnidadHit | null>(null)
+  const [qUnidad, setQUnidad] = useState('')
+  const [plate, setPlate] = useState('')
+  const qDemorada = useDemora(qUnidad)
+  const unidades = useBuscarUnidades(unidad ? '' : qDemorada.trim())
+  const alta = useAltaExpres()
+
+  function cerrar(v: boolean) {
+    if (!v) { setGuestName(''); setUnidad(null); setQUnidad(''); setPlate('') }
+    onAbiertoChange(v)
+  }
+
+  async function enviar(e: React.FormEvent) {
+    e.preventDefault()
+    if (!unidad) return
+    const inv = await alta.mutateAsync({ unitId: unidad.unitId, guestName, plate: plate || undefined })
+    cerrar(false)
+    onCreada(inv.id)
+  }
+
+  return (
+    <Sheet open={abierto} onOpenChange={cerrar}>
+      {/* Lo abre un botón suelto en BuscarInvitado, no un SheetTrigger: sin
+          onCloseAutoFocus, Radix manda el foco al body al cerrar. */}
+      <SheetContent onCloseAutoFocus={(e) => { e.preventDefault(); disparador?.focus() }}>
+        <SheetHeader>
+          <SheetTitle>Autorizar sin invitación</SheetTitle>
+          <SheetDescription>Para cuando el vecino aprobó por teléfono. Vale solo por hoy.</SheetDescription>
+        </SheetHeader>
+        <form onSubmit={enviar} className="flex flex-col gap-4 px-4 pb-8">
+          <Campo id="nombre-expres" etiqueta="Nombre del invitado">
+            <Input id="nombre-expres" required value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+          </Campo>
+
+          <Campo id="lote-expres" etiqueta="Lote">
+            {unidad ? (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-input px-3 py-2">
+                <span className="text-sm font-semibold">{unidad.unitLabel} · {unidad.residentName}</span>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setUnidad(null)}>Cambiar</Button>
+              </div>
+            ) : (
+              <>
+                <Input id="lote-expres" value={qUnidad} placeholder="Lote o apellido del vecino"
+                  onChange={(e) => setQUnidad(e.target.value)} />
+                {unidades.data && unidades.data.length > 0 && (
+                  <div className="mt-1 max-h-48 overflow-auto rounded-md border border-border">
+                    {unidades.data.map((u) => (
+                      <Fila key={`${u.unitId}-${u.residentName}`} titulo={u.residentName} meta={u.unitLabel}
+                        onClick={() => { setUnidad(u); setQUnidad('') }} />
+                    ))}
+                  </div>
+                )}
+                {unidades.data?.length === 0 && (
+                  <p className="mt-1 text-sm text-ink-soft">Sin resultados. Probá con el lote o el apellido.</p>
+                )}
+              </>
+            )}
+          </Campo>
+
+          <Campo id="patente-expres" etiqueta="Patente (opcional)">
+            <Input id="patente-expres" value={plate} className="uppercase"
+              onChange={(e) => setPlate(e.target.value.toUpperCase())} />
+          </Campo>
+
+          <Button type="submit" disabled={!unidad || !guestName.trim() || alta.isPending}>
+            {alta.isPending ? 'Creando…' : 'Autorizar ingreso'}
+          </Button>
+        </form>
+      </SheetContent>
+    </Sheet>
+  )
+}
