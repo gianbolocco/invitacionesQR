@@ -11,6 +11,7 @@ import { importPeopleRows, previewPeopleCsv } from '../services/people-import.js
 import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
 import { guardarLogo, borrarLogo } from '../services/branding.js'
 import { AppError } from '../lib/errors.js'
+import { contrasena } from '../lib/contrasena.js'
 
 export const adminRoutes = Router()
 adminRoutes.use(requireAuth, requireRole('admin'))
@@ -34,7 +35,7 @@ adminRoutes.post('/guards', async (req, res) => {
   const body = z.object({
     name: z.string().trim().min(1).max(160),
     username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}$/),
-    password: z.string().min(10),
+    password: contrasena,
   }).parse(req.body)
 
   const guard = await createGuard({
@@ -95,7 +96,7 @@ adminRoutes.post('/people/:id/resend', async (req, res) => {
 })
 
 adminRoutes.post('/people/:id/password', async (req, res) => {
-  const { password } = z.object({ password: z.string().min(10) }).parse(req.body)
+  const { password } = z.object({ password: contrasena }).parse(req.body)
   await setGuardPassword(req.params.id, password, req.person!.id, req.person!.neighborhoodId)
   res.json({ ok: true })
 })

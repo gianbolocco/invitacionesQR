@@ -13,10 +13,10 @@ import {
 } from '../services/sessions.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { AppError } from '../lib/errors.js'
+import { contrasena } from '../lib/contrasena.js'
 
 export const authRoutes = Router()
 
-const passwordSchema = z.string().min(10, 'La contraseña necesita al menos 10 caracteres')
 
 // GET solo mira: si el escáner de links del cliente de mail pasa por acá, no
 // consume nada y el vecino todavía puede usar su invitación.
@@ -29,7 +29,7 @@ authRoutes.get('/invite/:token', async (req, res) => {
 authRoutes.post('/invite', async (req, res) => {
   const { token, password, lot } = z.object({
     token: z.string(),
-    password: passwordSchema,
+    password: contrasena,
     // Si administración no lo asignó, el vecino declara el lote al entrar.
     // Numérico para que "lote 142" y "Lote 142" no terminen como unidades distintas.
     lot: z.coerce.number().int().min(1).max(99999).optional(),
@@ -130,7 +130,7 @@ authRoutes.get('/reset/:token', async (req, res) => {
 })
 
 authRoutes.post('/reset', async (req, res) => {
-  const { token, password } = z.object({ token: z.string(), password: passwordSchema }).parse(req.body)
+  const { token, password } = z.object({ token: z.string(), password: contrasena }).parse(req.body)
   const personId = await consumeToken(token, 'reset')
   await setPassword(personId, password)
   setSessionCookie(res, await createSession(personId, req.get('user-agent')))

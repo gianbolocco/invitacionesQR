@@ -17,6 +17,7 @@ import { Campo } from '@/components/dominio/campo'
 import { Nota } from '@/components/dominio/nota'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MIN_CONTRASENA } from '@/components/campo-contrasena'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -38,7 +39,7 @@ function AltaGuardia({ abierto, onAbiertoChange }: { abierto: boolean; onAbierto
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    if (password.length < 10) { setError('La contraseña necesita al menos 10 caracteres.'); return }
+    if (password.length < MIN_CONTRASENA) { setError(`La contraseña necesita al menos ${MIN_CONTRASENA} caracteres.`); return }
     const usuarioNormalizado = username.trim().toLowerCase()
     if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(usuarioNormalizado)) {
       setError('El usuario debe tener 3 a 32 caracteres: letras, números, punto, guion o guion bajo.')
@@ -68,7 +69,7 @@ function AltaGuardia({ abierto, onAbiertoChange }: { abierto: boolean; onAbierto
             required placeholder="cruiz" value={username}
             onChange={(e) => setUsername(e.target.value)} />
         </Campo>
-        <Campo id="pass-g" etiqueta="Contraseña" ayuda="Mínimo 10 caracteres. Se la das vos en mano.">
+        <Campo id="pass-g" etiqueta="Contraseña" ayuda={`Mínimo ${MIN_CONTRASENA} caracteres. Se la das vos en mano.`}>
           <Input id="pass-g" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </Campo>
         {error && <Nota tono="error">{error}</Nota>}
@@ -86,7 +87,7 @@ function DialogContrasena({ persona, disparador, onCerrar }: {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
-    if (!persona || password.length < 10) return
+    if (!persona || password.length < MIN_CONTRASENA) return
     await cambiar.mutateAsync({ personId: persona.id, password })
     setPassword('')
     onCerrar()
@@ -111,7 +112,7 @@ function DialogContrasena({ persona, disparador, onCerrar }: {
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={onCerrar}>Cancelar</Button>
-          <Button type="submit" form="form-contrasena" disabled={cambiar.isPending || password.length < 10}>
+          <Button type="submit" form="form-contrasena" disabled={cambiar.isPending || password.length < MIN_CONTRASENA}>
             Guardar
           </Button>
         </DialogFooter>
