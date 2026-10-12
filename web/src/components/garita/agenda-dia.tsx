@@ -15,7 +15,7 @@ function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
   /*
    * `adentro` se pregunta PRIMERO, antes que `enteredCount`. Alguien que
    * entró ayer y nadie le registró la salida tiene enteredCount 0 para hoy
-   * pero sigue adentro: preguntando al revés aparecería como "Esperando".
+   * pero sigue adentro: preguntando al revés aparecería como "Pendiente".
    */
   const estado: Estado = r.adentro ? 'adentro' : r.enteredCount === 0 ? 'esperando' : 'salio'
   const detalle = estado === 'adentro'
@@ -83,7 +83,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
           {esperando.length > 0 && (
             <section className="flex flex-col gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
-                Esperando ({esperando.length})
+                Pendientes ({esperando.length})
               </p>
               <div>{esperando.map((r) => filaDe(r, onAbrir))}</div>
             </section>

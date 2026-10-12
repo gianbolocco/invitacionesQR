@@ -37,7 +37,7 @@ type AuditRow = {
 const ESTADO: Record<AuditRow['status'], { label: string; clase: string }> = {
   adentro: { label: 'Adentro', clase: 'text-marca font-bold' },
   concluida: { label: 'Concluida', clase: 'text-marca' },
-  esperando: { label: 'Esperando', clase: '' },
+  esperando: { label: 'Pendiente', clase: '' },
   vencida: { label: 'No llegó', clase: 'text-peligro' },
   anulada: { label: 'Anulada', clase: 'opacity-60' },
 }
@@ -156,7 +156,7 @@ export default function AuditoriaPage() {
           { valor: 'todos', etiqueta: 'Todos', contador: todos },
           { valor: 'adentro', etiqueta: 'Adentro', contador: counts?.adentro ?? 0 },
           { valor: 'concluida', etiqueta: 'Concluidas', contador: counts?.concluida ?? 0 },
-          { valor: 'esperando', etiqueta: 'Esperando', contador: counts?.esperando ?? 0 },
+          { valor: 'esperando', etiqueta: 'Pendientes', contador: counts?.esperando ?? 0 },
           { valor: 'vencida', etiqueta: 'No llegaron', contador: counts?.vencida ?? 0 },
           { valor: 'anulada', etiqueta: 'Anuladas', contador: counts?.anulada ?? 0 },
         ]} />
