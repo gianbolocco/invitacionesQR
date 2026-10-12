@@ -22,7 +22,7 @@ export function SelectorTema({ className }: { className?: string }) {
         <button key={valor} type="button" role="radio" aria-checked={tema === valor}
           title={etiqueta} onClick={() => setTema(valor)}
           className={cn('grid size-11 place-items-center rounded-full transition-colors duration-150',
-            tema === valor ? 'bg-marca text-sobre-marca' : 'text-ink-soft hover:text-ink')}>
+            tema === valor ? 'bg-marca/15 text-marca' : 'text-ink-soft hover:text-ink')}>
           <Icono className="size-[18px]" aria-hidden />
           <span className="sr-only">{etiqueta}</span>
         </button>
