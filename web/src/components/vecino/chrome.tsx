@@ -39,8 +39,12 @@ export function ChromeVecino({ children }: { children: React.ReactNode }) {
           <nav aria-label="Secciones" className="hidden items-center gap-1 sm:flex">
             {items.map((i) => (
               <Link key={i.href} href={i.href} aria-current={i.activo ? 'page' : undefined}
-                className={cn('rounded-full px-3.5 py-2 text-sm font-semibold transition-colors duration-150',
+                className={cn('flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors duration-150',
                   i.activo ? 'bg-white/20' : 'opacity-80 hover:bg-white/10 hover:opacity-100')}>
+                {/* Solo Administración lleva ícono acá: es la única pill que
+                    cambia de "modo" en vez de sección, y conviene que se
+                    distinga del resto. */}
+                {i.href === '/admin' && <i.icono aria-hidden className="size-4" />}
                 {i.etiqueta}
               </Link>
             ))}
