@@ -23,6 +23,10 @@ test('el guardia busca un invitado, registra el ingreso y lo deshace', async ({ 
 
   await g.getByLabel('Documento').fill('30111222')
   await g.getByRole('button', { name: 'Registrar ingreso' }).click()
+  // La confirmación tiene que decir INGRESO, no EGRESO: la mutación invalida
+  // el veredicto al terminar, y esEgreso no se puede recalcular después de
+  // eso o termina leyendo el estado opuesto al que se acaba de registrar.
+  await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
   await expect(g.getByText('Deshacer')).toBeVisible()
 
   await g.getByRole('button', { name: 'Deshacer' }).click()
@@ -85,6 +89,7 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
   await g.getByLabel('Documento').fill('30111222')
   await g.getByRole('button', { name: 'Registrar ingreso' }).click()
+  await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
   await expect(g.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
 
   // Vuelve a "Hoy" y busca al mismo invitado: ahora tiene que ofrecer el egreso.
@@ -96,6 +101,7 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await g.getByText(nombre).first().click()
   await expect(g.getByText('EGRESO', { exact: true })).toBeVisible()
   await g.getByRole('button', { name: 'Registrar egreso' }).click()
+  await expect(g.getByText('EGRESO', { exact: true })).toBeVisible()
   await expect(g.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
 
   // La agenda lo deja afuera, en "ya entraron". .first(): en escritorio,
@@ -129,5 +135,6 @@ test('el guardia da de alta una invitación exprés y el ingreso exige documento
 
   await page.getByLabel('Documento').fill('30999888')
   await page.getByRole('button', { name: 'Registrar ingreso' }).click()
+  await expect(page.getByText('INGRESO', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
 })

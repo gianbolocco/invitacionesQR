@@ -81,7 +81,11 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const [idCargado, setIdCargado] = useState<string | null>(null)
   const [doc, setDoc] = useState('')
   const [plate, setPlate] = useState('')
-  const [hecho, setHecho] = useState<Movimiento | null>(null)
+  // esEgreso va adentro de `hecho`, no se recalcula en el render: la
+  // mutación invalida el veredicto al terminar, así que para cuando se
+  // muestra la confirmación, `adentro` ya cambió y diría lo contrario de
+  // lo que realmente se acaba de registrar.
+  const [hecho, setHecho] = useState<{ movimiento: Movimiento; esEgreso: boolean } | null>(null)
   const accionRef = useRef<HTMLButtonElement>(null)
 
   // Precarga de doc/patente al llegar el resultado: se ajusta durante el
@@ -140,7 +144,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           guestDoc: doc || undefined, plate: plate || undefined,
         })
       // No sale: pasa a la confirmación, que es donde vive el Deshacer.
-      setHecho(mov)
+      setHecho({ movimiento: mov, esEgreso })
     } catch {
       // El toast de error ya lo muestra la mutación.
     }
@@ -148,9 +152,9 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
 
   if (hecho) {
     return (
-      <Confirmacion movimiento={hecho} esEgreso={esEgreso} guestName={inv.guestName}
+      <Confirmacion movimiento={hecho.movimiento} esEgreso={hecho.esEgreso} guestName={inv.guestName}
         onListo={salir}
-        onDeshacer={() => deshacerMov.mutate(hecho.id, { onSuccess: salir })}
+        onDeshacer={() => deshacerMov.mutate(hecho.movimiento.id, { onSuccess: salir })}
         deshaciendo={deshacerMov.isPending} />
     )
   }
