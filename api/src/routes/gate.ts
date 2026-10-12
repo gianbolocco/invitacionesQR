@@ -104,7 +104,7 @@ const ESTADO_EXCEL: Record<string, string> = {
   adentro: 'Adentro',
   concluida: 'Concluida',
   esperando: 'Esperando',
-  vencida: 'No entró',
+  vencida: 'Vencida',
   anulada: 'Anulada',
 }
 
