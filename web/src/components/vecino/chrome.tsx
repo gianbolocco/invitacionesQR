@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { History, Ticket, UserRound } from 'lucide-react'
+import { History, Settings2, Ticket, UserRound } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { Marca } from '@/components/dominio/marca'
 import { BarraSeccion, type ItemBarra } from '@/components/dominio/barra-seccion'
@@ -25,6 +25,9 @@ export function ChromeVecino({ children }: { children: React.ReactNode }) {
       activo: path === '/' || path.startsWith('/invitaciones') },
     { href: '/historial', etiqueta: 'Historial', icono: History, activo: path.startsWith('/historial') },
     { href: '/perfil', etiqueta: 'Perfil', icono: UserRound, activo: path.startsWith('/perfil') },
+    ...(me.role === 'admin'
+      ? [{ href: '/admin', etiqueta: 'Administración', icono: Settings2, activo: path.startsWith('/admin') }]
+      : []),
   ]
 
   return (

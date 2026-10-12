@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Building2, ClipboardList, LayoutDashboard, LogOut, MoreHorizontal, Palette, ShieldCheck, Users,
+  ArrowLeft, Building2, ClipboardList, LayoutDashboard, LogOut, MoreHorizontal, Palette, ShieldCheck, Users,
 } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { logout } from '@/lib/session'
@@ -59,6 +59,13 @@ export function ChromeAdmin({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="flex shrink-0 items-center gap-2">
+            {/* El admin entra acá y, sin esto, no hay vuelta a la vista de
+                invitaciones: ninguna pill de arriba lleva a "/". */}
+            <Link href="/" aria-label="Volver a invitaciones" title="Volver a invitaciones"
+              className="flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-sobre-marca hover:bg-white/10">
+              <ArrowLeft className="size-[18px]" aria-hidden />
+              <span className="hidden sm:inline">Invitaciones</span>
+            </Link>
             <span className="hidden text-sm opacity-85 sm:inline">{me.name}</span>
             <SelectorTema />
             <button onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión"
