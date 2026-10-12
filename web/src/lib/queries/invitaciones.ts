@@ -3,7 +3,7 @@ import {
   keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient,
 } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import type { Invitation } from '@/lib/invitations'
 
 export type FiltrosHistorial = {
@@ -131,9 +131,11 @@ export function useAnularInvitacion() {
       qc.setQueryData<Invitation[]>(claves.vigentes, (l) => l?.filter((i) => i.id !== inv.id))
       return { antes }
     },
-    onError: (_e, _inv, ctx) => {
+    onError: (e, _inv, ctx) => {
       if (ctx?.antes) qc.setQueryData(claves.vigentes, ctx.antes)
-      toast.error('No se pudo anular. Probá de nuevo.')
+      toast.error(e instanceof ApiError && e.code === 'guest_inside'
+        ? 'No se puede anular mientras el invitado está adentro.'
+        : 'No se pudo anular. Probá de nuevo.')
     },
     onSuccess: (_r, inv) => {
       toast.success(`Anulaste la invitación de ${inv.guestName}`, {

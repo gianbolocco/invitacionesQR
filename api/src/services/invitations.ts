@@ -254,10 +254,25 @@ export async function getInvitation(id: string, personId: string) {
   return row
 }
 
+/** Hay una fila de esa invitación sin salida registrada: el invitado sigue adentro. */
+async function estaAdentro(invitationId: string): Promise<boolean> {
+  const [row] = await db.select({ id: entryLogs.id }).from(entryLogs)
+    .where(and(eq(entryLogs.invitationId, invitationId), isNull(entryLogs.exitedAt)))
+    .limit(1)
+  return Boolean(row)
+}
+
+/**
+ * No se puede anular con el invitado adentro: confundiría al guardia si lo
+ * mira en ese momento, y no tiene sentido retirarle el acceso a alguien que
+ * ya está físicamente en el barrio. Una vez que sale, se puede anular igual
+ * que cualquier otra — ya cumplió su propósito.
+ */
 export async function revokeInvitation(id: string, personId: string, neighborhoodId: string): Promise<void> {
   const [inv] = await db.select().from(invitations).where(eq(invitations.id, id)).limit(1)
   if (!inv) throw new AppError(404, 'not_found')
   await assertMemberOfUnit(personId, inv.unitId)
+  if (await estaAdentro(id)) throw new AppError(409, 'guest_inside')
 
   await db.update(invitations).set({ revokedAt: new Date() }).where(eq(invitations.id, id))
   await audit(personId, neighborhoodId, 'invitation.revoked', 'invitation', id)

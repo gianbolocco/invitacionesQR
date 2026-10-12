@@ -96,6 +96,52 @@ describe('invitaciones', () => {
     expect(hist.body.rows[0].revokedAt).not.toBeNull()
   })
 
+  /** Un guardia logueado, para registrar el ingreso en los tests de abajo. */
+  async function guardiaDeTurno() {
+    const barrio = await neighborhood()
+    await db.insert(people).values({
+      neighborhoodId: barrio.id, email: 'guardia@example.com', name: 'Guardia',
+      role: 'guard', status: 'active', passwordHash: await hashPassword(PASS),
+    }).onConflictDoNothing()
+    const g = await request(app).post('/auth/login')
+      .send({ email: 'guardia@example.com', password: PASS })
+    return g.headers['set-cookie']
+  }
+
+  it('no deja anular con el invitado adentro', async () => {
+    const { cookie, unitId } = await resident('martin@example.com', 'Lote 142')
+    const inv = await request(app).post('/invitations').set('Cookie', cookie).send({
+      unitId, kind: 'visita', guestName: 'Juan', validFrom: DIA, validTo: DIA, capacity: 1,
+    }).expect(201).then((r) => r.body)
+
+    const g = await guardiaDeTurno()
+    await request(app).post('/gate/entries').set('Cookie', g)
+      .send({ invitationId: inv.id, guestName: 'Juan', guestDoc: '30123456' }).expect(201)
+
+    const res = await request(app).post(`/invitations/${inv.id}/revoke`).set('Cookie', cookie)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('guest_inside')
+
+    // Sigue vigente: no quedó anulada a medias.
+    const lista = await request(app).get('/invitations').set('Cookie', cookie).expect(200)
+    expect(lista.body.map((i: { id: string }) => i.id)).toContain(inv.id)
+  })
+
+  it('se puede anular una vez que el invitado salió', async () => {
+    const { cookie, unitId } = await resident('martin@example.com', 'Lote 142')
+    const inv = await request(app).post('/invitations').set('Cookie', cookie).send({
+      unitId, kind: 'visita', guestName: 'Juan', validFrom: DIA, validTo: DIA, capacity: 1,
+    }).expect(201).then((r) => r.body)
+
+    const g = await guardiaDeTurno()
+    await request(app).post('/gate/entries').set('Cookie', g)
+      .send({ invitationId: inv.id, guestName: 'Juan', guestDoc: '30123456' }).expect(201)
+    await request(app).post('/gate/exits').set('Cookie', g)
+      .send({ invitationId: inv.id }).expect(201)
+
+    await request(app).post(`/invitations/${inv.id}/revoke`).set('Cookie', cookie).expect(200)
+  })
+
   it('un vecino de otra UF no puede revocar', async () => {
     const a = await resident('martin@example.com', 'Lote 142')
     const b = await resident('ana@example.com', 'Lote 7')

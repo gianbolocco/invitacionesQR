@@ -30,6 +30,25 @@ test('el vecino crea una invitación, copia el link y la anula con deshacer', as
   await expect(page.getByRole('link', { name: new RegExp(nombre) })).toBeVisible()
 })
 
+test('no se puede anular una invitación con el invitado adentro', async ({ page, browser }) => {
+  await entrar(page, 'vecino')
+  const nombre = await crearInvitacion(page)
+  const url = page.url()
+
+  const guardia = await browser.newContext()
+  const g = await guardia.newPage()
+  await entrar(g, 'guardia')
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).click()
+  await g.getByLabel('Documento').fill('30111222')
+  await g.getByRole('button', { name: 'Registrar ingreso' }).click()
+  await guardia.close()
+
+  await page.goto(url)
+  await expect(page.getByText('No se puede anular mientras está adentro.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Anular invitación' })).toHaveCount(0)
+})
+
 test('el formulario no deja crear sin nombre', async ({ page }) => {
   await entrar(page, 'vecino')
   await page.goto('/invitaciones/nueva')
