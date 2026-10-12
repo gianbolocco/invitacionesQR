@@ -365,7 +365,7 @@ describe('la home del vecino pide solo lo vigente', () => {
 
     const g = await guardia()
     await request(app).post('/gate/entries').set('Cookie', g)
-      .send({ invitationId: usada.id, guestName: 'Ya entró' }).expect(201)
+      .send({ invitationId: usada.id, guestName: 'Ya entró', guestDoc: '30123456' }).expect(201)
     await request(app).post('/gate/exits').set('Cookie', g)
       .send({ invitationId: usada.id }).expect(201)
 
@@ -388,7 +388,7 @@ describe('la home del vecino pide solo lo vigente', () => {
 
     const g = await guardia()
     await request(app).post('/gate/entries').set('Cookie', g)
-      .send({ invitationId: inv.id, guestName: 'Adentro' }).expect(201)
+      .send({ invitationId: inv.id, guestName: 'Adentro', guestDoc: '30123456' }).expect(201)
 
     const res = await request(app).get('/invitations').set('Cookie', cookie).expect(200)
     expect(res.body).toHaveLength(1)

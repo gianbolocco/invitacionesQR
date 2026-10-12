@@ -121,6 +121,14 @@ export async function registerEntry(
       note: data.note?.trim() || null,
     }).returning()
 
+    // Si la invitación no tenía documento, el que se tipeó en la puerta
+    // queda ahí: la próxima vez (frecuente, proveedor) ya viene precargado.
+    // La fila de la invitación ya está bloqueada por el FOR UPDATE de arriba.
+    if (!target.guestDoc && data.guestDoc?.trim()) {
+      await tx.update(invitations).set({ guestDoc: data.guestDoc.trim() })
+        .where(eq(invitations.id, invitationId))
+    }
+
     return entry
   })
 }
@@ -303,7 +311,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       i.plate,
       i.kind,
       u.label             as "unitLabel",
-      p.name              as "inviterName",
+      case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
       i.capacity,
       (select count(*) from entry_log e
         where ${eseDia} and e.invitation_id = i.id)::int as "enteredCount",
@@ -474,7 +482,7 @@ async function auditRows(
       i.plate,
       i.kind,
       u.label                     as "unitLabel",
-      p.name                      as "inviterName",
+      case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
       i.valid_from                as "validFrom",
       i.valid_to                  as "validTo",
       i.created_at                as "createdAt",

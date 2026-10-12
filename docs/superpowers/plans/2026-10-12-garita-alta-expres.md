@@ -1064,7 +1064,9 @@ test('el guardia da de alta una invitación exprés y el ingreso exige documento
 
   await page.getByLabel('Nombre del invitado').fill(nombre)
   await page.getByLabel('Lote').fill('900')
-  await page.getByText('Vecina E2E').click()
+  // Acotado al sheet: la agenda de atrás puede tener su propia fila "invita
+  // Vecina E2E" de otros tests, y el nombre quedaría ambiguo sin esto.
+  await page.getByRole('dialog').getByText('Vecina E2E').click()
   await page.getByRole('button', { name: 'Autorizar ingreso' }).click()
 
   await expect(page).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)

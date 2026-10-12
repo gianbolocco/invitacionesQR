@@ -40,6 +40,8 @@ export type Hit = {
   adentro: boolean
 }
 
+export type UnidadHit = { unitId: string; unitLabel: string; residentName: string }
+
 export const MOTIVO: Record<string, string> = {
   revoked: 'La anularon',
   not_yet: 'Todavía no empieza',
@@ -62,6 +64,11 @@ export const registrarIngreso = (datos: {
 
 export const registrarEgreso = (invitationId: string) =>
   api<Movimiento>('/gate/exits', { method: 'POST', body: JSON.stringify({ invitationId }) })
+
+export const buscarUnidades = (q: string) => api<UnidadHit[]>(`/gate/units?q=${encodeURIComponent(q)}`)
+
+export const altaExpres = (datos: { unitId: string; guestName: string; plate?: string }) =>
+  api<{ id: string }>('/gate/invitations', { method: 'POST', body: JSON.stringify(datos) })
 
 export const deshacer = (entryId: string) =>
   api<{ deshecho: 'ingreso' | 'egreso' }>(`/gate/entries/${entryId}/undo`, { method: 'POST' })

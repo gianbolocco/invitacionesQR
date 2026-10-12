@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import {
-  porId, registrarIngreso, registrarEgreso, deshacer,
+  porId, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres,
   type Hit, type Resultado,
 } from '@/lib/gate'
 
@@ -97,5 +97,22 @@ export function useDeshacerMovimiento() {
     mutationFn: (entryId: string) => deshacer(entryId),
     onError: () => toast.error('No se pudo deshacer. Revisalo en la auditoría.'),
     onSettled: () => invalidarGarita(qc),
+  })
+}
+
+export function useBuscarUnidades(q: string) {
+  return useQuery({
+    queryKey: ['garita', 'unidades', q] as const,
+    queryFn: () => buscarUnidades(q),
+    enabled: q.length > 0,
+  })
+}
+
+export function useAltaExpres() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: altaExpres,
+    onError: () => toast.error('No se pudo crear la invitación. Probá de nuevo.'),
+    onSuccess: () => invalidarGarita(qc),
   })
 }
