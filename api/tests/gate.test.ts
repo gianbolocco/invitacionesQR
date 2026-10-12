@@ -175,6 +175,7 @@ describe('quién dio el ingreso', () => {
       invitationId: inv.id,
       guardId: '00000000-0000-0000-0000-000000000000',
       guestName: 'Juan Pérez',
+      guestDoc: '30123456',
     }).expect(201)
 
     const [fila] = await db.select().from(entryLogs).where(eq(entryLogs.invitationId, inv.id))
@@ -184,7 +185,7 @@ describe('quién dio el ingreso', () => {
   it('la auditoría muestra el nombre de ese guardia', async () => {
     const { cookie, inv } = await scenario()
     await request(app).post('/gate/entries').set('Cookie', cookie)
-      .send({ invitationId: inv.id, guestName: 'Juan Pérez' }).expect(201)
+      .send({ invitationId: inv.id, guestName: 'Juan Pérez', guestDoc: '30123456' }).expect(201)
 
     const res = await request(app).get('/gate/audit').set('Cookie', cookie)
     const fila = res.body.rows.find((r: { guestName: string }) => r.guestName === 'Juan Pérez')

@@ -26,6 +26,49 @@ export async function assertMemberOfUnit(personId: string, unitId: string): Prom
   if (!row) throw new AppError(403, 'not_your_unit')
 }
 
+export async function assertUnitInNeighborhood(unitId: string, neighborhoodId: string): Promise<void> {
+  const [row] = await db.select().from(units)
+    .where(and(eq(units.id, unitId), eq(units.neighborhoodId, neighborhoodId)))
+    .limit(1)
+  if (!row) throw new AppError(403, 'not_your_neighborhood')
+}
+
+export type CreateExpressInvitationInput = {
+  unitId: string
+  guestName: string
+  plate?: string
+  createdBy: string
+  neighborhoodId: string
+}
+
+/**
+ * El alta exprés: la crea el guardia cuando alguien llega sin invitación y
+ * el vecino aprueba por teléfono. No usa `assertMemberOfUnit` —el guardia
+ * nunca es miembro de una unidad— sino que valida que la unidad sea del
+ * mismo barrio.
+ *
+ * Nada de lo que normalmente se elige: es de hoy, una vez, una persona —
+ * los mismos defaults que ya tendría una visita de un solo día.
+ */
+export async function createExpressInvitation(input: CreateExpressInvitationInput) {
+  await assertUnitInNeighborhood(input.unitId, input.neighborhoodId)
+  const hoy = todayInBuenosAires()
+
+  const [inv] = await db.insert(invitations).values({
+    unitId: input.unitId,
+    createdBy: input.createdBy,
+    kind: 'visita',
+    guestName: input.guestName.trim(),
+    plate: input.plate?.trim().toUpperCase() || null,
+    validFrom: hoy,
+    validTo: hoy,
+    capacity: 1,
+    token: randomToken(16),
+  }).returning()
+
+  return inv
+}
+
 export async function createInvitation(input: CreateInvitationInput) {
   await assertMemberOfUnit(input.createdBy, input.unitId)
 
@@ -54,6 +97,14 @@ export async function createInvitation(input: CreateInvitationInput) {
  */
 const adentroSql = sql<boolean>`coalesce(bool_or(${entryLogs.id} is not null and ${entryLogs.exitedAt} is null), false)`
 
+/**
+ * Cuando quien creó la invitación es un guardia (alta exprés por teléfono),
+ * se muestra esta etiqueta en vez de su nombre: no es el vecino que invita,
+ * y mostrar el nombre del guardia da la impresión de que invitó él
+ * personalmente a un desconocido.
+ */
+const nombreOEtiquetaSql = sql<string>`case when ${people.role} = 'guard' then 'Portería (autorizado por teléfono)' else ${people.name} end`
+
 const columnas = {
   id: invitations.id,
   kind: invitations.kind,
@@ -68,7 +119,7 @@ const columnas = {
   revokedAt: invitations.revokedAt,
   createdAt: invitations.createdAt,
   createdBy: invitations.createdBy,
-  creatorName: people.name,
+  creatorName: nombreOEtiquetaSql,
   unitId: invitations.unitId,
   unitLabel: units.label,
   usedCount: count(entryLogs.id),
@@ -107,7 +158,7 @@ export async function listForUnits(unitIds: string[]) {
       isNull(invitations.revokedAt),
       gte(invitations.validTo, hoy),
     ))
-    .groupBy(invitations.id, people.name, units.label)
+    .groupBy(invitations.id, people.name, people.role, units.label)
     // El cupo se mide sobre el count de ingresos, así que va en HAVING. Quien
     // está adentro sigue en la home aunque haya agotado el cupo: es justo lo
     // que el vecino quiere ver ("ya llegó").
@@ -172,7 +223,7 @@ export async function searchInvitations(
   const [rows, [conteo]] = await Promise.all([
     consultaInvitaciones()
       .where(donde)
-      .groupBy(invitations.id, people.name, units.label)
+      .groupBy(invitations.id, people.name, people.role, units.label)
       .orderBy(desc(invitations.createdAt))
       .limit(pageSize)
       .offset((page - 1) * pageSize),
@@ -192,7 +243,7 @@ export async function searchInvitations(
 export async function getInvitation(id: string, personId: string) {
   const [row] = await consultaInvitaciones()
     .where(eq(invitations.id, id))
-    .groupBy(invitations.id, people.name, units.label)
+    .groupBy(invitations.id, people.name, people.role, units.label)
     .limit(1)
   if (!row) throw new AppError(404, 'not_found')
   await assertMemberOfUnit(personId, row.unitId)
@@ -225,7 +276,7 @@ export async function findPublicByToken(token: string) {
     validTo: invitations.validTo,
     revokedAt: invitations.revokedAt,
     unitLabel: units.label,
-    inviterName: people.name,
+    inviterName: nombreOEtiquetaSql,
     neighborhoodName: neighborhoods.name,
     address: neighborhoods.address,
     mapUrl: neighborhoods.mapUrl,

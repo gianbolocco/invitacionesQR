@@ -7,6 +7,8 @@ import {
   checkByToken, checkById, registerEntry, registerExit, undoMovement, searchGuests, agendaForDay,
   auditInvitations, auditAll,
 } from '../services/entries.js'
+import { searchUnits } from '../services/units.js'
+import { createExpressInvitation } from '../services/invitations.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { slug } from '../lib/slug.js'
 import { buildWorkbook, XLSX_MIME } from '../lib/excel.js'
@@ -30,11 +32,30 @@ gateRoutes.get('/search', async (req, res) => {
   res.json(await searchGuests(req.person!.neighborhoodId, q))
 })
 
+/** Unidades del barrio por lote o apellido, para el alta exprés. */
+gateRoutes.get('/units', async (req, res) => {
+  const { q } = z.object({ q: z.string().min(1) }).parse(req.query)
+  res.json(await searchUnits(req.person!.neighborhoodId, q))
+})
+
+/** El alta exprés: nombre + lote, el resto fijo. Ver createExpressInvitation. */
+gateRoutes.post('/invitations', async (req, res) => {
+  const body = z.object({
+    unitId: z.string().uuid(),
+    guestName: z.string().min(1),
+    plate: z.string().optional(),
+  }).parse(req.body)
+
+  res.status(201).json(await createExpressInvitation({
+    ...body, createdBy: req.person!.id, neighborhoodId: req.person!.neighborhoodId,
+  }))
+})
+
 gateRoutes.post('/entries', async (req, res) => {
   const body = z.object({
     invitationId: z.string().uuid(),
     guestName: z.string().min(1),
-    guestDoc: z.string().optional(),
+    guestDoc: z.string().trim().min(1),
     plate: z.string().optional(),
     note: z.string().optional(),
   }).parse(req.body)
