@@ -14,18 +14,18 @@ import { cn } from '@/lib/utils'
  * no se elige: hace visible una sesión que quedó abierta del turno
  * anterior — y la navegación. El escáner va en el centro de la barra
  * inferior en mobile; en escritorio, el botón grande vive en la columna
- * derecha de "Hoy" (no acá), así que no es parte de `items`.
+ * derecha de la pantalla principal (no acá), así que no es parte de `items`.
  *
  * A diferencia de `ChromeVecino`, esto NO se usa desde el layout de la
- * sección: solo lo monta la pantalla "Hoy". Escanear y el veredicto quedan
- * a pantalla completa, sin este marco.
+ * sección: solo lo monta la pantalla principal (`/garita`). Escanear y el
+ * veredicto quedan a pantalla completa, sin este marco.
  */
 export function ChromeGarita({ children }: { children: React.ReactNode }) {
   const me = useSesion()
   const path = usePathname()
 
   const items: ItemBarra[] = [
-    { href: '/garita', etiqueta: 'Hoy', icono: CalendarDays, activo: path === '/garita' },
+    { href: '/garita', etiqueta: 'Garita', icono: CalendarDays, activo: path === '/garita' },
     { href: '/auditoria', etiqueta: 'Auditoría', icono: ClipboardList, activo: path.startsWith('/auditoria') },
   ]
 
