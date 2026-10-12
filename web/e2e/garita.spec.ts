@@ -19,18 +19,19 @@ test('el guardia busca un invitado, registra el ingreso y lo deshace', async ({ 
   await expect(g.getByText(nombre)).toBeVisible()
   await g.getByText(nombre).click()
   await expect(g).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
-  await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
+  await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
 
   await g.getByLabel('Documento').fill('30111222')
   await g.getByRole('button', { name: 'Registrar ingreso' }).click()
   // La confirmación tiene que decir INGRESO, no EGRESO: la mutación invalida
   // el veredicto al terminar, y esEgreso no se puede recalcular después de
   // eso o termina leyendo el estado opuesto al que se acaba de registrar.
-  await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
+  await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
   await expect(g.getByText('Deshacer')).toBeVisible()
 
+  // Vuelve a donde estaba (la búsqueda), no siempre al escáner.
   await g.getByRole('button', { name: 'Deshacer' }).click()
-  await expect(g).toHaveURL(/\/garita\/escanear$/)
+  await expect(g).toHaveURL(/\/garita$/)
 
   await guardia.close()
 })
@@ -66,7 +67,7 @@ test('una invitación anulada no pasa', async ({ page, browser }) => {
   await entrar(g, 'guardia')
   await g.getByLabel('Buscar invitado').fill(nombre)
   await g.getByText(nombre).click()
-  await expect(g.getByText('NO PASA')).toBeVisible()
+  await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
   await expect(g.getByText('La anularon')).toBeVisible()
   await guardia.close()
 })
@@ -86,27 +87,34 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   // Ingreso.
   await g.getByLabel('Buscar invitado').fill(nombre)
   await g.getByText(nombre).click()
-  await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
+  await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
   await g.getByLabel('Documento').fill('30111222')
   await g.getByRole('button', { name: 'Registrar ingreso' }).click()
-  await expect(g.getByText('INGRESO', { exact: true })).toBeVisible()
+  await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
   await expect(g.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
 
-  // Vuelve a "Hoy" y busca al mismo invitado: ahora tiene que ofrecer el egreso.
-  // .first(): la agenda, debajo del buscador, ya lo muestra en "Ya entraron"
-  // desde el ingreso, así que el nombre aparece dos veces en la página; el
-  // resultado del buscador es el primero en el DOM.
-  await g.goto('/garita')
+  // Siguiente vuelve a la garita, de donde vino, y busca al mismo invitado:
+  // ahora tiene que ofrecer el egreso. .first(): la agenda, debajo del
+  // buscador, ya lo muestra en "Ya entraron" desde el ingreso, así que el
+  // nombre aparece dos veces en la página; el resultado del buscador es el
+  // primero en el DOM.
+  await g.getByRole('button', { name: /^Siguiente/ }).click()
+  await expect(g).toHaveURL(/\/garita$/)
   await g.getByLabel('Buscar invitado').fill(nombre)
   await g.getByText(nombre).first().click()
-  await expect(g.getByText('EGRESO', { exact: true })).toBeVisible()
+  await expect(g.getByRole('heading', { name: 'EGRESO', exact: true })).toBeVisible()
   await g.getByRole('button', { name: 'Registrar egreso' }).click()
-  await expect(g.getByText('EGRESO', { exact: true })).toBeVisible()
+  await expect(g.getByRole('heading', { name: 'EGRESO', exact: true })).toBeVisible()
   await expect(g.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
 
   // La agenda lo deja afuera, en "ya entraron". .first(): en escritorio,
   // "Últimos movimientos" también nombra al invitado, aparte de la agenda.
-  await g.goto('/garita')
+  // Se queda en la garita: vuelve UNA pantalla, no dos, aunque el contador
+  // siga corriendo hasta que se desmonta.
+  await g.getByRole('button', { name: /^Siguiente/ }).click()
+  await expect(g).toHaveURL(/\/garita$/)
+  await g.waitForTimeout(1500)
+  await expect(g).toHaveURL(/\/garita$/)
   await expect(g.getByText(/^Ya entraron/)).toBeVisible()
   await expect(g.getByText(nombre).first()).toBeVisible()
 
@@ -128,13 +136,13 @@ test('el guardia da de alta una invitación exprés y el ingreso exige documento
   await page.getByRole('button', { name: 'Autorizar ingreso' }).click()
 
   await expect(page).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
-  await expect(page.getByText('INGRESO', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
 
   // Sin documento, el botón no deja avanzar.
   await expect(page.getByRole('button', { name: 'Registrar ingreso' })).toBeDisabled()
 
   await page.getByLabel('Documento').fill('30999888')
   await page.getByRole('button', { name: 'Registrar ingreso' }).click()
-  await expect(page.getByText('INGRESO', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
 })

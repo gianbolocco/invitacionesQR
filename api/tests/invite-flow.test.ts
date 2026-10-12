@@ -92,10 +92,16 @@ describe('alta por magic link', () => {
     expect(res.body.error).toBe('invalid_token')
   })
 
-  it('rechaza contraseñas de menos de 10 caracteres', async () => {
+  it('rechaza contraseñas de menos de 6 caracteres', async () => {
     const { inviteToken } = await invitedPerson()
     const res = await request(app).post('/auth/invite').send({ token: inviteToken, password: 'corta' })
     expect(res.status).toBe(400)
+  })
+
+  it('acepta una contraseña de exactamente 6 caracteres', async () => {
+    const { inviteToken } = await invitedPerson()
+    const res = await request(app).post('/auth/invite').send({ token: inviteToken, password: 'seis66' })
+    expect(res.status).toBe(200)
   })
 
   it('logout revoca la sesión', async () => {
