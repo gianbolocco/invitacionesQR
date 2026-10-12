@@ -6,6 +6,8 @@ import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
 import { hora } from '@/lib/gate'
 import { hoyISO, sumarDias, fechaNumerica } from '@/lib/fechas'
+import { ChromeAdmin } from '@/components/admin/chrome'
+import { ChromeGarita } from '@/components/garita/chrome'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
 import { Chips } from '@/components/dominio/chips'
@@ -120,9 +122,15 @@ export default function AuditoriaPage() {
   const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const todos = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0
 
+  // Se llega acá desde las dos secciones (bug reportado: sin esto, la
+  // pantalla no tenía ninguna forma de volver ni de navegar a otro lado).
+  // Cada rol ve el marco de su propia sección, con el resto de su menú.
+  const Chrome = me.role === 'admin' ? ChromeAdmin : ChromeGarita
+
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 sm:py-8">
-      <EncabezadoPagina titulo="Auditoría" />
+    <Chrome>
+      <div className="flex flex-col gap-5">
+        <EncabezadoPagina titulo="Auditoría" />
 
       <div className="flex flex-wrap items-end gap-3">
         {/* Botones sueltos, no Chips: un atajo es una acción de un solo toque,
@@ -238,6 +246,7 @@ export default function AuditoriaPage() {
           </div>
         </nav>
       )}
-    </div>
+      </div>
+    </Chrome>
   )
 }

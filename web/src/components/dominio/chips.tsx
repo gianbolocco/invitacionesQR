@@ -46,7 +46,9 @@ export function Chips<T extends string>({ opciones, valor, onCambio, etiqueta }:
       {opciones.map((o) => (
         <Pastilla key={o.valor} grupo={grupo} activa={o.valor === valor} onClick={() => onCambio(o.valor)}>
           {o.etiqueta}
-          {o.contador !== undefined && <span className="tabular opacity-70">{o.contador}</span>}
+          {/* ml-1 y no gap: etiqueta y contador son nodos sueltos dentro del
+              mismo span, no items flex — el gap del botón no los separa. */}
+          {o.contador !== undefined && <span className="ml-1 tabular opacity-70">{o.contador}</span>}
         </Pastilla>
       ))}
     </div>
