@@ -112,9 +112,7 @@ test('el guardia da de alta una invitación exprés y el ingreso exige documento
   await entrar(page, 'guardia')
   await page.goto('/garita')
 
-  await page.getByLabel('Buscar invitado').fill(nombre)
-  await expect(page.getByText('Sin resultados.', { exact: false })).toBeVisible()
-  await page.getByRole('button', { name: '¿No tiene invitación? Autorizar ahora' }).click()
+  await page.getByRole('button', { name: 'Autorizar sin invitación' }).click()
 
   await page.getByLabel('Nombre del invitado').fill(nombre)
   await page.getByLabel('Lote').fill('900')

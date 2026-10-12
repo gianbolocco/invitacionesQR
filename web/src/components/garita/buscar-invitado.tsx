@@ -6,17 +6,12 @@ import { Fila } from '@/components/dominio/fila'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { useDemora } from '@/lib/use-demora'
 import { useBusqueda } from '@/lib/queries/garita'
-import { AltaExpres } from './alta-expres'
 
 /** Búsqueda en vivo, sin botón: el guardia escribe y los resultados aparecen solos. */
 export function BuscarInvitado({ onAbrir }: { onAbrir: (id: string) => void }) {
   const [q, setQ] = useState('')
   const qDemorada = useDemora(q)
   const busqueda = useBusqueda(qDemorada.trim())
-  const [altaAbierta, setAltaAbierta] = useState(false)
-  // Estado, no ref leído en el render: así Radix sabe a quién devolverle el
-  // foco al cerrar el sheet (mismo patrón que DialogLote/DialogBaja del admin).
-  const [disparador, setDisparador] = useState<HTMLButtonElement | null>(null)
 
   return (
     <div className="flex flex-col gap-3">
@@ -27,16 +22,6 @@ export function BuscarInvitado({ onAbrir }: { onAbrir: (id: string) => void }) {
           className="h-12 pl-10 text-base" />
       </div>
 
-      {busqueda.data?.length === 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-ink-soft">Sin resultados. Probá con el apellido o la unidad.</p>
-          <button type="button" onClick={(e) => { setDisparador(e.currentTarget); setAltaAbierta(true) }}
-            className="self-start text-sm font-semibold text-marca underline underline-offset-4">
-            ¿No tiene invitación? Autorizar ahora
-          </button>
-        </div>
-      )}
-
       {busqueda.data && busqueda.data.length > 0 && (
         <div>
           {busqueda.data.map((h) => (
@@ -46,9 +31,6 @@ export function BuscarInvitado({ onAbrir }: { onAbrir: (id: string) => void }) {
           ))}
         </div>
       )}
-
-      <AltaExpres abierto={altaAbierta} onAbiertoChange={setAltaAbierta}
-        disparador={disparador} onCreada={onAbrir} />
     </div>
   )
 }
