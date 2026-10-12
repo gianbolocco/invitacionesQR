@@ -11,7 +11,8 @@ const OPCIONES: { valor: Tema; etiqueta: string; icono: typeof Sun }[] = [
 
 /**
  * Tres estados y no dos: "Automático" sigue al celular, que de noche se pone
- * oscuro solo. Botones de 44px: se toca con el pulgar.
+ * oscuro solo. Mismo tamaño que los otros botones del header (cerrar
+ * sesión, admin), no el de un botón pensado para el pulgar.
  */
 export function SelectorTema({ className }: { className?: string }) {
   const [tema, setTema] = useTema()
@@ -21,9 +22,9 @@ export function SelectorTema({ className }: { className?: string }) {
       {OPCIONES.map(({ valor, etiqueta, icono: Icono }) => (
         <button key={valor} type="button" role="radio" aria-checked={tema === valor}
           title={etiqueta} onClick={() => setTema(valor)}
-          className={cn('grid size-11 place-items-center rounded-full transition-colors duration-150',
+          className={cn('grid size-9 place-items-center rounded-full transition-colors duration-150',
             tema === valor ? 'bg-marca/15 text-marca' : 'text-ink-soft hover:text-ink')}>
-          <Icono className="size-[18px]" aria-hidden />
+          <Icono className="size-4" aria-hidden />
           <span className="sr-only">{etiqueta}</span>
         </button>
       ))}
