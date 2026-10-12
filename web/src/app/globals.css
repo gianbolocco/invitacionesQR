@@ -86,6 +86,7 @@
   --color-peligro: var(--peligro);
   --color-escaner-fondo: var(--escaner-fondo);
   --color-escaner-texto: var(--escaner-texto);
+  --color-escaner-acento: var(--escaner-acento);
 
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-bricolage), var(--font-geist), ui-sans-serif, sans-serif;
@@ -119,6 +120,9 @@
   /* El escáner es un visor de cámara: oscuro SIEMPRE, no sigue el tema. */
   --escaner-fondo: oklch(from var(--marca-base) 0.27 c h);
   --escaner-texto: #f2f0e8;
+  /* El marco de escaneo: el tono del barrio, subido para leerse sobre la
+     cámara. El croma se topa para que un color de marca saturado no queme. */
+  --escaner-acento: oklch(from var(--marca-base) 0.88 min(c, 0.13) h);
 }
 
 /*
@@ -203,22 +207,9 @@ input, select, textarea { font-size: 16px; }
   outline-offset: 2px;
 }
 
-/* ------------------------------------------------------------------------
-   Legado: lo que usan las pantallas viejas que no se rediseñaron todavía.
-   ------------------------------------------------------------------------ */
-.display {
-  font-family: var(--font-display);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-
+/* La librería del escáner dibuja su propio marco y su sombreado; usamos los
+   nuestros, que siguen la marca y no se desalinean al redimensionar. */
+#reader #qr-shaded-region { border-color: transparent !important; }
 #reader #qr-shaded-region > div { display: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
