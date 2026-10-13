@@ -85,7 +85,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       onListo(inv)
     } catch {
       setErrorGeneral(editando
-        ? 'No se pudo guardar. Si ya entró gente, no podés achicar el período por debajo de esos ingresos.'
+        ? 'No se pudo guardar. Una invitación que ya se usó o venció no se puede editar.'
         : 'No se pudo crear la invitación. Revisá los datos y probá de nuevo.')
     }
   }

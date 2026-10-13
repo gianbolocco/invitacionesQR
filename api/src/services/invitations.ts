@@ -388,9 +388,13 @@ export type EditInvitationInput = {
 /**
  * Editar una invitación ya creada.
  *
+ * Solo mientras está pendiente: sin anular, sin ningún ingreso y sin vencer.
+ * Una vez usada, la auditoría muestra los datos de la invitación, y editarla
+ * reescribiría quién entró; para volver a usarla está "Volver a invitar", que
+ * crea otra. Vencida, lo mismo.
+ *
  * No se puede cambiar de unidad ni de tipo: eso es otra invitación, no la misma
- * editada, y el guardia ya vio la anterior. Tampoco se puede bajar el cupo por
- * debajo de la gente que ya entró, porque dejaría el contador mintiendo.
+ * editada, y el guardia ya vio la anterior.
  */
 export async function editInvitation(
   id: string,
@@ -402,16 +406,14 @@ export async function editInvitation(
   await assertMemberOfUnit(personId, inv.unitId)
 
   if (inv.revokedAt) throw new AppError(409, 'revoked')
-
-  const [{ usados }] = await db.select({ usados: sql<number>`count(*)::int` })
-    .from(entryLogs).where(eq(entryLogs.invitationId, id))
+  if ((await entriesOf(inv.id)) > 0) throw new AppError(409, 'ya_usada')
+  if (inv.validTo < todayInBuenosAires()) throw new AppError(409, 'vencida')
 
   const validFrom = input.validFrom ?? inv.validFrom
   const validTo = input.validTo ?? inv.validTo
   if (validTo < validFrom) throw new AppError(400, 'ventana_invertida')
 
   const capacity = input.capacity ?? inv.capacity
-  if (capacity < Math.max(1, usados)) throw new AppError(409, 'cupo_menor_al_usado')
 
   const [actualizada] = await db.update(invitations).set({
     ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),

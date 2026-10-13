@@ -1,6 +1,6 @@
 /** `node src/lib/estado-invitacion.check.ts`. */
 import assert from 'node:assert/strict'
-import { estadoInvitacion } from './estado-invitacion.ts'
+import { estadoInvitacion, sePuedeEditar } from './estado-invitacion.ts'
 
 const HOY = '2026-10-11'
 const base = { kind: 'visita', revokedAt: null, validTo: HOY, usedCount: 0, adentro: false }
@@ -15,5 +15,11 @@ assert.equal(estadoInvitacion({ ...base, validTo: '2026-10-10' }, HOY), 'vencida
 assert.equal(estadoInvitacion({ ...base, kind: 'frecuente', usedCount: 5 }, HOY), 'esperando')
 // Una visita usada de un día que ya pasó cuenta como que salió, no como vencida.
 assert.equal(estadoInvitacion({ ...base, validTo: '2026-10-01', usedCount: 1 }, HOY), 'salio')
+
+// Solo se edita una pendiente que nunca se usó.
+assert.equal(sePuedeEditar(base, HOY), true)
+assert.equal(sePuedeEditar({ ...base, kind: 'frecuente', usedCount: 5 }, HOY), false)
+assert.equal(sePuedeEditar({ ...base, adentro: true, usedCount: 1 }, HOY), false)
+assert.equal(sePuedeEditar({ ...base, validTo: '2026-10-10' }, HOY), false)
 
 console.log('estado-invitacion: ok')
