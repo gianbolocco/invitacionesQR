@@ -8,6 +8,7 @@ import { AgendaDia } from '@/components/garita/agenda-dia'
 import { BuscarInvitado } from '@/components/garita/buscar-invitado'
 import { UltimosMovimientos } from '@/components/garita/ultimos-movimientos'
 import { AltaExpres } from '@/components/garita/alta-expres'
+import { useAvisosGarita } from '@/lib/queries/garita'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +26,7 @@ export default function GaritaHoy() {
   // Estado, no ref leído en el render: así Radix sabe a quién devolverle el
   // foco al cerrar el sheet (mismo patrón que DialogLote/DialogBaja del admin).
   const [disparador, setDisparador] = useState<HTMLButtonElement | null>(null)
+  useAvisosGarita()
 
   return (
     <ChromeGarita>

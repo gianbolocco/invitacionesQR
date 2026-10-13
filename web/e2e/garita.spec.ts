@@ -152,3 +152,25 @@ test('el guardia da de alta una invitación exprés y el ingreso exige documento
   await expect(page.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
 })
+
+test('una invitación nueva aparece en la garita sin recargar', async ({ page, browser }) => {
+  // El guardia ya tiene la garita abierta.
+  const guardia = await browser.newContext()
+  const g = await guardia.newPage()
+  await entrar(g, 'guardia')
+  await expect(g.getByText(/^Pendientes|Nadie tiene autorización/).first()).toBeVisible()
+
+  const nombre = `En vivo E2E ${Date.now()}`
+  await entrar(page, 'vecino')
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await expect(page).toHaveURL(/\/invitaciones\/[0-9a-f-]{36}\?creada=1$/)
+
+  // Sin reload y enseguida: llega por el aviso en vivo. El refresco de
+  // respaldo es cada 60 s, así que con 3 s esto solo pasa si el aviso anda.
+  await expect(g.getByText(nombre).first()).toBeVisible({ timeout: 3_000 })
+  await g.screenshot({ path: 'test-results/garita-en-vivo.png' })
+
+  await guardia.close()
+})

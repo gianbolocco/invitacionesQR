@@ -1,8 +1,9 @@
 'use client'
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api } from '@/lib/api'
+import { api, apiBase } from '@/lib/api'
+import { hoyISO } from '@/lib/fechas'
 import {
   porId, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres,
   type Hit, type Resultado,
@@ -35,10 +36,37 @@ export const claves = {
   adentro: ['garita', 'adentro'] as const,
 }
 
+/*
+ * Respaldo de los avisos en vivo (useAvisosGarita): si la conexión se corta
+ * sin que el navegador se entere —un proxy que la deja colgada—, la garita
+ * igual se pone al día en un minuto. React Query frena el intervalo con la
+ * pestaña oculta y vuelve a pedir al recuperar el foco.
+ */
+const CADA = 60_000
+
+/**
+ * La garita queda abierta todo el turno: la API avisa por Server-Sent Events
+ * cada vez que algo cambia (una invitación nueva, un ingreso de otro guardia)
+ * y acá se vuelve a pedir lo que se muestra. Al (re)conectar también, por lo
+ * que haya pasado mientras estaba cortado. EventSource reintenta solo.
+ */
+export function useAvisosGarita() {
+  const qc = useQueryClient()
+  useEffect(() => {
+    const avisos = new EventSource(`${apiBase}/gate/eventos`, { withCredentials: true })
+    const refrescar = () => invalidarGarita(qc)
+    avisos.onmessage = refrescar
+    avisos.onopen = refrescar
+    return () => avisos.close()
+  }, [qc])
+}
+
 export function useAgenda(fecha: string) {
   return useQuery({
     queryKey: claves.agenda(fecha),
     queryFn: ({ signal }) => api<AgendaRow[]>(`/gate/agenda?date=${fecha}`, { signal }),
+    // Solo hoy: es lo que el guardia tiene abierto durante el turno.
+    refetchInterval: fecha === hoyISO() ? CADA : false,
   })
 }
 
@@ -48,6 +76,7 @@ export function useAdentro(habilitado: boolean) {
     queryKey: claves.adentro,
     queryFn: ({ signal }) => api<AgendaRow[]>('/gate/adentro', { signal }),
     enabled: habilitado,
+    refetchInterval: CADA,
   })
 }
 

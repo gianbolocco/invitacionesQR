@@ -11,6 +11,7 @@ import { invitationRoutes } from './routes/invitations.js'
 import { gateRoutes } from './routes/gate.js'
 import { brandingRoutes } from './routes/branding.js'
 import { reportRoutes } from './routes/reports.js'
+import { avisarAlEscribir } from './lib/avisos.js'
 
 export function buildApp() {
   const app = express()
@@ -34,6 +35,9 @@ export function buildApp() {
 
   app.use('/auth', authRoutes)
   app.use('/auth', googleRoutes)
+  // Lo que se escribe acá puede cambiar lo que muestra la garita: altas,
+  // ediciones, anulaciones, ingresos, egresos, bajas de vecinos.
+  app.use(['/admin', '/invitations', '/gate'], avisarAlEscribir)
   app.use('/admin', adminRoutes)
   app.use('/invitations', invitationRoutes)
   app.use('/gate', gateRoutes)
