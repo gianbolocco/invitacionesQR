@@ -280,6 +280,8 @@ export type AgendaRow = {
   unitLabel: string
   inviterName: string
   capacity: number
+  /** Para que la garita distinga "no vino todavía" de "ya venció". */
+  validTo: string
   enteredCount: number
   lastEntryAt: Date | null
   /** Última salida registrada ESE día. */
@@ -324,6 +326,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       u.label             as "unitLabel",
       case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
       i.capacity,
+      i.valid_to          as "validTo",
       (select count(*) from entry_log e
         where ${eseDia} and e.invitation_id = i.id)::int as "enteredCount",
       (select max(e.entered_at) from entry_log e
@@ -366,6 +369,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       u.label             as "unitLabel",
       case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
       i.capacity,
+      i.valid_to          as "validTo",
       (select count(*) from entry_log e
         where ${hoy} and e.invitation_id = i.id)::int  as "enteredCount",
       abiertas.desde                                    as "lastEntryAt",

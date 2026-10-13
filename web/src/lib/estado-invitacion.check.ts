@@ -1,6 +1,6 @@
 /** `node src/lib/estado-invitacion.check.ts`. */
 import assert from 'node:assert/strict'
-import { estadoInvitacion, sePuedeEditar } from './estado-invitacion.ts'
+import { estadoEnAgenda, estadoInvitacion, sePuedeEditar } from './estado-invitacion.ts'
 
 const HOY = '2026-10-11'
 const base = { kind: 'visita', revokedAt: null, validTo: HOY, usedCount: 0, adentro: false }
@@ -21,5 +21,13 @@ assert.equal(sePuedeEditar(base, HOY), true)
 assert.equal(sePuedeEditar({ ...base, kind: 'frecuente', usedCount: 5 }, HOY), false)
 assert.equal(sePuedeEditar({ ...base, adentro: true, usedCount: 1 }, HOY), false)
 assert.equal(sePuedeEditar({ ...base, validTo: '2026-10-10' }, HOY), false)
+
+// Agenda: la visita de ayer que no vino venció, no está pendiente.
+const fila = { adentro: false, enteredCount: 0, validTo: HOY }
+assert.equal(estadoEnAgenda(fila, HOY), 'esperando')
+assert.equal(estadoEnAgenda({ ...fila, validTo: '2026-10-10' }, HOY), 'vencida')
+assert.equal(estadoEnAgenda({ ...fila, validTo: '2026-10-10', enteredCount: 1 }, HOY), 'salio')
+// Entró ayer con una invitación de ayer y no salió: adentro, no vencida.
+assert.equal(estadoEnAgenda({ ...fila, validTo: '2026-10-10', adentro: true }, HOY), 'adentro')
 
 console.log('estado-invitacion: ok')
