@@ -28,7 +28,13 @@ async function loadForCheck(where: SQL) {
     revokedAt: invitations.revokedAt,
     unitId: invitations.unitId,
     unitLabel: units.label,
-  }).from(invitations).innerJoin(units, eq(units.id, invitations.unitId)).where(where).limit(1)
+    // Para el veredicto: a quién llamar si hay dudas. Si la creó un guardia
+    // (alta exprés), no se muestra su nombre, igual que en la agenda.
+    inviterName: sql<string>`case when ${people.role} = 'guard' then 'Portería (autorizado por teléfono)' else ${people.name} end`,
+  }).from(invitations)
+    .innerJoin(units, eq(units.id, invitations.unitId))
+    .innerJoin(people, eq(people.id, invitations.createdBy))
+    .where(where).limit(1)
   return row ?? null
 }
 

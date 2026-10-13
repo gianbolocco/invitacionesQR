@@ -1,5 +1,7 @@
 'use client'
 import { api } from './api'
+import { fechaNumerica } from './fechas'
+import { DIAS } from './invitations'
 
 export type Check = { ok: true } | { ok: false; reason: string }
 
@@ -15,7 +17,10 @@ export type Resultado = {
     validFrom: string
     validTo: string
     capacity: number
+    weekdays: number[] | null
     unitLabel: string
+    /** El vecino que invita, o "Portería (…)" si fue un alta exprés. */
+    inviterName: string
   }
   check: Check
   usedCount: number
@@ -50,6 +55,22 @@ export const MOTIVO: Record<string, string> = {
   no_capacity: 'Cupo agotado',
   no_esta_adentro: 'No figura adentro',
   fuera_de_plazo: 'Pasó el tiempo para deshacer',
+}
+
+/**
+ * El dato concreto detrás del motivo, para que el guardia se lo pueda decir al
+ * invitado sin llamar a nadie: no solo "Venció", sino hasta cuándo valía.
+ */
+export function detalleRechazo(
+  reason: string,
+  inv: { validFrom: string; validTo: string; weekdays: number[] | null },
+): string | null {
+  if (reason === 'expired') return `Era válida hasta el ${fechaNumerica(inv.validTo)}`
+  if (reason === 'not_yet') return `Es válida desde el ${fechaNumerica(inv.validFrom)}`
+  if (reason === 'wrong_weekday' && inv.weekdays?.length) {
+    return `Habilitada solo ${inv.weekdays.map((d) => DIAS.at(d)).join(' ')}`
+  }
+  return null
 }
 
 export const porToken = (token: string) => api<Resultado>(`/gate/check/${token}`)

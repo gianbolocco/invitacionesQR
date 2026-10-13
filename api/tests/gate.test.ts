@@ -233,6 +233,12 @@ describe('el check informa si la persona está adentro', () => {
     const res = await request(app).get(`/gate/invitation/${inv.id}`).set('Cookie', cookie).expect(200)
     expect(res.body.adentro.entryId).toBe(segunda.id)
   })
+
+  it('dice quién invita, para saber a quién llamar', async () => {
+    const { inv, cookie } = await scenario()
+    const res = await request(app).get(`/gate/invitation/${inv.id}`).set('Cookie', cookie).expect(200)
+    expect(res.body.invitation.inviterName).toBe('Martín')
+  })
 })
 
 describe('buscar por documento en la garita', () => {

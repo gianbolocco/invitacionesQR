@@ -3,7 +3,9 @@ import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2 } from 'lucide-react'
-import { MOTIVO, hora, type Movimiento } from '@/lib/gate'
+import { MOTIVO, detalleRechazo, hora, type Movimiento } from '@/lib/gate'
+import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
+import { KIND_LABEL, vigencia } from '@/lib/invitations'
 import {
   useDeshacerMovimiento, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
 } from '@/lib/queries/garita'
@@ -159,6 +161,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   }
 
   const motivo = !ok ? MOTIVO[(check as { reason: string }).reason] ?? 'Rechazado' : ''
+  const detalle = !ok ? detalleRechazo((check as { reason: string }).reason, inv) : null
   const sinCupo = !ok && (check as { reason: string }).reason === 'no_capacity'
   const palabra = esEgreso ? 'EGRESO' : ok ? 'INGRESO' : 'NO PASA'
   const registrando = ingresar.isPending || egresar.isPending
@@ -188,19 +191,29 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
             )}
           </p>
         )}
+        {detalle && <p className="mt-1 text-xl tabular opacity-80 sm:text-2xl">{detalle}</p>}
 
         <div className={`mt-8 border-t pt-5 ${ok ? 'border-pass-ink/15' : 'border-deny-ink/20'}`}>
           <p className="break-words text-3xl font-semibold leading-tight sm:text-4xl">{inv.guestName}</p>
           <p className="mt-1 text-xl tabular opacity-75 sm:text-2xl">
-            {inv.unitLabel}
-            {inv.capacity > 1 && ` · ${resultado.usedCount} de ${inv.capacity} entraron`}
+            {inv.unitLabel} · invita {inv.inviterName}
+            {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}
+            {inv.capacity > 1 && inv.kind !== 'frecuente' && ` · ${resultado.usedCount} de ${inv.capacity} entraron`}
           </p>
+          {/* Lo que el guardia compara con lo que tiene adelante: el documento y
+              el auto. Y el tipo, porque un proveedor no se trata como una visita. */}
+          <p className="mt-1 text-xl font-semibold tabular sm:text-2xl">
+            {[inv.guestDoc && `DNI ${inv.guestDoc}`, inv.plate, KIND_LABEL[inv.kind]].filter(Boolean).join(' · ')}
+          </p>
+          {ok && !esEgreso && <p className="mt-1 text-lg opacity-75 sm:text-xl">Vigencia: {vigencia(inv)}</p>}
           {(entro || salio) && (
             <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-xl font-semibold tabular sm:text-2xl">
               {entro && (
                 <motion.span key={`e-${entro}`} initial={hecho && !hecho.esEgreso ? { opacity: 0, y: 6 } : false}
                   animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: SALIDA }}>
-                  Entró {hora(entro)}
+                  Entró {horaODia(entro, hoyISO())}
+                  {/* Cuánto lleva adentro: alguien con dos días salta a la vista. */}
+                  {esEgreso && !hecho && <span className="font-normal opacity-75"> · adentro hace {tiempoDesde(entro)}</span>}
                 </motion.span>
               )}
               {salio && (
