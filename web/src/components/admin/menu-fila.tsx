@@ -12,7 +12,12 @@ import { Button } from '@/components/ui/button'
  * cuando el diálogo tiene su propio `DialogTrigger`, y acá el que abre es
  * este menú, no el diálogo.
  */
-export type AccionFila = { etiqueta: string; onClick: (disparador: HTMLButtonElement) => void; destructiva?: boolean }
+export type AccionFila = {
+  etiqueta: string
+  onClick: (disparador: HTMLButtonElement) => void
+  destructiva?: boolean
+  deshabilitada?: boolean
+}
 
 /** El menú ⋯ de cada fila: reenviar, cambiar lote, dar de baja, lo que haga falta. */
 export function MenuFila({ acciones }: { acciones: AccionFila[] }) {
@@ -27,7 +32,7 @@ export function MenuFila({ acciones }: { acciones: AccionFila[] }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {acciones.map((a) => (
-          <DropdownMenuItem key={a.etiqueta} onClick={() => a.onClick(disparadorRef.current!)}
+          <DropdownMenuItem key={a.etiqueta} onClick={() => a.onClick(disparadorRef.current!)} disabled={a.deshabilitada}
             className={a.destructiva ? 'text-peligro focus:bg-peligro/10 focus:text-peligro' : undefined}>
             {a.etiqueta}
           </DropdownMenuItem>

@@ -96,9 +96,6 @@ function Login() {
           {busy ? 'Entrando…' : 'Entrar'}
         </Button>
       </form>
-      <p className="-mt-3 text-xs text-ink-soft">
-        Si sos guardia y no tenés email, pedile a la administración que te restablezca la contraseña.
-      </p>
 
       {google && (
         <>

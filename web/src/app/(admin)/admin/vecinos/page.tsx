@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Search, X } from 'lucide-react'
 import {
   usePersonas, useAltaVecino, useReenviarInvitacion, useReactivarPersona,
-  useDeshabilitarPersona, useCambiarLote, ApiError,
+  useDeshabilitarPersona, useCambiarLote, copiarLinkDeAlta, ApiError,
 } from '@/lib/queries/admin'
 import { ESTADO, normalizarBusqueda, type Person } from '@/lib/admin'
 import { fechaConAnio } from '@/lib/fechas'
@@ -161,7 +161,10 @@ export default function VecinosPage() {
 
   function accionesDe(p: Person): AccionFila[] {
     const acciones: AccionFila[] = []
-    if (p.status === 'invited') acciones.push({ etiqueta: 'Reenviar invitación', onClick: () => reenviar.mutate(p) })
+    if (p.status === 'invited') acciones.push(
+      { etiqueta: 'Reenviar invitación', onClick: () => reenviar.mutate(p), deshabilitada: reenviar.isPending },
+      { etiqueta: 'Copiar link de alta', onClick: () => copiarLinkDeAlta(p) },
+    )
     acciones.push({ etiqueta: 'Cambiar lote', onClick: (btn) => { setDisparador(btn); setCorrigiendo(p) } })
     if (p.status === 'disabled') acciones.push({ etiqueta: 'Reactivar', onClick: () => reactivar.mutate(p) })
     else acciones.push({
