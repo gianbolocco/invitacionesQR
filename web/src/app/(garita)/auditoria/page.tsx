@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Inbox } from 'lucide-react'
 import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
-import { hoyISO, sumarDias, fechaNumerica, fechaHora, horaODia } from '@/lib/fechas'
+import { hoyISO, sumarDias, fechaNumerica, fechaHora } from '@/lib/fechas'
+import { KIND_LABEL, quienInvita } from '@/lib/invitations'
 import { ChromeAdmin } from '@/components/admin/chrome'
 import { ChromeGarita } from '@/components/garita/chrome'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
@@ -49,6 +50,7 @@ type Movimiento = {
   guestDoc: string | null
   plate: string | null
   guardName: string | null
+  exitGuardName: string | null
 }
 
 type Pagina = {
@@ -57,6 +59,14 @@ type Pagina = {
   page: number
   pageSize: number
   counts: Record<AuditRow['status'], number>
+}
+
+const TH = 'py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft'
+
+/** La segunda línea de una celda: el dato que acompaña al principal. */
+function Secundaria({ children }: { children: React.ReactNode }) {
+  if (!children) return null
+  return <span className="mt-0.5 block truncate text-xs text-ink-soft tabular">{children}</span>
 }
 
 const PAGE_SIZE = 25
@@ -168,71 +178,92 @@ export default function AuditoriaPage() {
         <Vacio icono={Inbox} titulo="No hay invitaciones en ese rango" />
       ) : (
         <div className="overflow-x-auto rounded-md border border-line">
-          <table className="w-full min-w-[860px] table-fixed border-collapse text-left text-sm">
+          <table className="w-full min-w-[920px] table-fixed border-collapse text-left text-sm">
             <thead className="bg-surface-sunk">
               <tr className="border-b border-line">
-                <th className="w-[22%] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Invitado</th>
-                <th className="w-[12%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Unidad</th>
-                <th className="w-[14%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Fecha</th>
-                <th className="w-[12%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Estado</th>
-                <th className="w-[12%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Ingreso</th>
-                <th className="w-[12%] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Salida</th>
-                <th className="w-[16%] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Guardia</th>
+                <th className={`w-[23%] px-4 ${TH}`}>Invitado</th>
+                <th className={`w-[16%] px-3 ${TH}`}>Unidad</th>
+                <th className={`w-[11%] px-3 ${TH}`}>Vigencia</th>
+                <th className={`w-[11%] px-3 ${TH}`}>Estado</th>
+                <th className={`w-[19%] px-3 ${TH}`}>Ingreso</th>
+                <th className={`w-[20%] px-4 ${TH}`}>Salida</th>
               </tr>
             </thead>
             <tbody>
               {lista.map((r) => (
                 <Fragment key={r.id}>
-                  <tr className="border-b border-line">
-                    <td className="px-4 py-3 font-semibold">{r.guestName}</td>
-                    <td className="px-3 py-3 tabular">{r.unitLabel}</td>
+                  <tr className="border-b border-line align-top">
+                    <td className="px-4 py-3">
+                      <span className="block truncate font-semibold">{r.guestName}</span>
+                      <Secundaria>{[r.guestDoc && `DNI ${r.guestDoc}`, r.plate, KIND_LABEL[r.kind]].filter(Boolean).join(' · ')}</Secundaria>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="block tabular">{r.unitLabel}</span>
+                      <Secundaria>{quienInvita(r.inviterName)}</Secundaria>
+                    </td>
                     <td className="px-3 py-3 tabular">
                       {r.validFrom === r.validTo ? fechaNumerica(r.validFrom) : `${fechaNumerica(r.validFrom)}–${fechaNumerica(r.validTo)}`}
                     </td>
                     <td className={`px-3 py-3 font-semibold ${ESTADO[r.status].clase}`}>{ESTADO[r.status].label}</td>
                     <td className="px-3 py-3">
-                      {r.enteredCount === 0 ? <span className="tabular">—</span> : (
-                        <button onClick={() => desplegar(r.id)} aria-expanded={abierta === r.id}
-                          className="flex items-center gap-1 tabular underline underline-offset-4">
-                          {/* Con fecha si no fue el primer día de la invitación: una frecuente
-                              entra muchos días distintos. */}
-                          {horaODia(r.enteredAt!, r.validFrom)}{r.enteredCount > 1 && ` ×${r.enteredCount}`}
-                          <ChevronDown className={`size-3.5 transition-transform ${abierta === r.id ? 'rotate-180' : ''}`} aria-hidden />
-                        </button>
+                      {r.enteredCount === 0 ? <span className="tabular text-ink-soft">—</span> : (
+                        <>
+                          <button onClick={() => desplegar(r.id)} aria-expanded={abierta === r.id}
+                            aria-label={`Ver los ingresos de ${r.guestName}`}
+                            className="flex items-center gap-1 tabular underline underline-offset-4">
+                            {fechaHora(r.enteredAt!)}{r.enteredCount > 1 && ` · ×${r.enteredCount}`}
+                            <ChevronDown className={`size-3.5 transition-transform ${abierta === r.id ? 'rotate-180' : ''}`} aria-hidden />
+                          </button>
+                          <Secundaria>{r.guardName ?? 'Guardia sin registrar'}</Secundaria>
+                        </>
                       )}
-                    </td>
-                    <td className="px-3 py-3 tabular">
-                      {/* Entró un día y salió otro: la hora sola parecía del mismo día. */}
-                      {r.exitedAt ? horaODia(r.exitedAt, hoyISO(new Date(r.enteredAt ?? r.exitedAt))) : '—'}
                     </td>
                     <td className="px-4 py-3">
-                      {r.guardName ?? '—'}
-                      {r.exitGuardName && r.exitGuardName !== r.guardName && (
-                        <span className="block text-xs opacity-70">salió con {r.exitGuardName}</span>
-                      )}
+                      {r.exitedAt ? (
+                        <>
+                          <span className="block tabular">{fechaHora(r.exitedAt)}</span>
+                          <Secundaria>{r.exitGuardName ?? 'Guardia sin registrar'}</Secundaria>
+                        </>
+                      ) : r.status === 'adentro' ? (
+                        <span className="font-semibold text-marca">Sigue adentro</span>
+                      ) : <span className="tabular text-ink-soft">—</span>}
                     </td>
                   </tr>
                   {abierta === r.id && (
                     <tr className="border-b border-line bg-surface-sunk/60">
-                      <td colSpan={7} className="px-4 py-3">
+                      <td colSpan={6} className="px-4 py-3">
                         {movimientos === null ? <SkeletonFilas filas={2} /> : movimientos.length === 0 ? (
                           <p className="text-sm text-ink-soft">Sin movimientos.</p>
                         ) : (
-                          <ul className="flex flex-col gap-1">
-                            {movimientos.map((m) => (
-                              <li key={m.id} className="tabular text-sm">
-                                {/* fechaHora y no enteredAt.slice(0, 10): esa es la fecha UTC, y a
-                                    las 22 acá ya es el día siguiente allá. */}
-                                {fechaHora(m.enteredAt)}
-                                {' · '}<span className="font-semibold">{m.guestName}</span>
-                                {m.guestDoc && ` · ${m.guestDoc}`}{m.plate && ` · ${m.plate}`}
-                                {' · lo dejó pasar '}{m.guardName ?? '(sin registrar)'}
-                                {m.exitedAt
-                                  ? <> · salió {horaODia(m.exitedAt, hoyISO(new Date(m.enteredAt)))}</>
-                                  : <> · sin salida registrada</>}
-                              </li>
-                            ))}
-                          </ul>
+                          // Cada ingreso con su salida y sus dos guardias: la fila de
+                          // arriba resume el último; acá están todos.
+                          <table className="w-full table-fixed text-left text-[13px]">
+                            <thead>
+                              <tr className="text-ink-soft">
+                                <th className={`w-[17%] pb-1 ${TH}`}>Ingreso</th>
+                                <th className={`w-[17%] pb-1 ${TH}`}>Guardia</th>
+                                <th className={`w-[17%] pb-1 ${TH}`}>Salida</th>
+                                <th className={`w-[17%] pb-1 ${TH}`}>Guardia</th>
+                                <th className={`w-[32%] pb-1 ${TH}`}>Invitado</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {movimientos.map((m) => (
+                                <tr key={m.id} className="border-t border-line/70">
+                                  {/* fechaHora y no enteredAt.slice(0, 10): esa es la fecha UTC, y a
+                                      las 22 acá ya es el día siguiente allá. */}
+                                  <td className="py-1.5 tabular">{fechaHora(m.enteredAt)}</td>
+                                  <td className="py-1.5">{m.guardName ?? '—'}</td>
+                                  <td className="py-1.5 tabular">{m.exitedAt ? fechaHora(m.exitedAt) : 'Sin salida'}</td>
+                                  <td className="py-1.5">{m.exitGuardName ?? '—'}</td>
+                                  <td className="truncate py-1.5">
+                                    <span className="font-semibold">{m.guestName}</span>
+                                    {m.guestDoc && ` · DNI ${m.guestDoc}`}{m.plate && ` · ${m.plate}`}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         )}
                       </td>
                     </tr>

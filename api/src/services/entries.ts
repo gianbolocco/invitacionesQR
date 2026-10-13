@@ -522,15 +522,23 @@ async function auditRows(
     with uso as (
       select e.invitation_id,
              count(*)::int as veces,
-             max(e.entered_at) as ultima,
-             max(g.name) as guardia,
-             count(*) filter (where e.exited_at is null)::int as abiertas,
-             max(e.exited_at) as ultima_salida,
-             max(gs.name) as guardia_salida
+             count(*) filter (where e.exited_at is null)::int as abiertas
+      from entry_log e
+      group by e.invitation_id
+    ),
+    /*
+     * El último ingreso ENTERO, con su salida y sus dos guardias. Antes eran
+     * max() por columna: max(nombre) daba el guardia alfabéticamente último, y
+     * max(salida) podía ser la de un ingreso anterior al que sigue abierto.
+     */
+    ultimo as (
+      select distinct on (e.invitation_id)
+             e.invitation_id, e.entered_at, e.exited_at,
+             g.name as guardia, gs.name as guardia_salida
       from entry_log e
       left join person g on g.id = e.guard_id
       left join person gs on gs.id = e.exit_guard_id
-      group by e.invitation_id
+      order by e.invitation_id, e.entered_at desc
     )
     select
       i.id,
@@ -550,15 +558,16 @@ async function auditRows(
         when i.valid_to < ${hoy}::date then 'vencida'
         else 'esperando'
       end                         as status,
-      uso.ultima                  as "enteredAt",
+      ultimo.entered_at           as "enteredAt",
       coalesce(uso.veces, 0)      as "enteredCount",
-      uso.guardia                 as "guardName",
-      uso.ultima_salida           as "exitedAt",
-      uso.guardia_salida          as "exitGuardName"
+      ultimo.guardia              as "guardName",
+      ultimo.exited_at            as "exitedAt",
+      ultimo.guardia_salida       as "exitGuardName"
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
     left join uso on uso.invitation_id = i.id
+    left join ultimo on ultimo.invitation_id = i.id
     where u.neighborhood_id = ${neighborhoodId}
       and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
       and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)

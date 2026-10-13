@@ -87,7 +87,7 @@ describe('auditoría de invitaciones', () => {
   })
 
 
-  it('exporta un .xlsx de verdad, con las hojas Invitaciones e Ingresos', async () => {
+  it('exporta un .xlsx de verdad, con portada y las hojas Invitaciones e Ingresos', async () => {
     const ctx = await base()
     const i = await inv(ctx, { guestName: 'Martín Pérez' })
     await registerEntry(i.id, ctx.guardiaId, { guestName: 'Martín Pérez' })
@@ -108,7 +108,7 @@ describe('auditoría de invitaciones', () => {
 
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buf)
-    expect(wb.worksheets.map((w) => w.name)).toEqual(['Invitaciones', 'Ingresos'])
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Resumen', 'Invitaciones', 'Ingresos'])
 
     const inv1 = wb.getWorksheet('Invitaciones')!
     const encabezados = (inv1.getRow(1).values as unknown[]).map(String)
@@ -125,7 +125,35 @@ describe('auditoría de invitaciones', () => {
     const cabecerasIng = (ing.getRow(1).values as unknown[]).map(String)
     const colIng = (t: string) => cabecerasIng.indexOf(t)
     expect(ing.getRow(2).getCell(colIng('Invitado')).value).toBe('Martín Pérez')
-    expect(ing.getRow(2).getCell(colIng('Guardia')).value).toBe('Rulo')
+    expect(ing.getRow(2).getCell(colIng('Guardia ingreso')).value).toBe('Rulo')
+    // Fecha de verdad, en hora de Buenos Aires: Excel la ordena y filtra.
+    expect(ing.getRow(2).getCell(colIng('Ingreso')).value).toBeInstanceOf(Date)
+    // Sin "Último ingreso" ni la columna de cantidad de ingresos.
+    expect(encabezados).not.toContain('Último ingreso')
+    expect(encabezados).not.toContain('Ingresos')
+    expect(encabezados).toContain('Guardia ingreso')
+  })
+
+  it('la portada dice con qué filtros se sacó y quién lo generó', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Martín Pérez' })
+    const res = await request(app).get(`/gate/audit.xlsx?from=2026-10-06&to=2026-10-13&status=vencida`)
+      .set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+      .expect(200)
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const valores: Record<string, unknown> = {}
+    wb.getWorksheet('Resumen')!.eachRow((fila) => { valores[String(fila.getCell(1).value)] = fila.getCell(2).value })
+    expect(valores['Período']).toBe('06/10/2026 al 13/10/2026')
+    expect(valores['Estado']).toBe('Vencida')
+    expect(valores['Unidad']).toBe('Todas')
+    expect(valores['Por']).toBe('Rulo')
   })
 
   it('el Excel se llama como el barrio, no como el de la demo', async () => {
@@ -234,6 +262,26 @@ describe('la auditoría muestra la salida', () => {
     const fila = res.body.rows.find((r: { id: string }) => r.id === i.id)
     expect(fila.exitedAt).not.toBeNull()
     expect(fila.exitGuardName).toBe('Rulo')
+  })
+
+  it('con varios ingresos, la fila muestra los guardias del ÚLTIMO, no los máximos', async () => {
+    const ctx = await base()
+    const [ana] = await db.insert(people).values({
+      neighborhoodId: (await db.select().from(neighborhoods))[0].id, email: 'ana@example.com', name: 'Ana',
+      role: 'guard', status: 'active',
+    }).returning()
+    const i = await inv(ctx, { guestName: 'Frecuente', kind: 'frecuente', capacity: 10 })
+    // Primero Rulo entra y saca; después Ana entra y sigue adentro.
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Frecuente' })
+    await registerExit(i.id, ctx.guardiaId)
+    await registerEntry(i.id, ana.id, { guestName: 'Frecuente' })
+
+    const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie).expect(200)
+    const fila = res.body.rows.find((r: { id: string }) => r.id === i.id)
+    // Antes: max(nombre) daba "Rulo" y max(salida) la salida del primer ingreso.
+    expect(fila.guardName).toBe('Ana')
+    expect(fila.exitedAt).toBeNull()
+    expect(fila.exitGuardName).toBeNull()
   })
 
   it('sin salida registrada, los dos campos vienen en null', async () => {
