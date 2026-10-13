@@ -62,6 +62,14 @@ export function fechaHora(instante: string): string {
   return `${fechaNumerica(hoyISO(new Date(instante)))}, ${hora(instante)}`
 }
 
+/**
+ * "14:02" si el instante cae el día `dia`; si no, "04/10, 14:02". Para el que
+ * entra un día y sale otro: la hora sola parecería del mismo día.
+ */
+export function horaODia(instante: string, dia: string): string {
+  return hoyISO(new Date(instante)) === dia ? hora(instante) : fechaHora(instante)
+}
+
 /** "Hoy", "Mañana", "Ayer" o "miércoles, 14 de octubre". */
 export function tituloDia(iso: string, hoy: string = hoyISO()): string {
   if (iso === hoy) return 'Hoy'

@@ -4,8 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Inbox } from 'lucide-react'
 import { api, apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
-import { hora } from '@/lib/gate'
-import { hoyISO, sumarDias, fechaNumerica } from '@/lib/fechas'
+import { hoyISO, sumarDias, fechaNumerica, fechaHora, horaODia } from '@/lib/fechas'
 import { ChromeAdmin } from '@/components/admin/chrome'
 import { ChromeGarita } from '@/components/garita/chrome'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
@@ -195,12 +194,17 @@ export default function AuditoriaPage() {
                       {r.enteredCount === 0 ? <span className="tabular">—</span> : (
                         <button onClick={() => desplegar(r.id)} aria-expanded={abierta === r.id}
                           className="flex items-center gap-1 tabular underline underline-offset-4">
-                          {hora(r.enteredAt!)}{r.enteredCount > 1 && ` ×${r.enteredCount}`}
+                          {/* Con fecha si no fue el primer día de la invitación: una frecuente
+                              entra muchos días distintos. */}
+                          {horaODia(r.enteredAt!, r.validFrom)}{r.enteredCount > 1 && ` ×${r.enteredCount}`}
                           <ChevronDown className={`size-3.5 transition-transform ${abierta === r.id ? 'rotate-180' : ''}`} aria-hidden />
                         </button>
                       )}
                     </td>
-                    <td className="px-3 py-3 tabular">{r.exitedAt ? hora(r.exitedAt) : '—'}</td>
+                    <td className="px-3 py-3 tabular">
+                      {/* Entró un día y salió otro: la hora sola parecía del mismo día. */}
+                      {r.exitedAt ? horaODia(r.exitedAt, hoyISO(new Date(r.enteredAt ?? r.exitedAt))) : '—'}
+                    </td>
                     <td className="px-4 py-3">
                       {r.guardName ?? '—'}
                       {r.exitGuardName && r.exitGuardName !== r.guardName && (
@@ -217,11 +221,15 @@ export default function AuditoriaPage() {
                           <ul className="flex flex-col gap-1">
                             {movimientos.map((m) => (
                               <li key={m.id} className="tabular text-sm">
-                                {fechaNumerica(m.enteredAt.slice(0, 10))} {hora(m.enteredAt)}
+                                {/* fechaHora y no enteredAt.slice(0, 10): esa es la fecha UTC, y a
+                                    las 22 acá ya es el día siguiente allá. */}
+                                {fechaHora(m.enteredAt)}
                                 {' · '}<span className="font-semibold">{m.guestName}</span>
                                 {m.guestDoc && ` · ${m.guestDoc}`}{m.plate && ` · ${m.plate}`}
                                 {' · lo dejó pasar '}{m.guardName ?? '(sin registrar)'}
-                                {m.exitedAt ? <> · salió {hora(m.exitedAt)}</> : <> · sin salida registrada</>}
+                                {m.exitedAt
+                                  ? <> · salió {horaODia(m.exitedAt, hoyISO(new Date(m.enteredAt)))}</>
+                                  : <> · sin salida registrada</>}
                               </li>
                             ))}
                           </ul>

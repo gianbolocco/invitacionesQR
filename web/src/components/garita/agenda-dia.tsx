@@ -10,7 +10,7 @@ import { EstadoTag, type Estado } from '@/components/dominio/estado-tag'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { Vacio } from '@/components/dominio/vacio'
-import { hoyISO, sumarDias, tituloDia, hora, fechaHora } from '@/lib/fechas'
+import { hoyISO, sumarDias, tituloDia, hora, horaODia } from '@/lib/fechas'
 import { useAgenda, useAdentro, type AgendaRow } from '@/lib/queries/garita'
 
 type Filtro = 'todos' | 'pendientes' | 'adentro'
@@ -24,7 +24,7 @@ function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
   const estado: Estado = r.adentro ? 'adentro' : r.enteredCount === 0 ? 'esperando' : 'salio'
   const detalle = estado === 'adentro'
     // Si entró otro día, la hora sola engaña: lleva la fecha.
-    ? (r.lastEntryAt ? (hoyISO(new Date(r.lastEntryAt)) === hoyISO() ? hora(r.lastEntryAt) : fechaHora(r.lastEntryAt)) : undefined)
+    ? (r.lastEntryAt ? horaODia(r.lastEntryAt, hoyISO()) : undefined)
     : estado === 'salio'
       ? (r.lastExitAt ? hora(r.lastExitAt) : undefined)
       : undefined
