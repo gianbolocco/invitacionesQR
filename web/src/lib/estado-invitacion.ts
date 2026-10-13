@@ -17,3 +17,15 @@ export function estadoInvitacion(
   if (inv.validTo < hoy) return 'vencida'
   return 'esperando'
 }
+
+/**
+ * Solo se edita lo que nunca se usó. Una frecuente que ya entró vuelve a
+ * "esperando", así que no alcanza con el estado: también tiene que estar en
+ * cero. Es el mismo criterio que aplica la API.
+ */
+export function sePuedeEditar(
+  inv: Parameters<typeof estadoInvitacion>[0],
+  hoy: string,
+): boolean {
+  return estadoInvitacion(inv, hoy) === 'esperando' && inv.usedCount === 0
+}

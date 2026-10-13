@@ -14,6 +14,7 @@ import { slug } from '../lib/slug.js'
 import { buildWorkbook, XLSX_MIME } from '../lib/excel.js'
 import { entriesLog } from '../services/reports.js'
 import { getNeighborhood } from '../services/neighborhoods.js'
+import { escucharAvisos } from '../lib/avisos.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
@@ -85,6 +86,9 @@ gateRoutes.get('/agenda', async (req, res) => {
 
   res.json(await agendaForDay(req.person!.neighborhoodId, date ?? todayInBuenosAires()))
 })
+
+/** Avisos en vivo para la garita: "algo cambió, volvé a pedir". */
+gateRoutes.get('/eventos', escucharAvisos)
 
 /** Quiénes están adentro ahora, de cualquier día. */
 gateRoutes.get('/adentro', async (req, res) => {

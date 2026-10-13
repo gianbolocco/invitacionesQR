@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { CalendarX, CheckCheck, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
@@ -41,6 +42,41 @@ function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
 }
 
 /**
+ * Una lista de la agenda. La que llega con el refresco entra abriéndose y con
+ * un destello, para que el guardia note a quién acaban de invitar; la carga
+ * inicial no anima (initial={false}), así no baila toda la lista al entrar.
+ * El que cambia de sección (llegó: de Pendientes a Ya entraron) entra igual.
+ */
+function Lista({ filas, onAbrir, className }: {
+  filas: AgendaRow[]
+  onAbrir: (id: string) => void
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      <AnimatePresence initial={false}>
+        {filas.map((r) => (
+          // Variantes y no initial/animate sueltos: así el initial={false} de
+          // AnimatePresence también apaga el destello en la carga inicial.
+          // -mx-2 px-2: la fila se sale 8 px para su fondo al pasar el mouse, y el
+          // overflow-hidden de la animación se lo recortaba.
+          <motion.div key={r.id} layout className="relative -mx-2 overflow-hidden px-2"
+            initial="nueva" animate="lista" exit="sale" variants={{
+              nueva: { opacity: 0, height: 0 },
+              lista: { opacity: 1, height: 'auto', transition: { duration: 0.3 } },
+              sale: { opacity: 0, height: 0, transition: { duration: 0.2 } },
+            }}>
+            <motion.span aria-hidden className="pointer-events-none absolute inset-0 rounded-md bg-marca-suave"
+              variants={{ nueva: { opacity: 1 }, lista: { opacity: 0, transition: { duration: 1.6, delay: 0.3 } } }} />
+            <div className="relative">{filaDe(r, onAbrir)}</div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/**
  * La agenda del día, en el panel en reposo de la garita.
  *
  * La división principal es esperando / ya entraron, no alfabética: es la
@@ -53,10 +89,23 @@ function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
  * invitación de ayer. Por eso es otra consulta, y solo existe mirando hoy.
  */
 export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
-  const [fecha, setFecha] = useState(hoyISO())
+  /*
+   * null = "hoy", no una fecha fija: la garita queda abierta toda la noche y
+   * a las 00:00 tiene que pasar sola al día nuevo. Con la fecha guardada al
+   * montar, el guardia del turno noche miraba la agenda de ayer, sin refresco.
+   * Se chequea el día cada minuto; si no cambió, setHoy no re-renderiza.
+   */
+  const [hoy, setHoy] = useState(hoyISO)
+  useEffect(() => {
+    const t = setInterval(() => setHoy(hoyISO()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+  const [elegida, setElegida] = useState<string | null>(null)
+  const fecha = elegida ?? hoy
+  const setFecha = (f: string) => setElegida(f === hoy ? null : f)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [verFrecuentes, setVerFrecuentes] = useState(false)
-  const esHoy = fecha === hoyISO()
+  const esHoy = fecha === hoy
   const vista: Filtro = esHoy ? filtro : 'todos'
   const q = useAgenda(fecha)
   const adentro = useAdentro(esHoy)
@@ -71,18 +120,18 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="icon" aria-label="Día anterior"
-          onClick={() => setFecha((f) => sumarDias(f, -1))}>
+          onClick={() => setFecha(sumarDias(fecha, -1))}>
           <ChevronLeft aria-hidden />
         </Button>
-        <Button variant="outline" onClick={() => setFecha(hoyISO())}>Hoy</Button>
+        <Button variant="outline" onClick={() => setElegida(null)}>Hoy</Button>
         <Button variant="outline" size="icon" aria-label="Día siguiente"
-          onClick={() => setFecha((f) => sumarDias(f, 1))}>
+          onClick={() => setFecha(sumarDias(fecha, 1))}>
           <ChevronRight aria-hidden />
         </Button>
         <CampoFecha id="agenda-fecha" valor={fecha} onCambio={setFecha} className="w-44" />
       </div>
 
-      <h2 className="font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha)}</h2>
+      <h2 className="font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha, hoy)}</h2>
 
       {esHoy && (
         <Chips etiqueta="Filtrar la agenda" valor={filtro} onCambio={setFiltro} opciones={[
@@ -100,7 +149,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
         ) : adentro.data.length === 0 ? (
           <Vacio icono={DoorOpen} titulo="No hay nadie adentro" />
         ) : (
-          <div>{adentro.data.map((r) => filaDe(r, onAbrir))}</div>
+          <Lista filas={adentro.data} onAbrir={onAbrir} />
         )
       ) : q.isPending ? (
         <SkeletonFilas filas={4} />
@@ -110,7 +159,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
         esperando.length === 0 ? (
           <Vacio icono={CheckCheck} titulo="No falta llegar nadie" />
         ) : (
-          <div>{esperando.map((r) => filaDe(r, onAbrir))}</div>
+          <Lista key={fecha} filas={esperando} onAbrir={onAbrir} />
         )
       ) : todas.length === 0 ? (
         <Vacio icono={CalendarX} titulo="Nadie tiene autorización para este día" />
@@ -121,7 +170,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
                 Pendientes ({esperando.length})
               </p>
-              <div>{esperando.map((r) => filaDe(r, onAbrir))}</div>
+              <Lista key={fecha} filas={esperando} onAbrir={onAbrir} />
             </section>
           )}
           {entraron.length > 0 && (
@@ -129,7 +178,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
                 Ya entraron ({entraron.length})
               </p>
-              <div className="opacity-70">{entraron.map((r) => filaDe(r, onAbrir))}</div>
+              <Lista key={fecha} filas={entraron} onAbrir={onAbrir} className="opacity-70" />
             </section>
           )}
           {frecuentes.length > 0 && (
@@ -138,7 +187,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
                 onClick={() => setVerFrecuentes((v) => !v)}>
                 {verFrecuentes ? 'Ocultar' : 'Mostrar'} frecuentes habilitados ({frecuentes.length})
               </Button>
-              {verFrecuentes && <div>{frecuentes.map((r) => filaDe(r, onAbrir))}</div>}
+              {verFrecuentes && <Lista key={fecha} filas={frecuentes} onAbrir={onAbrir} />}
             </section>
           )}
         </>

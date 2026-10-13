@@ -18,7 +18,10 @@
 }
 
 {$SITIO} {
-	encode zstd gzip
+	# Todo comprimido salvo los avisos en vivo de la garita: comprimir un stream
+	# de Server-Sent Events lo retiene en el buffer y los avisos llegan tarde.
+	@comprimible not path /api/gate/eventos
+	encode @comprimible zstd gzip
 
 	handle_path /api/* {
 		reverse_proxy api:8080

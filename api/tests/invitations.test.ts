@@ -187,25 +187,30 @@ describe('invitaciones', () => {
 describe('editar una invitación', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
 
+  const HOY = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+  const MANIANA = new Date(Date.parse(`${HOY}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+
   async function visita(ctx: { cookie: string[]; unitId: string }, over = {}) {
     const res = await request(app).post('/invitations').set('Cookie', ctx.cookie).send({
       unitId: ctx.unitId, kind: 'visita', guestName: 'Juan Pérez',
-      validFrom: '2026-09-20', validTo: '2026-09-20', capacity: 1, ...over,
+      validFrom: HOY, validTo: HOY, capacity: 1, ...over,
     })
     return res.body
   }
 
-  it('cambia nombre, documento y fecha', async () => {
+  it('cambia nombre, documento y fecha mientras está pendiente', async () => {
     const ctx = await resident('martin@example.com', 'Lote 142')
     const inv = await visita(ctx)
 
     const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', ctx.cookie)
-      .send({ guestName: 'Juan Carlos Pérez', guestDoc: '30123456', validTo: '2026-09-21' })
+      .send({ guestName: 'Juan Carlos Pérez', guestDoc: '30123456', validTo: MANIANA })
 
     expect(res.status).toBe(200)
     expect(res.body.guestName).toBe('Juan Carlos Pérez')
     expect(res.body.guestDoc).toBe('30123456')
-    expect(res.body.validTo).toBe('2026-09-21')
+    expect(res.body.validTo).toBe(MANIANA)
     // El token no cambia: el invitado ya tiene el link.
     expect(res.body.token).toBe(inv.token)
   })
@@ -222,32 +227,41 @@ describe('editar una invitación', () => {
 
   it('no deja invertir la ventana', async () => {
     const ctx = await resident('martin@example.com', 'Lote 142')
-    const inv = await visita(ctx)
+    const inv = await visita(ctx, { validTo: MANIANA })
 
     const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', ctx.cookie)
-      .send({ validFrom: '2026-09-25', validTo: '2026-09-20' })
+      .send({ validFrom: MANIANA, validTo: HOY })
     expect(res.status).toBe(400)
   })
 
-  it('no deja bajar el cupo por debajo de los que ya entraron', async () => {
+  it('no se edita una invitación usada, ni con el invitado adentro ni después', async () => {
     const ctx = await resident('martin@example.com', 'Lote 142')
-    const hoy = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date())
-    const frec = await visita(ctx, { kind: 'frecuente', capacity: 10, validFrom: hoy, validTo: hoy })
+    const frec = await visita(ctx, { kind: 'frecuente', capacity: 10 })
 
-    const { registerEntry } = await import('../src/services/entries.js')
-    await registerEntry(frec.id, null, { guestName: 'Uno' })
-    await registerEntry(frec.id, null, { guestName: 'Dos' })
+    const { registerEntry, registerExit } = await import('../src/services/entries.js')
+    await registerEntry(frec.id, null, { guestName: 'Juan Pérez' })
 
-    const res = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
-      .send({ capacity: 1 })
+    const adentro = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ guestName: 'Otro' })
+    expect(adentro.status).toBe(409)
+    expect(adentro.body.error).toBe('ya_usada')
+
+    await registerExit(frec.id, null)
+    const salio = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ validTo: MANIANA })
+    expect(salio.status).toBe(409)
+  })
+
+  it('no se edita una vencida', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const inv = await visita(ctx)
+    await db.update(invitations).set({ validFrom: '2020-01-01', validTo: '2020-01-02' })
+      .where(eq(invitations.id, inv.id))
+
+    const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', ctx.cookie)
+      .send({ validTo: MANIANA })
     expect(res.status).toBe(409)
-    expect(res.body.error).toBe('cupo_menor_al_usado')
-
-    // Subirlo sí se puede.
-    await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
-      .send({ capacity: 20 }).expect(200)
+    expect(res.body.error).toBe('vencida')
   })
 
   it('no se edita una anulada', async () => {
@@ -259,7 +273,6 @@ describe('editar una invitación', () => {
       .send({ guestName: 'Otro' })
     expect(res.status).toBe(409)
   })
-
 })
 
 describe('historial: buscar, filtrar y paginar', () => {
