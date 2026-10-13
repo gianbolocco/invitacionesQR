@@ -89,7 +89,7 @@ describe('alta exprés de invitación', () => {
 
     // El veredicto no muestra el nombre del guardia como si invitara él.
     const veredicto = await request(app).get(`/gate/invitation/${res.body.id}`).set('Cookie', cookie).expect(200)
-    expect(veredicto.body.invitation.inviterName).toBe('Portería (autorizado por teléfono)')
+    expect(veredicto.body.invitation.inviterName).toBe('Autorizado por portería')
     expect(res.body.guestName).toBe('Invitado Exprés')
   })
 
@@ -172,7 +172,7 @@ describe('el documento es obligatorio al ingreso', () => {
 describe('a quién se le atribuye una invitación de garita', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
 
-  const ETIQUETA = 'Portería (autorizado por teléfono)'
+  const ETIQUETA = 'Autorizado por portería'
 
   it('en el historial del vecino', async () => {
     const { cookie, unit142 } = await escenario()

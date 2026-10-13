@@ -5,6 +5,7 @@ import { canEnter, type EntryCheck } from '../authz.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { audit } from '../lib/audit.js'
+import { PORTERIA } from '../lib/porteria.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -30,7 +31,7 @@ async function loadForCheck(where: SQL) {
     unitLabel: units.label,
     // Para el veredicto: a quién llamar si hay dudas. Si la creó un guardia
     // (alta exprés), no se muestra su nombre, igual que en la agenda.
-    inviterName: sql<string>`case when ${people.role} = 'guard' then 'Portería (autorizado por teléfono)' else ${people.name} end`,
+    inviterName: sql<string>`case when ${people.role} = 'guard' then ${PORTERIA} else ${people.name} end`,
   }).from(invitations)
     .innerJoin(units, eq(units.id, invitations.unitId))
     .innerJoin(people, eq(people.id, invitations.createdBy))
@@ -324,7 +325,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       i.plate,
       i.kind,
       u.label             as "unitLabel",
-      case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
+      case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
       i.valid_to          as "validTo",
       (select count(*) from entry_log e
@@ -367,7 +368,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       i.plate,
       i.kind,
       u.label             as "unitLabel",
-      case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
+      case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
       i.valid_to          as "validTo",
       (select count(*) from entry_log e
@@ -538,7 +539,7 @@ async function auditRows(
       i.plate,
       i.kind,
       u.label                     as "unitLabel",
-      case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
+      case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.valid_from                as "validFrom",
       i.valid_to                  as "validTo",
       i.created_at                as "createdAt",

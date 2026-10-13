@@ -19,7 +19,7 @@ export type Resultado = {
     capacity: number
     weekdays: number[] | null
     unitLabel: string
-    /** El vecino que invita, o "Portería (…)" si fue un alta exprés. */
+    /** El vecino que invita, o PORTERIA si fue un alta exprés. */
     inviterName: string
   }
   check: Check

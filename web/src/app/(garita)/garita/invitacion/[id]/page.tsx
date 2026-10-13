@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2 } from 'lucide-react'
 import { MOTIVO, detalleRechazo, hora, type Movimiento } from '@/lib/gate'
 import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
-import { KIND_LABEL, vigencia } from '@/lib/invitations'
+import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
 import {
   useDeshacerMovimiento, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
 } from '@/lib/queries/garita'
@@ -196,7 +196,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
         <div className={`mt-8 border-t pt-5 ${ok ? 'border-pass-ink/15' : 'border-deny-ink/20'}`}>
           <p className="break-words text-3xl font-semibold leading-tight sm:text-4xl">{inv.guestName}</p>
           <p className="mt-1 text-xl tabular opacity-75 sm:text-2xl">
-            {inv.unitLabel} · invita {inv.inviterName}
+            {inv.unitLabel} · {quienInvita(inv.inviterName)}
             {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}
             {inv.capacity > 1 && inv.kind !== 'frecuente' && ` · ${resultado.usedCount} de ${inv.capacity} entraron`}
           </p>
