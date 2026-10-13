@@ -100,6 +100,12 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   // primero en el DOM.
   await g.getByRole('button', { name: /^Siguiente/ }).click()
   await expect(g).toHaveURL(/\/garita$/)
+
+  // El filtro "Adentro" lo muestra y esconde las secciones de la agenda.
+  await g.getByRole('button', { name: /^Adentro/ }).click()
+  await expect(g.getByText(/^Ya entraron/)).toBeHidden()
+  await expect(g.getByText(nombre).first()).toBeVisible()
+
   await g.getByLabel('Buscar invitado').fill(nombre)
   await g.getByText(nombre).first().click()
   await expect(g.getByRole('heading', { name: 'EGRESO', exact: true })).toBeVisible()

@@ -245,7 +245,12 @@ export async function searchGuests(neighborhoodId: string, query: string) {
     .innerJoin(units, eq(units.id, invitations.unitId))
     .where(and(
       eq(units.neighborhoodId, neighborhoodId),
-      gte(invitations.validTo, hoy),
+      // O sigue adentro: el que entró ayer con una invitación de ayer tiene que
+      // aparecer hoy por DNI, para registrarle la salida sin el QR.
+      or(
+        gte(invitations.validTo, hoy),
+        sql`exists (select 1 from entry_log e where e.invitation_id = ${invitations.id} and e.exited_at is null)`,
+      ),
       or(
         sql`unaccent(${invitations.guestName}) ilike unaccent(${q})`,
         sql`unaccent(${units.label}) ilike unaccent(${q})`,
@@ -329,6 +334,47 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       and ${day}::date between i.valid_from and i.valid_to
       and (i.weekdays is null or ${dow} = any(i.weekdays))
     order by lower(i.guest_name)
+  `)
+
+  return res.rows as unknown as AgendaRow[]
+}
+
+/**
+ * Quiénes están en el barrio ahora: toda invitación con un ingreso sin egreso.
+ *
+ * No mira fechas ni anulación, igual que el egreso: el que entró ayer con una
+ * invitación de ayer, o al que le anularon la invitación estando adentro,
+ * sigue adentro. Mismas columnas que la agenda, salvo `lastEntryAt`, que acá
+ * es el último ingreso abierto de cualquier día.
+ */
+export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
+  const hoy = sql`(e.entered_at at time zone ${TZ})::date = ${todayInBuenosAires()}::date`
+
+  const res = await db.execute(sql`
+    select
+      i.id,
+      i.guest_name        as "guestName",
+      i.guest_doc         as "guestDoc",
+      i.plate,
+      i.kind,
+      u.label             as "unitLabel",
+      case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
+      i.capacity,
+      (select count(*) from entry_log e
+        where ${hoy} and e.invitation_id = i.id)::int  as "enteredCount",
+      abiertas.desde                                    as "lastEntryAt",
+      (select max(e.exited_at) from entry_log e
+        where ${hoy} and e.invitation_id = i.id)       as "lastExitAt",
+      true                                              as "adentro"
+    from (
+      select invitation_id, max(entered_at) as desde
+      from entry_log where exited_at is null group by invitation_id
+    ) abiertas
+    join invitation i on i.id = abiertas.invitation_id
+    join unit u on u.id = i.unit_id
+    join person p on p.id = i.created_by
+    where u.neighborhood_id = ${neighborhoodId}
+    order by abiertas.desde desc
   `)
 
   return res.rows as unknown as AgendaRow[]
