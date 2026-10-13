@@ -13,6 +13,7 @@ import { Vacio } from '@/components/dominio/vacio'
 import { hoyISO, sumarDias, tituloDia, hora, horaODia } from '@/lib/fechas'
 import { useAgenda, useAdentro, type AgendaRow } from '@/lib/queries/garita'
 import { estadoEnAgenda } from '@/lib/estado-invitacion'
+import { quienInvita } from '@/lib/invitations'
 
 type Filtro = 'todos' | 'pendientes' | 'adentro'
 
@@ -26,7 +27,7 @@ function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
       : undefined
   const meta = [
     r.unitLabel,
-    `invita ${r.inviterName}`,
+    quienInvita(r.inviterName),
     r.plate,
     r.capacity > 1 && r.enteredCount > 1 ? `${r.enteredCount} ingresos hoy` : null,
   ].filter(Boolean).join(' · ')

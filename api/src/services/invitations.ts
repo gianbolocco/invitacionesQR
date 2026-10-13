@@ -5,6 +5,7 @@ import { randomToken } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
 import { todayInBuenosAires } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
+import { PORTERIA } from '../lib/porteria.js'
 
 export type CreateInvitationInput = {
   unitId: string
@@ -107,7 +108,7 @@ const adentroSql = sql<boolean>`coalesce(bool_or(${entryLogs.id} is not null and
  * y mostrar el nombre del guardia da la impresión de que invitó él
  * personalmente a un desconocido.
  */
-const nombreOEtiquetaSql = sql<string>`case when ${people.role} = 'guard' then 'Portería (autorizado por teléfono)' else ${people.name} end`
+const nombreOEtiquetaSql = sql<string>`case when ${people.role} = 'guard' then ${PORTERIA} else ${people.name} end`
 
 const columnas = {
   id: invitations.id,

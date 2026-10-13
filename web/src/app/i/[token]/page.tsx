@@ -4,7 +4,7 @@ import { motion } from 'motion/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, MapPin, SearchX, Sun } from 'lucide-react'
 import { api } from '@/lib/api'
-import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
+import { KIND_LABEL, PORTERIA, vigencia, type Invitation } from '@/lib/invitations'
 import { hoyISO } from '@/lib/fechas'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -125,7 +125,10 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
       {encabezado}
 
       <p className="text-ink-soft">
-        Te invita <strong className="text-ink">{inv.inviterName}</strong> · <span className="tabular">{inv.unitLabel}</span>
+        {inv.inviterName === PORTERIA
+          ? <strong className="text-ink">{PORTERIA}</strong>
+          : <>Te invita <strong className="text-ink">{inv.inviterName}</strong></>}
+        {' · '}<span className="tabular">{inv.unitLabel}</span>
       </p>
 
       {sello && <Nota tono="error">Esta invitación está {sello.toLowerCase()}. Pedile una nueva a quien te invitó.</Nota>}
