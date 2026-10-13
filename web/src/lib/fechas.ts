@@ -70,6 +70,16 @@ export function horaODia(instante: string, dia: string): string {
   return hoyISO(new Date(instante)) === dia ? hora(instante) : fechaHora(instante)
 }
 
+/** "45 min", "3 h 20 min", "2 d 4 h": cuánto pasó desde un instante. */
+export function tiempoDesde(instante: string, ahora: Date = new Date()): string {
+  const min = Math.max(0, Math.floor((ahora.getTime() - new Date(instante).getTime()) / 60_000))
+  if (min < 60) return `${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return min % 60 ? `${h} h ${min % 60} min` : `${h} h`
+  const d = Math.floor(h / 24)
+  return h % 24 ? `${d} d ${h % 24} h` : `${d} d`
+}
+
 /** "Hoy", "Mañana", "Ayer" o "miércoles, 14 de octubre". */
 export function tituloDia(iso: string, hoy: string = hoyISO()): string {
   if (iso === hoy) return 'Hoy'

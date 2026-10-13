@@ -18,6 +18,7 @@ export type AgendaRow = {
   unitLabel: string
   inviterName: string
   capacity: number
+  validTo: string
   enteredCount: number
   lastEntryAt: string | null
   lastExitAt: string | null

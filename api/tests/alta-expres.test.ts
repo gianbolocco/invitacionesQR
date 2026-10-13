@@ -86,6 +86,10 @@ describe('alta exprés de invitación', () => {
     expect(res.body.capacity).toBe(1)
     expect(res.body.validFrom).toBe(res.body.validTo)
     expect(res.body.createdBy).toBe(guardia.id)
+
+    // El veredicto no muestra el nombre del guardia como si invitara él.
+    const veredicto = await request(app).get(`/gate/invitation/${res.body.id}`).set('Cookie', cookie).expect(200)
+    expect(veredicto.body.invitation.inviterName).toBe('Portería (autorizado por teléfono)')
     expect(res.body.guestName).toBe('Invitado Exprés')
   })
 

@@ -19,6 +19,23 @@ export function estadoInvitacion(
 }
 
 /**
+ * El estado de una fila de la agenda de la garita, que mira UN día.
+ *
+ * `adentro` primero: el que entró ayer y no salió tiene 0 ingresos hoy pero
+ * sigue adentro. Y sin ingresos no siempre es "pendiente": si la invitación
+ * ya terminó, venció. Antes la agenda de ayer mostraba como pendiente a todo
+ * el que no vino.
+ */
+export function estadoEnAgenda(
+  r: { adentro: boolean; enteredCount: number; validTo: string },
+  hoy: string,
+): Extract<EstadoVecino, 'adentro' | 'salio' | 'vencida' | 'esperando'> {
+  if (r.adentro) return 'adentro'
+  if (r.enteredCount > 0) return 'salio'
+  return r.validTo < hoy ? 'vencida' : 'esperando'
+}
+
+/**
  * Solo se edita lo que nunca se usó. Una frecuente que ya entró vuelve a
  * "esperando", así que no alcanza con el estado: también tiene que estar en
  * cero. Es el mismo criterio que aplica la API.

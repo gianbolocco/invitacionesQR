@@ -12,16 +12,12 @@ import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { Vacio } from '@/components/dominio/vacio'
 import { hoyISO, sumarDias, tituloDia, hora, horaODia } from '@/lib/fechas'
 import { useAgenda, useAdentro, type AgendaRow } from '@/lib/queries/garita'
+import { estadoEnAgenda } from '@/lib/estado-invitacion'
 
 type Filtro = 'todos' | 'pendientes' | 'adentro'
 
 function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
-  /*
-   * `adentro` se pregunta PRIMERO, antes que `enteredCount`. Alguien que
-   * entró ayer y nadie le registró la salida tiene enteredCount 0 para hoy
-   * pero sigue adentro: preguntando al revés aparecería como "Pendiente".
-   */
-  const estado: Estado = r.adentro ? 'adentro' : r.enteredCount === 0 ? 'esperando' : 'salio'
+  const estado: Estado = estadoEnAgenda(r, hoyISO())
   const detalle = estado === 'adentro'
     // Si entró otro día, la hora sola engaña: lleva la fecha.
     ? (r.lastEntryAt ? horaODia(r.lastEntryAt, hoyISO()) : undefined)
@@ -113,7 +109,8 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const todas = q.data ?? []
   const frecuentes = todas.filter((r) => r.kind === 'frecuente')
   const personas = todas.filter((r) => r.kind !== 'frecuente')
-  const esperando = personas.filter((r) => !r.adentro && r.enteredCount === 0)
+  const esperando = personas.filter((r) => estadoEnAgenda(r, hoy) === 'esperando')
+  const vencidas = personas.filter((r) => estadoEnAgenda(r, hoy) === 'vencida')
   const entraron = personas.filter((r) => r.adentro || r.enteredCount > 0)
 
   return (
@@ -179,6 +176,14 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
                 Ya entraron ({entraron.length})
               </p>
               <Lista key={fecha} filas={entraron} onAbrir={onAbrir} className="opacity-70" />
+            </section>
+          )}
+          {vencidas.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
+                Vencidas ({vencidas.length})
+              </p>
+              <Lista key={fecha} filas={vencidas} onAbrir={onAbrir} className="opacity-70" />
             </section>
           )}
           {frecuentes.length > 0 && (

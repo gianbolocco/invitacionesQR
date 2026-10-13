@@ -28,7 +28,13 @@ async function loadForCheck(where: SQL) {
     revokedAt: invitations.revokedAt,
     unitId: invitations.unitId,
     unitLabel: units.label,
-  }).from(invitations).innerJoin(units, eq(units.id, invitations.unitId)).where(where).limit(1)
+    // Para el veredicto: a quién llamar si hay dudas. Si la creó un guardia
+    // (alta exprés), no se muestra su nombre, igual que en la agenda.
+    inviterName: sql<string>`case when ${people.role} = 'guard' then 'Portería (autorizado por teléfono)' else ${people.name} end`,
+  }).from(invitations)
+    .innerJoin(units, eq(units.id, invitations.unitId))
+    .innerJoin(people, eq(people.id, invitations.createdBy))
+    .where(where).limit(1)
   return row ?? null
 }
 
@@ -274,6 +280,8 @@ export type AgendaRow = {
   unitLabel: string
   inviterName: string
   capacity: number
+  /** Para que la garita distinga "no vino todavía" de "ya venció". */
+  validTo: string
   enteredCount: number
   lastEntryAt: Date | null
   /** Última salida registrada ESE día. */
@@ -318,6 +326,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       u.label             as "unitLabel",
       case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
       i.capacity,
+      i.valid_to          as "validTo",
       (select count(*) from entry_log e
         where ${eseDia} and e.invitation_id = i.id)::int as "enteredCount",
       (select max(e.entered_at) from entry_log e
@@ -360,6 +369,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       u.label             as "unitLabel",
       case when p.role = 'guard' then 'Portería (autorizado por teléfono)' else p.name end as "inviterName",
       i.capacity,
+      i.valid_to          as "validTo",
       (select count(*) from entry_log e
         where ${hoy} and e.invitation_id = i.id)::int  as "enteredCount",
       abiertas.desde                                    as "lastEntryAt",
