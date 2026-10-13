@@ -32,12 +32,22 @@ export const claves = {
   agenda: (fecha: string) => ['garita', 'agenda', fecha] as const,
   busqueda: (q: string) => ['garita', 'busqueda', q] as const,
   veredicto: (id: string) => ['garita', 'veredicto', id] as const,
+  adentro: ['garita', 'adentro'] as const,
 }
 
 export function useAgenda(fecha: string) {
   return useQuery({
     queryKey: claves.agenda(fecha),
     queryFn: ({ signal }) => api<AgendaRow[]>(`/gate/agenda?date=${fecha}`, { signal }),
+  })
+}
+
+/** Quiénes están en el barrio ahora, de cualquier día. Mismas filas que la agenda. */
+export function useAdentro(habilitado: boolean) {
+  return useQuery({
+    queryKey: claves.adentro,
+    queryFn: ({ signal }) => api<AgendaRow[]>('/gate/adentro', { signal }),
+    enabled: habilitado,
   })
 }
 

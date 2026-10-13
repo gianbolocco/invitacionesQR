@@ -1,15 +1,18 @@
 'use client'
 import { useState } from 'react'
-import { CalendarX, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarX, CheckCheck, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
+import { Chips } from '@/components/dominio/chips'
 import { Fila } from '@/components/dominio/fila'
 import { EstadoTag, type Estado } from '@/components/dominio/estado-tag'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { Vacio } from '@/components/dominio/vacio'
-import { hoyISO, sumarDias, tituloDia, hora } from '@/lib/fechas'
-import { useAgenda, type AgendaRow } from '@/lib/queries/garita'
+import { hoyISO, sumarDias, tituloDia, hora, fechaHora } from '@/lib/fechas'
+import { useAgenda, useAdentro, type AgendaRow } from '@/lib/queries/garita'
+
+type Filtro = 'todos' | 'pendientes' | 'adentro'
 
 function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
   /*
@@ -19,7 +22,8 @@ function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
    */
   const estado: Estado = r.adentro ? 'adentro' : r.enteredCount === 0 ? 'esperando' : 'salio'
   const detalle = estado === 'adentro'
-    ? (r.lastEntryAt ? hora(r.lastEntryAt) : undefined)
+    // Si entró otro día, la hora sola engaña: lleva la fecha.
+    ? (r.lastEntryAt ? (hoyISO(new Date(r.lastEntryAt)) === hoyISO() ? hora(r.lastEntryAt) : fechaHora(r.lastEntryAt)) : undefined)
     : estado === 'salio'
       ? (r.lastExitAt ? hora(r.lastExitAt) : undefined)
       : undefined
@@ -43,11 +47,19 @@ function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
  * pregunta que el guardia tiene a las 21, ¿quién falta? Los frecuentes van
  * aparte y colapsados, porque aparecen todos los días y el guardia deja de
  * leerlos.
+ *
+ * "Adentro" no sale de la agenda: la agenda es quién puede entrar ESE día, y
+ * adentro es quién está en el barrio ahora, aunque haya entrado ayer con una
+ * invitación de ayer. Por eso es otra consulta, y solo existe mirando hoy.
  */
 export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const [fecha, setFecha] = useState(hoyISO())
+  const [filtro, setFiltro] = useState<Filtro>('todos')
   const [verFrecuentes, setVerFrecuentes] = useState(false)
+  const esHoy = fecha === hoyISO()
+  const vista: Filtro = esHoy ? filtro : 'todos'
   const q = useAgenda(fecha)
+  const adentro = useAdentro(esHoy)
 
   const todas = q.data ?? []
   const frecuentes = todas.filter((r) => r.kind === 'frecuente')
@@ -72,10 +84,34 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
 
       <h2 className="font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha)}</h2>
 
-      {q.isPending ? (
+      {esHoy && (
+        <Chips etiqueta="Filtrar la agenda" valor={filtro} onCambio={setFiltro} opciones={[
+          { valor: 'todos', etiqueta: 'Todos' },
+          { valor: 'pendientes', etiqueta: 'Pendientes', contador: q.data ? esperando.length : undefined },
+          { valor: 'adentro', etiqueta: 'Adentro', contador: adentro.data?.length },
+        ]} />
+      )}
+
+      {vista === 'adentro' ? (
+        adentro.isPending ? (
+          <SkeletonFilas filas={4} />
+        ) : adentro.isError ? (
+          <ErrorConReintento onReintentar={() => adentro.refetch()} reintentando={adentro.isFetching} />
+        ) : adentro.data.length === 0 ? (
+          <Vacio icono={DoorOpen} titulo="No hay nadie adentro" />
+        ) : (
+          <div>{adentro.data.map((r) => filaDe(r, onAbrir))}</div>
+        )
+      ) : q.isPending ? (
         <SkeletonFilas filas={4} />
       ) : q.isError ? (
         <ErrorConReintento onReintentar={() => q.refetch()} reintentando={q.isFetching} />
+      ) : vista === 'pendientes' ? (
+        esperando.length === 0 ? (
+          <Vacio icono={CheckCheck} titulo="No falta llegar nadie" />
+        ) : (
+          <div>{esperando.map((r) => filaDe(r, onAbrir))}</div>
+        )
       ) : todas.length === 0 ? (
         <Vacio icono={CalendarX} titulo="Nadie tiene autorización para este día" />
       ) : (

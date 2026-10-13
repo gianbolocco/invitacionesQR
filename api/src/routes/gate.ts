@@ -5,7 +5,7 @@ import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
   checkByToken, checkById, registerEntry, registerExit, undoMovement, searchGuests, agendaForDay,
-  auditInvitations, auditAll,
+  insideNow, auditInvitations, auditAll,
 } from '../services/entries.js'
 import { searchUnits } from '../services/units.js'
 import { createExpressInvitation } from '../services/invitations.js'
@@ -84,6 +84,11 @@ gateRoutes.get('/agenda', async (req, res) => {
   }).parse(req.query)
 
   res.json(await agendaForDay(req.person!.neighborhoodId, date ?? todayInBuenosAires()))
+})
+
+/** Quiénes están adentro ahora, de cualquier día. */
+gateRoutes.get('/adentro', async (req, res) => {
+  res.json(await insideNow(req.person!.neighborhoodId))
 })
 
 const auditFilters = z.object({
