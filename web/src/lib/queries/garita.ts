@@ -115,8 +115,10 @@ export function usePrecargarVeredicto() {
 export function useAbrirQr() {
   const router = useRouter()
   const precargar = usePrecargarVeredicto()
-  return useCallback(async (token: string, reemplazar = false) => {
+  // `vigente`: si ya no corresponde (llegó una lectura más nueva), no navega.
+  return useCallback(async (token: string, reemplazar = false, vigente: () => boolean = () => true) => {
     const r = await porToken(token)
+    if (!vigente()) return r
     precargar(r.invitation.id, r)
     const url = `/garita/invitacion/${r.invitation.id}`
     if (reemplazar) router.replace(url)

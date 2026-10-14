@@ -253,7 +253,10 @@ test('el recuadro de la lectora confirma que leyó', async ({ page, isMobile }) 
   const recuadro = page.getByRole('region', { name: 'Lectora' })
   await expect(recuadro).toContainText('Escaneá un QR o un DNI con la lectora')
   // Mouse: el botón de la cámara no está; la cámara es el link del recuadro.
-  await expect(page.getByRole('link', { name: 'Escanear QR' })).toBeHidden()
+  // Scopeado al aside: el link de la barra inferior (mobile) también existe en el DOM.
+  const escanear = page.locator('aside').getByRole('link', { name: 'Escanear QR', includeHidden: true })
+  await expect(escanear).toHaveCount(1)
+  await expect(escanear).toBeHidden()
   await expect(recuadro.getByRole('link', { name: 'Usar la cámara' })).toBeVisible()
 
   await leerConLectora(page, 'ESTONOESUNCODIGO123')
@@ -261,8 +264,9 @@ test('el recuadro de la lectora confirma que leyó', async ({ page, isMobile }) 
   await expect(recuadro).toContainText('No reconocido')
 })
 
-test('un NO PASA por cupo se puede autorizar igual, con todo precargado', async ({ page, browser }) => {
-  const nombre = `Autorizar E2E ${Date.now()}`
+/** Deja una visita con el cupo agotado y abre su veredicto NO PASA. */
+async function abrirNoPasaPorCupo(page: import('@playwright/test').Page, browser: import('@playwright/test').Browser, prefijo: string) {
+  const nombre = `${prefijo} ${Date.now()}`
   await entrar(page, 'vecino')
   await page.goto('/invitaciones/nueva')
   await page.getByLabel('Nombre del invitado').fill(nombre)
@@ -286,6 +290,11 @@ test('un NO PASA por cupo se puede autorizar igual, con todo precargado', async 
   await g.getByText(nombre).first().click()
   await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
   await expect(g.getByText('Cupo agotado')).toBeVisible()
+  return { g, nombre }
+}
+
+test('un NO PASA por cupo se puede autorizar igual, con todo precargado', async ({ page, browser }) => {
+  const { g, nombre } = await abrirNoPasaPorCupo(page, browser, 'Autorizar E2E')
   await g.getByRole('button', { name: 'Autorizar igual' }).click()
 
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
@@ -312,4 +321,27 @@ test('una invitación anulada no se puede autorizar igual', async ({ page, brows
   await g.getByText(nombre).click()
   await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
   await expect(g.getByRole('button', { name: 'Autorizar igual' })).toHaveCount(0)
+})
+
+test('el Esc que cierra el sheet de Autorizar igual no saca del veredicto', async ({ page, browser }) => {
+  const { g } = await abrirNoPasaPorCupo(page, browser, 'Esc E2E')
+  const url = g.url()
+  await g.getByRole('button', { name: 'Autorizar igual' }).click()
+  await expect(g.getByRole('dialog')).toBeVisible()
+  await g.keyboard.press('Escape')
+  await expect(g.getByRole('dialog')).toBeHidden()
+  await g.waitForTimeout(500)
+  await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
+  expect(g.url()).toBe(url)
+})
+
+test('un DNI leído con el sheet precargado abierto reemplaza el nombre de la invitación', async ({ page, browser }) => {
+  const { g, nombre } = await abrirNoPasaPorCupo(page, browser, 'Mezcla E2E')
+  await g.getByRole('button', { name: 'Autorizar igual' }).click()
+  await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
+  await g.getByRole('button', { name: 'Cambiar' }).focus()
+  const doc = String(Date.now()).slice(-8)
+  await leerConLectora(g, dni(doc, 'MEZCLA'))
+  await expect(g.getByLabel('Nombre del invitado')).toHaveValue('Juan Mezcla')
+  await expect(g.getByLabel('Documento (opcional)')).toHaveValue(doc)
 })

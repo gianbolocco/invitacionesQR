@@ -105,11 +105,14 @@ export default function GaritaHoy() {
       else await resolverDni(l)
       return
     }
+    const mia = ++secuencia.current
     try {
-      const r = await abrirQr(l.token)
+      const r = await abrirQr(l.token, false, () => mia === secuencia.current)
+      if (mia !== secuencia.current) return
       anotar(`QR · ${r.invitation.guestName}`)
       cambiarAlta(false)
     } catch (e) {
+      if (mia !== secuencia.current) return
       anotar(`QR · ${mensajeDeError(e)}`)
       toast.error(mensajeDeError(e))
     }

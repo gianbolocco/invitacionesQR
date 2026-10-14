@@ -8,7 +8,7 @@ import { MOTIVO, detalleRechazo, hora, mensajeDeError, type Movimiento } from '@
 import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
 import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
-import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
+import { KIND_LABEL, vigencia } from '@/lib/invitations'
 import {
   useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
 } from '@/lib/queries/garita'
@@ -142,10 +142,10 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   }, [q.isPending])
 
   // Escape siempre vuelve. En la barrera no hay tiempo de buscar un botón.
-  // Con el alta abierta no escucha: el Esc que cierra el sheet no debe sacar también del veredicto.
+  // Con el alta abierta no escucha, y Radix hace preventDefault al cerrar el sheet: ese Esc no saca también del veredicto.
   useEffect(() => {
     if (altaAbierta) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') salir() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) salir() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,19 +160,28 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
    * invitado. Un QR siempre es el siguiente; replace para que Volver lleve a
    * donde estaba el guardia antes del primero.
    */
+  // Dos lecturas seguidas pueden resolverse desordenadas: solo vale la última.
+  const secuencia = useRef(0)
   async function leer(l: Lectura | null) {
     if (!l) { anotar('No reconocido'); toast.error(NO_RECONOCIDO); return }
+    const mia = ++secuencia.current
     if (l.tipo === 'qr') {
+      setAltaAbierta(false); setLecturaAlta(null)
       try {
-        const r = await abrirQr(l.token, true)
-        anotar(`QR · ${r.invitation.guestName}`)
+        const r = await abrirQr(l.token, true, () => mia === secuencia.current)
+        if (mia === secuencia.current) anotar(`QR · ${r.invitation.guestName}`)
       } catch (e) {
+        if (mia !== secuencia.current) return
         anotar(`QR · ${mensajeDeError(e)}`)
         toast.error(mensajeDeError(e))
       }
       return
     }
-    if (altaAbierta) { setLecturaAlta(l); return }
+    if (altaAbierta) {
+      anotar(`DNI ${formatearDni(l.documento)} · completó el alta exprés`)
+      setLecturaAlta(l)
+      return
+    }
     if (q.data && !hecho && !q.data.adentro && q.data.check.ok) {
       anotar(`DNI ${formatearDni(l.documento)} · completó el documento`)
       setDoc(l.documento)
@@ -240,8 +249,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
 
   const editable = ok && !esEgreso && !hecho
   const borde = ok ? 'border-pass-ink/15' : 'border-deny-ink/20'
-  const noCoincide = editable && inv.guestDoc && soloDigitos(doc).length >= 7
-    && soloDigitos(doc) !== soloDigitos(inv.guestDoc)
+  const noCoincide = Boolean(editable && inv.guestDoc && soloDigitos(doc).length >= 7
+    && soloDigitos(doc) !== soloDigitos(inv.guestDoc))
   const kbd = 'rounded border border-current/30 px-1.5 py-0.5 font-mono text-xs'
 
   return (
@@ -283,18 +292,19 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 <dd className="min-w-0">
                   {/* El campo es claro en los dos temas: el dark:bg-input/30 del Input lo ensuciaría. */}
                   <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
+                    aria-describedby={[docLeido && doc.trim() && 'doc-leido', noCoincide && 'doc-no-coincide', !doc.trim() && 'doc-falta'].filter(Boolean).join(' ') || undefined}
                     onChange={(e) => { setDoc(e.target.value); setDocLeido(false) }}
                     className="tabular h-12 border-pass-ink/20 bg-white/70 text-xl dark:bg-white/70" />
-                  {docLeido && doc.trim() && <p className="mt-1 text-sm font-semibold">Leído del DNI</p>}
+                  {docLeido && doc.trim() && <p id="doc-leido" className="mt-1 text-sm font-semibold">Leído del DNI</p>}
                   {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo.
                       Los dos números lado a lado: comparar es más rápido que leer una frase. */}
                   {noCoincide && (
-                    <p className="mt-1 text-base font-semibold tabular">
+                    <p id="doc-no-coincide" className="mt-1 text-base font-semibold tabular">
                       No coincide · Invitación {inv.guestDoc} · {docLeido ? 'Leído' : 'Cargado'} {doc}
                     </p>
                   )}
                   {/* Nadie entra sin documento: si la invitación no lo traía, se carga acá. */}
-                  {!doc.trim() && <p className="mt-1 text-sm font-semibold opacity-75">Hace falta para registrar el ingreso.</p>}
+                  {!doc.trim() && <p id="doc-falta" className="mt-1 text-sm font-semibold opacity-75">Hace falta para registrar el ingreso.</p>}
                 </dd>
                 <dt className="self-start pt-2.5 opacity-70"><label htmlFor="patente-veredicto">Patente</label></dt>
                 <dd className="min-w-0">
@@ -386,7 +396,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           guestName: inv.guestName,
           guestDoc: doc || inv.guestDoc || '',
           plate: plate || inv.plate || '',
-          unidad: { unitId: inv.unitId, unitLabel: inv.unitLabel, residentName: quienInvita(inv.inviterName) },
+          unidad: { unitId: inv.unitId, unitLabel: inv.unitLabel, residentName: inv.inviterName },
         }}
         // replace: "Volver" en el veredicto nuevo lleva a donde estaba el guardia antes del rechazo.
         onCreada={(nuevo) => router.replace(`/garita/invitacion/${nuevo}`)}

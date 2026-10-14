@@ -41,7 +41,8 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
 
   function aplicarDni(l: LecturaDni, pisarNombre: boolean) {
     setGuestDoc(l.documento)
-    if (pisarNombre || !guestName.trim()) setGuestName(`${l.nombre} ${l.apellido}`)
+    // Un nombre sin tocar (el de la invitación rechazada) no es de quien se escanea.
+    if (pisarNombre || !guestName.trim() || guestName === inicial?.guestName) setGuestName(`${l.nombre} ${l.apellido}`)
   }
   // Un DNI leído con el sheet abierto (o que lo abrió): ajuste durante el render, como el veredicto.
   const [lecturaVista, setLecturaVista] = useState<LecturaDni | null>(null)
