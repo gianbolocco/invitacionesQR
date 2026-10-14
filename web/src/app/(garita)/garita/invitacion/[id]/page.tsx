@@ -5,12 +5,12 @@ import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2 } from 'lucide-react'
 import { MOTIVO, detalleRechazo, hora, mensajeDeError, type Movimiento } from '@/lib/gate'
-import { NO_RECONOCIDO, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
+import { NO_RECONOCIDO, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
 import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
 import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
 import {
-  useAbrirQr, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
+  useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
 } from '@/lib/queries/garita'
 import { Input } from '@/components/ui/input'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
@@ -85,6 +85,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const egresar = useRegistrarEgreso()
   const deshacerMov = useDeshacerMovimiento()
   const abrirQr = useAbrirQr()
+  const anotar = useAnotarLectura()
   const dniPendiente = useDniPendiente()
   const documentoLeido = useDocumentoLeido()
   const [idCargado, setIdCargado] = useState<string | null>(null)
@@ -140,12 +141,19 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
    * donde estaba el guardia antes del primero.
    */
   async function leer(l: Lectura | null) {
-    if (!l) { toast.error(NO_RECONOCIDO); return }
+    if (!l) { anotar('No reconocido'); toast.error(NO_RECONOCIDO); return }
     if (l.tipo === 'qr') {
-      try { await abrirQr(l.token, true) } catch (e) { toast.error(mensajeDeError(e)) }
+      try {
+        const r = await abrirQr(l.token, true)
+        anotar(`QR · ${r.invitation.guestName}`)
+      } catch (e) {
+        anotar(`QR · ${mensajeDeError(e)}`)
+        toast.error(mensajeDeError(e))
+      }
       return
     }
     if (q.data && !hecho && !q.data.adentro && q.data.check.ok) {
+      anotar(`DNI ${formatearDni(l.documento)} · completó el documento`)
       setDoc(l.documento)
       accionRef.current?.focus()
       return

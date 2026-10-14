@@ -10,12 +10,13 @@ import { AgendaDia } from '@/components/garita/agenda-dia'
 import { BuscarInvitado } from '@/components/garita/buscar-invitado'
 import { UltimosMovimientos } from '@/components/garita/ultimos-movimientos'
 import { AltaExpres } from '@/components/garita/alta-expres'
+import { EstadoLectora } from '@/components/garita/estado-lectora'
 import {
-  claves, useAvisosGarita, useAbrirQr, useDniPendiente, useDocumentoLeido,
+  claves, useAvisosGarita, useAbrirQr, useAnotarLectura, useDniPendiente, useDocumentoLeido,
 } from '@/lib/queries/garita'
 import { buscar, mensajeDeError } from '@/lib/gate'
 import { useLectora } from '@/lib/use-lectora'
-import { interpretarLectura, NO_RECONOCIDO, soloDigitos, type Lectura, type LecturaDni } from '@/lib/lectora'
+import { formatearDni, interpretarLectura, NO_RECONOCIDO, soloDigitos, type Lectura, type LecturaDni } from '@/lib/lectora'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -30,6 +31,7 @@ export default function GaritaHoy() {
   const router = useRouter()
   const qc = useQueryClient()
   const abrirQr = useAbrirQr()
+  const anotar = useAnotarLectura()
   const dniPendiente = useDniPendiente()
   const documentoLeido = useDocumentoLeido()
   const [q, setQ] = useState('')
@@ -61,37 +63,56 @@ export default function GaritaHoy() {
   async function resolverDni(l: LecturaDni) {
     const mia = ++secuencia.current
     setDniLista(null)
+    const dni = `DNI ${formatearDni(l.documento)}`
     try {
       const porDoc = await buscarYa(l.documento)
       if (mia !== secuencia.current) return
       // La API busca por subcadena de dígitos: 1234567 también trae 11.234.567. Solo abre si es el mismo documento entero.
       if (porDoc.length === 1 && soloDigitos(porDoc[0].guestDoc ?? '') === l.documento) {
         documentoLeido.dejar(porDoc[0].id, l.documento)
+        anotar(`${dni} · ${porDoc[0].guestName}`)
         router.push(`/garita/invitacion/${porDoc[0].id}`)
         return
       }
-      if (porDoc.length > 0) { setQ(l.documento); setDniLista(l); return }
+      if (porDoc.length > 0) {
+        anotar(`${dni} · ${porDoc.length} posibles, elegí en la lista`)
+        setQ(l.documento); setDniLista(l); return
+      }
       // La palabra más larga del apellido: "De La Fuente" → "Fuente".
       const apellido = l.apellido.split(' ').reduce((a, p) => (p.length > a.length ? p : a), '')
       // Coincidir por apellido no alcanza para abrir el veredicto de alguien: solo la lista.
       const porApellido = await buscarYa(apellido)
       if (mia !== secuencia.current) return
-      if (porApellido.length > 0) { setQ(apellido); setDniLista(l); return }
+      if (porApellido.length > 0) {
+        anotar(`${dni} · sin coincidencia exacta, revisá la lista`)
+        setQ(apellido); setDniLista(l); return
+      }
+      anotar(`${dni} · sin invitación, alta exprés`)
       setLecturaAlta(l)
       setAltaAbierta(true)
     } catch {
-      if (mia === secuencia.current) toast.error('No se pudo buscar el DNI. Revisá la conexión y probá de nuevo.')
+      if (mia === secuencia.current) {
+        anotar(`${dni} · no se pudo buscar`)
+        toast.error('No se pudo buscar el DNI. Revisá la conexión y probá de nuevo.')
+      }
     }
   }
 
   async function leer(l: Lectura | null) {
-    if (!l) { toast.error(NO_RECONOCIDO); return }
+    if (!l) { anotar('No reconocido'); toast.error(NO_RECONOCIDO); return }
     if (l.tipo === 'dni') {
-      if (altaAbierta) setLecturaAlta(l)
+      if (altaAbierta) { anotar(`DNI ${formatearDni(l.documento)} · completó el alta exprés`); setLecturaAlta(l) }
       else await resolverDni(l)
       return
     }
-    try { await abrirQr(l.token); cambiarAlta(false) } catch (e) { toast.error(mensajeDeError(e)) }
+    try {
+      const r = await abrirQr(l.token)
+      anotar(`QR · ${r.invitation.guestName}`)
+      cambiarAlta(false)
+    } catch (e) {
+      anotar(`QR · ${mensajeDeError(e)}`)
+      toast.error(mensajeDeError(e))
+    }
   }
 
   useLectora({ onLectura: (texto) => leer(interpretarLectura(texto)) })
@@ -117,10 +138,12 @@ export default function GaritaHoy() {
           <AgendaDia onAbrir={abrir} />
         </div>
         <aside className="hidden flex-col gap-6 md:flex">
-          <Link href="/garita/escanear" className={cn(buttonVariants({ size: 'lg' }), 'w-full')}>
+          {/* Táctil (una tablet desde 768 px): la cámara al frente, como siempre.
+              Con mouse, la lectora; la cámara queda como link del recuadro. */}
+          <Link href="/garita/escanear" className={cn(buttonVariants({ size: 'lg' }), 'hidden w-full pointer-coarse:inline-flex')}>
             <ScanLine aria-hidden />Escanear QR
           </Link>
-          <Link href="/garita/lectora" className="text-sm text-ink-soft underline underline-offset-4">Probar lectora</Link>
+          <EstadoLectora />
           <UltimosMovimientos />
         </aside>
       </div>

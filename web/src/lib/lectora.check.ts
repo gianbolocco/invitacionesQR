@@ -1,6 +1,6 @@
 /** `node src/lib/lectora.check.ts`. Los dos primeros textos son de una lectora real de la instalación. */
 import assert from 'node:assert/strict'
-import { interpretarLectura, crearDetector, soloDigitos, repararTexto } from './lectora.ts'
+import { interpretarLectura, crearDetector, soloDigitos, repararTexto, formatearDni } from './lectora.ts'
 
 const DNI = { tipo: 'dni', documento: '46116502', apellido: 'Bolocco Veronelli', nombre: 'Gianlucca Valentino' }
 const QR = { tipo: 'qr', token: 'mcNlErk30BgByd7asEPm7Q' }
@@ -50,5 +50,7 @@ assert.equal(repararTexto('00705994066"BOLOCCO VERONELLI"GIANLUCCA VALENTINO"M"4
 assert.equal(repararTexto('httpsÑ--qa.visitpass.quest-i-mcNlErk30BgByd7asEPm7Q'), 'https://qa.visitpass.quest/i/mcNlErk30BgByd7asEPm7Q')
 assert.equal(repararTexto('HTTPSñ--QA.VISITPASS.QUEST-I-MCnLeRK30bGbYD7ASepM7q'), 'https://qa.visitpass.quest/i/mcNlErk30BgByd7asEPm7Q')
 assert.equal(repararTexto('https://qa.visitpass.quest/i/mcNlErk30BgByd7asEPm7Q'), 'https://qa.visitpass.quest/i/mcNlErk30BgByd7asEPm7Q')
+assert.equal(formatearDni('46116502'), '46.116.502')
+assert.equal(formatearDni('7123456'), '7.123.456')
 
 console.log('lectora: ok')

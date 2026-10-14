@@ -18,6 +18,9 @@ const QR_ES_A_US: Record<string, string> = { 'Ñ': ':', '-': '/', "'": '-', '?':
 
 export const soloDigitos = (s: string) => s.replace(/\D/g, '')
 
+/** "46116502" → "46.116.502": así lo lee el guardia en la tarjeta. */
+export const formatearDni = (doc: string) => doc.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+
 const invertirCaja = (s: string) =>
   [...s].map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase())).join('')
 

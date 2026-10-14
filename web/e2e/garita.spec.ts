@@ -245,3 +245,18 @@ test('el Enter de la lectora nunca registra: ni doble (CR+LF) ni tardío', async
   await g.keyboard.press('Enter')
   await sinRegistrar()
 })
+
+test('el recuadro de la lectora confirma que leyó', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'el recuadro vive en la columna de escritorio')
+  await entrar(page, 'guardia')
+  await page.goto('/garita')
+  const recuadro = page.getByRole('region', { name: 'Lectora' })
+  await expect(recuadro).toContainText('Escaneá un QR o un DNI con la lectora')
+  // Mouse: el botón de la cámara no está; la cámara es el link del recuadro.
+  await expect(page.getByRole('link', { name: 'Escanear QR' })).toBeHidden()
+  await expect(recuadro.getByRole('link', { name: 'Usar la cámara' })).toBeVisible()
+
+  await leerConLectora(page, 'ESTONOESUNCODIGO123')
+  await expect(recuadro).toContainText('Lectora funcionando')
+  await expect(recuadro).toContainText('No reconocido')
+})
