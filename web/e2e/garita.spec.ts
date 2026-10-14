@@ -174,3 +174,42 @@ test('una invitación nueva aparece en la garita sin recargar', async ({ page, b
 
   await guardia.close()
 })
+
+/** Una lectora: ráfaga de 5 ms por tecla y Enter, sin campo enfocado. */
+async function leerConLectora(page: import('@playwright/test').Page, texto: string) {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await page.keyboard.type(texto, { delay: 5 })
+  await page.keyboard.press('Enter')
+}
+const dni = (doc: string, apellido: string) => `00700000001@${apellido}@JUAN@M@${doc}@A@01/01/1990@01/01/2020@123`
+
+test('leer el DNI con la lectora abre la invitación con el documento cargado', async ({ page, browser }) => {
+  const doc = String(Date.now()).slice(-8)
+  const nombre = `Lectora E2E ${doc}`
+  await entrar(page, 'vecino')
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByLabel('Documento').fill(`${doc.slice(0, 2)}.${doc.slice(2, 5)}.${doc.slice(5)}`)
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await expect(page).toHaveURL(/\/invitaciones\/[0-9a-f-]{36}\?creada=1$/)
+
+  const g = await (await browser.newContext()).newPage()
+  await entrar(g, 'guardia')
+  await g.goto('/garita')
+  await leerConLectora(g, dni(doc, 'LECTORA'))
+  await expect(g).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
+  await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
+  await expect(g.getByLabel('Documento')).toHaveValue(doc)
+  // El Enter de la lectora no registró nada: decide el guardia.
+  await expect(g.getByRole('button', { name: 'Registrar ingreso' })).toBeFocused()
+})
+
+test('un DNI sin invitación abre el alta exprés con nombre y documento', async ({ page }) => {
+  const doc = String(Date.now()).slice(-8)
+  await entrar(page, 'guardia')
+  await page.goto('/garita')
+  await leerConLectora(page, dni(doc, `ZZSINVIT${doc}`))
+  await expect(page.getByRole('heading', { name: 'Autorizar sin invitación' })).toBeVisible()
+  await expect(page.getByLabel('Nombre del invitado')).toHaveValue(`Juan Zzsinvit${doc}`)
+  await expect(page.getByLabel('Documento (opcional)')).toHaveValue(doc)
+})

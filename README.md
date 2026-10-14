@@ -107,6 +107,16 @@ El stack de producción agrega, sobre el de desarrollo: `NODE_ENV=production`
 de Postgres desde el entorno, los puertos de la base y de la API sin publicar
 —solo salen 80 y 443, por Caddy— y `restart: unless-stopped`.
 
+### Lectora 2D en la garita
+
+Cualquier lectora 2D (USB, dongle o Bluetooth) en **modo teclado (HID)** lee el
+QR de la invitación y el DNI desde `/garita`, sin campo enfocado. Configurarla
+con terminador Enter (Tab o ninguno también andan) y **envío inmediato**, no en
+modo inventario. La distribución de teclado puede quedar en US aunque Windows
+esté en español: el texto deformado se repara solo. Para instalarla, *Garita →
+Probar lectora* muestra qué mandó y cómo se entendió. Los modos HID-POS y
+Alt+numpad no sirven: el navegador no recibe texto.
+
 ### En Coolify
 
 La base va en un recurso propio y la app en otro: así los backups de Coolify
