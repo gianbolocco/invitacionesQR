@@ -31,17 +31,26 @@ export function tokenDelQr(texto: string): string | null {
   return /^[A-Za-z0-9_-]{20,}$/.test(texto) ? texto : null
 }
 
-function qrDe(texto: string): Lectura | null {
-  let t = texto
+/**
+ * El texto como lo escribió la lectora, ya corregido: Bloq Mayús y teclas US→es
+ * para un QR delatado por su prefijo, `"`→`@` para un DNI. Lo usan la
+ * interpretación y "Probar lectora", para mostrar lo mismo.
+ */
+export function repararTexto(crudo: string): string {
+  let t = crudo.trim()
   if (/HTTPS?[:Ññ]/.test(t)) t = invertirCaja(t) // Bloq Mayús: el token distingue mayúsculas
   // Solo si el texto delata la deformación: a ciegas, rompería los - de un token limpio.
-  if (/https?Ñ/.test(t)) t = [...t].map((c) => QR_ES_A_US[c] ?? c).join('')
-  const token = tokenDelQr(t)
+  if (/https?Ñ/.test(t)) return [...t].map((c) => QR_ES_A_US[c] ?? c).join('')
+  return t.includes('@') ? t : t.replaceAll('"', '@')
+}
+
+function qrDe(texto: string): Lectura | null {
+  const token = tokenDelQr(texto)
   return token ? { tipo: 'qr', token } : null
 }
 
 function dniDe(texto: string): LecturaDni | null {
-  const c = (texto.includes('@') ? texto : texto.replaceAll('"', '@')).split('@').map((s) => s.trim())
+  const c = texto.split('@').map((s) => s.trim())
   let doc: string | undefined, apellido: string | undefined, nombre: string | undefined
   // Nuevo (frente): trámite@APELLIDO@NOMBRE@SEXO@DNI@… — viejo (dorso): @DNI@…@…@APELLIDO@NOMBRE@…
   if (c.length >= 8 && /\d{8,}$/.test(c[0]) && /^[MFX]$/.test(c[3])) [, apellido, nombre, , doc] = c
@@ -54,7 +63,7 @@ function dniDe(texto: string): LecturaDni | null {
 }
 
 export function interpretarLectura(crudo: string): Lectura | null {
-  const t = crudo.trim()
+  const t = repararTexto(crudo)
   return t ? qrDe(t) ?? dniDe(t) : null
 }
 
@@ -66,6 +75,8 @@ export const MIN_CARACTERES = 8
 export const PROMEDIO_MAX_MS = 35
 export const HUECO_MAX_MS = 200
 export const PAUSA_FIN_MS = 250
+/** Tras cerrar una ráfaga, un Enter/Tab más es del terminador (CR+LF, terminador lento), no de una persona. */
+export const GRACIA_TERMINADOR_MS = 1000
 
 export type Terminador = 'Enter' | 'Tab' | 'pausa'
 export type Rafaga = {
@@ -89,7 +100,7 @@ export function crearDetector() {
     teclas = []
     return {
       texto, promedioMs: Math.round(promedioMs), huecoMaxMs, terminador,
-      esLectura: texto.length >= MIN_CARACTERES && promedioMs < PROMEDIO_MAX_MS && huecoMaxMs <= HUECO_MAX_MS,
+      esLectura: texto.length >= MIN_CARACTERES && promedioMs < PROMEDIO_MAX_MS,
     }
   }
 

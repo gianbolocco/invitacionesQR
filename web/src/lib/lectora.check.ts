@@ -1,6 +1,6 @@
 /** `node src/lib/lectora.check.ts`. Los dos primeros textos son de una lectora real de la instalación. */
 import assert from 'node:assert/strict'
-import { interpretarLectura, crearDetector, soloDigitos } from './lectora.ts'
+import { interpretarLectura, crearDetector, soloDigitos, repararTexto } from './lectora.ts'
 
 const DNI = { tipo: 'dni', documento: '46116502', apellido: 'Bolocco Veronelli', nombre: 'Gianlucca Valentino' }
 const QR = { tipo: 'qr', token: 'mcNlErk30BgByd7asEPm7Q' }
@@ -43,5 +43,12 @@ assert.equal(tipear(qr, () => 4, 'Enter', 230)?.esLectura, true)                
 // Apóstrofo y guion también abren palabra.
 assert.deepEqual(interpretarLectura("00705994066@D'ANGELO@MARÍA-JOSÉ@F@20111222@A@01/01/1990@01/01/2020@123"),
   { tipo: 'dni', documento: '20111222', apellido: "D'Angelo", nombre: 'María-José' })
+
+// Texto reparado (Probar lectora): el mismo que usa la interpretación.
+assert.equal(repararTexto('00705994066"BOLOCCO VERONELLI"GIANLUCCA VALENTINO"M"46116502"B"12-09-2004"06-06-2023"209'),
+  '00705994066@BOLOCCO VERONELLI@GIANLUCCA VALENTINO@M@46116502@B@12-09-2004@06-06-2023@209')
+assert.equal(repararTexto('httpsÑ--qa.visitpass.quest-i-mcNlErk30BgByd7asEPm7Q'), 'https://qa.visitpass.quest/i/mcNlErk30BgByd7asEPm7Q')
+assert.equal(repararTexto('HTTPSñ--QA.VISITPASS.QUEST-I-MCnLeRK30bGbYD7ASepM7q'), 'https://qa.visitpass.quest/i/mcNlErk30BgByd7asEPm7Q')
+assert.equal(repararTexto('https://qa.visitpass.quest/i/mcNlErk30BgByd7asEPm7Q'), 'https://qa.visitpass.quest/i/mcNlErk30BgByd7asEPm7Q')
 
 console.log('lectora: ok')

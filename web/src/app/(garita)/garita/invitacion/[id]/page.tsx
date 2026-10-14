@@ -154,8 +154,12 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     router.push('/garita')
   }
   useLectora({ onLectura: (texto) => leer(interpretarLectura(texto)) })
-  // Un QR leído en el campo navega: se vacía para que no se vuelva a disparar.
-  const teclaDoc = useCampoLectora(doc, (l) => { if (l.tipo === 'qr') setDoc(''); leer(l) })
+  // Un QR leído en el campo navega: se restituye el valor que tendría el campo (cambia el
+  // texto, así no se vuelve a disparar) sin dejarlo vacío si abrirQr falla.
+  const teclaDoc = useCampoLectora(doc, (l) => {
+    if (l.tipo === 'qr') setDoc(documentoLeido.ver(id) ?? q.data?.invitation.guestDoc ?? '')
+    leer(l)
+  })
 
   if (q.isPending) {
     return (
@@ -274,8 +278,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               className="flex flex-col gap-3">
               {/* Los datos se cargan al entrar, no al salir: a la salida ya están. */}
               {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo. */}
-              {!esEgreso && inv.guestDoc && doc.trim() && soloDigitos(doc) !== soloDigitos(inv.guestDoc) && (
-                <p role="alert" className="text-lg font-semibold">
+              {!esEgreso && inv.guestDoc && soloDigitos(doc).length >= 7 && soloDigitos(doc) !== soloDigitos(inv.guestDoc) && (
+                <p className="text-lg font-semibold">
                   El DNI no coincide con el de la invitación ({inv.guestDoc}).
                 </p>
               )}

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -15,7 +15,7 @@ import {
 } from '@/lib/queries/garita'
 import { buscar, mensajeDeError } from '@/lib/gate'
 import { useLectora } from '@/lib/use-lectora'
-import { interpretarLectura, NO_RECONOCIDO, type Lectura, type LecturaDni } from '@/lib/lectora'
+import { interpretarLectura, NO_RECONOCIDO, soloDigitos, type Lectura, type LecturaDni } from '@/lib/lectora'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -54,24 +54,33 @@ export default function GaritaHoy() {
   }
   const buscarYa = (texto: string) => qc.fetchQuery({ queryKey: claves.busqueda(texto), queryFn: () => buscar(texto) })
 
+  // Dos lecturas seguidas pueden resolverse desordenadas: solo vale la última.
+  const secuencia = useRef(0)
+
   /** Spec 3.7: una → veredicto; varias → lista; ninguna → por apellido (solo lista); nada → alta exprés. */
   async function resolverDni(l: LecturaDni) {
+    const mia = ++secuencia.current
     setDniLista(null)
     try {
       const porDoc = await buscarYa(l.documento)
-      if (porDoc.length === 1) {
+      if (mia !== secuencia.current) return
+      // La API busca por subcadena de dígitos: 1234567 también trae 11.234.567. Solo abre si es el mismo documento entero.
+      if (porDoc.length === 1 && soloDigitos(porDoc[0].guestDoc ?? '') === l.documento) {
         documentoLeido.dejar(porDoc[0].id, l.documento)
         router.push(`/garita/invitacion/${porDoc[0].id}`)
         return
       }
-      if (porDoc.length > 1) { setQ(l.documento); setDniLista(l); return }
-      const apellido = l.apellido.split(' ')[0]
+      if (porDoc.length > 0) { setQ(l.documento); setDniLista(l); return }
+      // La palabra más larga del apellido: "De La Fuente" → "Fuente".
+      const apellido = l.apellido.split(' ').reduce((a, p) => (p.length > a.length ? p : a), '')
       // Coincidir por apellido no alcanza para abrir el veredicto de alguien: solo la lista.
-      if ((await buscarYa(apellido)).length > 0) { setQ(apellido); setDniLista(l); return }
+      const porApellido = await buscarYa(apellido)
+      if (mia !== secuencia.current) return
+      if (porApellido.length > 0) { setQ(apellido); setDniLista(l); return }
       setLecturaAlta(l)
       setAltaAbierta(true)
     } catch {
-      toast.error('No se pudo buscar el DNI. Revisá la conexión y probá de nuevo.')
+      if (mia === secuencia.current) toast.error('No se pudo buscar el DNI. Revisá la conexión y probá de nuevo.')
     }
   }
 

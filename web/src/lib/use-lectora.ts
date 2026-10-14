@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import { useDemora } from './use-demora'
-import { crearDetector, interpretarLectura, PAUSA_FIN_MS, type Lectura, type Rafaga } from './lectora'
+import { crearDetector, GRACIA_TERMINADOR_MS, interpretarLectura, PAUSA_FIN_MS, type Lectura, type Rafaga } from './lectora'
 
 const editable = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || el.matches('input, textarea, select'))
@@ -30,9 +30,11 @@ export function useLectora({ onLectura, onRafaga, activo = true }: {
     let entrega: ReturnType<typeof setTimeout> | undefined
     let pendiente: string | null = null
     let tragarEspacio = false
+    let ultimoCierre = -Infinity
 
     function cerrada(r: Rafaga | null) {
       if (!r) return
+      ultimoCierre = performance.now()
       cb.current.onRafaga?.(r, r.esLectura && pendiente !== null)
       if (r.esLectura) pendiente = r.texto
       if (pendiente === null) return
@@ -52,7 +54,13 @@ export function useLectora({ onLectura, onRafaga, activo = true }: {
       clearTimeout(pausa)
       if (e.key.length === 1) clearTimeout(entrega) // empieza otra ráfaga: ¿tanda?
       const r = detector.tecla(e.key, e.timeStamp)
-      if (r?.esLectura) { e.preventDefault(); e.stopPropagation() }
+      // El Enter/Tab de la lectora nunca llega al botón enfocado: tras cualquier ráfaga
+      // (una persona no tipea caracteres en un botón y después aprieta Enter) o dentro
+      // de la gracia (CR+LF, terminador lento, tramo final trabado por Bluetooth).
+      const terminador = e.key === 'Enter' || e.key === 'Tab'
+      if (r || (terminador && e.timeStamp - ultimoCierre <= GRACIA_TERMINADOR_MS)) {
+        e.preventDefault(); e.stopPropagation()
+      }
       cerrada(r)
       pausa = setTimeout(() => cerrada(detector.pausa()), PAUSA_FIN_MS)
     }

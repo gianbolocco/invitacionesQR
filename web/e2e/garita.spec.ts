@@ -213,3 +213,35 @@ test('un DNI sin invitación abre el alta exprés con nombre y documento', async
   await expect(page.getByLabel('Nombre del invitado')).toHaveValue(`Juan Zzsinvit${doc}`)
   await expect(page.getByLabel('Documento (opcional)')).toHaveValue(doc)
 })
+
+test('el Enter de la lectora nunca registra: ni doble (CR+LF) ni tardío', async ({ page, browser }) => {
+  const doc = String(Date.now()).slice(-8)
+  await entrar(page, 'vecino')
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(`Enter E2E ${doc}`)
+  await page.getByLabel('Documento').fill(doc)
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await expect(page).toHaveURL(/\/invitaciones\/[0-9a-f-]{36}\?creada=1$/)
+
+  const g = await (await browser.newContext()).newPage()
+  await entrar(g, 'guardia')
+  await g.goto('/garita')
+  await leerConLectora(g, dni(doc, 'ENTER'))
+  await expect(g.getByRole('button', { name: 'Registrar ingreso' })).toBeFocused()
+
+  const sinRegistrar = async () => {
+    await g.waitForTimeout(800)
+    await expect(g.getByRole('button', { name: 'Registrar ingreso' })).toBeVisible()
+    await expect(g.getByRole('button', { name: /^Siguiente|^Deshacer/ })).toHaveCount(0)
+  }
+  // Con el botón enfocado (sin blur): ráfaga + CR+LF.
+  await g.keyboard.type(dni(doc, 'ENTER'), { delay: 5 })
+  await g.keyboard.press('Enter')
+  await g.keyboard.press('Enter')
+  await sinRegistrar()
+  // Terminador lento: llega 400 ms después de la última tecla.
+  await g.keyboard.type(dni(doc, 'ENTER'), { delay: 5 })
+  await g.waitForTimeout(400)
+  await g.keyboard.press('Enter')
+  await sinRegistrar()
+})

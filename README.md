@@ -182,4 +182,6 @@ se lean en escala de grises y con daltonismo.
 
 - **Ley 25.326.** Falta decidir cuánto se guardan los ingresos con documento y
   patente, y el job de anonimización.
+  Además, el número de DNI viaja como parámetro de consulta a `/gate/search` y puede
+  quedar en los logs de acceso.
 - **Aviso al vecino** cuando su invitado llega a la barrera.
