@@ -13,18 +13,22 @@ import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
 
+/** Lo que ya se sabe de una invitación rechazada que se autoriza igual. */
+export type InicialAlta = { guestName: string; guestDoc: string; plate: string; unidad: UnidadHit }
+
 /**
  * El alta exprés: nombre + lote nada más. Tipo, ventana y cupo quedan fijos
  * (visita, solo hoy, una persona) — es alguien parado en la puerta ahora, no
  * una invitación a futuro.
  */
-export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lectura, onQr }: {
+export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lectura = null, onQr, inicial }: {
   abierto: boolean
   onAbiertoChange: (v: boolean) => void
   disparador: HTMLButtonElement | null
   onCreada: (id: string) => void
-  lectura: LecturaDni | null
+  lectura?: LecturaDni | null
   onQr: (token: string) => void
+  inicial?: InicialAlta
 }) {
   const [guestName, setGuestName] = useState('')
   const [unidad, setUnidad] = useState<UnidadHit | null>(null)
@@ -56,6 +60,11 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   if (abierto !== abiertoVisto) {
     setAbiertoVisto(abierto)
     if (!abierto) { setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate('') }
+    // "Autorizar igual": todo lo que ya se sabe de la invitación rechazada, lote incluido.
+    else if (inicial) {
+      setGuestName(inicial.guestName); setUnidad(inicial.unidad)
+      setGuestDoc(inicial.guestDoc); setPlate(inicial.plate)
+    }
   }
 
   const teclaUnidad = useCampoLectora(qUnidad, (l) =>

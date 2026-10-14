@@ -18,6 +18,7 @@ export type Resultado = {
     validTo: string
     capacity: number
     weekdays: number[] | null
+    unitId: string
     unitLabel: string
     /** El vecino que invita, o PORTERIA si fue un alta exprés. */
     inviterName: string

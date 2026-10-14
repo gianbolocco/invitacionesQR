@@ -260,3 +260,56 @@ test('el recuadro de la lectora confirma que leyó', async ({ page, isMobile }) 
   await expect(recuadro).toContainText('Lectora funcionando')
   await expect(recuadro).toContainText('No reconocido')
 })
+
+test('un NO PASA por cupo se puede autorizar igual, con todo precargado', async ({ page, browser }) => {
+  const nombre = `Autorizar E2E ${Date.now()}`
+  await entrar(page, 'vecino')
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await expect(page).toHaveURL(/\/invitaciones\/[0-9a-f-]{36}\?creada=1$/)
+
+  const g = await (await browser.newContext()).newPage()
+  await entrar(g, 'guardia')
+  // Ingreso y egreso: la visita agota su cupo de 1.
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).first().click()
+  await g.getByLabel('Documento').fill('30111222')
+  await g.getByRole('button', { name: 'Registrar ingreso' }).click()
+  await g.getByRole('button', { name: /^Siguiente/ }).click()
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).first().click()
+  await g.getByRole('button', { name: 'Registrar egreso' }).click()
+  await g.getByRole('button', { name: /^Siguiente/ }).click()
+
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).first().click()
+  await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
+  await expect(g.getByText('Cupo agotado')).toBeVisible()
+  await g.getByRole('button', { name: 'Autorizar igual' }).click()
+
+  await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
+  await expect(g.getByLabel('Documento (opcional)')).toHaveValue('30111222')
+  await expect(g.getByRole('button', { name: 'Cambiar' })).toBeVisible() // el lote ya está elegido
+  await g.getByRole('button', { name: 'Autorizar ingreso' }).click()
+
+  await expect(g).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
+  await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
+})
+
+test('una invitación anulada no se puede autorizar igual', async ({ page, browser }) => {
+  const nombre = `Anulada E2E ${Date.now()}`
+  await entrar(page, 'vecino')
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await page.getByRole('button', { name: 'Anular invitación' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Anular' }).click()
+
+  const g = await (await browser.newContext()).newPage()
+  await entrar(g, 'guardia')
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).click()
+  await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
+  await expect(g.getByRole('button', { name: 'Autorizar igual' })).toHaveCount(0)
+})

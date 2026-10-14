@@ -5,14 +5,15 @@ import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2 } from 'lucide-react'
 import { MOTIVO, detalleRechazo, hora, mensajeDeError, type Movimiento } from '@/lib/gate'
-import { NO_RECONOCIDO, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
+import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
 import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
-import { KIND_LABEL, vigencia } from '@/lib/invitations'
+import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
 import {
   useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
 } from '@/lib/queries/garita'
 import { Input } from '@/components/ui/input'
+import { AltaExpres } from '@/components/garita/alta-expres'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 
 /** Segundos que la confirmación espera antes de volver sola a la pantalla anterior. */
@@ -108,6 +109,9 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   // lo contrario de lo que se acaba de registrar.
   const [hecho, setHecho] = useState<{ movimiento: Movimiento; esEgreso: boolean } | null>(null)
   const accionRef = useRef<HTMLButtonElement>(null)
+  const [altaAbierta, setAltaAbierta] = useState(false)
+  const [disparadorAlta, setDisparadorAlta] = useState<HTMLButtonElement | null>(null)
+  const [lecturaAlta, setLecturaAlta] = useState<LecturaDni | null>(null)
 
   // Precarga de doc/patente al llegar el resultado: se ajusta durante el
   // render (patrón oficial de React para esto), no en un efecto.
@@ -138,12 +142,14 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   }, [q.isPending])
 
   // Escape siempre vuelve. En la barrera no hay tiempo de buscar un botón.
+  // Con el alta abierta no escucha: el Esc que cierra el sheet no debe sacar también del veredicto.
   useEffect(() => {
+    if (altaAbierta) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') salir() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [altaAbierta])
 
   // Se consume al salir: volver a abrir esta invitación más tarde no lo trae.
   useEffect(() => () => documentoLeido.borrar(id), [id, documentoLeido])
@@ -166,6 +172,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
       }
       return
     }
+    if (altaAbierta) { setLecturaAlta(l); return }
     if (q.data && !hecho && !q.data.adentro && q.data.check.ok) {
       anotar(`DNI ${formatearDni(l.documento)} · completó el documento`)
       setDoc(l.documento)
@@ -353,7 +360,14 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                   </button>
                 </motion.div>
               ) : (
-                <motion.div key="rechazo">
+                <motion.div key="rechazo" className="flex flex-col gap-3">
+                  {/* El vecino ya dijo que sí por teléfono. Una anulada no: ahí dijo que no. */}
+                  {(check as { reason: string }).reason !== 'revoked' && (
+                    <button onClick={(e) => { setDisparadorAlta(e.currentTarget); setAltaAbierta(true) }}
+                      className="min-h-16 w-full rounded bg-deny-ink text-xl font-bold text-deny-field">
+                      Autorizar igual
+                    </button>
+                  )}
                   <button ref={accionRef} onClick={salir}
                     className="min-h-16 w-full rounded border-2 border-deny-ink/40 text-xl font-bold">
                     Volver (Esc)
@@ -364,6 +378,19 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           </motion.div>
         </section>
       </div>
+
+      <AltaExpres abierto={altaAbierta} disparador={disparadorAlta}
+        onAbiertoChange={(v) => { setAltaAbierta(v); if (!v) setLecturaAlta(null) }}
+        lectura={lecturaAlta}
+        inicial={{
+          guestName: inv.guestName,
+          guestDoc: doc || inv.guestDoc || '',
+          plate: plate || inv.plate || '',
+          unidad: { unitId: inv.unitId, unitLabel: inv.unitLabel, residentName: quienInvita(inv.inviterName) },
+        }}
+        // replace: "Volver" en el veredicto nuevo lleva a donde estaba el guardia antes del rechazo.
+        onCreada={(nuevo) => router.replace(`/garita/invitacion/${nuevo}`)}
+        onQr={(token) => leer({ tipo: 'qr', token })} />
     </main>
   )
 }
