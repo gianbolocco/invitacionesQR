@@ -7,6 +7,8 @@ import { Fila } from '@/components/dominio/fila'
 import { useDemora } from '@/lib/use-demora'
 import { useBuscarUnidades, useAltaExpres } from '@/lib/queries/garita'
 import type { UnidadHit } from '@/lib/gate'
+import { useCampoLectora } from '@/lib/use-lectora'
+import type { LecturaDni } from '@/lib/lectora'
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
@@ -16,11 +18,13 @@ import {
  * (visita, solo hoy, una persona) — es alguien parado en la puerta ahora, no
  * una invitación a futuro.
  */
-export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
+export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lectura, onQr }: {
   abierto: boolean
   onAbiertoChange: (v: boolean) => void
   disparador: HTMLButtonElement | null
   onCreada: (id: string) => void
+  lectura: LecturaDni | null
+  onQr: (token: string) => void
 }) {
   const [guestName, setGuestName] = useState('')
   const [unidad, setUnidad] = useState<UnidadHit | null>(null)
@@ -30,6 +34,22 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
   const qDemorada = useDemora(qUnidad)
   const unidades = useBuscarUnidades(unidad ? '' : qDemorada.trim())
   const alta = useAltaExpres()
+
+  function aplicarDni(l: LecturaDni, pisarNombre: boolean) {
+    setGuestDoc(l.documento)
+    if (pisarNombre || !guestName.trim()) setGuestName(`${l.nombre} ${l.apellido}`)
+  }
+  // Un DNI leído con el sheet abierto (o que lo abrió): ajuste durante el render, como el veredicto.
+  const [lecturaVista, setLecturaVista] = useState<LecturaDni | null>(null)
+  if (lectura !== lecturaVista) {
+    setLecturaVista(lectura)
+    if (lectura) aplicarDni(lectura, false)
+  }
+  // El sheet abre con el foco en Nombre: ahí cae la lectura si el guardia escanea enseguida.
+  const teclaNombre = useCampoLectora(guestName, (l) =>
+    l.tipo === 'dni' ? aplicarDni(l, true) : (setGuestName(''), onQr(l.token)))
+  const teclaDoc = useCampoLectora(guestDoc, (l) =>
+    l.tipo === 'dni' ? aplicarDni(l, false) : (setGuestDoc(''), onQr(l.token)))
 
   function cerrar(v: boolean) {
     if (!v) { setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate('') }
@@ -57,7 +77,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
         </SheetHeader>
         <form onSubmit={enviar} className="flex flex-col gap-4 px-4 pb-8">
           <Campo id="nombre-expres" etiqueta="Nombre del invitado">
-            <Input id="nombre-expres" required value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+            <Input id="nombre-expres" required onKeyDown={teclaNombre}value={guestName} onChange={(e) => setGuestName(e.target.value)} />
           </Campo>
 
           <Campo id="lote-expres" etiqueta="Lote">
@@ -86,7 +106,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada }: {
           </Campo>
 
           <Campo id="doc-expres" etiqueta="Documento (opcional)" ayuda="Si no lo cargás acá, se pide al registrar el ingreso.">
-            <Input id="doc-expres" value={guestDoc} className="tabular" placeholder="30.123.456"
+            <Input id="doc-expres" onKeyDown={teclaDoc} value={guestDoc} className="tabular" placeholder="30.123.456"
               onChange={(e) => setGuestDoc(e.target.value)} />
           </Campo>
 

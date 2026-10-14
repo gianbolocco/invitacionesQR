@@ -1,13 +1,15 @@
 'use client'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api, apiBase } from '@/lib/api'
 import { hoyISO } from '@/lib/fechas'
 import {
-  porId, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres,
-  type Hit, type Resultado,
+  porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres,
+  type Resultado,
 } from '@/lib/gate'
+import type { LecturaDni } from '@/lib/lectora'
 
 export type AgendaRow = {
   id: string
@@ -84,7 +86,7 @@ export function useAdentro(habilitado: boolean) {
 export function useBusqueda(q: string) {
   return useQuery({
     queryKey: claves.busqueda(q),
-    queryFn: ({ signal }) => api<Hit[]>(`/gate/search?q=${encodeURIComponent(q)}`, { signal }),
+    queryFn: ({ signal }) => buscar(q, signal),
     enabled: q.length > 0,
   })
 }
@@ -107,6 +109,50 @@ export function usePrecargarVeredicto() {
   // de escanear. Sin memoizar, una función nueva en cada render reinicia la
   // cámara en cada render.
   return useCallback((id: string, resultado: Resultado) => qc.setQueryData(claves.veredicto(id), resultado), [qc])
+}
+
+/** QR leído (cámara, lectora o campo) → su veredicto, sin pedirlo dos veces. Tira si falla. */
+export function useAbrirQr() {
+  const router = useRouter()
+  const precargar = usePrecargarVeredicto()
+  return useCallback(async (token: string, reemplazar = false) => {
+    const r = await porToken(token)
+    precargar(r.invitation.id, r)
+    const url = `/garita/invitacion/${r.invitation.id}`
+    if (reemplazar) router.replace(url)
+    else router.push(url)
+  }, [router, precargar])
+}
+
+/*
+ * Lo leído viaja entre pantallas en memoria y no en la URL: en la query string
+ * el DNI y el nombre quedarían en el historial de la compu de la garita.
+ * Fuera de ['garita'] para que invalidarGarita no lo toque.
+ */
+const CLAVE_DNI = ['lectora', 'dni'] as const
+const claveDoc = (id: string) => ['lectora', 'documento', id] as const
+
+/** Un DNI leído fuera de /garita espera acá a que /garita lo resuelva. */
+export function useDniPendiente() {
+  const qc = useQueryClient()
+  return useMemo(() => ({
+    dejar: (l: LecturaDni) => { qc.setQueryData(CLAVE_DNI, l) },
+    tomar: () => {
+      const l = qc.getQueryData<LecturaDni>(CLAVE_DNI)
+      qc.removeQueries({ queryKey: CLAVE_DNI, exact: true })
+      return l
+    },
+  }), [qc])
+}
+
+/** El documento leído para una invitación, para que su veredicto lo traiga cargado. */
+export function useDocumentoLeido() {
+  const qc = useQueryClient()
+  return useMemo(() => ({
+    dejar: (id: string, doc: string) => { qc.setQueryData(claveDoc(id), doc) },
+    ver: (id: string) => qc.getQueryData<string>(claveDoc(id)),
+    borrar: (id: string) => qc.removeQueries({ queryKey: claveDoc(id), exact: true }),
+  }), [qc])
 }
 
 function invalidarGarita(qc: QueryClient): Promise<void> {
