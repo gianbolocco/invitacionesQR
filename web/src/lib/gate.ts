@@ -1,5 +1,5 @@
 'use client'
-import { api } from './api'
+import { api, ApiError } from './api'
 import { fechaNumerica } from './fechas'
 import { DIAS } from './invitations'
 
@@ -74,6 +74,18 @@ export function detalleRechazo(
 }
 
 export const porToken = (token: string) => api<Resultado>(`/gate/check/${token}`)
+export const buscar = (q: string, signal?: AbortSignal) =>
+  api<Hit[]>(`/gate/search?q=${encodeURIComponent(q)}`, { signal })
+
+export function mensajeDeError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 401) return 'La sesión venció. Volvé a iniciar sesión.'
+    if (error.status === 403) return 'Esta cuenta no tiene permiso para usar la garita.'
+    if (error.status === 404) return 'Ese QR no es de una invitación válida.'
+  }
+  return 'No se pudo validar el QR. Revisá la conexión y probá de nuevo.'
+}
+
 export const porId = (id: string) => api<Resultado>(`/gate/invitation/${id}`)
 
 export const registrarIngreso = (datos: {

@@ -275,4 +275,27 @@ describe('buscar por documento en la garita', () => {
     const res = await request(app).get('/gate/search?q=99999999').set('Cookie', cookie).expect(200)
     expect(res.body).toHaveLength(0)
   })
+
+  it('el documento se compara por dígitos: 30111222 encuentra 30.111.222, y al revés', async () => {
+    const { inv, cookie } = await scenario()
+    await db.update(invitations).set({ guestDoc: '30.111.222' }).where(eq(invitations.id, inv.id))
+
+    const sinPuntos = await request(app).get('/gate/search?q=30111222').set('Cookie', cookie).expect(200)
+    expect(sinPuntos.body.map((h: { id: string }) => h.id)).toEqual([inv.id])
+
+    await db.update(invitations).set({ guestDoc: '30111222' }).where(eq(invitations.id, inv.id))
+    const conPuntos = await request(app).get('/gate/search?q=30.111.222').set('Cookie', cookie).expect(200)
+    expect(conPuntos.body).toHaveLength(1)
+  })
+
+  it('una búsqueda con letras no compara dígitos: "Zona 142" no matchea el documento 99.142.000', async () => {
+    const { inv, cookie } = await scenario()
+    await db.update(invitations).set({ guestDoc: '99.142.000' }).where(eq(invitations.id, inv.id))
+
+    const conLetras = await request(app).get('/gate/search?q=Zona 142').set('Cookie', cookie).expect(200)
+    expect(conLetras.body).toHaveLength(0)
+
+    const soloDigitos = await request(app).get('/gate/search?q=99142000').set('Cookie', cookie).expect(200)
+    expect(soloDigitos.body).toHaveLength(1)
+  })
 })
