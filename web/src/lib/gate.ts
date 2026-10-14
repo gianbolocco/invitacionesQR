@@ -86,7 +86,7 @@ export function mensajeDeError(error: unknown): string {
   return 'No se pudo validar el QR. Revisá la conexión y probá de nuevo.'
 }
 
-export const porId =(id: string) => api<Resultado>(`/gate/invitation/${id}`)
+export const porId = (id: string) => api<Resultado>(`/gate/invitation/${id}`)
 
 export const registrarIngreso = (datos: {
   invitationId: string

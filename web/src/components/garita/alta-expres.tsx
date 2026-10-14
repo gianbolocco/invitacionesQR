@@ -51,8 +51,19 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const teclaDoc = useCampoLectora(guestDoc, (l) =>
     l.tipo === 'dni' ? aplicarDni(l, false) : (setGuestDoc(''), onQr(l.token)))
 
+  // Cualquier cierre (botón, Esc, o el padre al leer un QR) deja el formulario limpio.
+  const [abiertoVisto, setAbiertoVisto] = useState(abierto)
+  if (abierto !== abiertoVisto) {
+    setAbiertoVisto(abierto)
+    if (!abierto) { setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate('') }
+  }
+
+  const teclaUnidad = useCampoLectora(qUnidad, (l) =>
+    l.tipo === 'dni' ? (setQUnidad(''), aplicarDni(l, false)) : (setQUnidad(''), onQr(l.token)))
+  const teclaPatente = useCampoLectora(plate, (l) =>
+    l.tipo === 'dni' ? (setPlate(''), aplicarDni(l, false)) : (setPlate(''), onQr(l.token)))
+
   function cerrar(v: boolean) {
-    if (!v) { setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate('') }
     onAbiertoChange(v)
   }
 
@@ -77,7 +88,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
         </SheetHeader>
         <form onSubmit={enviar} className="flex flex-col gap-4 px-4 pb-8">
           <Campo id="nombre-expres" etiqueta="Nombre del invitado">
-            <Input id="nombre-expres" required onKeyDown={teclaNombre}value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+            <Input id="nombre-expres" required onKeyDown={teclaNombre} value={guestName} onChange={(e) => setGuestName(e.target.value)} />
           </Campo>
 
           <Campo id="lote-expres" etiqueta="Lote">
@@ -88,7 +99,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
               </div>
             ) : (
               <>
-                <Input id="lote-expres" value={qUnidad} placeholder="Lote o apellido del vecino"
+                <Input id="lote-expres" onKeyDown={teclaUnidad} value={qUnidad} placeholder="Lote o apellido del vecino"
                   onChange={(e) => setQUnidad(e.target.value)} />
                 {unidades.data && unidades.data.length > 0 && (
                   <div className="mt-1 max-h-48 overflow-auto rounded-md border border-border p-2 [&>*:last-child]:border-b-0">
@@ -111,7 +122,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
           </Campo>
 
           <Campo id="patente-expres" etiqueta="Patente (opcional)">
-            <Input id="patente-expres" value={plate} className="uppercase"
+            <Input id="patente-expres" onKeyDown={teclaPatente} value={plate} className="uppercase"
               onChange={(e) => setPlate(e.target.value.toUpperCase())} />
           </Campo>
 

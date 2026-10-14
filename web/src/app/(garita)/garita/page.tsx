@@ -42,14 +42,21 @@ export default function GaritaHoy() {
   const [disparador, setDisparador] = useState<HTMLButtonElement | null>(null)
   useAvisosGarita()
 
-  function abrir(id: string) {
+  const abrir = (id: string) => router.push(`/garita/invitacion/${id}`)
+  // Solo los resultados de la lista armada por un DNI llevan el documento leído.
+  function abrirDeLista(id: string) {
     if (dniLista) documentoLeido.dejar(id, dniLista.documento)
-    router.push(`/garita/invitacion/${id}`)
+    abrir(id)
+  }
+  function cambiarAlta(v: boolean) {
+    setAltaAbierta(v)
+    if (!v) setLecturaAlta(null)
   }
   const buscarYa = (texto: string) => qc.fetchQuery({ queryKey: claves.busqueda(texto), queryFn: () => buscar(texto) })
 
   /** Spec 3.7: una → veredicto; varias → lista; ninguna → por apellido (solo lista); nada → alta exprés. */
   async function resolverDni(l: LecturaDni) {
+    setDniLista(null)
     try {
       const porDoc = await buscarYa(l.documento)
       if (porDoc.length === 1) {
@@ -75,8 +82,7 @@ export default function GaritaHoy() {
       else await resolverDni(l)
       return
     }
-    setAltaAbierta(false)
-    try { await abrirQr(l.token) } catch (e) { toast.error(mensajeDeError(e)) }
+    try { await abrirQr(l.token); cambiarAlta(false) } catch (e) { toast.error(mensajeDeError(e)) }
   }
 
   useLectora({ onLectura: (texto) => leer(interpretarLectura(texto)) })
@@ -94,7 +100,7 @@ export default function GaritaHoy() {
     <ChromeGarita>
       <div className="grid grid-cols-1 gap-8 md:grid-cols-[1fr_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
-          <BuscarInvitado q={q} onQ={(v) => { setQ(v); setDniLista(null) }} onAbrir={abrir} onLectura={leer} />
+          <BuscarInvitado q={q} onQ={(v) => { setQ(v); setDniLista(null) }} onAbrir={abrirDeLista} onLectura={leer} />
           <Button type="button" variant="outline"
             onClick={(e) => { setDisparador(e.currentTarget); setAltaAbierta(true) }}>
             <UserPlus aria-hidden />Autorizar sin invitación
@@ -111,7 +117,7 @@ export default function GaritaHoy() {
       </div>
 
       <AltaExpres abierto={altaAbierta} disparador={disparador} onCreada={abrir}
-        onAbiertoChange={(v) => { setAltaAbierta(v); if (!v) setLecturaAlta(null) }}
+        onAbiertoChange={cambiarAlta}
         lectura={lecturaAlta} onQr={(token) => leer({ tipo: 'qr', token })} />
     </ChromeGarita>
   )
