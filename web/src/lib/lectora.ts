@@ -21,7 +21,7 @@ export const soloDigitos = (s: string) => s.replace(/\D/g, '')
 const invertirCaja = (s: string) =>
   [...s].map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase())).join('')
 
-const titulo = (s: string) => s.toLowerCase().replace(/(^|\s)\p{L}/gu, (m) => m.toUpperCase())
+const titulo = (s: string) => s.toLowerCase().replace(/(^|[\s'-])\p{L}/gu, (m) => m.toUpperCase())
 
 /** La URL de la invitación en cualquier parte del texto (prefijos de lectora), o el token suelto. */
 export function tokenDelQr(texto: string): string | null {
@@ -97,7 +97,8 @@ export function crearDetector() {
     /** Devuelve la ráfaga si esta tecla la cerró (Enter o Tab). */
     tecla(key: string, t: number): Rafaga | null {
       const ultima = teclas.at(-1)
-      if (ultima && t - ultima.t > HUECO_MAX_MS) teclas = []
+      // Solo un carácter corta la ráfaga: algunas lectoras mandan el terminador tarde (terminador lento).
+      if (key.length === 1 && ultima && t - ultima.t > HUECO_MAX_MS) teclas = []
       if (key === 'Enter' || key === 'Tab') return cerrar(key)
       // Una sola letra: afuera modificadores, `Dead` y `Unidentified` (Android).
       if (key.length === 1) teclas.push({ key, t })

@@ -25,11 +25,11 @@ for (const basura of ['', 'perez', '46116502', 'Lote 142', 'https://otro.com/x',
 }
 assert.equal(soloDigitos('30.123.456'), '30123456')
 
-function tipear(texto: string, ms: (i: number) => number, fin = 'Enter') {
+function tipear(texto: string, ms: (i: number) => number, fin = 'Enter', esperaFin = 3) {
   const d = crearDetector()
   let t = 1000
   for (const [i, k] of [...texto].entries()) { t += ms(i); assert.equal(d.tecla(k, t), null) }
-  return fin === 'pausa' ? d.pausa() : d.tecla(fin, t + 3)
+  return fin === 'pausa' ? d.pausa() : d.tecla(fin, t + esperaFin)
 }
 const qr = 'httpsÑ--qa.visitpass.quest-i-mcNlErk30BgByd7asEPm7Q'
 assert.equal(tipear(qr, () => 4)?.esLectura, true)                                // USB
@@ -39,5 +39,9 @@ assert.equal(tipear('juan perez lote', () => 90)?.esLectura, false)             
 assert.equal(tipear('abc', () => 3)?.esLectura, false)                            // muy corta
 assert.equal(tipear(qr, () => 4, 'pausa')?.terminador, 'pausa')                   // sin terminador
 assert.equal(tipear(qr, (i) => (i === 20 ? 300 : 4))?.texto, qr.slice(20))        // un hueco largo corta
+assert.equal(tipear(qr, () => 4, 'Enter', 230)?.esLectura, true)                  // terminador lento: no pierde la ráfaga
+// Apóstrofo y guion también abren palabra.
+assert.deepEqual(interpretarLectura("00705994066@D'ANGELO@MARÍA-JOSÉ@F@20111222@A@01/01/1990@01/01/2020@123"),
+  { tipo: 'dni', documento: '20111222', apellido: "D'Angelo", nombre: 'María-José' })
 
 console.log('lectora: ok')
