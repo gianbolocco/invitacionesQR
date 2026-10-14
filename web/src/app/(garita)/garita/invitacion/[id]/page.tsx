@@ -1,13 +1,16 @@
 'use client'
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2 } from 'lucide-react'
-import { MOTIVO, detalleRechazo, hora, type Movimiento } from '@/lib/gate'
+import { MOTIVO, detalleRechazo, hora, mensajeDeError, type Movimiento } from '@/lib/gate'
+import { NO_RECONOCIDO, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
+import { useCampoLectora, useLectora } from '@/lib/use-lectora'
 import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
 import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
 import {
-  useDeshacerMovimiento, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
+  useAbrirQr, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
 } from '@/lib/queries/garita'
 import { Input } from '@/components/ui/input'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
@@ -81,6 +84,9 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const ingresar = useRegistrarIngreso()
   const egresar = useRegistrarEgreso()
   const deshacerMov = useDeshacerMovimiento()
+  const abrirQr = useAbrirQr()
+  const dniPendiente = useDniPendiente()
+  const documentoLeido = useDocumentoLeido()
   const [idCargado, setIdCargado] = useState<string | null>(null)
   const [doc, setDoc] = useState('')
   const [plate, setPlate] = useState('')
@@ -94,7 +100,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   // render (patrón oficial de React para esto), no en un efecto.
   if (q.data && q.data.invitation.id !== idCargado) {
     setIdCargado(q.data.invitation.id)
-    setDoc(q.data.invitation.guestDoc ?? '')
+    setDoc(documentoLeido.ver(q.data.invitation.id) ?? q.data.invitation.guestDoc ?? '')
     setPlate(q.data.invitation.plate ?? '')
   }
 
@@ -123,6 +129,33 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Se consume al salir: volver a abrir esta invitación más tarde no lo trae.
+  useEffect(() => () => documentoLeido.borrar(id), [id, documentoLeido])
+
+  /*
+   * Con un ingreso pendiente, un DNI es el de quien está adelante: completa y
+   * enfoca "Registrar ingreso" (nunca registra solo). Si no, es el siguiente
+   * invitado. Un QR siempre es el siguiente; replace para que Volver lleve a
+   * donde estaba el guardia antes del primero.
+   */
+  async function leer(l: Lectura | null) {
+    if (!l) { toast.error(NO_RECONOCIDO); return }
+    if (l.tipo === 'qr') {
+      try { await abrirQr(l.token, true) } catch (e) { toast.error(mensajeDeError(e)) }
+      return
+    }
+    if (q.data && !hecho && !q.data.adentro && q.data.check.ok) {
+      setDoc(l.documento)
+      accionRef.current?.focus()
+      return
+    }
+    dniPendiente.dejar(l)
+    router.push('/garita')
+  }
+  useLectora({ onLectura: (texto) => leer(interpretarLectura(texto)) })
+  // Un QR leído en el campo navega: se vacía para que no se vuelva a disparar.
+  const teclaDoc = useCampoLectora(doc, (l) => { if (l.tipo === 'qr') setDoc(''); leer(l) })
 
   if (q.isPending) {
     return (
@@ -240,11 +273,17 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
             <motion.div key="pendiente" exit={{ opacity: 0, y: -8, transition: { duration: 0.16 } }}
               className="flex flex-col gap-3">
               {/* Los datos se cargan al entrar, no al salir: a la salida ya están. */}
+              {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo. */}
+              {!esEgreso && inv.guestDoc && doc.trim() && soloDigitos(doc) !== soloDigitos(inv.guestDoc) && (
+                <p role="alert" className="text-lg font-semibold">
+                  El DNI no coincide con el de la invitación ({inv.guestDoc}).
+                </p>
+              )}
               {!esEgreso && (
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <label className="flex flex-1 flex-col gap-1.5 font-semibold">
                     Documento
-                    <Input value={doc} onChange={(e) => setDoc(e.target.value)}
+                    <Input value={doc} onChange={(e) => setDoc(e.target.value)} onKeyDown={teclaDoc}
                       className="tabular h-14 border-pass-ink/20 bg-white/70 text-xl" />
                   </label>
                   <label className="flex flex-1 flex-col gap-1.5 font-semibold">
