@@ -232,6 +232,7 @@ export async function undoMovement(
 export async function searchGuests(neighborhoodId: string, query: string) {
   const q = `%${query.trim()}%`
   const hoy = todayInBuenosAires()
+  const digitos = query.replace(/\D/g, '')
 
   return db.select({
     id: invitations.id,
@@ -265,6 +266,13 @@ export async function searchGuests(neighborhoodId: string, query: string) {
         // Sin unaccent: un documento no lleva tildes, y pasarlo por unaccent
         // sería gasto sin efecto.
         ilike(invitations.guestDoc, q),
+        // Por dígitos: el vecino cargó "30.123.456" y la lectora del DNI manda
+        // 30123456. Desde 3 dígitos, para que "Lote 1" no matchee todo con un 1.
+        // Solo si la búsqueda no tiene letras: "Lote 142" es una unidad, no un
+        // documento, y sin este corte matchearía cualquier DNI con 142 adentro.
+        digitos.length >= 3 && !/\p{L}/u.test(query)
+          ? sql`regexp_replace(${invitations.guestDoc}, '\\D', '', 'g') like ${`%${digitos}%`}`
+          : undefined,
       ),
     ))
     .orderBy(desc(invitations.createdAt))
