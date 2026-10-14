@@ -43,6 +43,7 @@ export default function GaritaHoy() {
           <Link href="/garita/escanear" className={cn(buttonVariants({ size: 'lg' }), 'w-full')}>
             <ScanLine aria-hidden />Escanear QR
           </Link>
+          <Link href="/garita/lectora" className="text-sm text-ink-soft underline underline-offset-4">Probar lectora</Link>
           <UltimosMovimientos />
         </aside>
       </div>
