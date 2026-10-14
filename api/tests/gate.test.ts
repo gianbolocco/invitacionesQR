@@ -287,4 +287,15 @@ describe('buscar por documento en la garita', () => {
     const conPuntos = await request(app).get('/gate/search?q=30.111.222').set('Cookie', cookie).expect(200)
     expect(conPuntos.body).toHaveLength(1)
   })
+
+  it('una búsqueda con letras no compara dígitos: "Zona 142" no matchea el documento 99.142.000', async () => {
+    const { inv, cookie } = await scenario()
+    await db.update(invitations).set({ guestDoc: '99.142.000' }).where(eq(invitations.id, inv.id))
+
+    const conLetras = await request(app).get('/gate/search?q=Zona 142').set('Cookie', cookie).expect(200)
+    expect(conLetras.body).toHaveLength(0)
+
+    const soloDigitos = await request(app).get('/gate/search?q=99142000').set('Cookie', cookie).expect(200)
+    expect(soloDigitos.body).toHaveLength(1)
+  })
 })
