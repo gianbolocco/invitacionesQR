@@ -1,31 +1,13 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Html5Qrcode } from 'html5-qrcode'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowLeft, CameraOff, Loader2 } from 'lucide-react'
 import { useMe } from '@/lib/session'
-import { ApiError } from '@/lib/api'
-import { porToken } from '@/lib/gate'
-import { usePrecargarVeredicto } from '@/lib/queries/garita'
-
-function tokenDelQr(texto: string): string | null {
-  try {
-    const url = new URL(texto)
-    return url.pathname.match(/^\/i\/([A-Za-z0-9_-]+)\/?$/)?.[1] ?? null
-  } catch {
-    return /^[A-Za-z0-9_-]+$/.test(texto) ? texto : null
-  }
-}
-
-function mensajeDeError(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 401) return 'La sesión venció. Volvé a iniciar sesión.'
-    if (error.status === 403) return 'Esta cuenta no tiene permiso para usar la garita.'
-    if (error.status === 404) return 'Ese QR no es de una invitación válida.'
-  }
-  return 'No se pudo validar el QR. Revisá la conexión y probá de nuevo.'
-}
+import { mensajeDeError } from '@/lib/gate'
+import { interpretarLectura } from '@/lib/lectora'
+import { useAbrirQr, useDniPendiente } from '@/lib/queries/garita'
 
 type Estado = 'abriendo' | 'listo' | 'sin_camara'
 
@@ -58,7 +40,8 @@ export default function EscanearPage() {
   const me = useMe()
   const router = useRouter()
   const reducir = useReducedMotion()
-  const precargarVeredicto = usePrecargarVeredicto()
+  const abrirQr = useAbrirQr()
+  const dniPendiente = useDniPendiente()
   const [estado, setEstado] = useState<Estado>('abriendo')
   const [error, setError] = useState<string | null>(null)
   const [validando, setValidando] = useState(false)
@@ -69,7 +52,13 @@ export default function EscanearPage() {
 
   useEffect(() => {
     if (!me) return
-    const scanner = new Html5Qrcode('reader', { verbose: false })
+    const scanner = new Html5Qrcode('reader', {
+      verbose: false,
+      // PDF417 es el código del DNI. El BarcodeDetector nativo (Chrome en
+      // Android) lo lee bastante mejor que la implementación en JS.
+      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.PDF_417],
+      useBarCodeDetectorIfSupported: true,
+    })
     let vivo = true
 
     scanner.start(
@@ -93,27 +82,23 @@ export default function EscanearPage() {
         setError(null)
         setValidando(true)
 
-        const token = tokenDelQr(texto)
-        if (!token) {
+        const l = interpretarLectura(texto)
+        if (!l) {
           if (vivo) {
-            setError('Ese código no es de VisitPass. Enfocá el QR de la invitación.')
+            setError('Ese código no es de VisitPass. Enfocá el QR de la invitación o el DNI.')
             setValidando(false)
           }
           procesando.current = false
           return
         }
-
+        if (l.tipo === 'dni') {
+          if (vivo) { dniPendiente.dejar(l); router.push('/garita') }
+          return
+        }
         try {
-          const r = await porToken(token)
-          if (vivo) {
-            precargarVeredicto(r.invitation.id, r)
-            router.push(`/garita/invitacion/${r.invitation.id}`)
-          }
+          if (vivo) await abrirQr(l.token)
         } catch (e) {
-          if (vivo) {
-            setError(mensajeDeError(e))
-            setValidando(false)
-          }
+          if (vivo) { setError(mensajeDeError(e)); setValidando(false) }
         } finally {
           procesando.current = false
         }
@@ -127,7 +112,7 @@ export default function EscanearPage() {
       vivo = false
       scanner.stop().catch(() => {})
     }
-  }, [me, router, precargarVeredicto])
+  }, [me, router, abrirQr, dniPendiente])
 
   const salir = useCallback(() => router.push('/garita'), [router])
   const reintentar = useCallback(() => {
@@ -228,7 +213,7 @@ export default function EscanearPage() {
             </button>
           </>
         ) : (
-          <p className="text-sm opacity-65">Centrá el QR en el marco. Si cuesta, que el invitado suba el brillo.</p>
+          <p className="text-sm opacity-65">Centrá el QR o el código del DNI en el marco. Si cuesta, que el invitado suba el brillo.</p>
         )}
       </footer>
     </main>
