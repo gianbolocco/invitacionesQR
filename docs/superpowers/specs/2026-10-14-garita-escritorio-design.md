@@ -125,9 +125,11 @@ de dos columnas (≈ 3/5 y 2/5), centrada con un ancho máximo amplio (≈ 80rem
 - El egreso no tiene campos: muestra cuándo entró y hace cuánto está adentro,
   como hoy.
 
-**Por debajo de 1024 px no cambia nada**: la columna única de hoy. Es **el
-mismo componente**; las piezas se reacomodan con la grilla (`lg:`), no hay dos
-árboles de JSX. El orden en el DOM sigue siendo palabra → nombre → ficha →
+**Por debajo de 1024 px sigue siendo una columna única**, en el mismo orden;
+lo único que cambia es que los renglones de datos pasan a la ficha (sin dos
+árboles de JSX no hay forma de tener la ficha solo en escritorio, y duplicar los
+campos de Documento y Patente rompería labels y e2e). Es **el mismo
+componente**; las piezas se reacomodan con la grilla (`lg:`). El orden en el DOM sigue siendo palabra → nombre → ficha →
 acción, que es también el orden de lectura de un lector de pantalla.
 
 Atajos, foco y lectora no cambian: el foco cae en la acción al cargar, `Esc`
