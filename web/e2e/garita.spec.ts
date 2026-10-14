@@ -245,3 +245,118 @@ test('el Enter de la lectora nunca registra: ni doble (CR+LF) ni tardío', async
   await g.keyboard.press('Enter')
   await sinRegistrar()
 })
+
+test('el recuadro de la lectora confirma que leyó', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'el recuadro vive en la columna de escritorio')
+  await entrar(page, 'guardia')
+  await page.goto('/garita')
+  const recuadro = page.getByRole('region', { name: 'Lectora' })
+  await expect(recuadro).toContainText('Escaneá un QR o un DNI con la lectora')
+  // Mouse: el botón de la cámara no está; la cámara es el link del recuadro.
+  // Scopeado al aside: el link de la barra inferior (mobile) también existe en el DOM.
+  const escanear = page.locator('aside').getByRole('link', { name: 'Escanear QR', includeHidden: true })
+  await expect(escanear).toHaveCount(1)
+  await expect(escanear).toBeHidden()
+  await expect(recuadro.getByRole('link', { name: 'Usar la cámara' })).toBeVisible()
+
+  await leerConLectora(page, 'ESTONOESUNCODIGO123')
+  await expect(recuadro).toContainText('Lectora funcionando')
+  await expect(recuadro).toContainText('No reconocido')
+})
+
+/** Deja una visita con el cupo agotado y abre su veredicto NO PASA. */
+async function abrirNoPasaPorCupo(page: import('@playwright/test').Page, browser: import('@playwright/test').Browser, prefijo: string) {
+  const nombre = `${prefijo} ${Date.now()}`
+  await entrar(page, 'vecino')
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await expect(page).toHaveURL(/\/invitaciones\/[0-9a-f-]{36}\?creada=1$/)
+
+  const g = await (await browser.newContext()).newPage()
+  await entrar(g, 'guardia')
+  // Ingreso y egreso: la visita agota su cupo de 1.
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).first().click()
+  await g.getByLabel('Documento').fill('30111222')
+  await g.getByRole('button', { name: 'Registrar ingreso' }).click()
+  await g.getByRole('button', { name: /^Siguiente/ }).click()
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).first().click()
+  await g.getByRole('button', { name: 'Registrar egreso' }).click()
+  await g.getByRole('button', { name: /^Siguiente/ }).click()
+
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).first().click()
+  await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
+  await expect(g.getByText('Cupo agotado')).toBeVisible()
+  return { g, nombre }
+}
+
+test('un NO PASA por cupo se puede autorizar igual, con todo precargado', async ({ page, browser }) => {
+  const { g, nombre } = await abrirNoPasaPorCupo(page, browser, 'Autorizar E2E')
+  await g.getByRole('button', { name: 'Autorizar igual' }).click()
+
+  await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
+  await expect(g.getByLabel('Documento (opcional)')).toHaveValue('30111222')
+  await expect(g.getByRole('button', { name: 'Cambiar' })).toBeVisible() // el lote ya está elegido
+  await g.getByRole('button', { name: 'Autorizar ingreso' }).click()
+
+  await expect(g).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
+  await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
+})
+
+test('una invitación anulada no se puede autorizar igual', async ({ page, browser }) => {
+  const nombre = `Anulada E2E ${Date.now()}`
+  await entrar(page, 'vecino')
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await page.getByRole('button', { name: 'Anular invitación' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Anular' }).click()
+
+  const g = await (await browser.newContext()).newPage()
+  await entrar(g, 'guardia')
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByText(nombre).click()
+  await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
+  await expect(g.getByRole('button', { name: 'Autorizar igual' })).toHaveCount(0)
+})
+
+test('el Esc que cierra el sheet de Autorizar igual no saca del veredicto', async ({ page, browser }) => {
+  const { g } = await abrirNoPasaPorCupo(page, browser, 'Esc E2E')
+  const url = g.url()
+  await g.getByRole('button', { name: 'Autorizar igual' }).click()
+  await expect(g.getByRole('dialog')).toBeVisible()
+  await g.keyboard.press('Escape')
+  await expect(g.getByRole('dialog')).toBeHidden()
+  await g.waitForTimeout(500)
+  await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
+  expect(g.url()).toBe(url)
+})
+
+test('un DNI leído con el sheet precargado abierto reemplaza el nombre de la invitación', async ({ page, browser }) => {
+  const { g, nombre } = await abrirNoPasaPorCupo(page, browser, 'Mezcla E2E')
+  await g.getByRole('button', { name: 'Autorizar igual' }).click()
+  await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
+  await g.getByRole('button', { name: 'Cambiar' }).focus()
+  const doc = String(Date.now()).slice(-8)
+  await leerConLectora(g, dni(doc, 'MEZCLA'))
+  await expect(g.getByLabel('Nombre del invitado')).toHaveValue('Juan Mezcla')
+  await expect(g.getByLabel('Documento (opcional)')).toHaveValue(doc)
+})
+
+test('dos DNI seguidos en el alta exprés no mezclan nombre y documento', async ({ page }) => {
+  const t = String(Date.now())
+  const docA = t.slice(-8), docB = String(Number(docA) + 1).padStart(8, '0')
+  await entrar(page, 'guardia')
+  await page.goto('/garita')
+  await page.getByRole('button', { name: 'Autorizar sin invitación' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  // El sheet autofocusea Nombre; leerConLectora hace blur para que la lectura caiga en el hook de ventana.
+  await leerConLectora(page, dni(docA, `ZZAAA${docA}`))
+  await expect(page.getByLabel('Documento (opcional)')).toHaveValue(docA)
+  await leerConLectora(page, dni(docB, `ZZBBB${docB}`))
+  await expect(page.getByLabel('Documento (opcional)')).toHaveValue(docB)
+  await expect(page.getByLabel('Nombre del invitado')).toHaveValue(`Juan Zzbbb${docB}`)
+})
