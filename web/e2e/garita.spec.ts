@@ -345,3 +345,18 @@ test('un DNI leído con el sheet precargado abierto reemplaza el nombre de la in
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue('Juan Mezcla')
   await expect(g.getByLabel('Documento (opcional)')).toHaveValue(doc)
 })
+
+test('dos DNI seguidos en el alta exprés no mezclan nombre y documento', async ({ page }) => {
+  const t = String(Date.now())
+  const docA = t.slice(-8), docB = String(Number(docA) + 1).padStart(8, '0')
+  await entrar(page, 'guardia')
+  await page.goto('/garita')
+  await page.getByRole('button', { name: 'Autorizar sin invitación' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  // El sheet autofocusea Nombre; leerConLectora hace blur para que la lectura caiga en el hook de ventana.
+  await leerConLectora(page, dni(docA, `ZZAAA${docA}`))
+  await expect(page.getByLabel('Documento (opcional)')).toHaveValue(docA)
+  await leerConLectora(page, dni(docB, `ZZBBB${docB}`))
+  await expect(page.getByLabel('Documento (opcional)')).toHaveValue(docB)
+  await expect(page.getByLabel('Nombre del invitado')).toHaveValue(`Juan Zzbbb${docB}`)
+})
