@@ -13,18 +13,22 @@ import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
 
+/** Lo que ya se sabe de una invitación rechazada que se autoriza igual. */
+export type InicialAlta = { guestName: string; guestDoc: string; plate: string; unidad: UnidadHit }
+
 /**
  * El alta exprés: nombre + lote nada más. Tipo, ventana y cupo quedan fijos
  * (visita, solo hoy, una persona) — es alguien parado en la puerta ahora, no
  * una invitación a futuro.
  */
-export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lectura, onQr }: {
+export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lectura = null, onQr, inicial }: {
   abierto: boolean
   onAbiertoChange: (v: boolean) => void
   disparador: HTMLButtonElement | null
   onCreada: (id: string) => void
-  lectura: LecturaDni | null
+  lectura?: LecturaDni | null
   onQr: (token: string) => void
+  inicial?: InicialAlta
 }) {
   const [guestName, setGuestName] = useState('')
   const [unidad, setUnidad] = useState<UnidadHit | null>(null)
@@ -35,9 +39,19 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const unidades = useBuscarUnidades(unidad ? '' : qDemorada.trim())
   const alta = useAltaExpres()
 
+  // El nombre que escribió el último escaneo de DNI.
+  // (state y no ref: aplicarDni también corre durante el render, y ahí no se leen refs.)
+  const [nombreEscaneado, setNombreEscaneado] = useState('')
   function aplicarDni(l: LecturaDni, pisarNombre: boolean) {
     setGuestDoc(l.documento)
-    if (pisarNombre || !guestName.trim()) setGuestName(`${l.nombre} ${l.apellido}`)
+    // Un nombre sin tocar (el de la invitación rechazada) no es de quien se escanea; tampoco
+    // el que dejó el DNI anterior: si no, dos DNI seguidos dejan el nombre de A con el documento de B.
+    // Un nombre tipeado a mano (distinto de ambos) se respeta.
+    if (pisarNombre || !guestName.trim() || guestName === inicial?.guestName || guestName === nombreEscaneado) {
+      const nombre = `${l.nombre} ${l.apellido}`
+      setNombreEscaneado(nombre)
+      setGuestName(nombre)
+    }
   }
   // Un DNI leído con el sheet abierto (o que lo abrió): ajuste durante el render, como el veredicto.
   const [lecturaVista, setLecturaVista] = useState<LecturaDni | null>(null)
@@ -55,7 +69,12 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const [abiertoVisto, setAbiertoVisto] = useState(abierto)
   if (abierto !== abiertoVisto) {
     setAbiertoVisto(abierto)
-    if (!abierto) { setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate('') }
+    if (!abierto) { setNombreEscaneado(''); setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate('') }
+    // "Autorizar igual": todo lo que ya se sabe de la invitación rechazada, lote incluido.
+    else if (inicial) {
+      setGuestName(inicial.guestName); setUnidad(inicial.unidad)
+      setGuestDoc(inicial.guestDoc); setPlate(inicial.plate)
+    }
   }
 
   const teclaUnidad = useCampoLectora(qUnidad, (l) =>

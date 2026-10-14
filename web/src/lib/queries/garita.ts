@@ -115,12 +115,15 @@ export function usePrecargarVeredicto() {
 export function useAbrirQr() {
   const router = useRouter()
   const precargar = usePrecargarVeredicto()
-  return useCallback(async (token: string, reemplazar = false) => {
+  // `vigente`: si ya no corresponde (llegó una lectura más nueva), no navega.
+  return useCallback(async (token: string, reemplazar = false, vigente: () => boolean = () => true) => {
     const r = await porToken(token)
+    if (!vigente()) return r
     precargar(r.invitation.id, r)
     const url = `/garita/invitacion/${r.invitation.id}`
     if (reemplazar) router.replace(url)
     else router.push(url)
+    return r
   }, [router, precargar])
 }
 
@@ -153,6 +156,32 @@ export function useDocumentoLeido() {
     ver: (id: string) => qc.getQueryData<string>(claveDoc(id)),
     borrar: (id: string) => qc.removeQueries({ queryKey: claveDoc(id), exact: true }),
   }), [qc])
+}
+
+export type UltimaLectura = { descripcion: string; cuando: string }
+const CLAVE_ULTIMA = ['lectora', 'ultima'] as const
+
+/**
+ * La última lectura y qué pasó con ella, para el recuadro "Lectora" de la
+ * garita: la confirmación de que la lectora leyó, que un toast que se va no da.
+ * En memoria (fuera de ['garita']) y sin gc: sobrevive al ir y volver del veredicto.
+ */
+export function useUltimaLectura() {
+  const { data } = useQuery<UltimaLectura | null>({
+    queryKey: CLAVE_ULTIMA,
+    queryFn: () => null,
+    enabled: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+  return data ?? null
+}
+
+export function useAnotarLectura() {
+  const qc = useQueryClient()
+  return useCallback((descripcion: string) => {
+    qc.setQueryData<UltimaLectura>(CLAVE_ULTIMA, { descripcion, cuando: new Date().toISOString() })
+  }, [qc])
 }
 
 function invalidarGarita(qc: QueryClient): Promise<void> {
