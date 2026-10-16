@@ -1,4 +1,4 @@
-import type { Person, Unit } from './admin.ts'
+import { sinLote as estaSinLote, type Person, type Unit } from './admin.ts'
 
 /** Un lote y quiénes viven ahí; o el grupo de los que todavía no declararon el suyo. */
 export type GrupoLote = {
@@ -33,7 +33,7 @@ export function agruparPorLote(vecinos: Person[], unidades: Unit[], incluirVacio
   const sinLote: Person[] = []
   for (const p of vecinos) {
     // Un admin no necesita casa: no cuenta como "sin lote" (sigue en la lista).
-    if (p.units.length === 0) { if (p.role !== 'admin') sinLote.push(p); continue }
+    if (p.units.length === 0) { if (estaSinLote(p)) sinLote.push(p); continue }
     for (const u of p.units) {
       const g = grupos.get(u.id) ?? { clave: u.id, titulo: u.label, sinLote: false, vecinos: [] }
       g.vecinos.push(p)

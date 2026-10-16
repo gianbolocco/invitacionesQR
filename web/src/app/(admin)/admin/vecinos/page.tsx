@@ -5,12 +5,16 @@ import {
   usePersonas, useUnidades, useAltaVecino, useReenviarInvitacion, useReactivarPersona,
   useDeshabilitarPersona, useCambiarLote, copiarLinkDeAlta, ApiError,
 } from '@/lib/queries/admin'
-import { ESTADO, normalizarBusqueda, type Person } from '@/lib/admin'
+import {
+  ESTADO, filtrarVecinos, normalizarBusqueda, type FiltroCuenta, type FiltroLote, type Person,
+} from '@/lib/admin'
 import { fechaConAnio } from '@/lib/fechas'
 import { agruparPorLote } from '@/lib/lotes'
 import { usePreferencia } from '@/lib/use-preferencia'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { SelectorVista, type OpcionVista } from '@/components/dominio/selector-vista'
+import { Chips } from '@/components/dominio/chips'
+import { HojaFiltros } from '@/components/dominio/hoja-filtros'
 import { VistaPorLote } from '@/components/admin/vista-por-lote'
 import { SheetAlta } from '@/components/admin/sheet-alta'
 import { MenuFila, type AccionFila } from '@/components/admin/menu-fila'
@@ -160,6 +164,8 @@ export default function VecinosPage() {
   const reenviar = useReenviarInvitacion()
   const reactivar = useReactivarPersona()
   const [busqueda, setBusqueda] = useState('')
+  const [cuenta, setCuenta] = useState<FiltroCuenta>('todas')
+  const [lote, setLote] = useState<FiltroLote>('todos')
   const [altaAbierta, setAltaAbierta] = useState(false)
   const [corrigiendo, setCorrigiendo] = useState<Person | null>(null)
   const [porDarDeBaja, setPorDarDeBaja] = useState<Person | null>(null)
@@ -167,11 +173,13 @@ export default function VecinosPage() {
 
   const vecinos = (personas.data ?? []).filter((p) => p.role !== 'guard')
   const consulta = normalizarBusqueda(busqueda)
-  const filtrados = consulta
-    ? vecinos.filter((p) => normalizarBusqueda(p.name).includes(consulta)
-      || p.units.some((u) => normalizarBusqueda(u.label).includes(consulta)
-        || normalizarBusqueda(u.label.replace(/^lote\s*/i, '')).includes(consulta)))
-    : vecinos
+  const filtros = { cuenta, lote, consulta }
+  const filtrados = filtrarVecinos(vecinos, filtros)
+  // Cuántos da cada opción de un filtro con el OTRO y la búsqueda puestos: con el
+  // propio puesto, todas las demás opciones dirían cero.
+  const porCuenta = filtrarVecinos(vecinos, filtros, 'cuenta')
+  const cuentas = (estado: FiltroCuenta) => porCuenta.filter((p) => estado === 'todas' || p.status === estado).length
+  const hayFiltros = cuenta !== 'todas' || lote !== 'todos'
 
   function accionesDe(p: Person): AccionFila[] {
     const acciones: AccionFila[] = []
@@ -203,7 +211,8 @@ export default function VecinosPage() {
     )
   }
 
-  const grupos = agruparPorLote(filtrados, unidades.data ?? [], !consulta)
+  // Los lotes vacíos solo con la lista completa: buscando o filtrando, taparían lo que se busca.
+  const grupos = agruparPorLote(filtrados, unidades.data ?? [], !consulta && !hayFiltros)
 
   return (
     <>
@@ -231,13 +240,30 @@ export default function VecinosPage() {
           </div>
         </div>
 
+        <HojaFiltros activos={(cuenta !== 'todas' ? 1 : 0) + (lote !== 'todos' ? 1 : 0)}
+          resultados={personas.data ? filtrados.length : undefined}
+          onLimpiar={() => { setCuenta('todas'); setLote('todos') }}>
+          <Chips etiqueta="Estado de la cuenta" valor={cuenta} onCambio={setCuenta} opciones={[
+            { valor: 'todas', etiqueta: 'Todos', contador: personas.data ? cuentas('todas') : undefined },
+            { valor: 'active', etiqueta: 'Con cuenta', contador: personas.data ? cuentas('active') : undefined },
+            { valor: 'invited', etiqueta: 'Sin activar', contador: personas.data ? cuentas('invited') : undefined },
+            { valor: 'disabled', etiqueta: 'De baja', contador: personas.data ? cuentas('disabled') : undefined },
+          ]} />
+          <Chips etiqueta="Lote" valor={lote} onCambio={setLote} opciones={[
+            { valor: 'todos', etiqueta: 'Todos los lotes' },
+            { valor: 'sinLote', etiqueta: 'Sin lote',
+              contador: personas.data ? filtrarVecinos(vecinos, { ...filtros, lote: 'sinLote' }).length : undefined },
+          ]} />
+        </HojaFiltros>
+
         {personas.isPending ? (
           <SkeletonFilas filas={5} />
         ) : personas.isError ? (
           <ErrorConReintento onReintentar={() => personas.refetch()} reintentando={personas.isFetching} />
         ) : filtrados.length === 0 && (vista === 'lista' || grupos.length === 0) ? (
           <Vacio icono={Search}
-            titulo={consulta ? 'No encontramos vecinos con ese nombre o lote' : 'Todavía no hay vecinos en el padrón'} />
+            titulo={consulta || hayFiltros ? 'No hay vecinos con esos filtros' : 'Todavía no hay vecinos en el padrón'}
+            accion={hayFiltros ? <Button variant="outline" onClick={() => { setCuenta('todas'); setLote('todos') }}>Quitar filtros</Button> : undefined} />
         ) : vista === 'lote' ? (
           // Con la key, cambiar de vista entra con su animación y un refresco no.
           <div key="lote" className="entra-vista"><VistaPorLote grupos={grupos} fila={(p) => filaVecino(p, false)} /></div>
