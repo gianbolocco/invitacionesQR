@@ -57,15 +57,19 @@ describe('anulación de invitaciones por la guardia', () => {
     expect(log.meta).toEqual({ reason: 'El vecino llamó para cancelar' })
   })
 
-  it('exige un motivo: vacío o demasiado corto no anula', async () => {
-    const ctx = await base()
-    for (const reason of ['', '   ', 'no']) {
+  it('el motivo es opcional: sin motivo igual anula y queda marcada como de la portería', async () => {
+    for (const reason of [undefined, '', '   ']) {
+      await resetDb(); resetRateLimits()
+      const ctx = await base()
       const res = await anular(ctx, reason)
-      expect(res.status).toBe(400)
-      expect(res.body.error).toBe('motivo_requerido')
+      expect(res.status).toBe(200)
+      const [fila] = await db.select().from(invitations).where(eq(invitations.id, ctx.inv.id))
+      expect(fila.revokedAt).not.toBeNull()
+      // '' y no null: null querría decir que no la anuló la portería.
+      expect(fila.revokedReason).toBe('')
+      const det = await request(app).get(`/invitations/${ctx.inv.id}`).set('Cookie', ctx.cv)
+      expect(det.body.revokedReason).toBe('')
     }
-    const [fila] = await db.select().from(invitations).where(eq(invitations.id, ctx.inv.id))
-    expect(fila.revokedAt).toBeNull()
   })
 
   it('no anula con el invitado adentro, igual que cuando anula el vecino', async () => {

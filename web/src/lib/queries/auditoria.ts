@@ -20,7 +20,7 @@ export type AuditRow = {
   exitGuardName: string | null
   /** Algún movimiento se cargó a mano, no se escaneó. */
   manual: boolean
-  /** Por qué la anuló la portería. */
+  /** null = no la anuló la portería. '' = la anuló sin dejar motivo. */
   revokedReason: string | null
 }
 

@@ -54,9 +54,9 @@ gateRoutes.post('/invitations', async (req, res) => {
   }))
 })
 
-/** La portería anula una invitación. El motivo es obligatorio: ver revokeByGuard. */
+/** La portería anula una invitación. El motivo es opcional: ver revokeByGuard. */
 gateRoutes.post('/invitations/:id/revoke', async (req, res) => {
-  const { reason } = z.object({ reason: z.string().max(200) }).parse(req.body)
+  const { reason } = z.object({ reason: z.string().max(200).optional() }).parse(req.body)
   await revokeByGuard(req.params.id, req.person!.id, req.person!.neighborhoodId, reason)
   res.json({ ok: true })
 })

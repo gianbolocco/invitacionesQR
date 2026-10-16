@@ -73,8 +73,10 @@ export default function DetalleInvitacion({ params, searchParams }: {
   return (
     <div className="flex flex-col items-center gap-6">
       {volver}
-      {inv.revokedAt && inv.revokedReason && (
-        <Nota tono="info" className="w-full max-w-sm">Anulada por portería: {inv.revokedReason}</Nota>
+      {inv.revokedAt && inv.revokedReason !== null && (
+        <Nota tono="info" className="w-full max-w-sm">
+          Anulada por portería{inv.revokedReason ? `: ${inv.revokedReason}` : ''}
+        </Nota>
       )}
       {creada === '1' && (
         <Nota tono="exito" className="w-full max-w-sm">Listo. Compartila con {inv.guestName}.</Nota>

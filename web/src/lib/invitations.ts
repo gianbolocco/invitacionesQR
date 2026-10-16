@@ -14,7 +14,7 @@ export type Invitation = {
   capacity: number
   token: string
   revokedAt: string | null
-  /** Por qué la anuló la portería; null si no está anulada o la anuló el vecino. */
+  /** null = no la anuló la portería. '' = la anuló sin dejar motivo. */
   revokedReason: string | null
   createdAt: string
   createdBy: string

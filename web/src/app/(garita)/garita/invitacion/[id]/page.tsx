@@ -405,7 +405,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
       </div>
 
       <AnularInvitacion abierto={anulando} onAbiertoChange={setAnulando} invitacion={inv}
-        onAnulada={() => { toast.success('Invitación anulada. El vecino ve el motivo.'); salir() }} />
+        onAnulada={() => { toast.success('Invitación anulada.'); salir() }} />
 
       <AltaExpres abierto={altaAbierta} disparador={disparadorAlta}
         onAbiertoChange={(v) => { setAltaAbierta(v); if (!v) setLecturaAlta(null) }}

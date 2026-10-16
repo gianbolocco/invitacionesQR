@@ -82,8 +82,9 @@ export const invitations = pgTable('invitation', {
   capacity: integer('capacity').notNull().default(1),
   token: text('token').notNull(),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
-  // Solo la anulación de un guardia lleva motivo: el vecino que anula la suya
-  // no tiene que explicarse. Es lo que el vecino lee después: "anulada por portería".
+  // null = no la anuló la portería (la anuló el vecino, o no está anulada).
+  // Distinto de null = la anuló un guardia; '' es "sin motivo", porque el motivo
+  // es opcional. Es lo que el vecino lee después: "anulada por portería".
   revokedReason: text('revoked_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

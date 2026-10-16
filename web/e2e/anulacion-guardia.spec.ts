@@ -19,13 +19,11 @@ test('el guardia anula una invitación con motivo y el vecino lo ve', async ({ p
 
   await g.getByRole('button', { name: /Anular esta invitación/ }).click()
   const anular = g.getByRole('button', { name: 'Anular invitación', exact: true })
-  // Sin motivo no se puede: es lo que el vecino va a leer.
-  await expect(anular).toBeDisabled()
-  await g.getByLabel('Motivo').fill('abc')
-  await expect(anular).toBeDisabled()
-  await g.getByLabel('Motivo').fill('El vecino llamó para cancelar')
+  // El motivo es opcional: el botón anda sin escribir nada.
+  await expect(anular).toBeEnabled()
+  await g.getByLabel('Motivo (opcional)').fill('El vecino llamó para cancelar')
   await anular.click()
-  await expect(g.getByText('Invitación anulada. El vecino ve el motivo.')).toBeVisible()
+  await expect(g.getByText('Invitación anulada.')).toBeVisible()
 
   // La garita ya no la deja pasar, y el vecino lee por qué.
   await g.goto('/garita')

@@ -71,8 +71,10 @@ export function Tabla({ filas }: { filas: AuditRow[] }) {
                   <td className="px-3 py-3 tabular">{vigenciaCorta(r)}</td>
                   <td className="px-3 py-3">
                     <EstadoTag estado={ESTADO_TAG[r.status]} />
-                    {r.status === 'anulada' && r.revokedReason && (
-                      <span title={r.revokedReason} className="mt-1 block truncate text-xs text-ink-soft">{r.revokedReason}</span>
+                    {r.status === 'anulada' && r.revokedReason !== null && (
+                      <span title={r.revokedReason} className="mt-1 block truncate text-xs text-ink-soft">
+                        {r.revokedReason || 'Por portería'}
+                      </span>
                     )}
                   </td>
                   <td className="px-3 py-3">

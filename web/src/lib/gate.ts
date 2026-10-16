@@ -124,10 +124,7 @@ export function mensajeCargaManual(error: unknown): string {
   } as Record<string, string>)[codigo] ?? 'No se pudo guardar. No se cargó nada: probá de nuevo.'
 }
 
-/** Mismo mínimo que MOTIVO_MIN en la API. */
-export const MOTIVO_ANULACION_MIN = 5
-
-export const anularPorPorteria = (datos: { id: string; reason: string }) =>
+export const anularPorPorteria = (datos: { id: string; reason?: string }) =>
   api<{ ok: true }>(`/gate/invitations/${datos.id}/revoke`, { method: 'POST', body: JSON.stringify({ reason: datos.reason }) })
 
 export function mensajeAnulacion(error: unknown): string {
@@ -135,6 +132,5 @@ export function mensajeAnulacion(error: unknown): string {
   return ({
     guest_inside: 'No se puede anular: esa persona está adentro. Primero registrá su salida.',
     already_revoked: 'Esa invitación ya estaba anulada.',
-    motivo_requerido: 'Escribí el motivo de la anulación.',
   } as Record<string, string>)[codigo] ?? 'No se pudo anular. Probá de nuevo.'
 }

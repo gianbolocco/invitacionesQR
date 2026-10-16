@@ -14,7 +14,7 @@ test('el guardia carga a mano un movimiento y la auditoría lo marca', async ({ 
   const g = await guardia.newPage()
   await entrar(g, 'guardia')
 
-  await g.getByRole('link', { name: 'Cargar movimientos' }).click()
+  await g.getByRole('link', { name: /Cargar movimientos/ }).click()
   await expect(g).toHaveURL(/\/garita\/cargar$/)
 
   await g.getByLabel('Buscar invitado').fill(nombre)

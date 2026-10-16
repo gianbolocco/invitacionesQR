@@ -51,8 +51,8 @@ export function Tarjetas({ filas }: { filas: AuditRow[] }) {
               <EstadoTag estado={ESTADO_TAG[r.status]} />
             </div>
 
-            {r.status === 'anulada' && r.revokedReason && (
-              <p className="text-[13px] text-ink-soft">Anulada por portería: {r.revokedReason}</p>
+            {r.status === 'anulada' && r.revokedReason !== null && (
+              <p className="text-[13px] text-ink-soft">Anulada por portería{r.revokedReason ? `: ${r.revokedReason}` : ''}</p>
             )}
 
             <dl className="grid grid-cols-3 gap-3 border-t border-line pt-3">
