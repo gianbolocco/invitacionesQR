@@ -16,6 +16,8 @@ import { SelectorVista, type OpcionVista } from '@/components/dominio/selector-v
 import { Chips } from '@/components/dominio/chips'
 import { HojaFiltros } from '@/components/dominio/hoja-filtros'
 import { VistaPorLote } from '@/components/admin/vista-por-lote'
+import { TablaVecinos } from '@/components/admin/tabla-vecinos'
+import { useMedia } from '@/lib/use-media'
 import { SheetAlta } from '@/components/admin/sheet-alta'
 import { MenuFila, type AccionFila } from '@/components/admin/menu-fila'
 import { ImportarVecinos } from '@/components/admin/importar-vecinos'
@@ -164,6 +166,8 @@ export default function VecinosPage() {
   const reenviar = useReenviarInvitacion()
   const reactivar = useReactivarPersona()
   const [busqueda, setBusqueda] = useState('')
+  // La tabla solo entra en pantallas anchas; en el celular, filas con menú.
+  const ancho = useMedia('(min-width: 768px)')
   const [cuenta, setCuenta] = useState<FiltroCuenta>('todas')
   const [lote, setLote] = useState<FiltroLote>('todos')
   const [altaAbierta, setAltaAbierta] = useState(false)
@@ -184,8 +188,8 @@ export default function VecinosPage() {
   function accionesDe(p: Person): AccionFila[] {
     const acciones: AccionFila[] = []
     if (p.status === 'invited') acciones.push(
-      { etiqueta: 'Reenviar invitación', onClick: () => reenviar.mutate(p), deshabilitada: reenviar.isPending },
-      { etiqueta: 'Copiar link de alta', onClick: () => copiarLinkDeAlta(p) },
+      { etiqueta: 'Reenviar invitación', corta: 'Reenviar', onClick: () => reenviar.mutate(p), deshabilitada: reenviar.isPending },
+      { etiqueta: 'Copiar link de alta', corta: 'Copiar link', onClick: () => copiarLinkDeAlta(p) },
     )
     acciones.push({ etiqueta: 'Cambiar lote', onClick: (btn) => { setDisparador(btn); setCorrigiendo(p) } })
     if (p.status === 'disabled') acciones.push({ etiqueta: 'Reactivar', onClick: () => reactivar.mutate(p) })
@@ -205,8 +209,7 @@ export default function VecinosPage() {
           ESTADO[p.status],
           p.lastLoginAt ? `Último acceso ${fechaConAnio(p.lastLoginAt)}` : 'Sin ingresos',
         ].filter(Boolean).join(' · ')}
-        // En la lista hay lugar: las acciones a la vista. En las tarjetas de lote, el menú.
-        extremo={<MenuFila acciones={accionesDe(p)} visibles={conLote} />}
+        extremo={<MenuFila acciones={accionesDe(p)} />}
         className={p.status === 'disabled' ? 'opacity-50' : undefined} />
     )
   }
@@ -240,7 +243,7 @@ export default function VecinosPage() {
           </div>
         </div>
 
-        <HojaFiltros activos={(cuenta !== 'todas' ? 1 : 0) + (lote !== 'todos' ? 1 : 0)}
+        <HojaFiltros className="flex-row flex-wrap items-center gap-x-6 gap-y-2" activos={(cuenta !== 'todas' ? 1 : 0) + (lote !== 'todos' ? 1 : 0)}
           resultados={personas.data ? filtrados.length : undefined}
           onLimpiar={() => { setCuenta('todas'); setLote('todos') }}>
           <Chips etiqueta="Estado de la cuenta" valor={cuenta} onCambio={setCuenta} opciones={[
@@ -269,7 +272,9 @@ export default function VecinosPage() {
           <div key="lote" className="entra-vista"><VistaPorLote grupos={grupos} fila={(p) => filaVecino(p, false)} /></div>
         ) : (
           <div key="lista" className="entra-vista">
-            {filtrados.map((p) => filaVecino(p, true))}
+            {ancho
+              ? <TablaVecinos vecinos={filtrados} acciones={accionesDe} />
+              : filtrados.map((p) => filaVecino(p, true))}
           </div>
         )}
       </div>

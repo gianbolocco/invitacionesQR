@@ -4,6 +4,7 @@ import { SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useMedia } from '@/lib/use-media'
+import { cn } from '@/lib/utils'
 
 /**
  * Los filtros de una pantalla. En escritorio van a la vista, tal cual. En el
@@ -12,18 +13,20 @@ import { useMedia } from '@/lib/use-media'
  * se comían media altura, y en una fila que se desliza quedaban cortados.
  * Se monta UNA de las dos formas, no las dos: los campos llevan ids.
  */
-export function HojaFiltros({ activos, resultados, onLimpiar, children }: {
+export function HojaFiltros({ activos, resultados, onLimpiar, className, children }: {
   /** Cuántos filtros hay puestos, para el botón. */
   activos: number
   /** Cuántos resultados dan, para el botón de cerrar la hoja. */
   resultados?: number
   onLimpiar: () => void
+  /** Cómo se acomodan los filtros en escritorio (por defecto, uno debajo del otro). */
+  className?: string
   children: ReactNode
 }) {
   const escritorio = useMedia('(min-width: 640px)')
   const [abierta, setAbierta] = useState(false)
 
-  if (escritorio) return <div className="flex flex-col gap-4">{children}</div>
+  if (escritorio) return <div className={cn('flex flex-col gap-4', className)}>{children}</div>
 
   return (
     <Sheet open={abierta} onOpenChange={setAbierta}>

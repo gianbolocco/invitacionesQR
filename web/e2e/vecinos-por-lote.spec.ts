@@ -27,14 +27,14 @@ test('el admin filtra el padrón por cuenta sin activar y por sin lote', async (
   await abrir()
   await page.getByRole('button', { name: /^Sin activar/ }).click()
   await cerrar()
-  await expect(page.getByText(/Invitado, todavía no entró/).first()).toBeVisible()
+  await expect(page.getByText(/Invitado/).first()).toBeVisible()
   // Los que ya tienen cuenta no figuran.
-  await expect(page.getByText(/ · Activo · /)).toHaveCount(0)
+  await expect(page.getByText(/Activo/)).toHaveCount(0)
 
   await abrir()
   await page.getByRole('button', { name: /^Sin lote/ }).click()
   await cerrar()
-  await expect(page.getByText(/Lote \d+ · /)).toHaveCount(0)
+  await expect(page.getByText(/Lote \d+/)).toHaveCount(0)
 
   await abrir()
   // El contador va pegado a la etiqueta ("Todos12"), sin espacio en el nombre accesible.
