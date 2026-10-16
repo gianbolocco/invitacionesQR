@@ -1,13 +1,17 @@
 'use client'
 import { useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { Building2, List, Search, X } from 'lucide-react'
 import {
-  usePersonas, useAltaVecino, useReenviarInvitacion, useReactivarPersona,
+  usePersonas, useUnidades, useAltaVecino, useReenviarInvitacion, useReactivarPersona,
   useDeshabilitarPersona, useCambiarLote, copiarLinkDeAlta, ApiError,
 } from '@/lib/queries/admin'
 import { ESTADO, normalizarBusqueda, type Person } from '@/lib/admin'
 import { fechaConAnio } from '@/lib/fechas'
+import { agruparPorLote } from '@/lib/lotes'
+import { usePreferencia } from '@/lib/use-preferencia'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
+import { SelectorVista, type OpcionVista } from '@/components/dominio/selector-vista'
+import { VistaPorLote } from '@/components/admin/vista-por-lote'
 import { SheetAlta } from '@/components/admin/sheet-alta'
 import { MenuFila, type AccionFila } from '@/components/admin/menu-fila'
 import { ImportarVecinos } from '@/components/admin/importar-vecinos'
@@ -141,8 +145,18 @@ function DialogBaja({ persona, disparador, onCerrar }: {
   )
 }
 
+type Vista = 'lista' | 'lote'
+
+const VISTAS: OpcionVista<Vista>[] = [
+  { valor: 'lista', etiqueta: 'Lista', icono: List },
+  { valor: 'lote', etiqueta: 'Por lote', icono: Building2 },
+]
+
 export default function VecinosPage() {
   const personas = usePersonas()
+  const unidades = useUnidades()
+  const [guardada, guardar] = usePreferencia<Vista>('visitpass.admin.vecinos.vista')
+  const vista: Vista = guardada ?? 'lista'
   const reenviar = useReenviarInvitacion()
   const reactivar = useReactivarPersona()
   const [busqueda, setBusqueda] = useState('')
@@ -174,6 +188,22 @@ export default function VecinosPage() {
     return acciones
   }
 
+  /** Una fila del padrón. En la vista por lote el lote ya es el título del grupo: no se repite. */
+  function filaVecino(p: Person, conLote: boolean) {
+    return (
+      <Fila key={p.id} titulo={<>{p.name}{p.role === 'admin' && <span className="ml-2 text-xs font-normal text-ink-soft">Admin</span>}</>}
+        meta={[
+          conLote ? (p.units.map((u) => u.label).join(' · ') || 'Sin lote asignar') : null,
+          ESTADO[p.status],
+          p.lastLoginAt ? `Último acceso ${fechaConAnio(p.lastLoginAt)}` : 'Sin ingresos',
+        ].filter(Boolean).join(' · ')}
+        extremo={<MenuFila acciones={accionesDe(p)} />}
+        className={p.status === 'disabled' ? 'opacity-50' : undefined} />
+    )
+  }
+
+  const grupos = agruparPorLote(filtrados, unidades.data ?? [], !consulta)
+
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -195,27 +225,24 @@ export default function VecinosPage() {
             )}
           </div>
           <ImportarVecinos onImported={() => personas.refetch()} />
+          <div className="sm:ml-auto">
+            <SelectorVista etiqueta="Vista del padrón" opciones={VISTAS} valor={vista} onCambio={guardar} />
+          </div>
         </div>
 
         {personas.isPending ? (
           <SkeletonFilas filas={5} />
         ) : personas.isError ? (
           <ErrorConReintento onReintentar={() => personas.refetch()} reintentando={personas.isFetching} />
-        ) : filtrados.length === 0 ? (
+        ) : filtrados.length === 0 && (vista === 'lista' || grupos.length === 0) ? (
           <Vacio icono={Search}
             titulo={consulta ? 'No encontramos vecinos con ese nombre o lote' : 'Todavía no hay vecinos en el padrón'} />
+        ) : vista === 'lote' ? (
+          // Con la key, cambiar de vista entra con su animación y un refresco no.
+          <div key="lote" className="entra-vista"><VistaPorLote grupos={grupos} fila={(p) => filaVecino(p, false)} /></div>
         ) : (
-          <div>
-            {filtrados.map((p) => (
-              <Fila key={p.id} titulo={<>{p.name}{p.role === 'admin' && <span className="ml-2 text-xs font-normal text-ink-soft">Admin</span>}</>}
-                meta={[
-                  p.units.map((u) => u.label).join(' · ') || 'Sin lote asignar',
-                  ESTADO[p.status],
-                  p.lastLoginAt ? `Último acceso ${fechaConAnio(p.lastLoginAt)}` : 'Sin ingresos',
-                ].join(' · ')}
-                extremo={<MenuFila acciones={accionesDe(p)} />}
-                className={p.status === 'disabled' ? 'opacity-50' : undefined} />
-            ))}
+          <div key="lista" className="entra-vista">
+            {filtrados.map((p) => filaVecino(p, true))}
           </div>
         )}
       </div>

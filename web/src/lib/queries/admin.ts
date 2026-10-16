@@ -170,15 +170,6 @@ export function useCambiarContrasenaGuardia() {
   })
 }
 
-export function useAltaUnidad() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (lot: number) => api<Unit>('/admin/units', { method: 'POST', body: JSON.stringify({ lot }) }),
-    onError: () => toast.error('No se pudo crear. Puede que ese lote ya esté cargado.'),
-    onSettled: () => qc.invalidateQueries({ queryKey: claves.unidades }),
-  })
-}
-
 export type Barrio = {
   id: string
   name: string

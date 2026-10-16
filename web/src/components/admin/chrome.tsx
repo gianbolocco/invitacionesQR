@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  ArrowLeft, Building2, ClipboardList, LayoutDashboard, LogOut, MoreHorizontal, Palette, ShieldCheck, Users,
+  ArrowLeft, ClipboardList, LayoutDashboard, LogOut, MoreHorizontal, Palette, ShieldCheck, Users,
 } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { logout } from '@/lib/session'
@@ -17,16 +17,15 @@ const PILLS = [
   { href: '/admin', etiqueta: 'Tablero' },
   { href: '/admin/vecinos', etiqueta: 'Vecinos' },
   { href: '/admin/guardias', etiqueta: 'Guardias' },
-  { href: '/admin/unidades', etiqueta: 'Unidades' },
   { href: '/admin/barrio', etiqueta: 'Barrio' },
   { href: '/auditoria', etiqueta: 'Auditoría' },
 ]
 
 /**
  * El marco del admin: banda del barrio y navegación. En escritorio, los
- * seis destinos como pills en la banda — sobra lugar. En mobile, los
- * cuatro de uso diario van en la barra inferior; Unidades y Barrio son
- * tareas de configuración, no de todos los días, y quedan detrás de "Más".
+ * cinco destinos como pills en la banda — sobra lugar. En mobile, los
+ * cuatro de uso diario van en la barra inferior; Barrio es una tarea de
+ * configuración, no de todos los días, y queda detrás de "Más".
  */
 export function ChromeAdmin({ children }: { children: React.ReactNode }) {
   const me = useSesion()
@@ -89,10 +88,6 @@ export function ChromeAdmin({ children }: { children: React.ReactNode }) {
         <SheetContent side="bottom" className="rounded-t-xl">
           <SheetHeader><SheetTitle>Más</SheetTitle></SheetHeader>
           <nav className="flex flex-col gap-1 px-4 pb-8">
-            <Link href="/admin/unidades" onClick={() => setMasAbierto(false)}
-              className="flex min-h-14 items-center gap-3 rounded-md px-3 text-base font-semibold hover:bg-surface-sunk">
-              <Building2 className="size-5 text-ink-soft" aria-hidden />Unidades
-            </Link>
             <Link href="/admin/barrio" onClick={() => setMasAbierto(false)}
               className="flex min-h-14 items-center gap-3 rounded-md px-3 text-base font-semibold hover:bg-surface-sunk">
               <Palette className="size-5 text-ink-soft" aria-hidden />Barrio
