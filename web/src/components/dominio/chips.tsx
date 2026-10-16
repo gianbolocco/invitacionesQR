@@ -14,7 +14,7 @@ function Pastilla({ activa, children, onClick, grupo }: {
   return (
     <button type="button" onClick={onClick} aria-pressed={activa}
       className={cn(
-        'relative inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold',
+        'relative inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold',
         'transition-colors duration-150',
         activa ? 'text-sobre-marca' : 'text-ink-soft hover:text-ink',
       )}>
@@ -34,15 +34,19 @@ function Pastilla({ activa, children, onClick, grupo }: {
  * Selector de una opción en pastillas. Uno solo para filtros, tipo de
  * invitación y estados: antes había cuatro copias con estilos distintos.
  */
-export function Chips<T extends string>({ opciones, valor, onCambio, etiqueta }: {
+export function Chips<T extends string>({ opciones, valor, onCambio, etiqueta, desplaza }: {
   opciones: Opcion<T>[]
   valor: T
   onCambio: (v: T) => void
   etiqueta: string
+  /** En el celular, una sola fila que se desliza en vez de varias que se apilan. */
+  desplaza?: boolean
 }) {
   const grupo = useId()
   return (
-    <div role="group" aria-label={etiqueta} className="flex flex-wrap gap-1.5">
+    <div role="group" aria-label={etiqueta}
+      className={cn('flex flex-wrap gap-1.5', desplaza &&
+        'max-sm:-mx-4 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-4 max-sm:[scrollbar-width:none]')}>
       {opciones.map((o) => (
         <Pastilla key={o.valor} grupo={grupo} activa={o.valor === valor} onClick={() => onCambio(o.valor)}>
           {o.etiqueta}

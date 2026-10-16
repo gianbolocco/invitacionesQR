@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "e2e": "playwright test",
-    "check": "node src/lib/fechas.check.ts && node src/lib/estado-invitacion.check.ts && node src/lib/ultimos-movimientos.check.ts && node src/lib/lectora.check.ts && node scripts/colores.check.mjs"
+    "check": "node src/lib/fechas.check.ts && node src/lib/estado-invitacion.check.ts && node src/lib/ultimos-movimientos.check.ts && node src/lib/lectora.check.ts && node src/lib/tablero.check.ts && node scripts/colores.check.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",

@@ -1,89 +1,42 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
-import { CalendarX, CheckCheck, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Building2, CalendarX, ChevronLeft, ChevronRight, Columns3, List, SearchX, Table2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
 import { Chips } from '@/components/dominio/chips'
-import { Fila } from '@/components/dominio/fila'
-import { EstadoTag, type Estado } from '@/components/dominio/estado-tag'
+import { SelectorVista, type OpcionVista } from '@/components/dominio/selector-vista'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { Vacio } from '@/components/dominio/vacio'
-import { hoyISO, sumarDias, tituloDia, hora, horaODia } from '@/lib/fechas'
-import { useAgenda, useAdentro, type AgendaRow } from '@/lib/queries/garita'
-import { estadoEnAgenda } from '@/lib/estado-invitacion'
-import { quienInvita } from '@/lib/invitations'
+import { hoyISO, sumarDias, tituloDia } from '@/lib/fechas'
+import { useAgenda, useAdentro } from '@/lib/queries/garita'
+import {
+  armarColumnas, filtrarPorTipo, type Columnas, type FiltroEstado, type FiltroTipo,
+} from '@/lib/tablero'
+import { useMedia } from '@/lib/use-media'
+import { usePreferencia } from '@/lib/use-preferencia'
+import { Tablero } from './vistas/tablero'
+import { Lista } from './vistas/lista'
+import { Compacta } from './vistas/compacta'
+import { PorUnidad } from './vistas/por-unidad'
 
-type Filtro = 'todos' | 'pendientes' | 'adentro'
+type Vista = 'tablero' | 'lista' | 'compacta' | 'unidad'
 
-function filaDe(r: AgendaRow, onAbrir: (id: string) => void) {
-  const estado: Estado = estadoEnAgenda(r, hoyISO())
-  const detalle = estado === 'adentro'
-    // Si entró otro día, la hora sola engaña: lleva la fecha.
-    ? (r.lastEntryAt ? horaODia(r.lastEntryAt, hoyISO()) : undefined)
-    : estado === 'salio'
-      ? (r.lastExitAt ? hora(r.lastExitAt) : undefined)
-      : undefined
-  const meta = [
-    r.unitLabel,
-    quienInvita(r.inviterName),
-    r.plate,
-    r.capacity > 1 && r.enteredCount > 1 ? `${r.enteredCount} ingresos hoy` : null,
-  ].filter(Boolean).join(' · ')
-
-  return (
-    <Fila key={r.id} titulo={r.guestName} meta={meta} onClick={() => onAbrir(r.id)}
-      extremo={<EstadoTag estado={estado} detalle={detalle} />} />
-  )
-}
+const VACIAS: Columnas = { porLlegar: [], adentro: [], seFueron: [], vencidas: [] }
 
 /**
- * Una lista de la agenda. La que llega con el refresco entra abriéndose y con
- * un destello, para que el guardia note a quién acaban de invitar; la carga
- * inicial no anima (initial={false}), así no baila toda la lista al entrar.
- * El que cambia de sección (llegó: de Pendientes a Ya entraron) entra igual.
- */
-function Lista({ filas, onAbrir, className }: {
-  filas: AgendaRow[]
-  onAbrir: (id: string) => void
-  className?: string
-}) {
-  return (
-    <div className={className}>
-      <AnimatePresence initial={false}>
-        {filas.map((r) => (
-          // Variantes y no initial/animate sueltos: así el initial={false} de
-          // AnimatePresence también apaga el destello en la carga inicial.
-          // -mx-2 px-2: la fila se sale 8 px para su fondo al pasar el mouse, y el
-          // overflow-hidden de la animación se lo recortaba.
-          <motion.div key={r.id} layout className="relative -mx-2 overflow-hidden px-2"
-            initial="nueva" animate="lista" exit="sale" variants={{
-              nueva: { opacity: 0, height: 0 },
-              lista: { opacity: 1, height: 'auto', transition: { duration: 0.3 } },
-              sale: { opacity: 0, height: 0, transition: { duration: 0.2 } },
-            }}>
-            <motion.span aria-hidden className="pointer-events-none absolute inset-0 rounded-md bg-marca-suave"
-              variants={{ nueva: { opacity: 1 }, lista: { opacity: 0, transition: { duration: 1.6, delay: 0.3 } } }} />
-            <div className="relative">{filaDe(r, onAbrir)}</div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-/**
- * La agenda del día, en el panel en reposo de la garita.
+ * La agenda del día, en el panel en reposo de la garita, con cuatro formas de
+ * mirarla: tablero (solo escritorio ancho), lista, tabla compacta y por
+ * unidad. La elegida se acuerda entre turnos.
  *
- * La división principal es esperando / ya entraron, no alfabética: es la
- * pregunta que el guardia tiene a las 21, ¿quién falta? Los frecuentes van
- * aparte y colapsados, porque aparecen todos los días y el guardia deja de
- * leerlos.
+ * La división principal es por dónde está cada persona —por llegar, adentro,
+ * se fueron—, no alfabética: es la pregunta que el guardia tiene a las 21,
+ * ¿quién falta? Los frecuentes no van aparte: son gente que viene, y se
+ * distinguen con un tag.
  *
  * "Adentro" no sale de la agenda: la agenda es quién puede entrar ESE día, y
  * adentro es quién está en el barrio ahora, aunque haya entrado ayer con una
- * invitación de ayer. Por eso es otra consulta, y solo existe mirando hoy.
+ * invitación de ayer. Por eso es otra consulta, y solo se mezcla mirando hoy.
  */
 export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   /*
@@ -100,19 +53,39 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const [elegida, setElegida] = useState<string | null>(null)
   const fecha = elegida ?? hoy
   const setFecha = (f: string) => setElegida(f === hoy ? null : f)
-  const [filtro, setFiltro] = useState<Filtro>('todos')
-  const [verFrecuentes, setVerFrecuentes] = useState(false)
   const esHoy = fecha === hoy
-  const vista: Filtro = esHoy ? filtro : 'todos'
+
+  const [tipo, setTipo] = useState<FiltroTipo>('todos')
+  const [estado, setEstado] = useState<FiltroEstado>('todos')
+
+  const ancho = useMedia('(min-width: 1280px)')
+  const medio = useMedia('(min-width: 768px)')
+  const [guardada, guardar] = usePreferencia<Vista>('visitpass.garita.vista')
+  const disponible: Record<Vista, boolean> = { tablero: ancho, lista: true, compacta: medio, unidad: true }
+  const preferida: Vista = guardada ?? (ancho ? 'tablero' : 'lista')
+  // Una vista guardada que esta pantalla no puede mostrar (el tablero en un celular) cae a la lista.
+  const vista: Vista = disponible[preferida] ? preferida : 'lista'
+
   const q = useAgenda(fecha)
   const adentro = useAdentro(esHoy)
 
-  const todas = q.data ?? []
-  const frecuentes = todas.filter((r) => r.kind === 'frecuente')
-  const personas = todas.filter((r) => r.kind !== 'frecuente')
-  const esperando = personas.filter((r) => estadoEnAgenda(r, hoy) === 'esperando')
-  const vencidas = personas.filter((r) => estadoEnAgenda(r, hoy) === 'vencida')
-  const entraron = personas.filter((r) => r.adentro || r.enteredCount > 0)
+  const columnas = useMemo(() => armarColumnas(
+    filtrarPorTipo(q.data ?? [], tipo),
+    esHoy && adentro.data ? filtrarPorTipo(adentro.data, tipo) : null,
+    hoy,
+  ), [q.data, adentro.data, tipo, esHoy, hoy])
+
+  const total = columnas.porLlegar.length + columnas.adentro.length + columnas.seFueron.length + columnas.vencidas.length
+  // El filtro de estado no existe en el tablero: ahí los tres estados ya son las columnas.
+  const visibles: Columnas = vista === 'tablero' || estado === 'todos' ? columnas : { ...VACIAS, [estado]: columnas[estado] }
+  const planas = [...visibles.adentro, ...visibles.porLlegar, ...visibles.seFueron, ...visibles.vencidas]
+
+  const opciones: OpcionVista<Vista>[] = [
+    { valor: 'tablero', etiqueta: 'Tablero', icono: Columns3, disponible: ancho },
+    { valor: 'lista', etiqueta: 'Lista', icono: List },
+    { valor: 'compacta', etiqueta: 'Compacta', icono: Table2, disponible: medio },
+    { valor: 'unidad', etiqueta: 'Por unidad', icono: Building2 },
+  ]
 
   return (
     <div className="flex flex-col gap-5">
@@ -127,76 +100,50 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
           <ChevronRight aria-hidden />
         </Button>
         <CampoFecha id="agenda-fecha" valor={fecha} onCambio={setFecha} className="w-44" />
+        <div className="ml-auto">
+          <SelectorVista etiqueta="Vista de la agenda" opciones={opciones} valor={vista} onCambio={guardar} />
+        </div>
       </div>
 
       <h2 className="font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha, hoy)}</h2>
 
-      {esHoy && (
-        <Chips etiqueta="Filtrar la agenda" valor={filtro} onCambio={setFiltro} opciones={[
+      <div className="flex flex-col gap-2">
+        <Chips desplaza etiqueta="Tipo de invitación" valor={tipo} onCambio={setTipo} opciones={[
           { valor: 'todos', etiqueta: 'Todos' },
-          { valor: 'pendientes', etiqueta: 'Pendientes', contador: q.data ? esperando.length : undefined },
-          { valor: 'adentro', etiqueta: 'Adentro', contador: adentro.data?.length },
+          { valor: 'visita', etiqueta: 'Visitas' },
+          { valor: 'frecuente', etiqueta: 'Frecuentes' },
+          { valor: 'proveedor', etiqueta: 'Proveedores' },
         ]} />
-      )}
+        {vista !== 'tablero' && (
+          <Chips desplaza etiqueta="Estado" valor={estado} onCambio={setEstado} opciones={[
+            { valor: 'todos', etiqueta: 'Todos', contador: q.data ? total : undefined },
+            { valor: 'porLlegar', etiqueta: 'Por llegar', contador: q.data ? columnas.porLlegar.length : undefined },
+            { valor: 'adentro', etiqueta: 'Adentro', contador: q.data ? columnas.adentro.length : undefined },
+            { valor: 'seFueron', etiqueta: 'Se fueron', contador: q.data ? columnas.seFueron.length : undefined },
+          ]} />
+        )}
+      </div>
 
-      {vista === 'adentro' ? (
-        adentro.isPending ? (
-          <SkeletonFilas filas={4} />
-        ) : adentro.isError ? (
-          <ErrorConReintento onReintentar={() => adentro.refetch()} reintentando={adentro.isFetching} />
-        ) : adentro.data.length === 0 ? (
-          <Vacio icono={DoorOpen} titulo="No hay nadie adentro" />
-        ) : (
-          <Lista filas={adentro.data} onAbrir={onAbrir} />
-        )
-      ) : q.isPending ? (
+      {guardada === undefined || q.isPending ? (
         <SkeletonFilas filas={4} />
       ) : q.isError ? (
         <ErrorConReintento onReintentar={() => q.refetch()} reintentando={q.isFetching} />
-      ) : vista === 'pendientes' ? (
-        esperando.length === 0 ? (
-          <Vacio icono={CheckCheck} titulo="No falta llegar nadie" />
-        ) : (
-          <Lista key={fecha} filas={esperando} onAbrir={onAbrir} />
-        )
-      ) : todas.length === 0 ? (
-        <Vacio icono={CalendarX} titulo="Nadie tiene autorización para este día" />
+      ) : total === 0 ? (
+        tipo === 'todos'
+          ? <Vacio icono={CalendarX} titulo="Nadie tiene autorización para este día" />
+          : <Vacio icono={SearchX} titulo="Ninguna invitación de ese tipo"
+              accion={<Button variant="outline" onClick={() => setTipo('todos')}>Ver todos</Button>} />
+      ) : vista !== 'tablero' && planas.length === 0 ? (
+        <Vacio icono={SearchX} titulo="Nadie en ese estado"
+          accion={<Button variant="outline" onClick={() => setEstado('todos')}>Ver todos</Button>} />
       ) : (
-        <>
-          {esperando.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
-                Pendientes ({esperando.length})
-              </p>
-              <Lista key={fecha} filas={esperando} onAbrir={onAbrir} />
-            </section>
-          )}
-          {entraron.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
-                Ya entraron ({entraron.length})
-              </p>
-              <Lista key={fecha} filas={entraron} onAbrir={onAbrir} className="opacity-70" />
-            </section>
-          )}
-          {vencidas.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
-                Vencidas ({vencidas.length})
-              </p>
-              <Lista key={fecha} filas={vencidas} onAbrir={onAbrir} className="opacity-70" />
-            </section>
-          )}
-          {frecuentes.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <Button variant="ghost" size="sm" className="self-start"
-                onClick={() => setVerFrecuentes((v) => !v)}>
-                {verFrecuentes ? 'Ocultar' : 'Mostrar'} frecuentes habilitados ({frecuentes.length})
-              </Button>
-              {verFrecuentes && <Lista key={fecha} filas={frecuentes} onAbrir={onAbrir} />}
-            </section>
-          )}
-        </>
+        // La key hace que el cambio de vista o de día entre con su animación, y el refresco no.
+        <div key={`${vista}-${fecha}`} className="entra-vista">
+          {vista === 'tablero' && <Tablero columnas={columnas} hoy={hoy} onAbrir={onAbrir} />}
+          {vista === 'lista' && <Lista columnas={visibles} hoy={hoy} onAbrir={onAbrir} />}
+          {vista === 'compacta' && <Compacta filas={planas} hoy={hoy} onAbrir={onAbrir} />}
+          {vista === 'unidad' && <PorUnidad filas={planas} hoy={hoy} onAbrir={onAbrir} />}
+        </div>
       )}
     </div>
   )

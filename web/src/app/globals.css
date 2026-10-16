@@ -41,6 +41,13 @@
   --shadow-flotante: 0 18px 40px -16px rgb(20 19 15 / 0.35);
 
   --ease-salida: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Entradas y cambios de vista: arranca rápido y se asienta. Los built-in
+     de CSS (ease, ease-in-out) son demasiado blandos para una UI de trabajo. */
+  --ease-entrada: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-vista: cubic-bezier(0.77, 0, 0.175, 1);
+
+  --shadow-tarjeta: 0 1px 2px rgb(20 19 15 / 0.06), 0 6px 14px -10px rgb(20 19 15 / 0.28);
+  --shadow-tarjeta-alta: 0 2px 4px rgb(20 19 15 / 0.07), 0 14px 24px -14px rgb(20 19 15 / 0.38);
 
   --animate-brillo: brillo 1.6s ease-in-out infinite;
   @keyframes brillo {
@@ -189,6 +196,40 @@ input, select, textarea { font-size: 16px; }
 .titulo-display em { font-style: normal; color: var(--marca); }
 
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* Lo que el navegador dibuja por su cuenta, con la marca: la selección y el
+   cursor de los campos, y scrollbars finas que no pelean con el diseño. */
+::selection { background: color-mix(in oklab, var(--marca) 28%, transparent); color: var(--ink); }
+input, textarea { caret-color: var(--marca); }
+/* Los buscadores traen su propia X de borrar (WebKit); varios dibujan la suya. */
+input[type='search']::-webkit-search-cancel-button { display: none; }
+* { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--ink) 22%, transparent) transparent; }
+
+/* Los títulos no dejan una palabra sola en la última línea. */
+h1, h2, h3 { text-wrap: balance; }
+
+/* Presionar se siente: un botón o una fila que cede apenas bajo el dedo.
+   Solo escala (barato) y solo con el cursor encima en pantallas con hover real. */
+button:not(:disabled), [role='button'], a.presionable {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-entrada);
+}
+button:not(:disabled):active, a.presionable:active { transform: scale(0.98); }
+
+/* Una tarjeta del tablero o de las vistas: sube un pelo al pasar el mouse. */
+@media (hover: hover) and (pointer: fine) {
+  .tarjeta-viva { transition: transform 180ms var(--ease-entrada), box-shadow 180ms var(--ease-entrada); }
+  .tarjeta-viva:hover { transform: translateY(-1px); box-shadow: var(--shadow-tarjeta-alta); }
+}
+.tarjeta-viva:active { transform: scale(0.99); }
+
+/* Cambio de vista: el contenido nuevo entra desde apenas abajo. */
+@keyframes entra-vista {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.entra-vista { animation: entra-vista 240ms var(--ease-entrada) both; }
 
 /* Skeleton con brillo que recorre: se lee como "está llegando", no como un
    bloque gris roto. */

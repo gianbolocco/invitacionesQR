@@ -32,7 +32,7 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
       <header className="sticky top-0 z-30 bg-marca text-sobre-marca">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link href="/garita" aria-label="Inicio" className="min-w-0"><Marca variante="banda" /></Link>
 
           <nav aria-label="Secciones" className="hidden items-center gap-1 sm:flex">
@@ -62,7 +62,7 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
 
       <BarraSeccion items={items} central={
         <Link href="/garita/escanear" aria-label="Escanear QR"
