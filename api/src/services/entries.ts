@@ -430,6 +430,9 @@ export type AuditFilters = {
   to?: string
   unitId?: string
   status?: AuditStatus
+  kind?: 'visita' | 'frecuente' | 'proveedor'
+  /** Texto libre: nombre, documento, patente, unidad o quién invita. */
+  q?: string
   page?: number
   pageSize?: number
 }
@@ -479,6 +482,35 @@ export function auditAll(neighborhoodId: string, f: AuditFilters): Promise<Audit
   return auditRows(neighborhoodId, f, 5000, 0)
 }
 
+
+/**
+ * Los filtros que comparten las filas y los contadores: con paginación, un
+ * contador que no mira la búsqueda mostraría números de otra lista.
+ * El estado NO entra acá: los contadores cuentan todos los estados a la vez.
+ */
+function filtrosAuditoria(neighborhoodId: string, f: AuditFilters) {
+  const q = f.q?.trim() ?? ''
+  // % y _ son comodines de LIKE: se escapan para que "Lote_1" busque ese texto.
+  const patron = q ? `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null
+  // El documento se guarda como lo escribió quien invitó ("30.123.456"): se
+  // compara solo por dígitos, y solo si lo buscado tiene alguno.
+  const digitos = q.replace(/\D/g, '')
+  const patronDoc = digitos ? `%${digitos}%` : null
+  return sql`
+    u.neighborhood_id = ${neighborhoodId}
+    and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
+    and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
+    and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+    and (${f.kind ?? null}::text is null or i.kind = ${f.kind ?? null}::text)
+    and (${patron}::text is null
+      or i.guest_name ilike ${patron}::text
+      or i.plate ilike ${patron}::text
+      or u.label ilike ${patron}::text
+      or p.name ilike ${patron}::text
+      or regexp_replace(coalesce(i.guest_doc, ''), '\\D', '', 'g') like ${patronDoc}::text)
+  `
+}
+
 async function auditCounts(
   neighborhoodId: string,
   f: AuditFilters,
@@ -501,11 +533,9 @@ async function auditCounts(
       end as status
       from invitation i
       join unit u on u.id = i.unit_id
+      join person p on p.id = i.created_by
       left join uso on uso.invitation_id = i.id
-      where u.neighborhood_id = ${neighborhoodId}
-        and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
-        and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
-        and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+      where ${filtrosAuditoria(neighborhoodId, f)}
     )
     select
       count(*) filter (where status = 'adentro')::int    as adentro,
@@ -576,10 +606,7 @@ async function auditRows(
     join person p on p.id = i.created_by
     left join uso on uso.invitation_id = i.id
     left join ultimo on ultimo.invitation_id = i.id
-    where u.neighborhood_id = ${neighborhoodId}
-      and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
-      and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
-      and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+    where ${filtrosAuditoria(neighborhoodId, f)}
       and (${f.status ?? null}::text is null or ${f.status ?? null}::text = case
         when i.revoked_at is not null then 'anulada'
         when coalesce(uso.abiertas, 0) > 0 then 'adentro'

@@ -101,6 +101,8 @@ const auditFilters = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   unitId: z.string().uuid().optional(),
   status: z.enum(['adentro', 'concluida', 'esperando', 'vencida', 'anulada']).optional(),
+  kind: z.enum(['visita', 'frecuente', 'proveedor']).optional(),
+  q: z.string().trim().max(80).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 })

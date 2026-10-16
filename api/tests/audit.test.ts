@@ -421,3 +421,65 @@ describe('el estado distingue al que sigue adentro del que ya se fue', () => {
     expect(w.getRow(2).getCell(cabeceras.indexOf('Estado')).value).toBe('Concluida')
   })
 })
+
+describe('auditoría: búsqueda y tipo', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  const nombres = (res: { body: { rows: { guestName: string }[] } }) =>
+    res.body.rows.map((r) => r.guestName).sort()
+
+  it('busca por nombre, sin importar mayúsculas', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Martín Gómez' })
+    await inv(ctx, { guestName: 'Laura Pérez' })
+    const res = await request(app).get('/gate/audit?q=GÓMEZ').set('Cookie', ctx.cookie)
+    expect(nombres(res)).toEqual(['Martín Gómez'])
+  })
+
+  it('busca el documento por dígitos aunque se guardó con puntos', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Con puntos', guestDoc: '30.123.456' })
+    await inv(ctx, { guestName: 'Otro', guestDoc: '28765432' })
+    const res = await request(app).get('/gate/audit?q=30123456').set('Cookie', ctx.cookie)
+    expect(nombres(res)).toEqual(['Con puntos'])
+  })
+
+  it('busca por patente, por unidad y por quién invita', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Con patente', plate: 'AB123CD' })
+    await inv(ctx, { guestName: 'Sin patente' })
+    expect(nombres(await request(app).get('/gate/audit?q=ab123').set('Cookie', ctx.cookie))).toEqual(['Con patente'])
+    expect(nombres(await request(app).get('/gate/audit?q=142').set('Cookie', ctx.cookie))).toHaveLength(2)
+    expect(nombres(await request(app).get('/gate/audit?q=Martín').set('Cookie', ctx.cookie))).toHaveLength(2)
+  })
+
+  it('el % y el _ no son comodines', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Cien por ciento' })
+    const res = await request(app).get('/gate/audit?q=%25').set('Cookie', ctx.cookie)
+    expect(res.body.rows).toHaveLength(0)
+  })
+
+  it('filtra por tipo y los contadores acompañan la búsqueda', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Visita A' })
+    await inv(ctx, { guestName: 'Frecuente A', kind: 'frecuente', capacity: 999 })
+    const res = await request(app).get('/gate/audit?kind=frecuente').set('Cookie', ctx.cookie)
+    expect(nombres(res)).toEqual(['Frecuente A'])
+    expect(res.body.counts.esperando).toBe(1)
+    expect(res.body.total).toBe(1)
+  })
+
+  it('el export respeta la búsqueda', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Martín Gómez' })
+    await inv(ctx, { guestName: 'Laura Pérez' })
+    const res = await request(app).get('/gate/audit.xlsx?q=laura').set('Cookie', ctx.cookie)
+      .buffer().parse((r, cb) => { const c: Buffer[] = []; r.on('data', (d) => c.push(d)); r.on('end', () => cb(null, Buffer.concat(c))) })
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body)
+    const texto = JSON.stringify(wb.worksheets.map((w) => w.getSheetValues()))
+    expect(texto).toContain('Laura Pérez')
+    expect(texto).not.toContain('Martín Gómez')
+  })
+})
