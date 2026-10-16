@@ -51,8 +51,10 @@ export function VistaPorLote({ grupos, fila }: {
         <Tarjeta g={sinLote} fila={fila}
           className="lg:sticky lg:top-20 lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto" />
       )}
-      <div className={cn('grid grid-cols-1 items-start gap-3 md:grid-cols-2', sinLote ? 'xl:grid-cols-2' : 'xl:grid-cols-3')}>
-        {lotes.map((g) => <Tarjeta key={g.clave} g={g} fila={fila} />)}
+      {/* Columnas de CSS y no una grilla: en una grilla la fila de abajo arranca donde
+          termina la tarjeta MÁS ALTA de la de arriba, y quedan huecos al lado de las bajas. */}
+      <div className={cn('gap-3 md:columns-2', !sinLote && 'xl:columns-3')}>
+        {lotes.map((g) => <Tarjeta key={g.clave} g={g} fila={fila} className="mb-3 break-inside-avoid" />)}
       </div>
     </div>
   )
