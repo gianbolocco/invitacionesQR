@@ -74,7 +74,7 @@ test('una invitación anulada no pasa', async ({ page, browser }) => {
   await guardia.close()
 })
 
-test('el guardia registra el ingreso y después el egreso del mismo invitado', async ({ page, browser }) => {
+test('el guardia registra el ingreso y después el egreso del mismo invitado', async ({ page, browser, isMobile }) => {
   const nombre = `Egreso E2E ${Date.now()}`
   await entrar(page, 'vecino')
   await page.goto('/invitaciones/nueva')
@@ -106,7 +106,13 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await expect(g).toHaveURL(/\/garita$/)
 
   // El filtro "Adentro" lo muestra y esconde las secciones de la agenda.
+  // En el celular los filtros viven en una hoja detrás del botón "Filtros".
+  if (isMobile) await g.getByRole('button', { name: /^Filtros/ }).click()
   await g.getByRole('button', { name: /^Adentro/ }).click()
+  if (isMobile) {
+    await g.getByRole('button', { name: /^Ver \d+ resultado/ }).click()
+    await expect(g.getByRole('dialog')).toBeHidden()
+  }
   await expect(g.getByRole('heading', { name: /^Se fueron/ })).toBeHidden()
   await expect(g.getByText(nombre).first()).toBeVisible()
 

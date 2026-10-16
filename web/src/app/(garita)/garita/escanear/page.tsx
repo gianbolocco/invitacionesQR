@@ -61,7 +61,7 @@ export default function EscanearPage() {
     })
     let vivo = true
 
-    scanner.start(
+    const arranque = scanner.start(
       { facingMode: 'environment' },
       {
         fps: 12,
@@ -110,7 +110,13 @@ export default function EscanearPage() {
 
     return () => {
       vivo = false
-      scanner.stop().catch(() => {})
+      // stop() TIRA (síncrono, y un string) si la cámara todavía no abrió: salir
+      // mientras conecta, o sin permiso, rompía la pantalla con el error de
+      // sección. Se espera a que termine de arrancar: si abre tarde, se apaga
+      // igual y la cámara no queda prendida.
+      arranque.finally(() => {
+        try { scanner.stop().catch(() => {}) } catch { /* no estaba corriendo */ }
+      })
     }
   }, [me, router, abrirQr, dniPendiente])
 
