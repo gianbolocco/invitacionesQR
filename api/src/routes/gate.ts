@@ -5,7 +5,7 @@ import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
   checkByToken, checkById, registerEntry, registerExit, undoMovement, searchGuests, agendaForDay,
-  insideNow, auditInvitations, auditAll,
+  insideNow, auditInvitations, auditAll, registerManual, MAX_CARGA_MANUAL,
 } from '../services/entries.js'
 import { searchUnits, listUnits } from '../services/units.js'
 import { createExpressInvitation } from '../services/invitations.js'
@@ -72,6 +72,29 @@ gateRoutes.post('/entries', async (req, res) => {
 gateRoutes.post('/exits', async (req, res) => {
   const body = z.object({ invitationId: z.string().uuid() }).parse(req.body)
   res.status(201).json(await registerExit(body.invitationId, req.person!.id))
+})
+
+/**
+ * Carga a mano de movimientos que ya pasaron (un corte de luz). Las horas
+ * llegan con offset: la pantalla manda la de Buenos Aires. Ver registerManual.
+ */
+gateRoutes.post('/manual', async (req, res) => {
+  const { items } = z.object({
+    items: z.array(z.object({
+      invitationId: z.string().uuid(),
+      enteredAt: z.string().datetime({ offset: true }),
+      exitedAt: z.string().datetime({ offset: true }).nullish(),
+      note: z.string().trim().max(200).optional(),
+    })).min(1).max(MAX_CARGA_MANUAL),
+  }).parse(req.body)
+
+  const filas = await registerManual(req.person!.neighborhoodId, req.person!.id, items.map((i) => ({
+    invitationId: i.invitationId,
+    enteredAt: new Date(i.enteredAt),
+    exitedAt: i.exitedAt ? new Date(i.exitedAt) : null,
+    note: i.note,
+  })))
+  res.status(201).json({ cargados: filas.length })
 })
 
 /** Deshacer el último movimiento, para el escaneo doble. */

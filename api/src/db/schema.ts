@@ -110,9 +110,14 @@ export const entryLogs = pgTable('entry_log', {
   guestDoc: text('guest_doc'),
   plate: text('plate'),
   note: text('note'),
+  // 'manual' = cargado después a mano (un corte de luz, una planilla de papel).
+  // La hora es la que se declaró, no la del servidor: la auditoría lo marca.
+  source: text('source').notNull().default('normal'),
+  loadedBy: uuid('loaded_by').references(() => people.id),
 }, (t) => [
   index('entry_unit_idx').on(t.unitId, t.enteredAt),
   index('entry_invitation_idx').on(t.invitationId),
+  check('entry_source_ck', sql`${t.source} in ('normal','manual')`),
 ])
 
 export const auditLogs = pgTable('audit_log', {
