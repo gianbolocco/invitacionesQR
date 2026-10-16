@@ -193,11 +193,12 @@ export default function VecinosPage() {
     return (
       <Fila key={p.id} titulo={<>{p.name}{p.role === 'admin' && <span className="ml-2 text-xs font-normal text-ink-soft">Admin</span>}</>}
         meta={[
-          conLote ? (p.units.map((u) => u.label).join(' · ') || 'Sin lote asignar') : null,
+          conLote ? (p.units.map((u) => u.label).join(' · ') || 'Sin lote asignado') : null,
           ESTADO[p.status],
           p.lastLoginAt ? `Último acceso ${fechaConAnio(p.lastLoginAt)}` : 'Sin ingresos',
         ].filter(Boolean).join(' · ')}
-        extremo={<MenuFila acciones={accionesDe(p)} />}
+        // En la lista hay lugar: las acciones a la vista. En las tarjetas de lote, el menú.
+        extremo={<MenuFila acciones={accionesDe(p)} visibles={conLote} />}
         className={p.status === 'disabled' ? 'opacity-50' : undefined} />
     )
   }
