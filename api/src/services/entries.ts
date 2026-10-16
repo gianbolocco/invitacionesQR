@@ -513,6 +513,8 @@ export type AuditRow = {
   exitGuardName: string | null
   /** Algún movimiento de esta invitación se cargó a mano. */
   manual: boolean
+  /** Por qué la anuló la portería; null si no está anulada o la anuló el vecino. */
+  revokedReason: string | null
 }
 
 export type AuditStatus = AuditRow['status']
@@ -694,7 +696,8 @@ async function auditRows(
       ultimo.guardia              as "guardName",
       ultimo.exited_at            as "exitedAt",
       ultimo.guardia_salida       as "exitGuardName",
-      coalesce(uso.manual, false) as manual
+      coalesce(uso.manual, false) as manual,
+      i.revoked_reason            as "revokedReason"
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by

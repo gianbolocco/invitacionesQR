@@ -1,0 +1,1 @@
+ALTER TABLE "invitation" ADD COLUMN "revoked_reason" text;

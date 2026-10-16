@@ -42,3 +42,13 @@ y que el guardia anule invitaciones (decisión pendiente, ver conversación).
 `api`: tests de `registerManual` (camino feliz, futuro, ventana, superposición,
 otro barrio, marca en auditoría). `web`: `carga-manual.check.ts` (armado de la
 fecha y validación), tsc, lint, e2e de la pantalla.
+
+## Anulación por la guardia (misma entrega)
+
+La portería puede anular una invitación desde el veredicto, con **motivo
+obligatorio** (mínimo 5 letras). Mismas reglas que la del vecino: no se anula con
+el invitado adentro. El motivo queda en `invitation.revoked_reason`; el vecino lo
+ve en su invitación ("Anulada por portería: …") y solo él (o quien sea de su
+unidad) puede volver a habilitarla —la guardia no—, lo que borra el motivo.
+Quién anuló y cuándo queda en `audit_log` (`invitation.revoked_by_guard`). La
+auditoría muestra el motivo de las anuladas.

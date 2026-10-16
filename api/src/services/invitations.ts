@@ -122,6 +122,7 @@ const columnas = {
   capacity: invitations.capacity,
   token: invitations.token,
   revokedAt: invitations.revokedAt,
+  revokedReason: invitations.revokedReason,
   createdAt: invitations.createdAt,
   createdBy: invitations.createdBy,
   creatorName: nombreOEtiquetaSql,
@@ -279,6 +280,36 @@ export async function revokeInvitation(id: string, personId: string, neighborhoo
   await audit(personId, neighborhoodId, 'invitation.revoked', 'invitation', id)
 }
 
+export const MOTIVO_MIN = 5
+
+/**
+ * La portería anula una invitación, y tiene que decir por qué.
+ *
+ * Mismas reglas que cuando anula el vecino —no se anula con el invitado
+ * adentro— más dos: el motivo es obligatorio y queda guardado en la propia
+ * invitación, que es donde el vecino lo lee ("anulada por portería: …"), y la
+ * anulación se puede deshacer SOLO desde la casa (restoreInvitation pide ser
+ * miembro de la unidad). Quién anuló y cuándo queda en el audit_log.
+ */
+export async function revokeByGuard(
+  id: string,
+  guardId: string,
+  neighborhoodId: string,
+  reason: string,
+): Promise<void> {
+  const motivo = reason.trim()
+  if (motivo.length < MOTIVO_MIN) throw new AppError(400, 'motivo_requerido')
+
+  const [inv] = await db.select().from(invitations).where(eq(invitations.id, id)).limit(1)
+  if (!inv) throw new AppError(404, 'not_found')
+  await assertUnitInNeighborhood(inv.unitId, neighborhoodId)
+  if (inv.revokedAt) throw new AppError(409, 'already_revoked')
+  if (await estaAdentro(id)) throw new AppError(409, 'guest_inside')
+
+  await db.update(invitations).set({ revokedAt: new Date(), revokedReason: motivo }).where(eq(invitations.id, id))
+  await audit(guardId, neighborhoodId, 'invitation.revoked_by_guard', 'invitation', id, { reason: motivo })
+}
+
 /**
  * Datos públicos del QR. Muestra quién invita, la unidad y cómo llegar: es una
  * apertura deliberada respecto de la versión anterior, que exponía lo mínimo.
@@ -372,7 +403,7 @@ export async function restoreInvitation(
   await assertMemberOfUnit(personId, inv.unitId)
   if (!inv.revokedAt) return
 
-  await db.update(invitations).set({ revokedAt: null }).where(eq(invitations.id, id))
+  await db.update(invitations).set({ revokedAt: null, revokedReason: null }).where(eq(invitations.id, id))
   await audit(personId, neighborhoodId, 'invitation.restored', 'invitation', id)
 }
 

@@ -8,7 +8,7 @@ import {
   insideNow, auditInvitations, auditAll, registerManual, MAX_CARGA_MANUAL,
 } from '../services/entries.js'
 import { searchUnits, listUnits } from '../services/units.js'
-import { createExpressInvitation } from '../services/invitations.js'
+import { createExpressInvitation, revokeByGuard } from '../services/invitations.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { slug } from '../lib/slug.js'
 import { buildWorkbook, diaExcel, fechaExcel, XLSX_MIME } from '../lib/excel.js'
@@ -52,6 +52,13 @@ gateRoutes.post('/invitations', async (req, res) => {
   res.status(201).json(await createExpressInvitation({
     ...body, createdBy: req.person!.id, neighborhoodId: req.person!.neighborhoodId,
   }))
+})
+
+/** La portería anula una invitación. El motivo es obligatorio: ver revokeByGuard. */
+gateRoutes.post('/invitations/:id/revoke', async (req, res) => {
+  const { reason } = z.object({ reason: z.string().max(200) }).parse(req.body)
+  await revokeByGuard(req.params.id, req.person!.id, req.person!.neighborhoodId, reason)
+  res.json({ ok: true })
 })
 
 gateRoutes.post('/entries', async (req, res) => {
