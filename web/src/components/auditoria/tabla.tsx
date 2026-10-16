@@ -1,7 +1,7 @@
 'use client'
 import { Fragment, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { TagTipo } from '@/components/dominio/tag-tipo'
+import { TagManual, TagTipo } from '@/components/dominio/tag-tipo'
 import { EstadoTag, type Estado } from '@/components/dominio/estado-tag'
 import { fechaHora, fechaNumerica } from '@/lib/fechas'
 import { quienInvita } from '@/lib/invitations'
@@ -60,6 +60,7 @@ export function Tabla({ filas }: { filas: AuditRow[] }) {
                     <span className="flex items-center gap-2">
                       <span className="min-w-0 truncate font-semibold">{r.guestName}</span>
                       <TagTipo kind={r.kind} />
+                      {r.manual && <TagManual />}
                     </span>
                     <Secundaria>{[r.guestDoc && `DNI ${r.guestDoc}`, r.plate].filter(Boolean).join(' · ')}</Secundaria>
                   </td>

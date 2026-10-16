@@ -1,4 +1,4 @@
-import { Repeat, Truck } from 'lucide-react'
+import { PenLine, Repeat, Truck } from 'lucide-react'
 import { KIND_LABEL, type Invitation } from '@/lib/invitations'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +20,24 @@ export function TagTipo({ kind, className }: { kind: Invitation['kind']; classNa
     )}>
       <Icono className="size-3" aria-hidden />
       {KIND_LABEL[kind]}
+    </span>
+  )
+}
+
+/**
+ * Un movimiento que no salió de un escaneo sino de una carga posterior a mano
+ * (un corte de luz): la hora es la que se declaró. Se marca siempre, en la
+ * auditoría y en el detalle, para que nadie lo confunda con un registro en vivo.
+ */
+export function TagManual({ className }: { className?: string }) {
+  return (
+    <span className={cn(
+      'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-sm border border-dashed border-ink/40 px-1.5 py-1',
+      'text-[10.5px] font-bold uppercase leading-none tracking-[0.05em] text-ink-soft',
+      className,
+    )}>
+      <PenLine className="size-3" aria-hidden />
+      Carga manual
     </span>
   )
 }

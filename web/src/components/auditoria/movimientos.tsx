@@ -1,4 +1,5 @@
 'use client'
+import { TagManual } from '@/components/dominio/tag-tipo'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { fechaHora } from '@/lib/fechas'
@@ -20,7 +21,8 @@ export function Movimientos({ id }: { id: string }) {
           {/* fechaHora y no enteredAt.slice(0, 10): esa es la fecha UTC, y a
               las 22 acá ya es el día siguiente allá. */}
           <p><span className="text-ink-soft">Ingresó </span><span className="tabular font-medium">{fechaHora(m.enteredAt)}</span>
-            <span className="text-ink-soft"> · {m.guardName ?? 'guardia sin registrar'}</span></p>
+            <span className="text-ink-soft"> · {m.guardName ?? 'guardia sin registrar'}</span>
+            {m.manual && <TagManual className="ml-2 align-middle" />}</p>
           <p><span className="text-ink-soft">Salió </span>
             {m.exitedAt
               ? <><span className="tabular font-medium">{fechaHora(m.exitedAt)}</span><span className="text-ink-soft"> · {m.exitGuardName ?? 'guardia sin registrar'}</span></>

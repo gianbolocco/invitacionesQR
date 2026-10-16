@@ -12,7 +12,7 @@ export function Vacio({ icono: Icono, titulo, detalle, accion }: {
   accion?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
+    <div className="flex flex-col items-center gap-4 px-6 py-12 text-center animate-in fade-in slide-in-from-bottom-1 duration-300">
       <span className="grid size-14 place-items-center rounded-full bg-surface-sunk text-ink-soft">
         <Icono className="size-6" aria-hidden />
       </span>

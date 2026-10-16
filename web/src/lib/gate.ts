@@ -108,3 +108,18 @@ export const deshacer = (entryId: string) =>
   api<{ deshecho: 'ingreso' | 'egreso' }>(`/gate/entries/${entryId}/undo`, { method: 'POST' })
 
 export { hora } from './fechas'
+
+export const cargarManual = (items: { invitationId: string; enteredAt: string; exitedAt: string | null; note?: string }[]) =>
+  api<{ cargados: number }>('/gate/manual', { method: 'POST', body: JSON.stringify({ items }) })
+
+/** Qué le dice la API al guardia cuando una tanda de carga manual no se guarda. */
+export function mensajeCargaManual(error: unknown): string {
+  const codigo = error instanceof ApiError ? error.code : ''
+  return ({
+    fecha_futura: 'Una de las horas todavía no pasó.',
+    fuera_de_ventana: 'Solo se puede cargar lo de las últimas 48 horas.',
+    salida_anterior: 'Una salida es anterior a su ingreso.',
+    se_superpone: 'Uno de los movimientos se superpone con otro ya registrado de esa persona.',
+    not_found: 'No se encontró una de las invitaciones.',
+  } as Record<string, string>)[codigo] ?? 'No se pudo guardar. No se cargó nada: probá de nuevo.'
+}

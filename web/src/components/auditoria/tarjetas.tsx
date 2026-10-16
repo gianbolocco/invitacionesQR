@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { TagTipo } from '@/components/dominio/tag-tipo'
+import { TagManual, TagTipo } from '@/components/dominio/tag-tipo'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { fechaHora } from '@/lib/fechas'
 import { quienInvita } from '@/lib/invitations'
@@ -37,6 +37,7 @@ export function Tarjetas({ filas }: { filas: AuditRow[] }) {
                 <p className="flex flex-wrap items-center gap-2">
                   <span className="min-w-0 text-[15px] font-semibold leading-snug">{r.guestName}</span>
                   <TagTipo kind={r.kind} />
+                  {r.manual && <TagManual />}
                 </p>
                 <p className="mt-0.5 truncate text-[13px] text-ink-soft">
                   {[r.unitLabel, quienInvita(r.inviterName)].join(' · ')}

@@ -18,6 +18,8 @@ export type AuditRow = {
   guardName: string | null
   exitedAt: string | null
   exitGuardName: string | null
+  /** Algún movimiento se cargó a mano, no se escaneó. */
+  manual: boolean
 }
 
 export type AuditEstado = AuditRow['status']
@@ -39,6 +41,7 @@ export type Movimiento = {
   plate: string | null
   guardName: string | null
   exitGuardName: string | null
+  manual: boolean
 }
 
 export type FiltrosAuditoria = {

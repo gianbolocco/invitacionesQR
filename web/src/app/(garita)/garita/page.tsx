@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ScanLine, UserPlus } from 'lucide-react'
+import { ClipboardPen, ScanLine, UserPlus } from 'lucide-react'
 import { ChromeGarita } from '@/components/garita/chrome'
 import { AgendaDia } from '@/components/garita/agenda-dia'
 import { BuscarInvitado } from '@/components/garita/buscar-invitado'
@@ -134,10 +134,15 @@ export default function GaritaHoy() {
       <div className="grid grid-cols-1 gap-8 md:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <BuscarInvitado q={q} onQ={(v) => { setQ(v); setDniLista(null) }} onAbrir={abrirDeLista} onLectura={leer} />
-          <Button type="button" variant="outline"
-            onClick={(e) => { setDisparador(e.currentTarget); setAltaAbierta(true) }}>
-            <UserPlus aria-hidden />Autorizar sin invitación
-          </Button>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Button type="button" variant="outline"
+              onClick={(e) => { setDisparador(e.currentTarget); setAltaAbierta(true) }}>
+              <UserPlus aria-hidden />Autorizar sin invitación
+            </Button>
+            <Link href="/garita/cargar" className={buttonVariants({ variant: 'outline' })}>
+              <ClipboardPen aria-hidden />Cargar movimientos
+            </Link>
+          </div>
           <AgendaDia onAbrir={abrir} />
         </div>
         <aside className="hidden flex-col gap-6 md:flex">
