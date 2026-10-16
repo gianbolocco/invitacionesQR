@@ -14,6 +14,7 @@ import {
 } from '@/lib/queries/garita'
 import { Input } from '@/components/ui/input'
 import { AltaExpres } from '@/components/garita/alta-expres'
+import { AnularInvitacion } from '@/components/garita/anular-invitacion'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 
 /** Segundos que la confirmación espera antes de volver sola a la pantalla anterior. */
@@ -112,6 +113,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const [altaAbierta, setAltaAbierta] = useState(false)
   const [disparadorAlta, setDisparadorAlta] = useState<HTMLButtonElement | null>(null)
   const [lecturaAlta, setLecturaAlta] = useState<LecturaDni | null>(null)
+  const [anulando, setAnulando] = useState(false)
 
   // Precarga de doc/patente al llegar el resultado: se ajusta durante el
   // render (patrón oficial de React para esto), no en un efecto.
@@ -144,12 +146,12 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   // Escape siempre vuelve. En la barrera no hay tiempo de buscar un botón.
   // Con el alta abierta no escucha, y Radix hace preventDefault al cerrar el sheet: ese Esc no saca también del veredicto.
   useEffect(() => {
-    if (altaAbierta) return
+    if (altaAbierta || anulando) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) salir() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [altaAbierta])
+  }, [altaAbierta, anulando])
 
   // Se consume al salir: volver a abrir esta invitación más tarde no lo trae.
   useEffect(() => () => documentoLeido.borrar(id), [id, documentoLeido])
@@ -163,6 +165,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   // Dos lecturas seguidas pueden resolverse desordenadas: solo vale la última.
   const secuencia = useRef(0)
   async function leer(l: Lectura | null) {
+    // Escribiendo el motivo de una anulación, una lectura no es para esta pantalla.
+    if (anulando) return
     if (!l) { anotar('No reconocido'); toast.error(NO_RECONOCIDO); return }
     const mia = ++secuencia.current
     if (l.tipo === 'qr') {
@@ -368,6 +372,12 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                   <button onClick={salir} className="min-h-11 underline underline-offset-4 opacity-70">
                     Cancelar (Esc)
                   </button>
+                  {/* Con alguien adentro no se anula (la API lo rechaza): ahí el paso es el egreso. */}
+                  {!esEgreso && (
+                    <button onClick={() => setAnulando(true)} className="min-h-11 text-sm underline underline-offset-4 opacity-60">
+                      Anular esta invitación…
+                    </button>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div key="rechazo" className="flex flex-col gap-3">
@@ -382,12 +392,20 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                     className="min-h-16 w-full rounded border-2 border-deny-ink/40 text-xl font-bold">
                     Volver (Esc)
                   </button>
+                  {(check as { reason: string }).reason !== 'revoked' && !esEgreso && (
+                    <button onClick={() => setAnulando(true)} className="min-h-11 text-sm underline underline-offset-4 opacity-70">
+                      Anular esta invitación…
+                    </button>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
           </motion.div>
         </section>
       </div>
+
+      <AnularInvitacion abierto={anulando} onAbiertoChange={setAnulando} invitacion={inv}
+        onAnulada={() => { toast.success('Invitación anulada. El vecino ve el motivo.'); salir() }} />
 
       <AltaExpres abierto={altaAbierta} disparador={disparadorAlta}
         onAbiertoChange={(v) => { setAltaAbierta(v); if (!v) setLecturaAlta(null) }}

@@ -20,6 +20,8 @@ export type AuditRow = {
   exitGuardName: string | null
   /** Algún movimiento se cargó a mano, no se escaneó. */
   manual: boolean
+  /** Por qué la anuló la portería. */
+  revokedReason: string | null
 }
 
 export type AuditEstado = AuditRow['status']

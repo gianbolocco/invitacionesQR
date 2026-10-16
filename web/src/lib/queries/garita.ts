@@ -7,7 +7,7 @@ import { api, apiBase } from '@/lib/api'
 import { hoyISO } from '@/lib/fechas'
 import {
   porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres,
-  cargarManual, mensajeCargaManual, type Resultado,
+  cargarManual, mensajeCargaManual, anularPorPorteria, mensajeAnulacion, type Resultado,
 } from '@/lib/gate'
 import type { LecturaDni } from '@/lib/lectora'
 
@@ -239,6 +239,15 @@ export function useCargarManual() {
     mutationFn: cargarManual,
     onError: (e) => toast.error(mensajeCargaManual(e)),
     // La auditoría también: las filas nuevas aparecen ahí marcadas como manuales.
+    onSuccess: () => Promise.all([invalidarGarita(qc), qc.invalidateQueries({ queryKey: ['auditoria'] })]),
+  })
+}
+
+export function useAnularInvitacion() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: anularPorPorteria,
+    onError: (e) => toast.error(mensajeAnulacion(e)),
     onSuccess: () => Promise.all([invalidarGarita(qc), qc.invalidateQueries({ queryKey: ['auditoria'] })]),
   })
 }
