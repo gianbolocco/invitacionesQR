@@ -63,7 +63,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const medio = useMedia('(min-width: 768px)')
   const [guardada, guardar] = usePreferencia<Vista>('visitpass.garita.vista')
   const disponible: Record<Vista, boolean> = { tablero: ancho, lista: true, compacta: medio, unidad: true }
-  const preferida: Vista = guardada ?? (ancho ? 'tablero' : 'lista')
+  const preferida: Vista = guardada ?? 'lista'
   // Una vista guardada que esta pantalla no puede mostrar (el tablero en un celular) cae a la lista.
   const vista: Vista = disponible[preferida] ? preferida : 'lista'
 
