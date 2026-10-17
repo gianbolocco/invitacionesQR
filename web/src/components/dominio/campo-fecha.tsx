@@ -33,8 +33,9 @@ export function CampoFecha({ id, valor, onCambio, min, className }: {
     <Popover open={abierto} onOpenChange={setAbierto}>
       <PopoverTrigger asChild>
         <button id={id} type="button"
-          className={cn('flex h-11 w-full items-center gap-2 rounded-md border border-input bg-card px-3.5 text-left text-base',
-            'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none', className)}>
+          className={cn('flex h-12 w-full items-center gap-2 rounded-sm border-2 border-control bg-card px-3.5 text-left text-base text-ink',
+            'transition-[border-color] duration-(--t-hover) outline-none',
+            'focus-visible:border-azul-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus', className)}>
           <CalendarDays className="size-4 text-ink-soft" aria-hidden />
           <span className="tabular">{textoFecha(valor)}</span>
         </button>

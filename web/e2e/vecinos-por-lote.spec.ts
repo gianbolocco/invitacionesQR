@@ -27,9 +27,11 @@ test('el admin filtra el padrón por cuenta sin activar y por sin lote', async (
   await abrir()
   await page.getByRole('button', { name: /^Sin activar/ }).click()
   await cerrar()
-  await expect(page.getByText(/Invitado/).first()).toBeVisible()
+  // La cuenta sin activar se marca con su estado; el chip del filtro dice lo mismo y no cuenta.
+  const fueraDeBotones = page.locator(':not(button *)')
+  await expect(page.getByText(/Sin activar/).and(fueraDeBotones).first()).toBeVisible()
   // Los que ya tienen cuenta no figuran.
-  await expect(page.getByText(/Activo/)).toHaveCount(0)
+  await expect(page.getByText(/\bActiva\b/)).toHaveCount(0)
 
   await abrir()
   await page.getByRole('button', { name: /^Sin lote/ }).click()
@@ -41,5 +43,5 @@ test('el admin filtra el padrón por cuenta sin activar y por sin lote', async (
   await page.getByRole('button', { name: /^Todos\d*$/ }).click()
   await page.getByRole('button', { name: /^Todos los lotes/ }).click()
   await cerrar()
-  await expect(page.getByText(/Activo/).first()).toBeVisible()
+  await expect(page.getByText(/\bActiva\b/).first()).toBeVisible()
 })

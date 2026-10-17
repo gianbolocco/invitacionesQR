@@ -3,30 +3,34 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
 
+/*
+ * Los botones de Pazzit (PLAN §1.4). El hover cambia el color solo con puntero
+ * fino (`hover-fino:`): en el celular el tap dejaba el hover pegado. La escala
+ * al presionar la pone globals.css para todo botón.
+ */
+const secundario =
+  "border-2 border-control bg-transparent text-azul-text hover-fino:bg-azul-tint"
+
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-[15px] font-semibold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-150 ease-entrada active:scale-[0.98] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-base font-bold whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-alto [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40",
-        outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
+        default: "bg-azul text-white hover-fino:bg-[color-mix(in_srgb,var(--azul)_84%,var(--navy))]",
+        destructive: "bg-alto text-white dark:text-navy hover-fino:bg-[color-mix(in_srgb,var(--alto)_88%,var(--navy))]",
+        secondary: secundario,
+        // Alias de `secondary`: así no hay que tocar cada uso viejo.
+        outline: secundario,
+        ghost: "text-ink hover-fino:bg-azul-tint",
+        link: "text-azul-text underline decoration-2 underline-offset-[3px]",
+        // Uso excepcional: el sol es una sola cosa por pantalla.
+        sol: "bg-sol text-navy",
       },
       size: {
-        default: "h-11 px-5 has-[>svg]:px-4",
-        xs: "h-7 gap-1 rounded-sm px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-9 gap-1.5 px-3.5 text-sm has-[>svg]:px-3",
-        lg: "h-12 px-6 text-base has-[>svg]:px-5",
+        default: "h-12 px-5 has-[>svg]:px-4",
+        sm: "h-11 gap-1.5 px-4 text-[15px] has-[>svg]:px-3.5",
+        lg: "h-14 px-6 text-base has-[>svg]:px-5",
         icon: "size-11",
-        "icon-xs": "size-7 rounded-sm [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-9",
         "icon-lg": "size-12",
       },
     },
