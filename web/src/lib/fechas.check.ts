@@ -1,7 +1,7 @@
 /** `node src/lib/fechas.check.ts`. Node 24 corre TypeScript solo. */
 import assert from 'node:assert/strict'
 import {
-  hoyISO, sumarDias, aFecha, aISO, fechaCorta, fechaNumerica, hora, fechaHora, tituloDia, cupoTexto,
+  hoyISO, sumarDias, aFecha, aISO, fechaCorta, fechaNumerica, hora, fechaHora, horaODia, tiempoDesde, tituloDia, cupoTexto,
 } from './fechas.ts'
 
 // Las 23:30 del 10 de octubre en Buenos Aires ya son el 11 en UTC: el día
@@ -20,6 +20,17 @@ assert.equal(hora('2026-10-11T12:05:00Z'), '09:05')
 assert.equal(hora('2026-10-11T03:00:00Z'), '00:00')
 assert.equal(fechaHora('2026-10-11T17:02:00Z'), '11/10, 14:02')
 assert.equal(fechaHora('2026-10-04T17:02:00Z'), '04/10, 14:02')
+assert.equal(horaODia('2026-10-11T17:02:00Z', '2026-10-11'), '14:02')
+assert.equal(horaODia('2026-10-12T11:30:00Z', '2026-10-11'), '12/10, 08:30')
+// 23:30 en Buenos Aires ya es el día siguiente en UTC: sigue siendo el mismo día.
+assert.equal(horaODia('2026-10-12T02:30:00Z', '2026-10-11'), '23:30')
+const AHORA = new Date('2026-10-12T15:00:00Z')
+assert.equal(tiempoDesde('2026-10-12T14:15:00Z', AHORA), '45 min')
+assert.equal(tiempoDesde('2026-10-12T11:40:00Z', AHORA), '3 h 20 min')
+assert.equal(tiempoDesde('2026-10-12T12:00:00Z', AHORA), '3 h')
+assert.equal(tiempoDesde('2026-10-10T11:00:00Z', AHORA), '2 d 4 h')
+// Un reloj de celular atrasado no da tiempo negativo.
+assert.equal(tiempoDesde('2026-10-12T15:02:00Z', AHORA), '0 min')
 
 assert.equal(tituloDia('2026-10-11', '2026-10-11'), 'Hoy')
 assert.equal(tituloDia('2026-10-12', '2026-10-11'), 'Mañana')

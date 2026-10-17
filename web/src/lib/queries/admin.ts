@@ -106,9 +106,30 @@ export function useReenviarInvitacion() {
   return useMutation({
     mutationFn: (p: Pick<Person, 'id' | 'email' | 'username'>) => api(`/admin/people/${p.id}/resend`, { method: 'POST' }),
     onSuccess: (_d, p) => toast.success(`Reenviamos la invitación a ${p.email ?? p.username ?? 'la persona'}.`),
-    onError: (_e, p) => toast.error(`No pudimos mandarle el mail a ${p.email ?? p.username ?? 'la persona'}. Probá de nuevo en un rato.`),
+    onError: (e, p) => toast.error(e instanceof ApiError && e.status === 429
+      ? 'Ya le reenviamos la invitación hace menos de un minuto. Esperá un poco antes de mandarla de nuevo.'
+      : `No pudimos mandarle el mail a ${p.email ?? p.username ?? 'la persona'}. Probá de nuevo en un rato.`),
     onSettled: () => invalidarPersonas(qc),
   })
+}
+
+/**
+ * Copia el link de alta para mandarlo por WhatsApp. El pedido sale adentro del
+ * ClipboardItem y no antes: Safari solo deja escribir el portapapeles durante
+ * el clic, y un `await` previo lo hace perder.
+ */
+export async function copiarLinkDeAlta(p: Pick<Person, 'id' | 'name'>): Promise<void> {
+  const url = api<{ url: string }>(`/admin/people/${p.id}/invite-link`, { method: 'POST' }).then((r) => r.url)
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ 'text/plain': url.then((u) => new Blob([u], { type: 'text/plain' })) }),
+    ])
+    toast.success(`Copiamos el link de alta de ${p.name}. Mandáselo por donde quieras.`)
+  } catch {
+    const u = await url.catch(() => null)
+    if (u) window.prompt('No pudimos copiarlo solo. Copiá el link desde acá:', u)
+    else toast.error('No pudimos generar el link. Probá de nuevo.')
+  }
 }
 
 export function useReactivarPersona() {
@@ -146,15 +167,6 @@ export function useCambiarContrasenaGuardia() {
       api(`/admin/people/${personId}/password`, { method: 'POST', body: JSON.stringify({ password }) }),
     onError: () => toast.error('No se pudo cambiar la contraseña. Probá de nuevo.'),
     onSettled: () => invalidarPersonas(qc),
-  })
-}
-
-export function useAltaUnidad() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (lot: number) => api<Unit>('/admin/units', { method: 'POST', body: JSON.stringify({ lot }) }),
-    onError: () => toast.error('No se pudo crear. Puede que ese lote ya esté cargado.'),
-    onSettled: () => qc.invalidateQueries({ queryKey: claves.unidades }),
   })
 }
 

@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipo rediseño Pazzit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Tokens de PLAN-REDISENO.md §1.1. Nombres de la app. */
+:root {
+  color-scheme: light;
+  --surface:#F3F6FF; --card:#FFFFFF; --surface-sunk:#E8EDFB; --line:#E1E6F5; --control:#7C86A8;
+  --ink:#0B1640; --ink-soft:#4A5578; --azul:#2F5BFF; --azul-text:#2F5BFF; --azul-tint:#E3E9FF;
+  --navy:#0B1640; --sol:#FFC933; --verde:#0E7A55; --verde-tint:#E2F6EC; --espera:#8A5A00; --espera-tint:#FFF3D1;
+  --alto:#B42318; --alto-tint:#FDE7E4; --focus:#2F5BFF; --barrio:#1e6b47;
+  --talon-fondo:#FFFFFF; --talon-qr:#0B1640;
+  --sombra-pase: drop-shadow(0 14px 16px rgb(11 22 64 / .14));
+  --sombra-flotante: 0 18px 40px -16px rgb(11 22 64 / .35);
+  --ease-out: cubic-bezier(.22,1,.36,1);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface:#0A1030; --card:#131B45; --surface-sunk:#1A2357; --line:#24306A; --control:#7480B8;
+  --ink:#E6ECFF; --ink-soft:#A6B0D6; --azul-text:#7D93FF; --azul-tint:#24306A;
+  --verde:#5BE0A8; --verde-tint:#0F2B26; --espera:#FFD166; --espera-tint:#2E2410; --alto:#FF8A7A; --alto-tint:#3A1620;
+  --focus:#FFC933; --sombra-pase: drop-shadow(0 14px 16px rgb(0 0 0 / .35)); --sombra-flotante: 0 18px 40px -16px rgb(0 0 0 / .6);
+}
+* { box-sizing: border-box; margin: 0; }
+body { font-family: Onest, system-ui, sans-serif; font-size: 16px; line-height: 24px; background: #c9cfe3; color: var(--ink); padding: 24px; }
+:root[data-theme="dark"] body { background: #050819; }
+button { font: inherit; cursor: pointer; border: 0; background: none; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tabular { font-variant-numeric: tabular-nums; }
+.barra-proto { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+.barra-proto h1 { font-size: 20px; font-weight: 800; margin-right: auto; color: #0B1640; }
+:root[data-theme="dark"] .barra-proto h1 { color: #E6ECFF; }
+.frames { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }
+.frame { background: var(--surface); border-radius: 24px; overflow: hidden; position: relative; }
+.frame-label { font-size: 14px; font-weight: 600; color: #4A5578; margin: 0 0 8px 4px; }
+:root[data-theme="dark"] .frame-label { color: #A6B0D6; }
+.movil { width: 390px; min-height: 844px; }
+.escritorio { width: 1280px; min-height: 760px; }
+/* ---- botones ---- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 14px; font-weight: 700; border: 2px solid transparent; transition: transform 120ms var(--ease-out), background-color 180ms var(--ease-out); }
+.btn:active { transform: scale(.97); }
+.btn-lg { min-height: 56px; }
+.btn-primary { background: var(--azul); color: #fff; }
+.btn-secondary { border-color: var(--control); color: var(--azul-text); }
+.btn-ink { background: var(--ink); color: var(--card); }
+.link-alto { color: var(--alto); font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; min-height: 44px; display: inline-flex; align-items: center; }
+/* ---- chips de estado ---- */
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; font-size: 13px; line-height: 16px; font-weight: 600; white-space: nowrap; }
+.chip svg { width: 14px; height: 14px; }
+.chip-inv { background: var(--azul-tint); color: var(--ink); } .chip-inv svg { color: var(--azul-text); }
+.chip-ok { background: var(--verde-tint); color: var(--verde); }
+.chip-wait { background: var(--espera-tint); color: var(--espera); }
+.chip-stop { background: var(--alto-tint); color: var(--alto); }
+/* ---- header app ---- */
+.hdr { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; background: var(--card); border-bottom: 1px solid var(--line); }
+.hdr .barrio { font-weight: 700; }
+.hdr .rol { color: var(--ink-soft); font-weight: 600; }
+.avatar { margin-left: auto; width: 40px; height: 40px; border-radius: 50%; background: var(--azul-tint); color: var(--azul-text); display: grid; place-items: center; font-size: 14px; font-weight: 700; }
+.mark { height: 22px; width: auto; }
+.logo-oscuro { display: none; } :root[data-theme="dark"] .logo-claro { display: none; } :root[data-theme="dark"] .logo-oscuro { display: inline; }
+/* ---- inicio vecino ---- */
+.pag { padding: 24px 16px 140px; }
+.t-display { font-size: 32px; line-height: 36px; font-weight: 800; letter-spacing: -1px; }
+.t-heading { font-size: 20px; line-height: 28px; font-weight: 700; }
+.t-title { font-size: 24px; line-height: 30px; font-weight: 700; letter-spacing: -.5px; }
+.muted { color: var(--ink-soft); }
+.grupo { margin-top: 28px; }
+.grupo h2 { display: flex; gap: 8px; align-items: baseline; }
+.grupo h2 span { font-size: 14px; color: var(--ink-soft); font-weight: 600; }
+.fila { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.fila .t { font-weight: 600; } .fila .m { font-size: 14px; color: var(--ink-soft); }
+.fila > div { flex: 1; min-width: 0; }
+.fab { position: absolute; left: 16px; right: 16px; bottom: 84px; box-shadow: var(--sombra-flotante); }
+.barra-inf { position: absolute; left: 0; right: 0; bottom: 0; display: flex; background: var(--card); border-top: 1px solid var(--line); }
+.barra-inf a { flex: 1; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); position: relative; text-decoration: none; }
+.barra-inf a.on { color: var(--azul-text); }
+.barra-inf a.on::before { content: ""; position: absolute; top: 0; width: 24px; height: 3px; border-radius: 2px; background: var(--azul); }
+.barra-inf svg { width: 22px; height: 22px; }
+/* ---- pase (PLAN §1.5) ---- */
+.pase { --notch: 13px; display: flex; width: 100%; padding-right: 8px; container-type: inline-size; color: var(--ink); }
+.pieza { filter: var(--sombra-pase); }
+.cuerpo-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
+.cuerpo { height: 100%; display: flex; flex-direction: column; gap: 4px; background: var(--card); border-radius: 24px 8px 8px 24px;
+  padding: clamp(16px,6cqw,24px) clamp(14px,5cqw,20px) clamp(16px,6cqw,24px) clamp(22px,7cqw,30px);
+  -webkit-mask: radial-gradient(circle var(--notch) at 0 50%, #0000 calc(var(--notch) - .5px), #000 var(--notch));
+  mask: radial-gradient(circle var(--notch) at 0 50%, #0000 calc(var(--notch) - .5px), #000 var(--notch)); }
+.chips { display: grid; justify-items: start; margin-bottom: 8px; } .chips > * { grid-area: 1/1; }
+.chip-b { opacity: 0; }
+.validado .chip-a { opacity: 0; } .validado .chip-b { opacity: 1; }
+.nombre { font-size: clamp(20px,6.4cqw,26px); line-height: 1.2; font-weight: 700; letter-spacing: -.5px; overflow-wrap: anywhere; }
+.motivo { color: var(--ink-soft); }
+.hora { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 14px; font-weight: 600; }
+.hora svg { color: var(--azul-text); width: 16px; height: 16px; }
+.barrio-p { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.barrio-p i { width: 8px; height: 8px; border-radius: 50%; background: var(--barrio); }
+.troquel { position: absolute; right: -1px; top: 14px; bottom: 14px; width: 4px; height: calc(100% - 28px); overflow: visible; }
+.troquel line { stroke-width: 3; stroke-linecap: round; stroke-dasharray: .1 7; vector-effect: non-scaling-stroke; }
+.tq-base { stroke: var(--line); } .tq-on { stroke: var(--control); clip-path: inset(0 0 100% 0); }
+.validado .tq-on { clip-path: inset(0); }
+.talon-wrap { flex: 0 0 auto; }
+.validado .talon-wrap { transform: translateX(8px); }
+.talon { position: relative; height: 100%; display: grid; place-items: center; padding: clamp(14px,4.5cqw,22px) clamp(20px,6cqw,28px) clamp(14px,4.5cqw,22px) clamp(14px,4.5cqw,22px);
+  background: var(--talon-fondo); color: var(--talon-qr); border-radius: 8px 24px 24px 8px;
+  -webkit-mask: radial-gradient(circle var(--notch) at 100% 50%, #0000 calc(var(--notch) - .5px), #000 var(--notch));
+  mask: radial-gradient(circle var(--notch) at 100% 50%, #0000 calc(var(--notch) - .5px), #000 var(--notch)); }
+.qr { display: block; width: clamp(110px,30cqw,150px); height: auto; }
+.talon-sol { position: absolute; inset: 0; display: grid; place-items: center; padding: inherit; background: var(--sol); color: var(--navy); opacity: 0; }
+.validado .talon-sol { opacity: 1; }
+/* vertical (link del invitado en celular) */
+.pase.vertical { flex-direction: column; padding: 0 0 8px; }
+.vertical .cuerpo { border-radius: 24px 24px 8px 8px;
+  -webkit-mask: radial-gradient(circle var(--notch) at 0 100%, #0000 calc(var(--notch) - .5px), #000 var(--notch)) left/51% 100% no-repeat, radial-gradient(circle var(--notch) at 100% 100%, #0000 calc(var(--notch) - .5px), #000 var(--notch)) right/51% 100% no-repeat;
+  mask: radial-gradient(circle var(--notch) at 0 100%, #0000 calc(var(--notch) - .5px), #000 var(--notch)) left/51% 100% no-repeat, radial-gradient(circle var(--notch) at 100% 100%, #0000 calc(var(--notch) - .5px), #000 var(--notch)) right/51% 100% no-repeat; }
+.vertical .troquel { right: 14px; left: 14px; top: auto; bottom: -1px; width: calc(100% - 28px); height: 4px; }
+.vertical .talon { border-radius: 8px 8px 24px 24px; padding: 22px;
+  -webkit-mask: radial-gradient(circle var(--notch) at 0 0, #0000 calc(var(--notch) - .5px), #000 var(--notch)) left/51% 100% no-repeat, radial-gradient(circle var(--notch) at 100% 0, #0000 calc(var(--notch) - .5px), #000 var(--notch)) right/51% 100% no-repeat;
+  mask: radial-gradient(circle var(--notch) at 0 0, #0000 calc(var(--notch) - .5px), #000 var(--notch)) left/51% 100% no-repeat, radial-gradient(circle var(--notch) at 100% 0, #0000 calc(var(--notch) - .5px), #000 var(--notch)) right/51% 100% no-repeat; }
+.vertical .qr { width: 220px; }
+.vertical.validado .talon-wrap { transform: translateY(8px); }
+/* momento de marca (PLAN §4.1): 1,1 s, una vez */
+@media (prefers-reduced-motion: no-preference) {
+  .is-validando .tq-on { animation: pase-troquel 420ms var(--ease-out) both; }
+  .is-validando .talon-wrap { animation: pase-talon 420ms var(--ease-out) 400ms both; }
+  .vertical.is-validando .talon-wrap { animation-name: pase-talon-v; }
+  .is-validando .talon-sol { animation: pase-sol 360ms var(--ease-out) 420ms both; }
+  .is-validando .chip-a { animation: pase-chip-out 260ms var(--ease-out) 700ms both; }
+  .is-validando .chip-b { animation: pase-chip-in 360ms var(--ease-out) 740ms both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-validando .talon-sol, .is-validando .chip-a, .is-validando .chip-b { transition: opacity 150ms; }
+}
+@keyframes pase-troquel { from { clip-path: inset(0 0 100% 0); } }
+@keyframes pase-talon { from { transform: none; } }
+@keyframes pase-talon-v { from { transform: none; } }
+@keyframes pase-sol { from { opacity: 0; } }
+@keyframes pase-chip-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-4px); } }
+@keyframes pase-chip-in { from { opacity: 0; transform: translateY(4px); } }
+/* ---- invitado ---- */
+.tarjeta { background: var(--card); border-radius: 14px; padding: 20px; }
+.campo label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.input { width: 100%; height: 48px; padding: 0 12px; border-radius: 8px; border: 2px solid var(--control); background: var(--card); color: var(--ink); font: inherit; }
+.pie { display: flex; align-items: center; gap: 6px; justify-content: center; font-size: 13px; color: var(--ink-soft); }
+/* ---- veredicto ---- */
+.vered { display: grid; grid-template-columns: 3fr 2fr; gap: 64px; align-items: center; padding: 56px; min-height: 760px; background: var(--verde-tint); color: var(--ink); }
+.vered.no { background: var(--alto); color: #fff; }
+:root[data-theme="dark"] .vered.no { color: var(--navy); }
+.palabra { font-size: 160px; line-height: .9; font-weight: 800; letter-spacing: -.035em; color: var(--verde); }
+.vered.no .palabra { color: inherit; }
+.vered .quien { margin-top: 32px; padding-top: 20px; border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent); font-size: 60px; line-height: 1.05; font-weight: 700; }
+.vered dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 24px; font-size: 20px; align-items: baseline; }
+.vered dt { opacity: .88; } .vered dd { font-weight: 600; }
+.vered .acciones { display: flex; flex-direction: column; gap: 12px; margin-top: 32px; }
+.btn-xl { min-height: 64px; font-size: 20px; border-radius: 14px; }
+.vered .dato-input { height: 48px; font-size: 20px; }
+.kbd { border: 1px solid currentColor; border-radius: 6px; padding: 1px 6px; font-size: 13px; opacity: .8; }
+.registrado { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 700; }
+.mini-talon { width: 40px; height: 56px; border-radius: 8px; background: var(--talon-fondo); display: grid; place-items: center; color: var(--navy); filter: var(--sombra-pase); position: relative; overflow: hidden; }
+.mini-talon .s { position: absolute; inset: 0; background: var(--sol); display: grid; place-items: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .mini-talon.anim { animation: pase-talon 420ms var(--ease-out) both; transform: translateX(8px); }
+  .mini-talon.anim .s { animation: pase-sol 360ms var(--ease-out) 60ms both; }
+}
+.contador { position: relative; overflow: hidden; }
+.contador::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: color-mix(in srgb, var(--card) 45%, transparent); transform-origin: left; animation: vaciar 8s linear forwards; }
+@keyframes vaciar { to { transform: scaleX(0); } }
+/* ---- garita hoy ---- */
+.ghdr { height: 64px; display: flex; align-items: center; gap: 24px; padding: 0 32px; background: var(--card); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 4px; } .tabs a { padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 15px; color: var(--ink); text-decoration: none; }
+.tabs a.on { background: var(--azul-tint); color: var(--azul-text); }
+.ghdr .der { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.iconbtn { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; color: var(--ink); }
+.gcuerpo { display: grid; grid-template-columns: minmax(0,1fr) 22rem; gap: 32px; padding: 28px 32px; max-width: 1440px; }
+.buscar { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; border-radius: 14px; background: var(--card); border: 2px solid var(--control); color: var(--ink-soft); font-size: 17px; }
+.seg { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.sel { min-height: 44px; padding: 0 14px; border-radius: 8px; border: 2px solid var(--control); font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; }
+.sel.on { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.sel span { opacity: .7; }
+.gfila { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 16px; align-items: center; min-height: 56px; border-bottom: 1px solid var(--line); }
+.gfila .m { font-size: 14px; color: var(--ink-soft); }
+.lado { display: flex; flex-direction: column; gap: 20px; }
+.lectora { background: var(--card); border-radius: 14px; padding: 20px; }
+.lectora .estado { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.lectora .estado i { width: 10px; height: 10px; border-radius: 50%; background: var(--verde); }
+.vermas { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="barra-proto">
+  <h1>Prototipo del rediseño · PLAN-REDISENO.md</h1>
+  <button class="btn btn-secondary" id="tema" type="button">Cambiar tema</button>
+  <button class="btn btn-primary" id="validar" type="button">Validar pase (momento de marca)</button>
+  <button class="btn btn-secondary" id="nopasa" type="button">Veredicto: ingreso / no pasa</button>
+</div>
+
+<div class="frames">
+  <!-- 1. Vecino · Inicio -->
+  <section>
+    <p class="frame-label">1 · Vecino, inicio (390)</p>
+    <div class="frame movil">
+      <header class="hdr">
+        <img class="mark" src="brand/pazzit-mark-azul.svg" alt="Pazzit">
+        <span class="barrio">Los Aromos</span>
+        <span class="avatar" aria-label="Tu perfil">VE</span>
+      </header>
+      <div class="pag">
+        <h1 class="t-display">Hola, Vecina.</h1>
+        <p class="muted">Lote 900</p>
+        <div class="grupo">
+          <h2 class="t-heading">Adentro ahora <span>1</span></h2>
+          <div class="fila"><div><p class="t">Carlos Ruiz</p><p class="m">Visita · Hoy</p></div><span class="chip chip-ok tabular"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Adentro 12:32</span></div>
+        </div>
+        <div class="grupo">
+          <h2 class="t-heading">Hoy y próximas <span>2</span></h2>
+          <div class="fila"><div><p class="t">Juan Pérez</p><p class="m">Visita · Hoy</p></div><span class="chip chip-inv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Invitado</span></div>
+          <div class="fila"><div><p class="t">Plomería Sur</p><p class="m">Proveedor · Lun 19 oct</p></div><span class="chip chip-inv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Invitado</span></div>
+        </div>
+        <div class="grupo">
+          <h2 class="t-heading">Frecuentes <span>1</span></h2>
+          <div class="fila"><div><p class="t">Rosa Benítez</p><p class="m">Lun Mié Vie · hasta 15 ene</p></div><span class="chip chip-inv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Invitado</span></div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-lg fab" type="button">+ Invitar visita</button>
+      <nav class="barra-inf">
+        <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/></svg>Invitaciones</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Historial</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Perfil</a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- 2a. Vecino · pase recién creado -->
+  <section>
+    <p class="frame-label">2a · Vecino, pase recién creado (390)</p>
+    <div class="frame movil">
+      <header class="hdr"><img class="mark" src="brand/pazzit-mark-azul.svg" alt="Pazzit"><span class="barrio">Los Aromos</span><span class="avatar">VE</span></header>
+      <div class="pag" style="display:flex;flex-direction:column;gap:20px">
+        <div><h1 class="t-title">Visita invitada.</h1><p class="muted">Mandale el pase a Juan.</p></div>
+        <div class="pase js-pase" data-qr="7"></div>
+        <p class="muted" style="font-size:14px">En la entrada, que muestre el QR con el brillo alto.</p>
+        <button class="btn btn-primary btn-lg" type="button">Mandar el pase</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn btn-secondary" type="button">Copiar link</button><button class="btn btn-secondary" type="button">Editar</button></div>
+        <div style="text-align:center"><a class="link-alto" href="#">Anular invitación</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2b. Invitado -->
+  <section>
+    <p class="frame-label">2b · Link del invitado, pase vertical (390)</p>
+    <div class="frame movil">
+      <div class="pag" style="display:flex;flex-direction:column;gap:20px;padding-bottom:32px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span><img class="logo-claro" src="brand/pazzit-lockup-claro.svg" alt="Pazzit" height="26"><img class="logo-oscuro" src="brand/pazzit-lockup-oscuro.svg" alt="Pazzit" height="26"></span>
+        </div>
+        <p class="muted">Te invita <strong style="color:var(--ink)">Vecina E2E</strong> · Lote 900</p>
+        <div class="pase vertical js-pase" data-qr="11"></div>
+        <p class="muted" style="text-align:center;font-size:14px">En la entrada, mostrá este pase con el brillo alto.</p>
+        <div class="tarjeta" style="display:flex;flex-direction:column;gap:14px">
+          <div><p class="t-heading">Ganá tiempo en la entrada</p><p class="muted" style="font-size:14px">Cargá tu documento y el guardia no te lo pide en la barrera.</p></div>
+          <div class="campo"><label for="d">Documento</label><input id="d" class="input" placeholder="30.123.456…"></div>
+          <button class="btn btn-primary" type="button">Guardar</button>
+        </div>
+        <p class="pie"><img src="brand/pazzit-mark-azul.svg" alt="" height="14"> Pase emitido con Pazzit</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Veredicto -->
+  <section>
+    <p class="frame-label">3 · Garita, veredicto (1280)</p>
+    <div class="frame escritorio">
+      <div class="vered" id="vered">
+        <div>
+          <h1 class="palabra" id="palabra">Ingreso</h1>
+          <p id="motivo" style="display:none;font-size:36px;font-weight:600;margin-top:16px">La anularon</p>
+          <p class="quien">Juan Pérez</p>
+        </div>
+        <div>
+          <dl class="tabular">
+            <dt>Documento</dt><dd><input class="input dato-input" value="30.123.456" aria-label="Documento"></dd>
+            <dt>Patente</dt><dd><input class="input dato-input" value="AB 123 CD" aria-label="Patente"></dd>
+            <dt>Tipo</dt><dd>Visita</dd><dt>Lote</dt><dd>Lote 900</dd><dt>Invita</dt><dd>Vecina E2E</dd><dt>Vigencia</dt><dd>Hoy</dd>
+          </dl>
+          <div class="acciones" id="acciones">
+            <button class="btn btn-ink btn-xl" id="registrar" type="button">Registrar ingreso</button>
+            <p style="font-size:14px"><span class="kbd">Enter</span> registra · <span class="kbd">Esc</span> vuelve</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Garita hoy -->
+  <section>
+    <p class="frame-label">4 · Garita, hoy (1280)</p>
+    <div class="frame escritorio">
+      <header class="ghdr">
+        <span style="display:flex;align-items:center;gap:10px"><img class="mark" src="brand/pazzit-mark-azul.svg" alt="Pazzit"><strong>Los Aromos</strong><span class="muted" style="font-weight:600">· Portería</span></span>
+        <nav class="tabs"><a class="on" href="#">Garita</a><a href="#">Auditoría</a></nav>
+        <div class="der"><span>Guardia E2E</span><button class="iconbtn" aria-label="Tema" type="button">◐</button><button class="iconbtn" aria-label="Cerrar sesión" type="button">⇥</button></div>
+      </header>
+      <div class="gcuerpo">
+        <div>
+          <div class="buscar">⌕ Apellido, documento, unidad o patente…</div>
+          <div class="seg"><button class="sel" type="button">‹</button><button class="sel on" type="button">Hoy</button><button class="sel" type="button">›</button><button class="sel" type="button">Sáb, 17 oct</button></div>
+          <div class="seg"><button class="sel on" type="button">Todos <span>186</span></button><button class="sel" type="button">Por llegar <span>3</span></button><button class="sel" type="button">Adentro <span>183</span></button><button class="sel" type="button">Se fueron <span>0</span></button></div>
+          <div class="grupo"><h2 class="t-heading">Por llegar <span>3</span></h2>
+            <div class="gfila"><div><p style="font-weight:600">Juan Pérez</p><p class="m">Lote 900 · invita Vecina E2E</p></div><span class="m tabular">AB 123 CD</span><span class="chip chip-inv">Por llegar</span></div>
+            <div class="gfila"><div><p style="font-weight:600">Plomería Sur</p><p class="m">Lote 142 · invita Ana Pérez</p></div><span class="m">Proveedor</span><span class="chip chip-inv">Por llegar</span></div>
+          </div>
+          <div class="grupo"><h2 class="t-heading">Adentro <span>183</span></h2>
+            <div class="gfila"><div><p style="font-weight:600">Carlos Ruiz</p><p class="m">Lote 900 · invita Vecina E2E</p></div><span class="m"></span><span class="chip chip-ok tabular">Adentro 12:32</span></div>
+            <div class="gfila"><div><p style="font-weight:600">Rosa Benítez</p><p class="m">Lote 900 · frecuente</p></div><span class="m"></span><span class="chip chip-ok tabular">Adentro 09:10</span></div>
+            <button class="btn btn-secondary vermas" type="button">Ver los 183</button>
+          </div>
+        </div>
+        <aside class="lado">
+          <div class="lectora"><p class="estado"><i></i>Lectora lista</p><p class="muted" style="margin-top:6px">Escaneá un QR o un DNI.</p><p style="margin-top:8px;font-size:14px"><a href="#" style="color:var(--azul-text)">Usar la cámara</a> · <a href="#" style="color:var(--azul-text)">Probar lectora</a></p></div>
+          <button class="btn btn-secondary" type="button">+ Autorizar sin invitación</button>
+          <div><p class="t-heading" style="font-size:16px">Últimos movimientos</p>
+            <div class="gfila" style="grid-template-columns:auto 1fr auto"><span class="chip chip-ok">Adentro</span><span>Carlos Ruiz</span><span class="m tabular">12:32</span></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// QR decorativo (como qrPath de la landing): el real lo dibuja qrcode.react.
+function qrPath(seed) { let s = seed; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const f = (x, y) => (x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12); let d = '';
+  for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) if (!f(x, y) && r() > .52) d += `M${x} ${y}h1v1h-1z`;
+  for (const [a, b] of [[0, 0], [14, 0], [0, 14]]) d += `M${a} ${b}h7v7h-7zM${a + 1} ${b + 1}v5h5v-5zM${a + 2} ${b + 2}h3v3h-3z`; return d }
+const qr = (seed) => `<svg class="qr" viewBox="0 0 21 21" aria-hidden="true" shape-rendering="crispEdges"><path d="${qrPath(seed)}" fill="currentColor" fill-rule="evenodd"/></svg>`
+const reloj = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+const check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>'
+document.querySelectorAll('.js-pase').forEach((el) => {
+  const vertical = el.classList.contains('vertical')
+  el.setAttribute('aria-label', 'Pase de Juan Pérez, visita para Lote 900, hoy. Estado: invitado.')
+  el.innerHTML = `
+    <div class="pieza cuerpo-wrap"><div class="cuerpo">
+      <span class="chips" aria-live="polite"><span class="chip chip-inv chip-a">${reloj}Invitado</span><span class="chip chip-ok chip-b">${check}Validado</span></span>
+      <span class="nombre">Juan Pérez</span><span class="motivo">Visita para Lote 900</span>
+      <span class="hora"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>Hoy, todo el día</span>
+      ${vertical ? '' : '<span class="motivo" style="font-size:14px">Invita Vecina E2E</span>'}
+      <span class="barrio-p"><i></i>Los Aromos</span>
+    </div>
+    <svg class="troquel" viewBox="${vertical ? '0 0 100 4' : '0 0 4 100'}" preserveAspectRatio="none" aria-hidden="true">
+      ${vertical ? '<line class="tq-base" x1="2" y1="2" x2="98" y2="2"/><line class="tq-on" x1="2" y1="2" x2="98" y2="2"/>' : '<line class="tq-base" x1="2" y1="2" x2="2" y2="98"/><line class="tq-on" x1="2" y1="2" x2="2" y2="98"/>'}
+    </svg></div>
+    <div class="pieza talon-wrap"><div class="talon">${qr(+el.dataset.qr)}<span class="talon-sol">${qr(+el.dataset.qr)}</span></div></div>`
+})
+document.getElementById('tema').onclick = () => { const d = document.documentElement; d.dataset.theme = d.dataset.theme === 'dark' ? 'light' : 'dark' }
+document.getElementById('validar').onclick = () => document.querySelectorAll('.js-pase').forEach((el) => {
+  el.classList.remove('is-validando', 'validado'); void el.offsetWidth; el.classList.add('is-validando', 'validado')
+})
+let no = false
+const accionesIniciales = document.getElementById('acciones').innerHTML
+document.getElementById('nopasa').onclick = () => { no = !no
+  document.getElementById('vered').classList.toggle('no', no)
+  document.getElementById('palabra').textContent = no ? 'No pasa' : 'Ingreso'
+  document.getElementById('motivo').style.display = no ? 'block' : 'none'
+  document.getElementById('acciones').innerHTML = accionesIniciales
+  document.getElementById('registrar').textContent = no ? 'Volver (Esc)' : 'Registrar ingreso'
+  document.querySelector('#acciones p').style.display = no ? 'none' : '' }
+document.getElementById('acciones').onclick = (e) => { if (no || e.target.id !== 'registrar') return
+  document.getElementById('acciones').innerHTML = `
+    <p class="registrado" role="status"><span class="mini-talon anim"><span class="s">${check.replace('<svg', '<svg width="20" height="20"')}</span></span>Ingreso registrado</p>
+    <button class="btn btn-ink btn-xl contador" type="button">Siguiente (8)</button>
+    <button class="btn btn-secondary btn-xl" type="button" style="color:inherit;border-color:currentColor">Deshacer</button>` }
+</script>
+</body>
+</html>

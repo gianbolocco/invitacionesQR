@@ -5,12 +5,14 @@ import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import { createUnit, listUnits, labelForLot, setPersonLot } from '../services/units.js'
 import {
-  createPerson, createGuard, listPeople, disablePerson, enablePerson, resendInvite, setGuardPassword,
+  createPerson, createGuard, listPeople, disablePerson, enablePerson, resendInvite, inviteLink, setGuardPassword,
 } from '../services/people.js'
 import { importPeopleRows, previewPeopleCsv } from '../services/people-import.js'
 import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
 import { guardarLogo, borrarLogo } from '../services/branding.js'
 import { AppError } from '../lib/errors.js'
+import { contrasena } from '../lib/contrasena.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 
 export const adminRoutes = Router()
 adminRoutes.use(requireAuth, requireRole('admin'))
@@ -34,7 +36,7 @@ adminRoutes.post('/guards', async (req, res) => {
   const body = z.object({
     name: z.string().trim().min(1).max(160),
     username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}$/),
-    password: z.string().min(10),
+    password: contrasena,
   }).parse(req.body)
 
   const guard = await createGuard({
@@ -89,13 +91,22 @@ adminRoutes.post('/people/:id/disable', async (req, res) => {
   res.json({ ok: true })
 })
 
-adminRoutes.post('/people/:id/resend', async (req, res) => {
-  await resendInvite(req.params.id, req.person!.id, req.person!.neighborhoodId)
+// Un mail por persona por minuto: el doble clic, o el admin que insiste porque
+// no lo ve llegar, no le llenan la bandeja al vecino. Cuenta al entrar y no al
+// terminar, así dos pedidos simultáneos no pasan los dos.
+const unReenvioPorMinuto = rateLimit({ max: 1, windowMs: 60_000, key: (req) => `reenvio:${req.params.id}` })
+
+adminRoutes.post('/people/:id/resend', unReenvioPorMinuto, async (req, res) => {
+  await resendInvite(String(req.params.id), req.person!.id, req.person!.neighborhoodId)
   res.json({ ok: true })
 })
 
+adminRoutes.post('/people/:id/invite-link', async (req, res) => {
+  res.json({ url: await inviteLink(req.params.id, req.person!.id, req.person!.neighborhoodId) })
+})
+
 adminRoutes.post('/people/:id/password', async (req, res) => {
-  const { password } = z.object({ password: z.string().min(10) }).parse(req.body)
+  const { password } = z.object({ password: contrasena }).parse(req.body)
   await setGuardPassword(req.params.id, password, req.person!.id, req.person!.neighborhoodId)
   res.json({ ok: true })
 })

@@ -71,6 +71,20 @@
       "when": 1791765750141,
       "tag": "0009_username_guardias",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792116259867,
+      "tag": "0010_carga_manual",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792117114160,
+      "tag": "0011_anulacion_motivo",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,8 @@
  */
 export type Marca = { nombre: string; color: string; tieneLogo: boolean; logoVersion: number | null }
 
-export const MARCA_DEFAULT: Marca = { nombre: 'VisitPass', color: '#1e6b47', tieneLogo: false, logoVersion: null }
+// El azul de Pazzit: el color de un barrio que todavía no eligió el suyo.
+export const MARCA_DEFAULT: Marca = { nombre: 'Pazzit', color: '#2f5bff', tieneLogo: false, logoVersion: null }
 
 export async function leerMarca(): Promise<Marca> {
   const base = process.env.API_INTERNAL_URL ?? 'http://localhost:8080'

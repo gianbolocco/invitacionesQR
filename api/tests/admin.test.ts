@@ -217,8 +217,8 @@ describe('color de marca del barrio', () => {
     const res = await request(app).get('/admin/neighborhood').set('Cookie', cookie).expect(200)
 
     expect(res.body.brandColor).toBeNull()
-    expect(res.body.paleta).toHaveLength(8)
-    expect(res.body.paleta).toContain('#1e6b47')
+    expect(res.body.paleta).toHaveLength(9)
+    expect(res.body.paleta[0]).toBe('#2f5bff')
   })
 
   it('guarda un color de la paleta', async () => {
@@ -249,5 +249,47 @@ describe('color de marca del barrio', () => {
     const { cookie } = await loginAs('resident')
     await request(app).patch('/admin/neighborhood')
       .set('Cookie', cookie).send({ brandColor: '#1d4e89' }).expect(403)
+  })
+})
+
+describe('reenvío y link de alta', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  async function vecinoInvitado(cookie: string[]) {
+    const alta = await request(app).post('/admin/people').set('Cookie', cookie)
+      .send({ email: 'martin@example.com', name: 'Martín', role: 'resident' })
+    return alta.body.id as string
+  }
+
+  it('un segundo reenvío dentro del minuto rebota sin mandar otro mail', async () => {
+    const { cookie } = await loginAs('admin')
+    const id = await vecinoInvitado(cookie)
+
+    const primero = await request(app).post(`/admin/people/${id}/resend`).set('Cookie', cookie)
+    expect(primero.status).toBe(200)
+    const segundo = await request(app).post(`/admin/people/${id}/resend`).set('Cookie', cookie)
+    expect(segundo.status).toBe(429)
+
+    const reenvios = await db.select().from(auditLogs).where(eq(auditLogs.action, 'person.reinvited'))
+    expect(reenvios).toHaveLength(1)
+  })
+
+  it('el link copiado sirve para darse de alta', async () => {
+    const { cookie } = await loginAs('admin')
+    const id = await vecinoInvitado(cookie)
+
+    const res = await request(app).post(`/admin/people/${id}/invite-link`).set('Cookie', cookie)
+    expect(res.status).toBe(200)
+    const token = new URL(res.body.url).searchParams.get('t')
+    expect(new URL(res.body.url).pathname).toBe('/acceso')
+
+    const alta = await request(app).post('/auth/invite').send({ token, password: 'una-contrasena-larga', lot: 142 })
+    expect(alta.status).toBe(200)
+  })
+
+  it('un vecino no puede pedir el link de otro', async () => {
+    const { cookie } = await loginAs('resident')
+    const res = await request(app).post('/admin/people/00000000-0000-4000-8000-000000000000/invite-link').set('Cookie', cookie)
+    expect(res.status).toBe(403)
   })
 })

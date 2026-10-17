@@ -3,7 +3,7 @@ import { leerMarca } from '@/lib/marca'
 
 export const dynamic = 'force-dynamic'
 
-/** La app instalada lleva el nombre y el color del barrio, no los del producto. */
+/** La app instalada lleva el nombre y el ícono del barrio; el fondo es el de Pazzit. */
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const marca = await leerMarca()
   return {

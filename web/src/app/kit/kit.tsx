@@ -111,7 +111,6 @@ export function Kit() {
 
       <Bloque titulo="Marca">
         <Marca />
-        <span className="rounded-lg bg-marca px-4 py-3"><Marca variante="banda" /></span>
         <Marca variante="grande" />
       </Bloque>
 
@@ -136,16 +135,16 @@ export function Kit() {
       </Bloque>
 
       <Bloque titulo="Vacío y error">
-        <div className="w-80 rounded-lg border border-line bg-card">
+        <div className="w-80 rounded-md border border-line bg-card">
           <Vacio icono={Inbox} titulo="Todavía no invitaste a nadie" detalle="Creá una invitación y compartila por WhatsApp." accion={<Button>Nueva invitación</Button>} />
         </div>
-        <div className="w-80 rounded-lg border border-line bg-card">
+        <div className="w-80 rounded-md border border-line bg-card">
           <ErrorConReintento onReintentar={() => toast('Reintentando')} />
         </div>
       </Bloque>
 
       <Bloque titulo="Skeleton de pantalla">
-        <div className="w-full rounded-lg border border-line"><SkeletonPantalla filas={3} /></div>
+        <div className="w-full rounded-md border border-line"><SkeletonPantalla filas={3} /></div>
       </Bloque>
       <Bloque titulo="Indicadores">
         <div className="grid w-full gap-3 sm:grid-cols-3">

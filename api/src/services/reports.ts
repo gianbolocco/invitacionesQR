@@ -129,6 +129,7 @@ export type EntryRow = {
   guardName: string | null
   exitedAt: string | null
   exitGuardName: string | null
+  manual: boolean
 }
 
 export async function entriesLog(neighborhoodId: string, f: EntryFilters): Promise<EntryRow[]> {
@@ -136,7 +137,8 @@ export async function entriesLog(neighborhoodId: string, f: EntryFilters): Promi
     select e.id, e.entered_at as "enteredAt", e.exited_at as "exitedAt",
            e.guest_name as "guestName",
            e.guest_doc as "guestDoc", e.plate, u.label as "unitLabel",
-           g.name as "guardName", gs.name as "exitGuardName"
+           g.name as "guardName", gs.name as "exitGuardName",
+           (e.source = 'manual') as manual
     from entry_log e
     join unit u on u.id = e.unit_id
     left join person g on g.id = e.guard_id

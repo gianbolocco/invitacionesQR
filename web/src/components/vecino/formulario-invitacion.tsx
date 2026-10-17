@@ -85,7 +85,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       onListo(inv)
     } catch {
       setErrorGeneral(editando
-        ? 'No se pudo guardar. Si ya entró gente, no podés achicar el período por debajo de esos ingresos.'
+        ? 'No se pudo guardar. Una invitación que ya se usó o venció no se puede editar.'
         : 'No se pudo crear la invitación. Revisá los datos y probá de nuevo.')
     }
   }
@@ -142,7 +142,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
         )}
       </section>
 
-      <section className="flex flex-col gap-5 rounded-lg bg-surface-sunk/70 p-4 sm:p-5">
+      <section className="flex flex-col gap-5 rounded-md bg-surface-sunk/70 p-4 sm:p-5">
         <div>
           <p className="font-semibold">Para entrar más rápido</p>
           <p className="text-sm text-ink-soft">Opcional. Si lo cargás, el guardia no lo tiene que pedir en la barrera.</p>

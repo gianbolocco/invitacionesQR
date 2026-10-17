@@ -5,3 +5,7 @@ dist/
 .next/
 out/
 .superpowers/
+# Capturas del rediseño: no se versionan, las regenera docs/rediseno/capturas.cjs
+docs/rediseno/antes/
+docs/rediseno/despues/
+docs/rediseno/*.png

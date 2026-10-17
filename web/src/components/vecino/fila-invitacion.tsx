@@ -2,7 +2,7 @@
 import { Fila } from '@/components/dominio/fila'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { estadoInvitacion } from '@/lib/estado-invitacion'
-import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
+import { KIND_LABEL, quienInvita, vigencia, type Invitation } from '@/lib/invitations'
 import { cupoTexto, hora, hoyISO } from '@/lib/fechas'
 
 /** Una invitación en una lista: quién, cuándo y en qué está. Lleva al pase. */
@@ -17,7 +17,7 @@ export function FilaInvitacion({ inv, mostrarUnidad = false, mostrarCreador = fa
     vigencia(inv),
     cupoTexto(inv),
     mostrarUnidad ? inv.unitLabel : null,
-    mostrarCreador ? `por ${inv.creatorName}` : null,
+    mostrarCreador ? quienInvita(inv.creatorName, 'por') : null,
   ].filter(Boolean).join(' · ')
 
   return (
