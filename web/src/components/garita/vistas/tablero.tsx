@@ -1,6 +1,6 @@
 'use client'
 import { LayoutGroup, MotionConfig, motion } from 'motion/react'
-import { CheckCheck, DoorOpen, Hourglass, LogOut } from 'lucide-react'
+import { CheckCheck, DoorOpen, Hourglass } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { TarjetaInvitado } from '@/components/garita/tarjeta-invitado'
 import { Fila } from '@/components/dominio/fila'
@@ -12,12 +12,13 @@ import { cn } from '@/lib/utils'
 import { metaDe } from '@/components/garita/datos-agenda'
 
 /*
- * Las columnas se distinguen por relleno y peso, igual que EstadoTag: macizo
- * es "está pasando ahora", contorno es "viene", apagado es "ya fue". Se lee
- * igual en escala de grises.
+ * Las columnas se distinguen por relleno y peso: macizo es "está pasando
+ * ahora", contorno es "viene". Se lee igual en escala de grises.
+ * Solo las dos que el guardia usa para decidir (decisión del dueño): quién ya
+ * se fue no cambia nada en la barrera, y sigue en la vista lista y en el filtro.
  */
 const COLUMNAS: {
-  clave: 'porLlegar' | 'adentro' | 'seFueron'
+  clave: 'porLlegar' | 'adentro'
   titulo: string
   vacio: string
   icono: LucideIcon
@@ -27,12 +28,10 @@ const COLUMNAS: {
     cabecera: 'border-[1.5px] border-ink text-ink' },
   { clave: 'adentro', titulo: 'Adentro', vacio: 'No hay nadie adentro', icono: DoorOpen,
     cabecera: 'bg-ink text-surface' },
-  { clave: 'seFueron', titulo: 'Se fueron', vacio: 'Todavía no salió nadie', icono: LogOut,
-    cabecera: 'border-[1.5px] border-ink/50 text-ink-soft' },
 ]
 
 /**
- * El día de un vistazo: quién viene, quién está adentro y quién ya se fue. Es
+ * El día de un vistazo: quién viene y quién está adentro. Es
  * solo lectura —ingresar y egresar pasa por el veredicto, que es donde se
  * decide—, pero cuando alguien cambia de estado su tarjeta viaja de una
  * columna a la otra, así se ve qué se movió. Las vencidas quedan abajo,
@@ -46,7 +45,7 @@ export function Tablero({ columnas, hoy, onAbrir }: {
   return (
     <MotionConfig reducedMotion="user">
       <LayoutGroup>
-        <div className="grid grid-cols-3 items-start gap-3">
+        <div className="grid grid-cols-2 items-start gap-3">
           {COLUMNAS.map((c) => {
             const filas = columnas[c.clave]
             const Icono = c.icono
@@ -72,7 +71,7 @@ export function Tablero({ columnas, hoy, onAbrir }: {
                     <motion.div key={r.id} layout="position" layoutId={r.id}
                       initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}>
-                      <TarjetaInvitado fila={r} hoy={hoy} onAbrir={onAbrir} apagada={c.clave === 'seFueron'} />
+                      <TarjetaInvitado fila={r} hoy={hoy} onAbrir={onAbrir} />
                     </motion.div>
                   ))}
                 </div>
