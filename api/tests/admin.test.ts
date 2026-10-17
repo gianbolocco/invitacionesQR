@@ -217,8 +217,8 @@ describe('color de marca del barrio', () => {
     const res = await request(app).get('/admin/neighborhood').set('Cookie', cookie).expect(200)
 
     expect(res.body.brandColor).toBeNull()
-    expect(res.body.paleta).toHaveLength(8)
-    expect(res.body.paleta).toContain('#1e6b47')
+    expect(res.body.paleta).toHaveLength(9)
+    expect(res.body.paleta[0]).toBe('#2f5bff')
   })
 
   it('guarda un color de la paleta', async () => {
