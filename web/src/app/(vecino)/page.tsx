@@ -40,8 +40,7 @@ export default function InicioVecino() {
         <ErrorConReintento onReintentar={() => q.refetch()} reintentando={q.isFetching} />
       ) : q.data.length === 0 ? (
         <Vacio icono={Ticket} titulo="Todavía no invitaste a nadie"
-          detalle="Creá una invitación y compartila por WhatsApp. Le llega el pase con el QR."
-          accion={<Link href={NUEVA} className={buttonVariants()}><Plus aria-hidden />Nueva invitación</Link>} />
+          detalle="Creá una invitación y compartila por WhatsApp. Le llega el pase con el QR." />
       ) : (
         <section aria-labelledby="vigentes">
           <div className="flex items-baseline justify-between border-b-2 border-ink pb-2">
