@@ -14,10 +14,13 @@
 - **Referencia de marca:** el código de la landing en `C:\Users\gianl\Desktop\pazzit\pazzit-landingpage`
   (`app/globals.css`, `components/Pass.tsx`). La landing publicada (pazzit.com) no respondía al
   armar el plan (HTTP: "no available server"; HTTPS: certificado inválido).
-- **Marca: "Pazzit manda"** (decisión del dueño). Azul, navy y sol de Pazzit en toda la UI. El barrio
-  aparece con su **nombre y logo**; su color (`--marca-base`, elegido en Administración → Barrio) queda
-  **solo** como acento chico en el pase (el punto antes del nombre del barrio) y en el ícono de la app
-  instalada (`lib/icono-marca.tsx`, sin cambios). El selector de color del admin se mantiene tal cual.
+- **Marca: el acento sigue al barrio** (decisión del dueño, revisada el 2026-10-17 al revisar la fase a;
+  reemplaza a "Pazzit manda"). Forma, letra, estados y sol son de Pazzit. El acento (botones, links,
+  fondos y neutros teñidos) es el color del barrio: **por defecto el azul de Pazzit** (`#2f5bff`, primero
+  de la paleta de `api/src/lib/marca.ts`), con los tokens del §1.1 tal cual; con otro color de la paleta,
+  `data-marca="propia"` en el `<html>` deriva la paleta clara y oscura de ese color (`globals.css`). Header:
+  sin logo cargado, mark de Pazzit en el color del barrio + nombre; con logo, solo el logo del barrio.
+  Motivo: el azul de Pazzit al lado de un logo o un color de barrio distinto hacía ruido.
 - **Dispositivo:** vecino e invitado se diseñan **desde el celular (390px)**. Garita y administración se
   diseñan **desde el escritorio (1280px+)**; el celular para ellos es secundario pero no se rompe.
 - **Prototipo visual:** `docs/rediseno/prototipo.html` (abrir en el navegador). Es la referencia de

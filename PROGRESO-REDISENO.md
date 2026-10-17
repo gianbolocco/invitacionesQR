@@ -90,6 +90,34 @@ Desvíos y decisiones:
   arranque y 404 (→ e), `/kit` (→ f). Los `uppercase` que quedan son de los inputs de patente (funcional) y
   del kit.
 
+### Revisión del dueño de la fase a (2026-10-17)
+
+Pedido: el azul de Pazzit contra el color y el logo del barrio hacía ruido. Default azul; cada color
+propio con su modo claro y oscuro sin romper la identidad; sin logo, el mark de Pazzit en el color
+elegido + nombre del barrio; con logo, solo el logo.
+
+Hecho:
+- `#2f5bff` (azul de Pazzit) entra primero en la paleta cerrada de `api/src/lib/marca.ts` y es el
+  `COLOR_DEFAULT`: un barrio sin color guardado queda en azul. Los 8 colores anteriores siguen.
+  **Desvío aprobado por el pedido:** toca `api/` (una constante; sin cambios de endpoints ni de modelo).
+  Tests de `admin.test.ts` y `branding.test.ts` actualizados (9 colores, default azul).
+- Con el azul, la paleta es la del §1.1 tal cual. Con otro color, el layout pone `data-marca="propia"` en
+  el `<html>` (y `AplicarMarca` lo cambia en vivo al guardar) y `globals.css` deriva `surface`, `card`
+  (oscuro), `surface-sunk`, `line`, `control`, `ink`, `ink-soft`, `azul`, `azul-text`, `azul-tint` y
+  `focus` del color, en claro y en oscuro (oklch relativo: mismo tono, luminosidad fija; el tinte de los
+  neutros se topa con un tercio del croma, así pizarra no sale celeste). Estados, sol, talón y escáner no
+  cambian.
+- `LogoPazzit variante="mark"` se dibuja como máscara sobre `bg-azul` (toma el color del barrio).
+  `Marca conPazzit`: sin logo, mark + nombre; con logo, solo el logo (h-9). Lo usan los tres headers y la
+  vista previa de `/admin/barrio`.
+- Ayuda del logo: "Sin logo, mostramos el nombre del barrio." (copy del §5, adelantada de la fase d).
+
+Verificación: `api npm test` 326 ok · web `check`, `lint`, `tsc` ok · `npm run e2e` 67 ok, 1 salteado.
+Capturas puntuales con azul, verde, violeta y pizarra en claro y oscuro (admin, tablero, inicio del
+vecino). El color del barrio de desarrollo quedó en azul (el que tenía al empezar).
+No verificado a la vista: el header sin logo (la base de desarrollo tiene logo cargado y no lo borré).
+La barra del navegador (`theme-color`) sigue con el fondo de Pazzit también con color propio.
+
 ## Pendiente de decisión
 
 Nada. Siguiente paso: revisión del dueño de la fase a; después, fase b (Pase, vecino e invitado).
