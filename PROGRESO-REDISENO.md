@@ -139,6 +139,24 @@ Pedidos del dueño y lo hecho:
 Verificación: web `check`, `lint`, `tsc` ok · e2e completo 67 ok, 1 salteado (antes del cambio del
 tablero) y `garita.spec.ts` 29 ok después · capturas 156 sin desborde.
 
+### Tercera ronda: una sola familia de color (2026-10-17)
+
+Problemas que marcó la autoevaluación y el dueño eligió resolver así (opciones 1A + 2A):
+- **Neutros cálidos fijos en los dos temas**: crema (`#F6F3EE`, `#ECE7DF`, `#E6E0D6`, ink `#14130F`,
+  ink-soft `#6B645A`) en claro y el espresso que ya estaba en oscuro, iguales para todos los barrios.
+  Sombras en `rgb(20 19 15)` en vez de navy. Manifest con fondo `#F6F3EE`.
+- **Rellenos con el color real del barrio** en los dos temas (`--azul: var(--marca-base)`): el header
+  bordó en oscuro es bordó, no rosado. Solo `azul-text` se aclara en oscuro; `azul-tint` es una mezcla
+  del color con la tarjeta (12% claro, 26% oscuro).
+- Con eso la paleta ya no depende de si el color es el azul de Pazzit: se borraron `data-marca`,
+  `esMarcaPropia`, `COLOR_PAZZIT` y los bloques de neutros derivados por oklch.
+- Plan actualizado (§0, §1.1, §1.2 sombras, §1.4 navegación, §3.3 "No pasa", §3.4 tablero) para que
+  vuelva a ser la única referencia.
+
+Verificación: web `check`, `lint`, `tsc` ok · capturas con azul, verde, bordó y pizarra en claro y
+oscuro (admin barrio, tablero, inicio del vecino). Pizarra en oscuro es el caso más tenue: el botón se
+distingue, pero con poco contraste contra la tarjeta.
+
 ## Pendiente de decisión
 
 Nada. Siguiente paso: revisión del dueño de la fase a; después, fase b (Pase, vecino e invitado).

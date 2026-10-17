@@ -14,13 +14,14 @@
 - **Referencia de marca:** el código de la landing en `C:\Users\gianl\Desktop\pazzit\pazzit-landingpage`
   (`app/globals.css`, `components/Pass.tsx`). La landing publicada (pazzit.com) no respondía al
   armar el plan (HTTP: "no available server"; HTTPS: certificado inválido).
-- **Marca: el acento sigue al barrio** (decisión del dueño, revisada el 2026-10-17 al revisar la fase a;
-  reemplaza a "Pazzit manda"). Forma, letra, estados y sol son de Pazzit. El acento (botones, links,
-  fondos y neutros teñidos) es el color del barrio: **por defecto el azul de Pazzit** (`#2f5bff`, primero
-  de la paleta de `api/src/lib/marca.ts`), con los tokens del §1.1 tal cual; con otro color de la paleta,
-  `data-marca="propia"` en el `<html>` deriva la paleta clara y oscura de ese color (`globals.css`). Header:
-  sin logo cargado, mark de Pazzit en el color del barrio + nombre; con logo, solo el logo del barrio.
-  Motivo: el azul de Pazzit al lado de un logo o un color de barrio distinto hacía ruido.
+- **Marca: el acento sigue al barrio** (decisión del dueño al revisar la fase a, 2026-10-17; reemplaza
+  a "Pazzit manda"). Forma, letra, estados, sol y **neutros cálidos fijos** (crema de día, espresso de
+  noche, iguales para todos los barrios) son de Pazzit. El acento es el color del barrio: **por defecto
+  el azul de Pazzit** (`#2f5bff`, primero de la paleta de `api/src/lib/marca.ts`). Los rellenos (header,
+  botón principal, barras) usan el color tal cual en los dos temas; solo el texto en color (`azul-text`)
+  se aclara en oscuro. Header en el color del barrio con todo en blanco encima: sin logo cargado, mark de
+  Pazzit + nombre; con logo, solo el logo. Motivo: el azul de Pazzit al lado de un logo o un color de
+  barrio distinto hacía ruido, y aclarar el color en oscuro lo lavaba (el bordó salía rosado).
 - **Dispositivo:** vecino e invitado se diseñan **desde el celular (390px)**. Garita y administración se
   diseñan **desde el escritorio (1280px+)**; el celular para ellos es secundario pero no se rompe.
 - **Prototipo visual:** `docs/rediseno/prototipo.html` (abrir en el navegador). Es la referencia de
@@ -57,24 +58,25 @@ con valores nuevos, y se **renombran** los que eran del barrio (`marca*` → `az
 
 | Token app | Claro | Oscuro | Uso |
 |---|---|---|---|
-| `--surface` (fondo de página) | `#F3F6FF` | `#0A1030` | `bg-surface` |
-| `--card` | `#FFFFFF` | `#131B45` | tarjetas, inputs, header, hojas |
-| `--surface-sunk` | `#E8EDFB` | `#1A2357` | bloques hundidos, skeleton |
-| `--line` | `#E1E6F5` | `#24306A` | divisores |
-| `--control` | `#7C86A8` | `#7480B8` | borde de inputs y botón secundario (3:1) |
-| `--ink` | `#0B1640` | `#E6ECFF` | texto |
-| `--ink-soft` | `#4A5578` | `#A6B0D6` | texto secundario |
-| `--azul` | `#2F5BFF` | `#2F5BFF` | botón principal (texto blanco) |
-| `--azul-text` | `#2F5BFF` | `#7D93FF` | links, íconos activos, texto azul |
-| `--azul-tint` | `#E3E9FF` | `#24306A` | estado "invitado", hover, ítem activo |
+| `--surface` (fondo de página) | `#F6F3EE` | `#12110E` | `bg-surface` |
+| `--card` | `#FFFFFF` | `#201E19` | tarjetas, inputs, hojas |
+| `--surface-sunk` | `#ECE7DF` | `#1C1A16` | bloques hundidos, skeleton |
+| `--line` | `#E6E0D6` | `#34312B` | divisores |
+| `--control` | `#8A8378` | `#8A8378` | borde de inputs y botón secundario (3:1) |
+| `--ink` | `#14130F` | `#F2EEE6` | texto |
+| `--ink-soft` | `#6B645A` | `#A8A195` | texto secundario |
+| `--azul` | `var(--marca-base)` | igual | header, botón principal, barras (texto blanco) |
+| `--azul-text` | `var(--marca-base)` | `oklch(from base 0.76 min(c,0.16) h)` | links, íconos activos, texto en color |
+| `--azul-tint` | `color-mix(base 12%, card)` | `color-mix(base 26%, card)` | estado "invitado", hover, ítem activo |
 | `--navy` | `#0B1640` | `#0B1640` | texto sobre sol |
 | `--sol` | `#FFC933` | `#FFC933` | acento (ver reglas) |
 | `--verde` / `--verde-tint` | `#0E7A55` / `#E2F6EC` | `#5BE0A8` / `#0F2B26` | validado |
 | `--espera` / `--espera-tint` | `#8A5A00` / `#FFF3D1` | `#FFD166` / `#2E2410` | esperando / atención |
 | `--alto` / `--alto-tint` | `#B42318` / `#FDE7E4` | `#FF8A7A` / `#3A1620` | vencido, anulado, error |
-| `--focus` | `#2F5BFF` | `#FFC933` | anillo de foco |
+| `--focus` | `var(--marca-base)` | `#FFC933` | anillo de foco (blanco sobre el header en claro) |
 | `--barrio` | `var(--marca-base)` | igual | **solo** el punto del barrio en el pase |
-| `--escaner-fondo` | `#0A1030` | igual | visor de cámara (oscuro siempre) |
+| `--escaner-fondo` | `#12110E` | igual | visor de cámara (oscuro siempre) |
+| `--no-pasa` / `--no-pasa-texto` | `#7A1420` / `#FFF1F0` | igual | campo del veredicto "No pasa" |
 
 Tailwind (`@theme inline`): exponer `azul`, `azul-text`, `azul-tint`, `navy`, `sol`, `verde`, `verde-tint`,
 `espera`, `espera-tint`, `alto`, `alto-tint`, `control`, `barrio`, además de los existentes. Nombres shadcn:
@@ -103,8 +105,8 @@ El tema oscuro se escribe dos veces, como hoy y como en la landing (`:root[data-
   `body` pasa de 15 a **16px**. Números: `tabular-nums`. Títulos: `text-wrap: balance`.
 - Radios: `--radius-sm 8px` (chips, inputs, filas activas) · `--radius-md 14px` (botones, tarjetas) ·
   `--radius-lg 24px` (pase, hojas, contenedores grandes). Se borra `--radius-xl`. Sin `rounded-full` salvo avatares y puntos.
-- Sombras: solo `--sombra-pase: drop-shadow(0 14px 16px rgb(11 22 64 / .14))` (oscuro: `rgb(0 0 0 / .35)`) y
-  `--sombra-flotante: 0 18px 40px -16px rgb(11 22 64 / .35)` (oscuro: `rgb(0 0 0 / .6)`, nunca una sombra de color sobre fondo oscuro) para hojas, diálogos, toasts y el botón flotante.
+- Sombras: solo `--sombra-pase: drop-shadow(0 14px 16px rgb(20 19 15 / .14))` (oscuro: `rgb(0 0 0 / .35)`) y
+  `--sombra-flotante: 0 18px 40px -16px rgb(20 19 15 / .35)` (oscuro: `rgb(0 0 0 / .6)`, nunca una sombra de color sobre fondo oscuro) para hojas, diálogos, toasts y el botón flotante.
   Tarjetas, inputs y filas: **planos** (sin `shadow-*`).
 - Íconos: `lucide-react` con `strokeWidth={2}` (es lo que usa la landing). Sin emojis ni glifos (▲▼).
 - Movimiento: `--ease-out: cubic-bezier(.22,1,.36,1)` · `--ease-in-out: cubic-bezier(.76,0,.24,1)` ·
@@ -133,8 +135,8 @@ Favicon de la pestaña: sigue siendo el del barrio (`app/icon.tsx`, sin cambios)
 | PassCard | `dominio/pase.tsx` (reescritura, se exporta como `Pase` para no tocar imports) | Ver §1.5. |
 | Fila | `dominio/fila.tsx` | min-h 64 (vecino) / 56 (garita, admin), divisor `line`, título 16/600, meta 14 `ink-soft`; hover `azul-tint` al 50% solo en puntero fino; sin sombra. |
 | Tarjeta | utilitaria | `bg-card rounded-[14px] p-5`, sin borde ni sombra sobre `surface`; con borde `line` solo sobre `card`. Se borra `.tarjeta-viva` (sube al hover). |
-| Navegación vecino | `vecino/chrome.tsx`, `dominio/barra-seccion.tsx` | Header h-14 sticky `bg-card` + borde inferior `line`: `LogoPazzit mark` 24px + nombre (o logo h-7) del barrio 16/700; derecha avatar 40px (`azul-tint`, iniciales `azul-text`) → perfil. Se va la banda de color y el "Lote 900" duplicado. Barra inferior: `bg-card`, ítems 64px, activo `azul-text` con indicador 3px×24 radio 2 `azul` arriba (spring existente). ≥640: tabs en el header (texto 15/600, activa `azul-tint` + `azul-text`, radio 8). |
-| Navegación garita/admin | `garita/chrome.tsx`, `admin/chrome.tsx` | **Escritorio primero.** Header h-16 `bg-card` + borde `line`, ancho máx. 1440/1280: izquierda mark + barrio + rol en `ink-soft` ("Portería" / "Administración"); tabs como arriba; derecha nombre de quien está de turno, `SelectorTema`, cerrar sesión (botones 44×44). Admin conserva "Invitaciones" (volver) como link `ghost`. Celular: igual que hoy (barra inferior; escáner central 56px `azul` con `--sombra-flotante`). |
+| Navegación vecino | `vecino/chrome.tsx`, `dominio/barra-seccion.tsx` | Header h-14 sticky `HEADER` (`bg-azul`, todo blanco encima, foco blanco en claro / sol en oscuro): `Marca conPazzit sobreColor` (sin logo: mark blanco 24px + nombre 16/700; con logo: solo el logo h-9); derecha avatar 40px (`white/20`, iniciales blancas) → perfil. Se va el "Lote 900" duplicado. Barra inferior: `bg-card`, ítems 64px, activo `azul-text` con indicador 3px×24 radio 2 `azul` arriba (spring existente). ≥640: tabs en el header (texto 15/600, activa `white/20`, radio 8). |
+| Navegación garita/admin | `garita/chrome.tsx`, `admin/chrome.tsx` | **Escritorio primero.** Header h-16 `HEADER` como el del vecino, ancho máx. 1440/1280: izquierda `Marca conPazzit sobreColor` + rol en `white/80` ("Portería" / "Administración"); tabs como arriba (admin desde 1024px: cinco no entran en una tablet); derecha nombre de quien está de turno, `SelectorTema sobreColor`, cerrar sesión (botones 44×44). Admin conserva "Invitaciones" (volver) como link `ghost`. Celular: igual que hoy (barra inferior; escáner central 56px `azul` con `--sombra-flotante`). |
 | SelectorTema | `selector-tema.tsx` | Tres estados se mantienen. Grupo radio 8, botones 44×44 (hoy 36), activo `azul-tint` + `azul-text`. |
 | Hoja (Sheet) | `ui/sheet.tsx` | Abajo en celular (radio 24 arriba, asa 36×4 `line`); a la derecha en escritorio (ancho 480). `--sombra-flotante`. Entrada 280ms `--ease-hoja` (translate 100%), salida 200ms. Overlay `rgb(11 22 64 / .4)`. `overscroll-behavior: contain`. Botón cerrar 44×44, `sr-only` "Cerrar" (hoy dice "Close"). |
 | Diálogo | `ui/dialog.tsx` | Radio 24, `bg-card`, `--sombra-flotante`; entra `opacity 0, scale .96` → 1 en 200ms `--ease-out`, sale 150ms; `sr-only` "Cerrar". Footer: acción a la derecha en escritorio, apiladas a ancho completo en celular. |
@@ -305,10 +307,10 @@ entrada" y "Cómo llegar" son tarjetas planas radio 14. Escritorio: PassCard hor
 Solo cambian clases, copy y el ícono de confirmación; **la lógica, los atajos, el foco y el contador
 no se tocan**. Campos por tema (se distinguen por luminancia dentro de cada tema):
 - "Ingreso" claro: fondo `verde-tint`, palabra `verde`, texto `ink` · oscuro: fondo `verde-tint` oscuro, palabra `verde`, texto `ink`.
-- "No pasa" claro: fondo `alto`, texto blanco · oscuro: fondo `alto` (#FF8A7A), texto `navy`.
+- "No pasa" (los dos temas): fondo `no-pasa` (#7A1420), texto `no-pasa-texto`; "Autorizar igual" los invierte.
 - "Egreso": fondo `azul-tint`, palabra `azul-text`.
 Botón principal: fondo `ink`, texto `card` (contraste máximo sobre el campo); foco: anillo 3px `ink`
-offset 3px (en "No pasa" claro, anillo blanco). Inputs del campo: `bg-card`, borde `control`.
+offset 3px (en "No pasa", anillo `no-pasa-texto`). Inputs del campo: `bg-card`, borde `control`.
 La palabra entra como hoy (scale 1.12→1, 260ms, `--ease-out`). Momento de marca: §4.1 (mini talón).
 Celular: misma estructura apilada (palabra 64px).
 
@@ -334,7 +336,9 @@ Celular: misma estructura apilada (palabra 64px).
 Grilla `minmax(0,1fr) 22rem` desde 1024px (hoy 768 y 20rem). Búsqueda h-14. "Por llegar" va primero
 (es lo que el guardia espera). "Autorizar sin invitación" pasa a la columna derecha como `secondary`
 ancho completo. Las cuatro vistas (tablero, lista, compacta, por unidad) se conservan con los
-componentes nuevos; la tarjeta del tablero pierde la sombra y el `translateY` al hover.
+componentes nuevos; la tarjeta del tablero pierde la sombra y el `translateY` al hover. El tablero tiene
+solo dos columnas, "Por llegar" y "Adentro" (decisión del dueño, ya hecho en la fase a); "Se fueron"
+queda en la vista lista y en el filtro.
 
 ### 3.5 Resto de pantallas
 
