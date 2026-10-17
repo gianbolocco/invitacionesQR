@@ -317,6 +317,49 @@ button:not(:disabled), [role='button'], a.presionable {
   :root:not([data-theme='light']) .logo-oscuro { display: inline-block; }
 }
 
+/*
+  Fondo de las pantallas de acceso (decisión del dueño: que el login no se vea
+  plano). Manchas difuminadas del color del barrio y del sol, hechas con
+  degradados radiales (sin `filter: blur`, que es caro). Las dos capas se
+  mueven muy lento solo con `transform`; con movimiento reducido quedan quietas.
+  En oscuro la mancha usa el color aclarado (`azul-text`): el color tal cual,
+  si es oscuro como el bordó, desaparece sobre el espresso.
+*/
+.fondo-acceso {
+  --mancha-color: var(--marca-base);
+  --mancha-marca: 30%;
+  --mancha-sol: 26%;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--surface);
+}
+:root[data-theme='dark'] .fondo-acceso { --mancha-color: var(--azul-text); --mancha-marca: 24%; --mancha-sol: 12%; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .fondo-acceso { --mancha-color: var(--azul-text); --mancha-marca: 24%; --mancha-sol: 12%; }
+}
+.fondo-acceso::before,
+.fondo-acceso::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+}
+.fondo-acceso::before {
+  background:
+    radial-gradient(34% 30% at 34% 32%, color-mix(in oklab, var(--mancha-color) var(--mancha-marca), transparent), transparent 72%),
+    radial-gradient(36% 32% at 68% 74%, color-mix(in oklab, var(--mancha-color) calc(var(--mancha-marca) * 0.75), transparent), transparent 72%);
+}
+.fondo-acceso::after {
+  background: radial-gradient(28% 26% at 70% 30%, color-mix(in oklab, var(--sol) var(--mancha-sol), transparent), transparent 72%);
+}
+@keyframes fondo-deriva-a { to { transform: translate3d(4%, 3%, 0) scale(1.06); } }
+@keyframes fondo-deriva-b { to { transform: translate3d(-5%, 4%, 0) scale(1.04); } }
+@media (prefers-reduced-motion: no-preference) {
+  .fondo-acceso::before { animation: fondo-deriva-a 24s var(--ease-in-out) infinite alternate; }
+  .fondo-acceso::after { animation: fondo-deriva-b 30s var(--ease-in-out) infinite alternate; }
+}
+
 /* La librería del escáner dibuja su propio marco y su sombreado; usamos los
    nuestros, que no se desalinean al redimensionar. */
 #reader #qr-shaded-region { border-color: transparent !important; }
