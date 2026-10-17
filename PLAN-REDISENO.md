@@ -120,7 +120,8 @@ El tema oscuro se escribe dos veces, como hoy y como en la landing (`:root[data-
 Copiar `pazzit-landingpage/public/brand/*.svg` a `web/public/brand/` (no editarlos; siempre como `<img>`:
 comparten `mask id="m1"` y en línea chocan). Componente nuevo `components/dominio/logo-pazzit.tsx`:
 `<LogoPazzit variante="lockup|mark" ancho>` que alterna `-claro`/`-oscuro` por CSS (como `Logo.tsx` de la landing).
-Favicon de la pestaña: sigue siendo el del barrio (`app/icon.tsx`, sin cambios).
+Favicon, ícono de la app instalada e ícono de iOS: el ícono de app de Pazzit (mark blanco sobre cuadrado)
+en el color del barrio (`lib/icono-marca.tsx`; decisión del dueño, hecho en la fase a). Ya no usa el logo del barrio.
 
 ### 1.4 Componentes base (especificación)
 
@@ -354,7 +355,7 @@ queda en la vista lista y en el filtro.
 | Admin tablero | KPI §1.4 (4 por fila ≥1024), barras `azul`; "Atención" con tono espera. |
 | Admin vecinos / guardias | Tabla como auditoría; acciones de texto `azul-text`, "Dar de baja" `alto`; `sheet-alta` e importar CSV con Hoja/Campo nuevos. |
 | Admin barrio | Paleta del barrio sigue igual (swatches 44px radio 8, seleccionado con anillo `ink`); vista previa con PassCard. |
-| Login, olvidé, reset, acceso | Sin halo; lockup Pazzit 120px arriba; tarjeta `card` radio 24 sin sombra; logo/nombre del barrio dentro de la tarjeta sobre el título. |
+| Login, olvidé, reset, acceso | Fondo de manchas difuminadas del color del barrio y del sol (`.fondo-acceso`, decisión del dueño, hecho en la fase a; reemplaza el "sin halo"); lockup Pazzit 120px arriba; tarjeta `card` radio 24 con `--sombra-flotante`; logo/nombre del barrio dentro de la tarjeta sobre el título. |
 | 404 | "Por acá no se pasa." + "Volver al inicio". |
 | Arranque | Mark de Pazzit 48px + nombre del barrio; barra indeterminada `azul`. |
 

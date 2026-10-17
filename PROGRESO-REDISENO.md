@@ -157,6 +157,20 @@ Verificación: web `check`, `lint`, `tsc` ok · capturas con azul, verde, bordó
 oscuro (admin barrio, tablero, inicio del vecino). Pizarra en oscuro es el caso más tenue: el botón se
 distingue, pero con poco contraste contra la tarjeta.
 
+### Cuarta ronda (2026-10-17)
+
+- Inicio del vecino: el estado vacío ya no repite "Nueva invitación" (queda el del encabezado / flotante).
+- Rama pusheada a `origin/rediseno-pazzit`.
+- **Fondo del acceso** (login, olvidé, reset, acceso), pedido del dueño en contra del "diseño plano" del plan:
+  `.fondo-acceso` en `globals.css`, tres manchas con degradados radiales (dos del color del barrio, una del
+  sol), sin `filter: blur`. En oscuro la mancha usa `azul-text` (el color tal cual, si es oscuro, no se
+  ve sobre el espresso). Se mueven muy lento con `transform` (24 s y 30 s, ida y vuelta); con movimiento
+  reducido, quietas. La tarjeta suma `--sombra-flotante` para despegarse del fondo.
+- **Favicon e íconos**: `lib/icono-marca.tsx` dibuja el ícono de app de Pazzit (mark blanco sobre
+  cuadrado redondeado) con el color del barrio. Lo usan la pestaña, la app instalada (manifest) y el
+  ícono de iOS (este último sin redondear: iOS redondea solo). El logo del barrio ya no se usa como
+  ícono.
+
 ## Pendiente de decisión
 
 Nada. Siguiente paso: revisión del dueño de la fase a; después, fase b (Pase, vecino e invitado).
