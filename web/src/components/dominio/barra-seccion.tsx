@@ -50,12 +50,20 @@ export function BarraSeccion({ items, central, hasta = 'sm' }: {
   )
 }
 
-/** La pestaña de los headers de escritorio: la activa en azul-tint, radio 8. */
+/*
+ * Los headers llevan de fondo el color del barrio (decisión del dueño), en su
+ * variante del tema: la paleta cerrada aguanta texto blanco en los dos. Encima
+ * todo es blanco; el foco también (el azul se perdería sobre el azul), salvo
+ * en oscuro, donde el foco ya es el sol.
+ */
+export const HEADER = 'sticky top-0 z-30 bg-azul text-white [--focus:white] dark:[--focus:var(--sol)]'
+
+/** La pestaña de los headers de escritorio: la activa con un velo blanco, radio 8. */
 export function claseTab(activo: boolean): string {
   return cn('flex h-11 items-center gap-1.5 rounded-sm px-3.5 text-[15px] font-semibold transition-colors duration-(--t-hover)',
-    activo ? 'bg-azul-tint text-azul-text' : 'text-ink hover-fino:bg-azul-tint/60')
+    activo ? 'bg-white/20 text-white' : 'text-white/85 hover-fino:bg-white/10 hover-fino:text-white')
 }
 
 /** Los botones de ícono de los headers (tema, cerrar sesión, admin): 44×44. */
 export const BOTON_HEADER =
-  'grid size-11 shrink-0 place-items-center rounded-md text-ink transition-colors duration-(--t-hover) hover-fino:bg-azul-tint'
+  'grid size-11 shrink-0 place-items-center rounded-md text-white transition-colors duration-(--t-hover) hover-fino:bg-white/15'

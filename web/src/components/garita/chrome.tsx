@@ -6,7 +6,7 @@ import { useSesion } from '@/lib/sesion-contexto'
 import { logout } from '@/lib/session'
 import { Marca } from '@/components/dominio/marca'
 import { SelectorTema } from '@/components/selector-tema'
-import { BarraSeccion, BOTON_HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
+import { BarraSeccion, HEADER, BOTON_HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
 
 /**
  * El marco de la garita, pensado desde el escritorio: header de Pazzit con el
@@ -31,11 +31,11 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
-      <header className="sticky top-0 z-30 border-b border-line bg-card">
+      <header className={HEADER}>
         <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-6 px-4 md:px-6 xl:px-8">
           <Link href="/garita" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
-            <Marca conPazzit />
-            <span className="hidden shrink-0 font-semibold text-ink-soft sm:inline">· Portería</span>
+            <Marca conPazzit sobreColor />
+            <span className="hidden shrink-0 font-semibold text-white/80 sm:inline">· Portería</span>
           </Link>
 
           <nav aria-label="Secciones" className="hidden items-center gap-1 sm:flex">
@@ -47,13 +47,13 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <span className="hidden text-[15px] text-ink sm:inline">{me.name}</span>
+            <span className="hidden text-[15px] text-white/90 sm:inline">{me.name}</span>
             {me.role === 'admin' && (
               <Link href="/admin" aria-label="Ir a administración" title="Ir a administración" className={BOTON_HEADER}>
                 <Settings2 className="size-5" aria-hidden />
               </Link>
             )}
-            <SelectorTema />
+            <SelectorTema sobreColor />
             <button onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión" className={BOTON_HEADER}>
               <LogOut className="size-5" aria-hidden />
             </button>

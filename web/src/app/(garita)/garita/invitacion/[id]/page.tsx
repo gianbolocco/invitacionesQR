@@ -259,7 +259,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
 
   return (
     <main aria-live="assertive"
-      className={`min-h-dvh overflow-x-hidden p-6 sm:p-10 lg:px-14 ${ok ? 'bg-verde-tint text-ink' : 'bg-alto text-white dark:text-navy'}`}>
+      className={`min-h-dvh overflow-x-hidden p-6 sm:p-10 lg:px-14 ${ok ? 'bg-verde-tint text-ink' : 'bg-no-pasa text-no-pasa-texto'}`}>
       {/* Un solo árbol. Mobile: una columna, la acción al pie. Desde lg: lo que
           decide a la izquierda, para leer de lejos; la ficha y la acción a la
           derecha, para el guardia sentado. Solo cambia la grilla. */}
@@ -384,7 +384,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                   {/* El vecino ya dijo que sí por teléfono. Una anulada no: ahí dijo que no. */}
                   {(check as { reason: string }).reason !== 'revoked' && (
                     <button onClick={(e) => { setDisparadorAlta(e.currentTarget); setAltaAbierta(true) }}
-                      className="min-h-16 w-full rounded bg-white text-xl font-bold text-alto dark:bg-navy">
+                      className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
                       Autorizar igual
                     </button>
                   )}

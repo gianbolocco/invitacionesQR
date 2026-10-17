@@ -9,7 +9,7 @@ import { useSesion } from '@/lib/sesion-contexto'
 import { logout } from '@/lib/session'
 import { Marca } from '@/components/dominio/marca'
 import { SelectorTema } from '@/components/selector-tema'
-import { BarraSeccion, BOTON_HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
+import { BarraSeccion, HEADER, BOTON_HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 
 const PESTANAS = [
@@ -42,11 +42,11 @@ export function ChromeAdmin({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
-      <header className="sticky top-0 z-30 border-b border-line bg-card">
+      <header className={HEADER}>
         <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-6 px-4 md:px-6 xl:px-8">
           <Link href="/admin" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
-            <Marca conPazzit />
-            <span className="hidden shrink-0 font-semibold text-ink-soft lg:inline">· Administración</span>
+            <Marca conPazzit sobreColor />
+            <span className="hidden shrink-0 font-semibold text-white/80 lg:inline">· Administración</span>
           </Link>
 
           {/* Cinco pestañas no entran en una tablet: hasta 1024px sigue la barra de abajo. */}
@@ -62,12 +62,12 @@ export function ChromeAdmin({ children }: { children: React.ReactNode }) {
             {/* El admin entra acá y, sin esto, no hay vuelta a la vista de
                 invitaciones: ninguna pestaña de arriba lleva a "/". */}
             <Link href="/" aria-label="Volver a invitaciones" title="Volver a invitaciones"
-              className="flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-3 text-[15px] font-semibold text-ink transition-colors duration-(--t-hover) hover-fino:bg-azul-tint">
+              className="flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-3 text-[15px] font-semibold text-white transition-colors duration-(--t-hover) hover-fino:bg-white/15">
               <ArrowLeft className="size-5" aria-hidden />
               <span className="hidden xl:inline">Invitaciones</span>
             </Link>
-            <span className="hidden text-[15px] text-ink xl:inline">{me.name}</span>
-            <SelectorTema />
+            <span className="hidden text-[15px] text-white/90 xl:inline">{me.name}</span>
+            <SelectorTema sobreColor />
             <button onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión" className={BOTON_HEADER}>
               <LogOut className="size-5" aria-hidden />
             </button>

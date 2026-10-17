@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { History, Settings2, Ticket, UserRound } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { Marca } from '@/components/dominio/marca'
-import { BarraSeccion, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
+import { BarraSeccion, HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
 
 function iniciales(nombre: string): string {
   return nombre.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('')
@@ -32,10 +32,10 @@ export function ChromeVecino({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
-      <header className="sticky top-0 z-30 border-b border-line bg-card">
+      <header className={HEADER}>
         <div className="mx-auto flex h-14 max-w-[calc(640px+3rem)] items-center justify-between gap-3 px-4 md:px-6">
           <Link href="/" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
-            <Marca conPazzit />
+            <Marca conPazzit sobreColor />
           </Link>
 
           <nav aria-label="Secciones" className="hidden items-center gap-1 sm:flex">
@@ -51,7 +51,7 @@ export function ChromeVecino({ children }: { children: React.ReactNode }) {
           </nav>
 
           <Link href="/perfil" aria-label="Tu perfil"
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-azul-tint text-sm font-bold text-azul-text sm:hidden">
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-white/20 text-sm font-bold text-white sm:hidden">
             <span aria-hidden>{iniciales(me.name)}</span>
           </Link>
         </div>

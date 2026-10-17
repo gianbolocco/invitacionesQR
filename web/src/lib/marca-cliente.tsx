@@ -40,8 +40,8 @@ export function logoUrl(m: Marca): string | null {
 
 /**
  * Lleva la marca al documento: el color como variable CSS (de él sale el
- * acento de toda la app) y el título. La barra del navegador ya no: es de Pazzit y la fija
- * el viewport del layout. No dibuja nada.
+ * acento de toda la app), el de la barra del navegador en claro y el título.
+ * No dibuja nada.
  */
 export function AplicarMarca() {
   const marca = useMarca()
@@ -52,6 +52,9 @@ export function AplicarMarca() {
     // Con el azul de Pazzit vuelve la paleta diseñada a mano; con otro, la derivada.
     if (esMarcaPropia(marca.color)) html.dataset.marca = 'propia'
     else delete html.dataset.marca
+    document
+      .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"][media="(prefers-color-scheme: light)"]')
+      .forEach((m) => { m.content = marca.color })
   }, [marca.color])
 
   // generateMetadata ya fija el título inicial; solo se toca si el nombre cambia

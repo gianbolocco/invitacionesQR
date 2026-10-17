@@ -9,16 +9,18 @@ import { cn } from '@/lib/utils'
  * pinta el barrio: si hay logo lo muestra, si no, el nombre.
  *
  * - normal: en los headers. Con `conPazzit` y sin logo, el nombre va
- *   acompañado del mark de Pazzit en el color del barrio; con logo cargado
- *   va solo el logo, que ya es la identidad del barrio.
+ *   acompañado del mark de Pazzit (en blanco sobre el color del barrio); con
+ *   logo cargado va solo el logo, que ya es la identidad del barrio.
  * - grande: arranque y pantallas de acceso.
  *
  * `marcaOverride` la usa la vista previa de /admin/barrio: en vez de leer
  * la marca guardada, muestra la que se está editando, antes de guardar.
  */
-export function Marca({ variante = 'normal', conPazzit = false, className, marcaOverride }: {
+export function Marca({ variante = 'normal', conPazzit = false, sobreColor = false, className, marcaOverride }: {
   variante?: 'normal' | 'grande'
   conPazzit?: boolean
+  /** Sobre el color del barrio (headers): nombre y mark en blanco. */
+  sobreColor?: boolean
   className?: string
   marcaOverride?: DatosMarca
 }) {
@@ -37,7 +39,7 @@ export function Marca({ variante = 'normal', conPazzit = false, className, marca
   }
 
   const nombre = (
-    <span className={cn('truncate text-ink', {
+    <span className={cn('truncate', sobreColor ? 'text-white' : 'text-ink', {
       normal: 'text-base font-bold',
       grande: 't-heading',
     }[variante], !conPazzit && className)}>
@@ -47,7 +49,7 @@ export function Marca({ variante = 'normal', conPazzit = false, className, marca
   if (!conPazzit) return nombre
   return (
     <span className={cn('flex min-w-0 items-center gap-2.5', className)}>
-      <LogoPazzit variante="mark" ancho={variante === 'grande' ? 40 : 24} alt="" />
+      <LogoPazzit variante="mark" ancho={variante === 'grande' ? 40 : 24} alt="" className={sobreColor ? 'bg-white' : undefined} />
       {nombre}
     </span>
   )

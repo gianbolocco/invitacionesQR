@@ -31,16 +31,20 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export const viewport: Viewport = {
-  // Espejan --surface de globals.css: la barra del navegador es de Pazzit,
-  // no del barrio (el color del barrio queda en el pase y en el ícono).
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f3f6ff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0a1030' },
-  ],
-  width: 'device-width',
-  initialScale: 1,
-  // Sin maximumScale: el vecino tiene que poder hacer zoom.
+export async function generateViewport(): Promise<Viewport> {
+  const marca = await leerMarca()
+  return {
+    // En claro la barra del navegador sigue al header, que lleva el color del
+    // barrio (AplicarMarca la actualiza en vivo). En oscuro, el fondo de la app:
+    // el header oscuro es una variante calculada en CSS que acá no se conoce.
+    themeColor: [
+      { media: '(prefers-color-scheme: light)', color: marca.color },
+      { media: '(prefers-color-scheme: dark)', color: '#12110e' },
+    ],
+    width: 'device-width',
+    initialScale: 1,
+    // Sin maximumScale: el vecino tiene que poder hacer zoom.
+  }
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

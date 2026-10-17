@@ -96,6 +96,8 @@
   --color-alto-tint: var(--alto-tint);
   --color-focus: var(--focus);
   --color-barrio: var(--barrio);
+  --color-no-pasa: var(--no-pasa);
+  --color-no-pasa-texto: var(--no-pasa-texto);
   --color-escaner-fondo: var(--escaner-fondo);
   --color-escaner-texto: var(--escaner-texto);
   --color-escaner-marco: var(--escaner-marco);
@@ -137,9 +139,14 @@
   --talon-fondo: #ffffff;
   --talon-qr: #0b1640;
 
+  /* El campo de "No pasa": bordó con texto casi blanco, igual en los dos temas
+     (decisión del dueño). Se lee a dos metros y no se confunde con el ingreso. */
+  --no-pasa: #7a1420;
+  --no-pasa-texto: #fff1f0;
+
   /* El escáner es un visor de cámara: oscuro SIEMPRE, no sigue el tema. */
-  --escaner-fondo: #0a1030;
-  --escaner-texto: #e6ecff;
+  --escaner-fondo: #12110e;
+  --escaner-texto: #f2eee6;
   /* El azul de texto del tema oscuro: el visor siempre es oscuro. */
   --escaner-marco: #7d93ff;
 
@@ -155,19 +162,22 @@
   Tema oscuro, escrito dos veces a propósito: una para la elección explícita y
   otra para la preferencia del sistema. CSS no tiene mixins, y encadenar los
   selectores haría que el toggle no le pueda ganar al sistema.
+  Los neutros del oscuro son cálidos y los mismos para todos los barrios
+  (decisión del dueño): con fondos casi negros, el acento de cualquier color
+  se lee sin pelear con un fondo teñido. El acento y su tinte siguen al barrio.
   Las sombras se oscurecen: nunca una sombra de color sobre fondo oscuro.
 */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --surface: #0a1030;
-  --card: #131b45;
-  --surface-sunk: #1a2357;
-  --line: #24306a;
-  --control: #7480b8;
-  --ink: #e6ecff;
-  --ink-soft: #a6b0d6;
+  --surface: #12110e;
+  --card: #201e19;
+  --surface-sunk: #1c1a16;
+  --line: #34312b;
+  --control: #8a8378;
+  --ink: #f2eee6;
+  --ink-soft: #a8a195;
   --azul-text: #7d93ff;
-  --azul-tint: #24306a;
+  --azul-tint: color-mix(in oklab, var(--azul) 24%, var(--card));
   --verde: #5be0a8;
   --verde-tint: #0f2b26;
   --espera: #ffd166;
@@ -182,15 +192,15 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --surface: #0a1030;
-    --card: #131b45;
-    --surface-sunk: #1a2357;
-    --line: #24306a;
-    --control: #7480b8;
-    --ink: #e6ecff;
-    --ink-soft: #a6b0d6;
+    --surface: #12110e;
+    --card: #201e19;
+    --surface-sunk: #1c1a16;
+    --line: #34312b;
+    --control: #8a8378;
+    --ink: #f2eee6;
+    --ink-soft: #a8a195;
     --azul-text: #7d93ff;
-    --azul-tint: #24306a;
+    --azul-tint: color-mix(in oklab, var(--azul) 24%, var(--card));
     --verde: #5be0a8;
     --verde-tint: #0f2b26;
     --espera: #ffd166;
@@ -227,30 +237,30 @@
   --focus: var(--marca-base);
 }
 :root[data-marca='propia'][data-theme='dark'] {
-  --surface: oklch(from var(--marca-base) 0.17 min(0.03, c * 0.35) h);
-  --card: oklch(from var(--marca-base) 0.215 min(0.04, c * 0.35) h);
-  --surface-sunk: oklch(from var(--marca-base) 0.25 min(0.045, c * 0.35) h);
-  --line: oklch(from var(--marca-base) 0.31 min(0.05, c * 0.35) h);
-  --control: oklch(from var(--marca-base) 0.62 min(0.06, c * 0.35) h);
-  --ink: oklch(from var(--marca-base) 0.94 min(0.015, c * 0.35) h);
-  --ink-soft: oklch(from var(--marca-base) 0.77 min(0.035, c * 0.35) h);
+  --surface: #12110e;
+  --card: #201e19;
+  --surface-sunk: #1c1a16;
+  --line: #34312b;
+  --control: #8a8378;
+  --ink: #f2eee6;
+  --ink-soft: #a8a195;
   --azul: oklch(from var(--marca-base) max(l, 0.5) c h);
   --azul-text: oklch(from var(--marca-base) 0.76 min(c, 0.14) h);
-  --azul-tint: oklch(from var(--marca-base) 0.31 min(0.06, c * 0.35) h);
+  --azul-tint: color-mix(in oklab, var(--azul) 24%, var(--card));
   --focus: #ffc933;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-marca='propia']:not([data-theme='light']) {
-    --surface: oklch(from var(--marca-base) 0.17 min(0.03, c * 0.35) h);
-    --card: oklch(from var(--marca-base) 0.215 min(0.04, c * 0.35) h);
-    --surface-sunk: oklch(from var(--marca-base) 0.25 min(0.045, c * 0.35) h);
-    --line: oklch(from var(--marca-base) 0.31 min(0.05, c * 0.35) h);
-    --control: oklch(from var(--marca-base) 0.62 min(0.06, c * 0.35) h);
-    --ink: oklch(from var(--marca-base) 0.94 min(0.015, c * 0.35) h);
-    --ink-soft: oklch(from var(--marca-base) 0.77 min(0.035, c * 0.35) h);
+    --surface: #12110e;
+    --card: #201e19;
+    --surface-sunk: #1c1a16;
+    --line: #34312b;
+    --control: #8a8378;
+    --ink: #f2eee6;
+    --ink-soft: #a8a195;
     --azul: oklch(from var(--marca-base) max(l, 0.5) c h);
     --azul-text: oklch(from var(--marca-base) 0.76 min(c, 0.14) h);
-    --azul-tint: oklch(from var(--marca-base) 0.31 min(0.06, c * 0.35) h);
+    --azul-tint: color-mix(in oklab, var(--azul) 24%, var(--card));
     --focus: #ffc933;
   }
 }
