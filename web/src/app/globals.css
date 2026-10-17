@@ -3,10 +3,9 @@
 
 /*
   Sistema de Pazzit (PLAN-REDISENO.md §1).
-  Forma, letra, estados y sol son de Pazzit. El acento (botones, links, fondos
-  y neutros teñidos) sigue al color del barrio (--marca-base, lo inyecta el
-  servidor): por defecto el azul de Pazzit, con la paleta diseñada a mano; con
-  otro color, la paleta se deriva de él (ver `data-marca` más abajo).
+  Forma, letra, estados, sol y neutros cálidos son de Pazzit. El acento
+  (header, botones, links) es el color del barrio (--marca-base, lo inyecta el
+  servidor); por defecto, el azul de Pazzit.
   Sol: una sola cosa por pantalla y siempre con navy encima.
 */
 
@@ -109,21 +108,30 @@
 :root {
   color-scheme: light;
   /* El servidor pisa esto con el color del barrio, y AplicarMarca lo vuelve a
-     pisar en vivo cuando el admin lo cambia. */
+     pisar en vivo cuando el admin lo cambia. Por defecto, el azul de Pazzit. */
   --marca-base: #2f5bff;
   --barrio: var(--marca-base);
 
-  --surface: #f3f6ff;
+  /* Neutros cálidos, fijos para todos los barrios: crema de día, espresso de
+     noche. Así el claro y el oscuro son de la misma familia, y el color del
+     barrio (o su logo) es lo único que tiene tono. */
+  --surface: #f6f3ee;
   --card: #ffffff;
-  --surface-sunk: #e8edfb;
-  --line: #e1e6f5;
-  /* 3:1 contra el fondo: es el borde de lo que se toca (inputs, secundario). */
-  --control: #7c86a8;
-  --ink: #0b1640;
-  --ink-soft: #4a5578;
-  --azul: #2f5bff;
-  --azul-text: #2f5bff;
-  --azul-tint: #e3e9ff;
+  --surface-sunk: #ece7df;
+  --line: #e6e0d6;
+  /* 3:1 contra el fondo y la tarjeta: es el borde de lo que se toca. */
+  --control: #8a8378;
+  --ink: #14130f;
+  /* 5,3:1 sobre el fondo, 5,9:1 sobre la tarjeta. */
+  --ink-soft: #6b645a;
+
+  /* El acento es el color del barrio, tal cual: la paleta cerrada
+     (api/src/lib/marca.ts) está elegida para llevar texto blanco encima. */
+  --azul: var(--marca-base);
+  --azul-text: var(--marca-base);
+  --azul-tint: color-mix(in oklab, var(--marca-base) 12%, var(--card));
+  --focus: var(--marca-base);
+
   --navy: #0b1640;
   --sol: #ffc933;
   --verde: #0e7a55;
@@ -132,7 +140,6 @@
   --espera-tint: #fff3d1;
   --alto: #b42318;
   --alto-tint: #fde7e4;
-  --focus: #2f5bff;
 
   /* El talón del pase es blanco con QR navy en los dos temas: un QR invertido
      sobre fondo oscuro no lo lee cualquier lector. */
@@ -150,8 +157,8 @@
   /* El azul de texto del tema oscuro: el visor siempre es oscuro. */
   --escaner-marco: #7d93ff;
 
-  --sombra-pase: drop-shadow(0 14px 16px rgb(11 22 64 / 0.14));
-  --sombra-flotante: 0 18px 40px -16px rgb(11 22 64 / 0.35);
+  --sombra-pase: drop-shadow(0 14px 16px rgb(20 19 15 / 0.14));
+  --sombra-flotante: 0 18px 40px -16px rgb(20 19 15 / 0.35);
 
   --t-press: 120ms;
   --t-hover: 180ms;
@@ -162,9 +169,9 @@
   Tema oscuro, escrito dos veces a propósito: una para la elección explícita y
   otra para la preferencia del sistema. CSS no tiene mixins, y encadenar los
   selectores haría que el toggle no le pueda ganar al sistema.
-  Los neutros del oscuro son cálidos y los mismos para todos los barrios
-  (decisión del dueño): con fondos casi negros, el acento de cualquier color
-  se lee sin pelear con un fondo teñido. El acento y su tinte siguen al barrio.
+  Los rellenos de acento (header, botones, barras) siguen siendo el color del
+  barrio tal cual: aclararlo lo lavaba (el bordó salía rosado). Solo el texto
+  en color se aclara para leerse sobre el espresso.
   Las sombras se oscurecen: nunca una sombra de color sobre fondo oscuro.
 */
 :root[data-theme='dark'] {
@@ -176,8 +183,8 @@
   --control: #8a8378;
   --ink: #f2eee6;
   --ink-soft: #a8a195;
-  --azul-text: #7d93ff;
-  --azul-tint: color-mix(in oklab, var(--azul) 24%, var(--card));
+  --azul-text: oklch(from var(--marca-base) 0.76 min(c, 0.16) h);
+  --azul-tint: color-mix(in oklab, var(--marca-base) 26%, var(--card));
   --verde: #5be0a8;
   --verde-tint: #0f2b26;
   --espera: #ffd166;
@@ -199,8 +206,8 @@
     --control: #8a8378;
     --ink: #f2eee6;
     --ink-soft: #a8a195;
-    --azul-text: #7d93ff;
-    --azul-tint: color-mix(in oklab, var(--azul) 24%, var(--card));
+    --azul-text: oklch(from var(--marca-base) 0.76 min(c, 0.16) h);
+    --azul-tint: color-mix(in oklab, var(--marca-base) 26%, var(--card));
     --verde: #5be0a8;
     --verde-tint: #0f2b26;
     --espera: #ffd166;
@@ -210,58 +217,6 @@
     --focus: #ffc933;
     --sombra-pase: drop-shadow(0 14px 16px rgb(0 0 0 / 0.35));
     --sombra-flotante: 0 18px 40px -16px rgb(0 0 0 / 0.6);
-  }
-}
-
-/*
-  Un barrio con color propio (`data-marca="propia"` en el <html>, lo pone el
-  layout): el acento es su color y los neutros toman su tono, cada uno con su
-  versión clara y oscura. Solo se mueven luminosidad y croma (oklch), así toda
-  la paleta sale del mismo tono y nada choca con el logo. El tinte de los
-  neutros se topa con un tercio del croma del color: un gris no se pinta. Los colores de estado,
-  el sol y el talón del pase no cambian: son la identidad que no se toca.
-  La paleta cerrada (api/src/lib/marca.ts) es oscura: en claro lleva texto
-  blanco encima; en oscuro el acento sube a L 0,5 para seguir leyéndose.
-*/
-:root[data-marca='propia'] {
-  --surface: oklch(from var(--marca-base) 0.973 min(0.012, c * 0.35) h);
-  --card: #ffffff;
-  --surface-sunk: oklch(from var(--marca-base) 0.94 min(0.02, c * 0.35) h);
-  --line: oklch(from var(--marca-base) 0.915 min(0.022, c * 0.35) h);
-  --control: oklch(from var(--marca-base) 0.6 min(0.04, c * 0.35) h);
-  --ink: oklch(from var(--marca-base) 0.22 min(0.05, c * 0.35) h);
-  --ink-soft: oklch(from var(--marca-base) 0.45 min(0.04, c * 0.35) h);
-  --azul: var(--marca-base);
-  --azul-text: var(--marca-base);
-  --azul-tint: oklch(from var(--marca-base) 0.94 min(0.035, c * 0.35) h);
-  --focus: var(--marca-base);
-}
-:root[data-marca='propia'][data-theme='dark'] {
-  --surface: #12110e;
-  --card: #201e19;
-  --surface-sunk: #1c1a16;
-  --line: #34312b;
-  --control: #8a8378;
-  --ink: #f2eee6;
-  --ink-soft: #a8a195;
-  --azul: oklch(from var(--marca-base) max(l, 0.5) c h);
-  --azul-text: oklch(from var(--marca-base) 0.76 min(c, 0.14) h);
-  --azul-tint: color-mix(in oklab, var(--azul) 24%, var(--card));
-  --focus: #ffc933;
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-marca='propia']:not([data-theme='light']) {
-    --surface: #12110e;
-    --card: #201e19;
-    --surface-sunk: #1c1a16;
-    --line: #34312b;
-    --control: #8a8378;
-    --ink: #f2eee6;
-    --ink-soft: #a8a195;
-    --azul: oklch(from var(--marca-base) max(l, 0.5) c h);
-    --azul-text: oklch(from var(--marca-base) 0.76 min(c, 0.14) h);
-    --azul-tint: color-mix(in oklab, var(--azul) 24%, var(--card));
-    --focus: #ffc933;
   }
 }
 

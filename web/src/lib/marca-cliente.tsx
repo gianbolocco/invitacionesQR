@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, apiBase } from './api'
-import { esMarcaPropia, MARCA_DEFAULT, type Marca } from './marca'
+import { MARCA_DEFAULT, type Marca } from './marca'
 
 export const claveMarca = ['marca'] as const
 
@@ -47,11 +47,7 @@ export function AplicarMarca() {
   const marca = useMarca()
 
   useEffect(() => {
-    const html = document.documentElement
-    html.style.setProperty('--marca-base', marca.color)
-    // Con el azul de Pazzit vuelve la paleta diseñada a mano; con otro, la derivada.
-    if (esMarcaPropia(marca.color)) html.dataset.marca = 'propia'
-    else delete html.dataset.marca
+    document.documentElement.style.setProperty('--marca-base', marca.color)
     document
       .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"][media="(prefers-color-scheme: light)"]')
       .forEach((m) => { m.content = marca.color })

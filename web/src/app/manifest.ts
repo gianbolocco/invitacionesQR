@@ -12,7 +12,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     description: 'Invitaciones y control de acceso del barrio',
     start_url: '/',
     display: 'standalone',
-    background_color: '#f3f6ff', // espeja --surface de globals.css: el manifest no puede leer variables CSS
+    background_color: '#f6f3ee', // espeja --surface de globals.css: el manifest no puede leer variables CSS
     theme_color: marca.color,
     lang: 'es-AR',
     icons: [

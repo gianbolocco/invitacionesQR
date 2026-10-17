@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Onest } from 'next/font/google'
 import { SCRIPT_ANTI_PARPADEO } from '@/lib/theme'
-import { esMarcaPropia, leerMarca } from '@/lib/marca'
+import { leerMarca } from '@/lib/marca'
 import { Proveedores } from '@/components/proveedores'
 import './globals.css'
 
@@ -52,7 +52,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="es-AR" className={onest.variable}
-      data-marca={esMarcaPropia(marca.color) ? 'propia' : undefined}
       suppressHydrationWarning>
       <head>
         {/* Antes de pintar: si no, la pantalla arranca clara y salta a oscura. */}
