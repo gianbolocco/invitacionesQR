@@ -1,21 +1,24 @@
 'use client'
 import { logoUrl, useMarca } from '@/lib/marca-cliente'
 import type { Marca as DatosMarca } from '@/lib/marca'
+import { LogoPazzit } from '@/components/dominio/logo-pazzit'
 import { cn } from '@/lib/utils'
 
 /**
  * El logo o el nombre del barrio. Es el único componente que sabe cómo se
- * pinta el barrio: si hay logo lo muestra, si no, el nombre. La marca de la
- * app es Pazzit (LogoPazzit); el barrio va en tinta, no en su color.
+ * pinta el barrio: si hay logo lo muestra, si no, el nombre.
  *
- * - normal: en los headers, al lado del mark de Pazzit.
+ * - normal: en los headers. Con `conPazzit` y sin logo, el nombre va
+ *   acompañado del mark de Pazzit en el color del barrio; con logo cargado
+ *   va solo el logo, que ya es la identidad del barrio.
  * - grande: arranque y pantallas de acceso.
  *
  * `marcaOverride` la usa la vista previa de /admin/barrio: en vez de leer
  * la marca guardada, muestra la que se está editando, antes de guardar.
  */
-export function Marca({ variante = 'normal', className, marcaOverride }: {
+export function Marca({ variante = 'normal', conPazzit = false, className, marcaOverride }: {
   variante?: 'normal' | 'grande'
+  conPazzit?: boolean
   className?: string
   marcaOverride?: DatosMarca
 }) {
@@ -24,7 +27,7 @@ export function Marca({ variante = 'normal', className, marcaOverride }: {
   const url = logoUrl(marca)
 
   if (url) {
-    const alto = { normal: 'h-7', grande: 'h-14' }[variante]
+    const alto = { normal: 'h-9', grande: 'h-14' }[variante]
     return (
       <span className={cn('inline-flex shrink-0 items-center', className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -33,12 +36,19 @@ export function Marca({ variante = 'normal', className, marcaOverride }: {
     )
   }
 
-  return (
+  const nombre = (
     <span className={cn('truncate text-ink', {
       normal: 'text-base font-bold',
       grande: 't-heading',
-    }[variante], className)}>
+    }[variante], !conPazzit && className)}>
       {marca.nombre}
+    </span>
+  )
+  if (!conPazzit) return nombre
+  return (
+    <span className={cn('flex min-w-0 items-center gap-2.5', className)}>
+      <LogoPazzit variante="mark" ancho={variante === 'grande' ? 40 : 24} alt="" />
+      {nombre}
     </span>
   )
 }

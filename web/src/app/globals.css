@@ -3,9 +3,10 @@
 
 /*
   Sistema de Pazzit (PLAN-REDISENO.md §1).
-  La marca es la de Pazzit: azul, navy y sol. El barrio aparece con su nombre
-  y su logo; su color (--marca-base, lo inyecta el servidor) queda solo como
-  acento chico en el pase (--barrio) y en el ícono de la app instalada.
+  Forma, letra, estados y sol son de Pazzit. El acento (botones, links, fondos
+  y neutros teñidos) sigue al color del barrio (--marca-base, lo inyecta el
+  servidor): por defecto el azul de Pazzit, con la paleta diseñada a mano; con
+  otro color, la paleta se deriva de él (ver `data-marca` más abajo).
   Sol: una sola cosa por pantalla y siempre con navy encima.
 */
 
@@ -107,7 +108,7 @@
   color-scheme: light;
   /* El servidor pisa esto con el color del barrio, y AplicarMarca lo vuelve a
      pisar en vivo cuando el admin lo cambia. */
-  --marca-base: #1e6b47;
+  --marca-base: #2f5bff;
   --barrio: var(--marca-base);
 
   --surface: #f3f6ff;
@@ -199,6 +200,58 @@
     --focus: #ffc933;
     --sombra-pase: drop-shadow(0 14px 16px rgb(0 0 0 / 0.35));
     --sombra-flotante: 0 18px 40px -16px rgb(0 0 0 / 0.6);
+  }
+}
+
+/*
+  Un barrio con color propio (`data-marca="propia"` en el <html>, lo pone el
+  layout): el acento es su color y los neutros toman su tono, cada uno con su
+  versión clara y oscura. Solo se mueven luminosidad y croma (oklch), así toda
+  la paleta sale del mismo tono y nada choca con el logo. El tinte de los
+  neutros se topa con un tercio del croma del color: un gris no se pinta. Los colores de estado,
+  el sol y el talón del pase no cambian: son la identidad que no se toca.
+  La paleta cerrada (api/src/lib/marca.ts) es oscura: en claro lleva texto
+  blanco encima; en oscuro el acento sube a L 0,5 para seguir leyéndose.
+*/
+:root[data-marca='propia'] {
+  --surface: oklch(from var(--marca-base) 0.973 min(0.012, c * 0.35) h);
+  --card: #ffffff;
+  --surface-sunk: oklch(from var(--marca-base) 0.94 min(0.02, c * 0.35) h);
+  --line: oklch(from var(--marca-base) 0.915 min(0.022, c * 0.35) h);
+  --control: oklch(from var(--marca-base) 0.6 min(0.04, c * 0.35) h);
+  --ink: oklch(from var(--marca-base) 0.22 min(0.05, c * 0.35) h);
+  --ink-soft: oklch(from var(--marca-base) 0.45 min(0.04, c * 0.35) h);
+  --azul: var(--marca-base);
+  --azul-text: var(--marca-base);
+  --azul-tint: oklch(from var(--marca-base) 0.94 min(0.035, c * 0.35) h);
+  --focus: var(--marca-base);
+}
+:root[data-marca='propia'][data-theme='dark'] {
+  --surface: oklch(from var(--marca-base) 0.17 min(0.03, c * 0.35) h);
+  --card: oklch(from var(--marca-base) 0.215 min(0.04, c * 0.35) h);
+  --surface-sunk: oklch(from var(--marca-base) 0.25 min(0.045, c * 0.35) h);
+  --line: oklch(from var(--marca-base) 0.31 min(0.05, c * 0.35) h);
+  --control: oklch(from var(--marca-base) 0.62 min(0.06, c * 0.35) h);
+  --ink: oklch(from var(--marca-base) 0.94 min(0.015, c * 0.35) h);
+  --ink-soft: oklch(from var(--marca-base) 0.77 min(0.035, c * 0.35) h);
+  --azul: oklch(from var(--marca-base) max(l, 0.5) c h);
+  --azul-text: oklch(from var(--marca-base) 0.76 min(c, 0.14) h);
+  --azul-tint: oklch(from var(--marca-base) 0.31 min(0.06, c * 0.35) h);
+  --focus: #ffc933;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-marca='propia']:not([data-theme='light']) {
+    --surface: oklch(from var(--marca-base) 0.17 min(0.03, c * 0.35) h);
+    --card: oklch(from var(--marca-base) 0.215 min(0.04, c * 0.35) h);
+    --surface-sunk: oklch(from var(--marca-base) 0.25 min(0.045, c * 0.35) h);
+    --line: oklch(from var(--marca-base) 0.31 min(0.05, c * 0.35) h);
+    --control: oklch(from var(--marca-base) 0.62 min(0.06, c * 0.35) h);
+    --ink: oklch(from var(--marca-base) 0.94 min(0.015, c * 0.35) h);
+    --ink-soft: oklch(from var(--marca-base) 0.77 min(0.035, c * 0.35) h);
+    --azul: oklch(from var(--marca-base) max(l, 0.5) c h);
+    --azul-text: oklch(from var(--marca-base) 0.76 min(c, 0.14) h);
+    --azul-tint: oklch(from var(--marca-base) 0.31 min(0.06, c * 0.35) h);
+    --focus: #ffc933;
   }
 }
 

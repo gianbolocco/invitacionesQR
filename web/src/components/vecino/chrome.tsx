@@ -4,7 +4,6 @@ import { usePathname } from 'next/navigation'
 import { History, Settings2, Ticket, UserRound } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { Marca } from '@/components/dominio/marca'
-import { LogoPazzit } from '@/components/dominio/logo-pazzit'
 import { BarraSeccion, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
 
 function iniciales(nombre: string): string {
@@ -36,8 +35,7 @@ export function ChromeVecino({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-line bg-card">
         <div className="mx-auto flex h-14 max-w-[calc(640px+3rem)] items-center justify-between gap-3 px-4 md:px-6">
           <Link href="/" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
-            <LogoPazzit variante="mark" ancho={24} alt="" />
-            <Marca />
+            <Marca conPazzit />
           </Link>
 
           <nav aria-label="Secciones" className="hidden items-center gap-1 sm:flex">

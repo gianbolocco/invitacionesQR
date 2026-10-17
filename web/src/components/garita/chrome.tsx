@@ -5,7 +5,6 @@ import { CalendarDays, ClipboardList, LogOut, ScanLine, Settings2 } from 'lucide
 import { useSesion } from '@/lib/sesion-contexto'
 import { logout } from '@/lib/session'
 import { Marca } from '@/components/dominio/marca'
-import { LogoPazzit } from '@/components/dominio/logo-pazzit'
 import { SelectorTema } from '@/components/selector-tema'
 import { BarraSeccion, BOTON_HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
 
@@ -35,8 +34,7 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-line bg-card">
         <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-6 px-4 md:px-6 xl:px-8">
           <Link href="/garita" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
-            <LogoPazzit variante="mark" ancho={24} alt="" />
-            <Marca />
+            <Marca conPazzit />
             <span className="hidden shrink-0 font-semibold text-ink-soft sm:inline">· Portería</span>
           </Link>
 

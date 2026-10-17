@@ -14,7 +14,7 @@ const RAIZ = fileURLToPath(new URL('../src/', import.meta.url))
 const PERMITIDOS = new Set(['app/globals.css', 'lib/marca.ts'])
 // Tiene que coincidir con PALETA en api/src/lib/marca.ts.
 // La paleta de api/src/lib/marca.ts y el verde de datos que usaba el tablero.
-const PROHIBIDOS = ['#1e6b47', '#14565c', '#1d4e89', '#3b3b7a', '#5b3a75', '#7a1f3d', '#8a3c1e', '#36454f', '#0f8f52']
+const PROHIBIDOS = ['#2f5bff', '#1e6b47', '#14565c', '#1d4e89', '#3b3b7a', '#5b3a75', '#7a1f3d', '#8a3c1e', '#36454f', '#0f8f52']
 // Los tokens y tamaños del sistema viejo (PLAN-REDISENO §6): si vuelve uno, el
 // componente queda con el color del barrio o con una etiqueta de 10px.
 const VIEJOS = [

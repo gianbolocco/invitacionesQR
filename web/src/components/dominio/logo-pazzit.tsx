@@ -5,10 +5,13 @@ import { cn } from '@/lib/utils'
 const RATIO = { lockup: 981 / 4201, mark: 60 / 92 }
 
 /**
- * El logo de Pazzit. Siempre `<img>`: los SVG comparten `mask id="m1"` y, en
- * línea, el segundo pisaría la máscara del primero. El lockup tiene versión
- * clara y oscura y el CSS (`.logo-claro` / `.logo-oscuro`) muestra la del
- * tema; el mark es el azul en los dos.
+ * El logo de Pazzit. El lockup va como `<img>`: los SVG comparten
+ * `mask id="m1"` y, en línea, el segundo pisaría la máscara del primero. Tiene
+ * versión clara y oscura y el CSS (`.logo-claro` / `.logo-oscuro`) muestra la
+ * del tema.
+ *
+ * El mark es de un solo color con recortes, así que se dibuja como máscara
+ * sobre `bg-azul`: toma el acento del barrio (azul de Pazzit por defecto).
  */
 export function LogoPazzit({ variante = 'lockup', ancho = 120, alt = 'Pazzit', className }: {
   variante?: 'lockup' | 'mark'
@@ -18,8 +21,11 @@ export function LogoPazzit({ variante = 'lockup', ancho = 120, alt = 'Pazzit', c
 }) {
   const alto = Math.round(ancho * RATIO[variante])
   if (variante === 'mark') {
-    return <img src="/brand/pazzit-mark-azul.svg" alt={alt} width={ancho} height={alto}
-      className={cn('shrink-0', className)} />
+    return (
+      <span role={alt ? 'img' : undefined} aria-label={alt || undefined} aria-hidden={alt ? undefined : true}
+        className={cn('inline-block shrink-0 bg-azul [mask:url(/brand/pazzit-mark-azul.svg)_center/contain_no-repeat]', className)}
+        style={{ width: ancho, height: alto }} />
+    )
   }
   return (
     <span className={cn('inline-flex shrink-0 leading-none', className)}>

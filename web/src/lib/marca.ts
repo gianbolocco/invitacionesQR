@@ -9,7 +9,17 @@
  */
 export type Marca = { nombre: string; color: string; tieneLogo: boolean; logoVersion: number | null }
 
-export const MARCA_DEFAULT: Marca = { nombre: 'Pazzit', color: '#1e6b47', tieneLogo: false, logoVersion: null }
+export const COLOR_PAZZIT = '#2f5bff'
+
+export const MARCA_DEFAULT: Marca = { nombre: 'Pazzit', color: COLOR_PAZZIT, tieneLogo: false, logoVersion: null }
+
+/**
+ * Con el azul de Pazzit la app usa la paleta diseñada a mano (globals.css). Con
+ * otro color, la paleta se deriva de ese color (`data-marca="propia"`).
+ */
+export function esMarcaPropia(color: string): boolean {
+  return color.toLowerCase() !== COLOR_PAZZIT
+}
 
 export async function leerMarca(): Promise<Marca> {
   const base = process.env.API_INTERNAL_URL ?? 'http://localhost:8080'

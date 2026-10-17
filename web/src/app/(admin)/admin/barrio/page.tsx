@@ -102,7 +102,7 @@ export default function BarrioPage() {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl(marcaReal) ?? ''} alt="Logo del barrio" className="h-16 w-auto max-w-[16rem] object-contain" />
           ) : (
-            <p className="text-ink-soft">Sin logo se muestra el nombre del barrio en itálica.</p>
+            <p className="text-ink-soft">Sin logo, mostramos el nombre del barrio.</p>
           )}
 
           <button type="button"

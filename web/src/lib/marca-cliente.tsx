@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, apiBase } from './api'
-import { MARCA_DEFAULT, type Marca } from './marca'
+import { esMarcaPropia, MARCA_DEFAULT, type Marca } from './marca'
 
 export const claveMarca = ['marca'] as const
 
@@ -39,15 +39,19 @@ export function logoUrl(m: Marca): string | null {
 }
 
 /**
- * Lleva la marca al documento: el color como variable CSS (el punto del barrio
- * en el pase) y el título. La barra del navegador ya no: es de Pazzit y la fija
+ * Lleva la marca al documento: el color como variable CSS (de él sale el
+ * acento de toda la app) y el título. La barra del navegador ya no: es de Pazzit y la fija
  * el viewport del layout. No dibuja nada.
  */
 export function AplicarMarca() {
   const marca = useMarca()
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--marca-base', marca.color)
+    const html = document.documentElement
+    html.style.setProperty('--marca-base', marca.color)
+    // Con el azul de Pazzit vuelve la paleta diseñada a mano; con otro, la derivada.
+    if (esMarcaPropia(marca.color)) html.dataset.marca = 'propia'
+    else delete html.dataset.marca
   }, [marca.color])
 
   // generateMetadata ya fija el título inicial; solo se toca si el nombre cambia
