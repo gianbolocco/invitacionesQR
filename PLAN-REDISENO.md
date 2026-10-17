@@ -355,7 +355,7 @@ queda en la vista lista y en el filtro.
 | Admin tablero | KPI §1.4 (4 por fila ≥1024), barras `azul`; "Atención" con tono espera. |
 | Admin vecinos / guardias | Tabla como auditoría; acciones de texto `azul-text`, "Dar de baja" `alto`; `sheet-alta` e importar CSV con Hoja/Campo nuevos. |
 | Admin barrio | Paleta del barrio sigue igual (swatches 44px radio 8, seleccionado con anillo `ink`); vista previa con PassCard. |
-| Login, olvidé, reset, acceso | Fondo de manchas difuminadas del color del barrio y del sol (`.fondo-acceso`, decisión del dueño, hecho en la fase a; reemplaza el "sin halo"); lockup Pazzit 120px arriba; tarjeta `card` radio 24 con `--sombra-flotante`; logo/nombre del barrio dentro de la tarjeta sobre el título. |
+| Login, olvidé, reset, acceso | Fondo de manchas difuminadas en tres tonos del color del barrio, sin sol (`.fondo-acceso`, decisión del dueño, hecho en la fase a; reemplaza el "sin halo"); lockup Pazzit 120px arriba; tarjeta `card` radio 24 con `--sombra-flotante`; logo/nombre del barrio dentro de la tarjeta sobre el título. |
 | 404 | "Por acá no se pasa." + "Volver al inicio". |
 | Arranque | Mark de Pazzit 48px + nombre del barrio; barra indeterminada `azul`. |
 

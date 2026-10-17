@@ -162,8 +162,8 @@ distingue, pero con poco contraste contra la tarjeta.
 - Inicio del vecino: el estado vacío ya no repite "Nueva invitación" (queda el del encabezado / flotante).
 - Rama pusheada a `origin/rediseno-pazzit`.
 - **Fondo del acceso** (login, olvidé, reset, acceso), pedido del dueño en contra del "diseño plano" del plan:
-  `.fondo-acceso` en `globals.css`, tres manchas con degradados radiales (dos del color del barrio, una del
-  sol), sin `filter: blur`. En oscuro la mancha usa `azul-text` (el color tal cual, si es oscuro, no se
+  `.fondo-acceso` en `globals.css`, tres manchas con degradados radiales en tonos del color del barrio (la
+  tercera era del sol; se cambió a otro tono del barrio para respetar la regla del sol), sin `filter: blur`. En oscuro la mancha usa `azul-text` (el color tal cual, si es oscuro, no se
   ve sobre el espresso). Se mueven muy lento con `transform` (24 s y 30 s, ida y vuelta); con movimiento
   reducido, quietas. La tarjeta suma `--sombra-flotante` para despegarse del fondo.
 - **Favicon e íconos**: `lib/icono-marca.tsx` dibuja el ícono de app de Pazzit (mark blanco sobre

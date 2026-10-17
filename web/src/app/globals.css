@@ -319,25 +319,28 @@ button:not(:disabled), [role='button'], a.presionable {
 
 /*
   Fondo de las pantallas de acceso (decisión del dueño: que el login no se vea
-  plano). Manchas difuminadas del color del barrio y del sol, hechas con
+  plano). Manchas difuminadas en tres tonos del color del barrio, hechas con
   degradados radiales (sin `filter: blur`, que es caro). Las dos capas se
   mueven muy lento solo con `transform`; con movimiento reducido quedan quietas.
   En oscuro la mancha usa el color aclarado (`azul-text`): el color tal cual,
   si es oscuro como el bordó, desaparece sobre el espresso.
+  La tercera mancha es otro tono del mismo color (más luminoso de día, el
+  color tal cual de noche), no el sol: el sol se guarda para el pase validado.
 */
 .fondo-acceso {
   --mancha-color: var(--marca-base);
   --mancha-marca: 30%;
-  --mancha-sol: 26%;
+  --mancha-tono: oklch(from var(--marca-base) calc(l + 0.22) c h);
+  --mancha-tono-alfa: 28%;
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
   background: var(--surface);
 }
-:root[data-theme='dark'] .fondo-acceso { --mancha-color: var(--azul-text); --mancha-marca: 24%; --mancha-sol: 12%; }
+:root[data-theme='dark'] .fondo-acceso { --mancha-color: var(--azul-text); --mancha-marca: 24%; --mancha-tono: var(--marca-base); --mancha-tono-alfa: 55%; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .fondo-acceso { --mancha-color: var(--azul-text); --mancha-marca: 24%; --mancha-sol: 12%; }
+  :root:not([data-theme='light']) .fondo-acceso { --mancha-color: var(--azul-text); --mancha-marca: 24%; --mancha-tono: var(--marca-base); --mancha-tono-alfa: 55%; }
 }
 .fondo-acceso::before,
 .fondo-acceso::after {
@@ -351,7 +354,7 @@ button:not(:disabled), [role='button'], a.presionable {
     radial-gradient(36% 32% at 68% 74%, color-mix(in oklab, var(--mancha-color) calc(var(--mancha-marca) * 0.75), transparent), transparent 72%);
 }
 .fondo-acceso::after {
-  background: radial-gradient(28% 26% at 70% 30%, color-mix(in oklab, var(--sol) var(--mancha-sol), transparent), transparent 72%);
+  background: radial-gradient(28% 26% at 70% 30%, color-mix(in oklab, var(--mancha-tono) var(--mancha-tono-alfa), transparent), transparent 72%);
 }
 @keyframes fondo-deriva-a { to { transform: translate3d(4%, 3%, 0) scale(1.06); } }
 @keyframes fondo-deriva-b { to { transform: translate3d(-5%, 4%, 0) scale(1.04); } }
