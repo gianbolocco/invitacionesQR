@@ -12,7 +12,7 @@ import { useUltimaLectura } from '@/lib/queries/garita'
 export function EstadoLectora() {
   const ultima = useUltimaLectura()
   return (
-    <section aria-label="Lectora" className="rounded-lg border border-border p-4">
+    <section aria-label="Lectora" className="rounded-md border border-border p-4">
       {ultima ? (
         <>
           <p className="flex items-center gap-2 font-semibold">

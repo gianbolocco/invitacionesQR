@@ -45,10 +45,10 @@ export default function InicioVecino() {
       ) : (
         <section aria-labelledby="vigentes">
           <div className="flex items-baseline justify-between border-b-2 border-ink pb-2">
-            <h2 id="vigentes" className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
+            <h2 id="vigentes" className="text-[13px] font-semibold text-ink-soft">
               Invitaciones vigentes
             </h2>
-            <span className="text-[11px] font-semibold text-ink-soft tabular">{q.data.length}</span>
+            <span className="text-[13px] font-semibold text-ink-soft tabular">{q.data.length}</span>
           </div>
           {/* Entran escalonadas la primera vez; una anulada se va deslizando. */}
           <motion.ul initial="oculto" animate="visible"
@@ -70,7 +70,7 @@ export default function InicioVecino() {
       {!sinUnidad && (
         <Link href={NUEVA}
           className={cn(buttonVariants({ size: 'lg' }),
-            'fixed inset-x-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] z-20 shadow-flotante sm:hidden')}>
+            'fixed inset-x-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] z-20 shadow-(--sombra-flotante) sm:hidden')}>
           <Plus aria-hidden />Nueva invitación
         </Link>
       )}

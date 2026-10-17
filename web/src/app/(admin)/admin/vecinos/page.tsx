@@ -203,7 +203,7 @@ export default function VecinosPage() {
   /** Una fila del padrón. En la vista por lote el lote ya es el título del grupo: no se repite. */
   function filaVecino(p: Person, conLote: boolean) {
     return (
-      <Fila key={p.id} titulo={<>{p.name}{p.role === 'admin' && <span className="ml-2 text-xs font-normal text-ink-soft">Admin</span>}</>}
+      <Fila densa key={p.id} titulo={<>{p.name}{p.role === 'admin' && <span className="ml-2 text-xs font-normal text-ink-soft">Admin</span>}</>}
         meta={[
           conLote ? (p.units.map((u) => u.label).join(' · ') || 'Sin lote asignado') : null,
           ESTADO[p.status],

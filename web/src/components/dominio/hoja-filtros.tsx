@@ -34,12 +34,12 @@ export function HojaFiltros({ activos, resultados, onLimpiar, className, childre
         <SlidersHorizontal className="size-4" aria-hidden />
         Filtros
         {activos > 0 && (
-          <span className="grid min-w-5 place-items-center rounded-full bg-marca px-1.5 text-xs font-bold tabular text-sobre-marca">
+          <span className="grid min-w-5 place-items-center rounded-full bg-azul px-1.5 text-xs font-bold tabular text-white">
             {activos}
           </span>
         )}
       </Button>
-      <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-xl p-0">
+      <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-lg p-0">
         <SheetHeader className="px-4 pt-5">
           <SheetTitle>Filtros</SheetTitle>
           <SheetDescription className="sr-only">Elegí qué mostrar en la lista.</SheetDescription>

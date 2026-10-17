@@ -86,7 +86,7 @@ function Login() {
             onChange={(e) => setIdentificador(e.target.value)} />
         </Campo>
         <Campo id="clave" etiqueta="Contraseña"
-          accesorio={<Link href="/olvide" className="text-sm font-medium text-marca hover:underline">¿La olvidaste?</Link>}>
+          accesorio={<Link href="/olvide" className="text-sm font-medium text-azul-text hover:underline">¿La olvidaste?</Link>}>
           <CampoContrasena id="clave" autoComplete="current-password" required
             value={password} onChange={setPassword} />
         </Campo>

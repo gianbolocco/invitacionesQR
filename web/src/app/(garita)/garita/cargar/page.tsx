@@ -79,9 +79,9 @@ export default function CargarMovimientosPage() {
         <EncabezadoPagina titulo="Cargar movimientos"
           subtitulo={`Para pasar lo que se anotó en papel durante un corte. Se puede cargar lo de las últimas ${VENTANA_HORAS} horas y queda marcado como carga manual.`} />
 
-        <section aria-label="Agregar un movimiento" className="flex flex-col gap-4 rounded-lg border border-line bg-card p-4 sm:p-5">
+        <section aria-label="Agregar un movimiento" className="flex flex-col gap-4 rounded-md border border-line bg-card p-4 sm:p-5">
           {persona ? (
-            <Fila titulo={persona.guestName} meta={[persona.unitLabel, persona.guestDoc, persona.plate].filter(Boolean).join(' · ')}
+            <Fila densa titulo={persona.guestName} meta={[persona.unitLabel, persona.guestDoc, persona.plate].filter(Boolean).join(' · ')}
               className="border-b-0 py-0"
               extremo={<Button variant="ghost" size="sm" onClick={() => setPersona(null)}>Cambiar</Button>} />
           ) : (
@@ -93,7 +93,7 @@ export default function CargarMovimientosPage() {
                   className="h-12 pl-10 text-base" />
               </div>
               {busqueda.data?.map((h) => (
-                <Fila key={h.id} titulo={h.guestName} meta={[h.unitLabel, h.guestDoc, h.plate].filter(Boolean).join(' · ')}
+                <Fila densa key={h.id} titulo={h.guestName} meta={[h.unitLabel, h.guestDoc, h.plate].filter(Boolean).join(' · ')}
                   onClick={() => setPersona(h)} extremo={h.adentro ? <EstadoTag estado="adentro" /> : undefined} />
               ))}
               {busqueda.data?.length === 0 && <p className="text-sm text-ink-soft">No hay nadie con ese dato.</p>}
@@ -131,7 +131,7 @@ export default function CargarMovimientosPage() {
                 <Input id="nota" value={nota} maxLength={200} onChange={(e) => setNota(e.target.value)} />
               </Campo>
 
-              {error && <p role="alert" className="text-sm text-peligro animate-in fade-in duration-200">{error}</p>}
+              {error && <p role="alert" className="text-sm text-alto animate-in fade-in duration-200">{error}</p>}
               <Button onClick={agregar} className="self-start"><Plus aria-hidden />Agregar a la tanda</Button>
             </>
           )}
@@ -148,7 +148,7 @@ export default function CargarMovimientosPage() {
             <>
               <div>
                 {tanda.map((c) => (
-                  <Fila key={c.clave} titulo={c.guestName}
+                  <Fila densa key={c.clave} titulo={c.guestName}
                     meta={`${c.unitLabel} · ${resumenCarga(c, hoy)}${c.nota ? ` · ${c.nota}` : ''}`}
                     extremo={
                       <Button variant="ghost" size="icon" aria-label={`Quitar a ${c.guestName} de la tanda`}

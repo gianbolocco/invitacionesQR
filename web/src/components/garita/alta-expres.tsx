@@ -123,7 +123,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
                 {unidades.data && unidades.data.length > 0 && (
                   <div className="mt-1 max-h-48 overflow-auto rounded-md border border-border p-2 [&>*:last-child]:border-b-0">
                     {unidades.data.map((u) => (
-                      <Fila key={`${u.unitId}-${u.residentName}`} titulo={u.residentName} meta={u.unitLabel}
+                      <Fila densa key={`${u.unitId}-${u.residentName}`} titulo={u.residentName} meta={u.unitLabel}
                         onClick={() => { setUnidad(u); setQUnidad('') }} />
                     ))}
                   </div>

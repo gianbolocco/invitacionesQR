@@ -32,7 +32,7 @@ export function BuscarInvitado({ q, onQ, onAbrir, onLectura }: {
       {busqueda.data && busqueda.data.length > 0 && (
         <div>
           {busqueda.data.map((h) => (
-            <Fila key={h.id} titulo={h.guestName} onClick={() => onAbrir(h.id)}
+            <Fila densa key={h.id} titulo={h.guestName} onClick={() => onAbrir(h.id)}
               meta={[h.unitLabel, h.guestDoc, h.plate].filter(Boolean).join(' · ')}
               extremo={h.adentro ? <EstadoTag estado="adentro" /> : undefined} />
           ))}

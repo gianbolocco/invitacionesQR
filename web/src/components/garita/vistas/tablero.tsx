@@ -52,10 +52,10 @@ export function Tablero({ columnas, hoy, onAbrir }: {
             const Icono = c.icono
             return (
               <section key={c.clave} aria-label={c.titulo}
-                className="flex min-w-0 flex-col gap-2 rounded-lg bg-surface-sunk/70 p-2">
+                className="flex min-w-0 flex-col gap-2 rounded-md bg-surface-sunk/70 p-2">
                 <header className="flex items-center justify-between px-1 pt-1">
                   <span className={cn(
-                    'inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10.5px] font-bold uppercase leading-none tracking-[0.05em]',
+                    'inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[13px] font-bold leading-4',
                     c.cabecera)}>
                     <Icono className="size-3" aria-hidden />{c.titulo}
                   </span>
@@ -89,13 +89,13 @@ export function Tablero({ columnas, hoy, onAbrir }: {
 
 function Vencidas({ filas, onAbrir }: { filas: AgendaRow[]; onAbrir: (id: string) => void }) {
   return (
-    <details className="mt-3 rounded-lg border border-line bg-card px-4 py-2">
+    <details className="mt-3 rounded-md border border-line bg-card px-4 py-2">
       <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold">
         Vencidas <span className="tabular text-ink-soft">({filas.length})</span>
       </summary>
       <div className="pb-1">
         {filas.map((r) => (
-          <Fila key={r.id}
+          <Fila densa key={r.id}
             titulo={<span className="flex items-center gap-2"><span className="min-w-0 truncate">{r.guestName}</span><TagTipo kind={r.kind} /></span>}
             meta={metaDe(r)} onClick={() => onAbrir(r.id)} extremo={<EstadoTag estado="vencida" />} />
         ))}

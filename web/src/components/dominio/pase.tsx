@@ -16,7 +16,7 @@ export type DatosPase = {
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8a8378]">{etiqueta}</p>
+      <p className="text-[13px] font-semibold text-[#8a8378]">{etiqueta}</p>
       <p className="truncate text-sm font-semibold">{children}</p>
     </div>
   )
@@ -40,16 +40,16 @@ export function Pase({ datos, qr, apagado = false, sello, className, marcaOverri
   const marcaReal = useMarca()
   const marca = marcaOverride ?? marcaReal
   return (
-    <article className={cn('relative w-full max-w-sm overflow-hidden rounded-xl bg-white text-[#14130f] shadow-flotante',
+    <article className={cn('relative w-full max-w-sm overflow-hidden rounded-lg bg-white text-[#14130f] shadow-(--sombra-flotante)',
       apagado && 'opacity-70 grayscale', className)}>
-      {/* bg-marca es el token global: refleja la marca guardada, no la que
+      {/* bg-azul es el token global: refleja la marca guardada, no la que
           se está editando. La vista previa de /admin/barrio necesita ver el
           color antes de guardar, así que con marcaOverride se fuerza por
           estilo en vez de depender de la clase. */}
-      <header className={cn('flex items-center justify-between px-5 py-4 text-sobre-marca', !marcaOverride && 'bg-marca')}
+      <header className={cn('flex items-center justify-between px-5 py-4 text-white', !marcaOverride && 'bg-azul')}
         style={marcaOverride ? { backgroundColor: marcaOverride.color } : undefined}>
         <div className="min-w-0">
-          <p className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] opacity-80">
+          <p className="truncate text-[13px] font-semibold opacity-80">
             {datos.barrio ?? marca.nombre}
           </p>
           <p className="text-sm font-bold">Pase de {datos.tipo.toLowerCase()}</p>
@@ -58,7 +58,7 @@ export function Pase({ datos, qr, apagado = false, sello, className, marcaOverri
       </header>
 
       <div className="px-5 pb-2 pt-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8a8378]">Invitado</p>
+        <p className="text-[13px] font-semibold text-[#8a8378]">Invitado</p>
         <p className="mt-0.5 break-words font-display text-[26px] font-extrabold leading-[1.05] tracking-[-0.02em]">
           {datos.invitado}
         </p>
@@ -80,7 +80,7 @@ export function Pase({ datos, qr, apagado = false, sello, className, marcaOverri
           title={`Código de acceso de ${datos.invitado}`} />
       </div>
 
-      {/* Rojo fijo: el cuerpo del pase es claro en los dos temas, y el token peligro se aclara en oscuro. */}
+      {/* Rojo fijo: el cuerpo del pase es claro en los dos temas, y el token alto se aclara en oscuro. */}
       {sello && (
         <span className="absolute right-4 top-24 rotate-[-12deg] rounded-md border-[3px] border-[#a3202f] px-3 py-1
           font-display text-xl font-extrabold uppercase tracking-wide text-[#a3202f]">

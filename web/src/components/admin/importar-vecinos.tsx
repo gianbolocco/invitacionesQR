@@ -134,7 +134,7 @@ export function ImportarVecinos({ onImported }: { onImported: () => void }) {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Importación masiva</p>
+                <p className="text-[13px] font-semibold text-ink-soft">Importación masiva</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Cargá varios vecinos de una vez. El rol será vecino; el lote es opcional.
                 </p>

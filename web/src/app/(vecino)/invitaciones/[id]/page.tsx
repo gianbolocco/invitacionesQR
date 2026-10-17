@@ -44,7 +44,7 @@ export default function DetalleInvitacion({ params, searchParams }: {
     return (
       <div className="flex flex-col items-center gap-6">
         {volver}
-        <Skeleton className="h-[34rem] w-full max-w-sm rounded-xl" />
+        <Skeleton className="h-[34rem] w-full max-w-sm rounded-lg" />
       </div>
     )
   }

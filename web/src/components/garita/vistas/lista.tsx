@@ -9,13 +9,13 @@ import { detalleDe, estadoDe, metaDe } from '@/components/garita/datos-agenda'
 
 export function FilaAgenda({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onAbrir: (id: string) => void }) {
   return (
-    <Fila titulo={
+    <Fila densa titulo={
       <span className="flex items-center gap-2">
         <span className="min-w-0 truncate">{r.guestName}</span>
         <TagTipo kind={r.kind} />
       </span>
     } meta={metaDe(r)} onClick={() => onAbrir(r.id)}
-      extremo={<EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} />} />
+      extremo={<EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />} />
   )
 }
 
@@ -44,7 +44,7 @@ function Tramo({ filas, hoy, onAbrir, className }: {
               lista: { opacity: 1, height: 'auto', transition: { duration: 0.3 } },
               sale: { opacity: 0, height: 0, transition: { duration: 0.2 } },
             }}>
-            <motion.span aria-hidden className="pointer-events-none absolute inset-0 rounded-md bg-marca-suave"
+            <motion.span aria-hidden className="pointer-events-none absolute inset-0 rounded-md bg-azul-tint"
               variants={{ nueva: { opacity: 1 }, lista: { opacity: 0, transition: { duration: 1.6, delay: 0.3 } } }} />
             <div className="relative"><FilaAgenda r={r} hoy={hoy} onAbrir={onAbrir} /></div>
           </motion.div>
@@ -75,7 +75,7 @@ export function Lista({ columnas, hoy, onAbrir }: {
     <div className="flex flex-col gap-6">
       {TRAMOS.filter((t) => columnas[t.clave].length > 0).map((t) => (
         <section key={t.clave} className="flex flex-col gap-2">
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
+          <h3 className="text-[13px] font-semibold text-ink-soft">
             {t.titulo} ({columnas[t.clave].length})
           </h3>
           <Tramo filas={columnas[t.clave]} hoy={hoy} onAbrir={onAbrir} className={t.apagado ? 'opacity-70' : undefined} />
