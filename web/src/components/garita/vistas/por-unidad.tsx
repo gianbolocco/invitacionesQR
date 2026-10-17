@@ -17,7 +17,7 @@ export function PorUnidad({ filas, hoy, onAbrir }: {
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       {grupos.map((g) => (
         <section key={g.unidad} aria-label={g.unidad}
-          className="rounded-lg border border-line bg-card px-4 pt-3 pb-1 shadow-tarjeta">
+          className="rounded-md border border-line bg-card px-4 pt-3 pb-1">
           <h3 className="flex items-baseline justify-between gap-2">
             <span className="font-display text-lg font-extrabold tracking-[-0.01em]">{g.unidad}</span>
             <span className="text-xs tabular text-ink-soft">

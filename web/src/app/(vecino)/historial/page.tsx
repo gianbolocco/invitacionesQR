@@ -60,10 +60,10 @@ export default function HistorialPage() {
           <SheetTrigger asChild>
             <Button variant="outline" className="sm:hidden" aria-label={`Filtros${activos ? ` (${activos} activos)` : ''}`}>
               <SlidersHorizontal aria-hidden />
-              {activos > 0 && <span className="grid size-5 place-items-center rounded-full bg-marca text-[11px] text-sobre-marca">{activos}</span>}
+              {activos > 0 && <span className="grid size-5 place-items-center rounded-full bg-azul text-[13px] text-white">{activos}</span>}
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-xl">
+          <SheetContent side="bottom" className="rounded-t-lg">
             <SheetHeader><SheetTitle>Filtros</SheetTitle></SheetHeader>
             <div className="px-4 pb-8"><FiltrosHistorialPanel valor={filtros} onCambio={setFiltros} /></div>
           </SheetContent>
@@ -73,7 +73,7 @@ export default function HistorialPage() {
       <div className="grid gap-8 sm:grid-cols-[1fr_15rem]">
         <section className="min-w-0">
           <div className="flex items-center justify-between pb-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft tabular" aria-live="polite">
+            <p className="text-[13px] font-semibold text-ink-soft tabular" aria-live="polite">
               {h.isPending ? 'Buscando…' : `${total} ${total === 1 ? 'invitación' : 'invitaciones'}`}
             </p>
             {hayFiltro && (

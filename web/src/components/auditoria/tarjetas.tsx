@@ -13,7 +13,7 @@ import { ESTADO_TAG, vigenciaCorta } from './tabla'
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">{etiqueta}</dt>
+      <dt className="text-[13px] font-semibold text-ink-soft">{etiqueta}</dt>
       <dd className="mt-0.5 truncate text-[13px] tabular">{children}</dd>
     </div>
   )
@@ -31,7 +31,7 @@ export function Tarjetas({ filas }: { filas: AuditRow[] }) {
       {filas.map((r) => {
         const abierto = abierta === r.id
         return (
-          <li key={r.id} className="flex flex-col gap-3 rounded-lg border border-line bg-card p-4 shadow-tarjeta">
+          <li key={r.id} className="flex flex-col gap-3 rounded-md border border-line bg-card p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2">
@@ -48,7 +48,7 @@ export function Tarjetas({ filas }: { filas: AuditRow[] }) {
                   </p>
                 )}
               </div>
-              <EstadoTag estado={ESTADO_TAG[r.status]} />
+              <EstadoTag estado={ESTADO_TAG[r.status]} contexto="garita" />
             </div>
 
             {r.status === 'anulada' && r.revokedReason !== null && (

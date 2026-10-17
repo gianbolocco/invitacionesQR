@@ -7,11 +7,11 @@ import { cn } from '@/lib/utils'
 function Tarjeta({ g, fila, className }: { g: GrupoLote; fila: (p: Person) => ReactNode; className?: string }) {
   return (
     <section aria-label={g.titulo}
-      className={cn('rounded-lg border bg-card px-4 pt-3 pb-1 shadow-tarjeta', g.sinLote ? 'border-ink/40' : 'border-line', className)}>
+      className={cn('rounded-md border bg-card px-4 pt-3 pb-1', g.sinLote ? 'border-ink/40' : 'border-line', className)}>
       <h3 className="flex items-baseline justify-between gap-2">
         <span className="font-display text-lg font-extrabold tracking-[-0.01em]">{g.titulo}</span>
         {g.vecinos.length === 0 ? (
-          <span className="rounded-sm bg-surface-sunk px-2 py-1 text-[10.5px] font-bold uppercase leading-none tracking-[0.05em] text-ink-soft">
+          <span className="rounded-sm bg-surface-sunk px-2 py-1 text-[13px] font-bold leading-4 text-ink-soft">
             Sin vecinos
           </span>
         ) : (

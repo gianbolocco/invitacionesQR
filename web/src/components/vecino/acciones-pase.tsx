@@ -88,7 +88,7 @@ export function AccionesPase({ inv, url, onAnular, onHabilitar, habilitando }: {
       {estado === 'adentro' ? (
         <p className="text-center text-sm text-ink-soft">No se puede anular mientras está adentro.</p>
       ) : (
-        <Button variant="ghost" className="text-peligro hover:bg-peligro/10 hover:text-peligro" onClick={onAnular}>
+        <Button variant="ghost" className="text-alto hover:bg-alto-tint hover:text-alto" onClick={onAnular}>
           <Ban aria-hidden />Anular invitación
         </Button>
       )}

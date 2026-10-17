@@ -13,7 +13,8 @@
  * sacar esta validación, no migrar datos.
  */
 export const PALETA = [
-  '#1e6b47', // verde, el del producto
+  '#2f5bff', // azul de Pazzit, el default
+  '#1e6b47', // verde
   '#14565c', // petróleo
   '#1d4e89', // azul
   '#3b3b7a', // índigo

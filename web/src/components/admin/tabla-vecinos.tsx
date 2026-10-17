@@ -7,7 +7,7 @@ import type { Person } from '@/lib/admin'
 import { cn } from '@/lib/utils'
 
 const TAG: Record<Person['status'], Estado> = { active: 'activo', invited: 'invitado', disabled: 'deshabilitado' }
-const TH = 'py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft'
+const TH = 'py-2 text-[13px] font-semibold text-ink-soft'
 
 /**
  * El padrón como tabla, para escritorio: cada dato en su columna y las acciones
@@ -20,7 +20,7 @@ export function TablaVecinos({ vecinos, acciones }: {
   acciones: (p: Person) => AccionFila[]
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-line bg-card">
+    <div className="overflow-x-auto rounded-md border border-line bg-card">
       <table className="w-full min-w-[860px] border-collapse text-left text-sm">
         <thead className="bg-surface-sunk">
           <tr className="border-b border-line">
@@ -39,7 +39,7 @@ export function TablaVecinos({ vecinos, acciones }: {
                 <span className="flex items-center gap-2">
                   <span className="font-semibold">{p.name}</span>
                   {p.role === 'admin' && (
-                    <span className="rounded-sm bg-surface-sunk px-1.5 py-0.5 text-[10.5px] font-bold uppercase leading-none tracking-[0.05em] text-ink-soft">
+                    <span className="rounded-sm bg-surface-sunk px-1.5 py-0.5 text-[13px] font-bold leading-4 text-ink-soft">
                       Admin
                     </span>
                   )}
@@ -62,7 +62,7 @@ export function TablaVecinos({ vecinos, acciones }: {
                       aria-label={`${a.etiqueta}: ${p.name}`} title={a.etiqueta}
                       onClick={(e) => a.onClick(e.currentTarget)}
                       className={cn('px-2.5 text-ink-soft hover:text-ink',
-                        a.destructiva && 'text-peligro/80 hover:bg-peligro/10 hover:text-peligro')}>
+                        a.destructiva && 'text-alto/80 hover:bg-alto-tint hover:text-alto')}>
                       {a.corta ?? a.etiqueta}
                     </Button>
                   ))}

@@ -2,6 +2,8 @@ import { PenLine, Repeat, Truck } from 'lucide-react'
 import { KIND_LABEL, type Invitation } from '@/lib/invitations'
 import { cn } from '@/lib/utils'
 
+const BASE = 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm px-2 py-1 text-[13px] leading-4 font-semibold'
+
 /**
  * El tipo de invitación, a la vista. La visita común no lleva tag: es lo
  * normal, y marcarla sería ruido. Frecuente y proveedor sí, porque cambian lo
@@ -12,13 +14,11 @@ export function TagTipo({ kind, className }: { kind: Invitation['kind']; classNa
   if (kind === 'visita') return null
   const Icono = kind === 'frecuente' ? Repeat : Truck
   return (
-    <span className={cn(
-      'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-sm px-1.5 py-1',
-      'text-[10.5px] font-bold uppercase leading-none tracking-[0.05em]',
-      kind === 'frecuente' ? 'bg-marca-suave text-marca-deep' : 'border border-line bg-card text-ink',
+    <span className={cn(BASE,
+      kind === 'frecuente' ? 'bg-azul-tint text-ink [&_svg]:text-azul-text' : 'border border-line bg-card text-ink',
       className,
     )}>
-      <Icono className="size-3" aria-hidden />
+      <Icono className="size-3.5" aria-hidden />
       {KIND_LABEL[kind]}
     </span>
   )
@@ -31,12 +31,8 @@ export function TagTipo({ kind, className }: { kind: Invitation['kind']; classNa
  */
 export function TagManual({ className }: { className?: string }) {
   return (
-    <span className={cn(
-      'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-sm border border-dashed border-ink/40 px-1.5 py-1',
-      'text-[10.5px] font-bold uppercase leading-none tracking-[0.05em] text-ink-soft',
-      className,
-    )}>
-      <PenLine className="size-3" aria-hidden />
+    <span className={cn(BASE, 'border border-dashed border-control text-ink-soft', className)}>
+      <PenLine className="size-3.5" aria-hidden />
       Carga manual
     </span>
   )

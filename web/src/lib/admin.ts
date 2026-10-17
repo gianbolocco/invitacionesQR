@@ -12,9 +12,9 @@ export type Person = {
 }
 
 export const ESTADO: Record<Person['status'], string> = {
-  invited: 'Invitado, todavía no entró',
-  active: 'Activo',
-  disabled: 'Deshabilitado',
+  invited: 'Sin activar',
+  active: 'Activa',
+  disabled: 'De baja',
 }
 
 /** Sin tildes ni mayúsculas: así "Lucía" matchea "lucia" y "142" matchea "Lote 142". */

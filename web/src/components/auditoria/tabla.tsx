@@ -14,7 +14,7 @@ export const ESTADO_TAG: Record<AuditRow['status'], Estado> = {
   adentro: 'adentro', concluida: 'concluida', esperando: 'esperando', vencida: 'vencida', anulada: 'anulada',
 }
 
-const TH = 'py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft'
+const TH = 'py-2 text-[13px] font-semibold text-ink-soft'
 
 /** La segunda línea de una celda: el dato que acompaña al principal. */
 function Secundaria({ children }: { children: React.ReactNode }) {
@@ -36,7 +36,7 @@ export function vigenciaCorta(r: Pick<AuditRow, 'validFrom' | 'validTo'>): strin
 export function Tabla({ filas }: { filas: AuditRow[] }) {
   const [abierta, setAbierta] = useState<string | null>(null)
   return (
-    <div className="overflow-x-auto rounded-lg border border-line bg-card">
+    <div className="overflow-x-auto rounded-md border border-line bg-card">
       <table className="w-full min-w-[860px] table-fixed border-collapse text-left text-sm">
         <thead className="bg-surface-sunk">
           <tr className="border-b border-line">
@@ -70,7 +70,7 @@ export function Tabla({ filas }: { filas: AuditRow[] }) {
                   </td>
                   <td className="px-3 py-3 tabular">{vigenciaCorta(r)}</td>
                   <td className="px-3 py-3">
-                    <EstadoTag estado={ESTADO_TAG[r.status]} />
+                    <EstadoTag estado={ESTADO_TAG[r.status]} contexto="garita" />
                     {r.status === 'anulada' && r.revokedReason !== null && (
                       <span title={r.revokedReason} className="mt-1 block truncate text-xs text-ink-soft">
                         {r.revokedReason || 'Por portería'}

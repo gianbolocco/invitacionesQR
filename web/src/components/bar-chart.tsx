@@ -5,7 +5,7 @@ export type Barra = { label: string; total: number; hint?: string }
 
 /**
  * Barras de una sola serie. Sin librería: son 24 o 30 valores y un div por barra.
- * Las barras usan el color de marca (bg-marca), así el gráfico sigue a cada barrio.
+ * Las barras van en el azul de Pazzit.
  */
 export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: {
   title: string
@@ -19,9 +19,9 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
   return (
     <figure className="m-0 flex flex-col gap-3">
       <figcaption className="flex items-baseline justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">{title}</p>
+        <p className="text-sm font-semibold text-ink-soft">{title}</p>
         <button onClick={() => setTabla((v) => !v)}
-          className="text-xs text-marca underline underline-offset-4">
+          className="min-h-11 text-sm font-semibold text-azul-text underline decoration-2 underline-offset-[3px]">
           {tabla ? 'Ver gráfico' : 'Ver tabla'}
         </button>
       </figcaption>
@@ -35,13 +35,13 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
             <div key={b.label} className="group relative flex h-full flex-1 flex-col justify-end">
               {/* Tooltip por barra. El área de hover es la columna entera, no la barra. */}
               <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden
-                -translate-x-1/2 whitespace-nowrap rounded bg-ink px-2 py-1 text-xs text-surface
+                -translate-x-1/2 whitespace-nowrap rounded-sm bg-ink px-2 py-1 text-[13px] text-surface
                 group-hover:block">
                 <span className="tabular">{b.hint ?? b.label}: {b.total}</span>
               </div>
               <div
-                className="w-full rounded-t-[4px] bg-marca transition-[height]
-                  group-hover:bg-marca-deep"
+                className="w-full rounded-t-[4px] bg-azul transition-colors duration-(--t-hover)
+                  group-hover:bg-[color-mix(in_srgb,var(--azul)_84%,var(--navy))]"
                 style={{ height: `${Math.max(2, (b.total / max) * 100)}%` }}
               />
             </div>
@@ -50,7 +50,7 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
       )}
 
       {hayDatos && !tabla && (
-        <div className="flex justify-between border-t border-line pt-1 text-xs text-ink-soft tabular">
+        <div className="flex justify-between border-t border-line pt-1 text-[13px] text-ink-soft tabular">
           {/* Etiquetas selectivas: extremos y máximo, no una por barra. */}
           <span>{bars[0]?.label}</span>
           <span className="font-semibold text-ink">
@@ -64,8 +64,8 @@ export function BarChart({ title, bars, emptyText = 'Todavía no hay datos.' }: 
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line">
-              <th className="py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Tramo</th>
-              <th className="py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Ingresos</th>
+              <th className="py-1 text-[13px] font-semibold text-ink-soft">Tramo</th>
+              <th className="py-1 text-[13px] font-semibold text-ink-soft">Ingresos</th>
             </tr>
           </thead>
           <tbody>

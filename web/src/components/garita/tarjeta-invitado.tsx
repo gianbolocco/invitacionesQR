@@ -1,7 +1,6 @@
 import { TagTipo } from '@/components/dominio/tag-tipo'
 import { quienInvita } from '@/lib/invitations'
 import type { AgendaRow } from '@/lib/queries/garita'
-import { cn } from '@/lib/utils'
 import { pieDe } from './datos-agenda'
 
 /**
@@ -9,17 +8,15 @@ import { pieDe } from './datos-agenda'
  * arriba, de quién y dónde en el medio, y abajo lo que cambia según el estado
  * (hace cuánto entró, a qué hora salió, cuánto cupo tiene).
  */
-export function TarjetaInvitado({ fila, hoy, onAbrir, apagada }: {
+export function TarjetaInvitado({ fila, hoy, onAbrir }: {
   fila: AgendaRow
   hoy: string
   onAbrir: (id: string) => void
-  apagada?: boolean
 }) {
   const pie = pieDe(fila, hoy)
   return (
     <button type="button" onClick={() => onAbrir(fila.id)}
-      className={cn('tarjeta-viva flex w-full flex-col gap-1.5 rounded-lg border border-line bg-card p-3 text-left shadow-tarjeta',
-        apagada && 'opacity-75')}>
+      className="flex w-full flex-col gap-1.5 rounded-md border border-line bg-card p-3 text-left">
       <span className="flex items-start justify-between gap-2">
         <span className="min-w-0 text-[15px] font-semibold leading-snug">{fila.guestName}</span>
         <TagTipo kind={fila.kind} />

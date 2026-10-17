@@ -42,7 +42,7 @@ export default function ProbarLectoraPage() {
           const reparado = repararTexto(r.texto)
           const esDni = interpretarLectura(r.texto)?.tipo === 'dni'
           return (
-          <li key={r.id} className="rounded-lg border border-border p-4">
+          <li key={r.id} className="rounded-md border border-border p-4">
             <p className="font-semibold">{r.esLectura ? interpretacion(r.texto) : 'No pasó como lectura (¿muy lenta o muy corta?)'}</p>
             <p className="mt-1 break-all font-mono text-sm">{esDni ? recortar(r.texto) : r.texto}</p>
             {reparado !== r.texto && (

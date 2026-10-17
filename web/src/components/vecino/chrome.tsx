@@ -4,17 +4,17 @@ import { usePathname } from 'next/navigation'
 import { History, Settings2, Ticket, UserRound } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { Marca } from '@/components/dominio/marca'
-import { BarraSeccion, type ItemBarra } from '@/components/dominio/barra-seccion'
-import { cn } from '@/lib/utils'
+import { BarraSeccion, HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
 
 function iniciales(nombre: string): string {
   return nombre.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('')
 }
 
 /**
- * El marco de la sección del vecino: la banda con el color del barrio arriba,
- * la navegación (arriba en pantalla ancha, abajo en el celular) y el contenido.
- * Se monta una vez para toda la sección: navegar no lo vuelve a dibujar.
+ * El marco de la sección del vecino: header de Pazzit con el nombre del
+ * barrio, la navegación (arriba en pantalla ancha, abajo en el celular) y el
+ * contenido a 640px. Se monta una vez para toda la sección: navegar no lo
+ * vuelve a dibujar.
  */
 export function ChromeVecino({ children }: { children: React.ReactNode }) {
   const me = useSesion()
@@ -32,16 +32,16 @@ export function ChromeVecino({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
-      <header className="sticky top-0 z-30 bg-marca text-sobre-marca">
-        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-3 px-4">
-          <Link href="/" aria-label="Inicio" className="min-w-0"><Marca variante="banda" /></Link>
+      <header className={HEADER}>
+        <div className="mx-auto flex h-14 max-w-[calc(640px+3rem)] items-center justify-between gap-3 px-4 md:px-6">
+          <Link href="/" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
+            <Marca conPazzit sobreColor />
+          </Link>
 
           <nav aria-label="Secciones" className="hidden items-center gap-1 sm:flex">
             {items.map((i) => (
-              <Link key={i.href} href={i.href} aria-current={i.activo ? 'page' : undefined}
-                className={cn('flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors duration-150',
-                  i.activo ? 'bg-white/20' : 'opacity-80 hover:bg-white/10 hover:opacity-100')}>
-                {/* Solo Administración lleva ícono acá: es la única pill que
+              <Link key={i.href} href={i.href} aria-current={i.activo ? 'page' : undefined} className={claseTab(i.activo)}>
+                {/* Solo Administración lleva ícono acá: es la única pestaña que
                     cambia de "modo" en vez de sección, y conviene que se
                     distinga del resto. */}
                 {i.href === '/admin' && <i.icono aria-hidden className="size-4" />}
@@ -50,16 +50,14 @@ export function ChromeVecino({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
 
-          <Link href="/perfil" className="flex shrink-0 items-center gap-2.5 text-sm sm:hidden" aria-label="Tu perfil">
-            <span className="opacity-85">{me.units[0]?.label}</span>
-            <span aria-hidden className="grid size-9 place-items-center rounded-full bg-white/20 text-xs font-bold">
-              {iniciales(me.name)}
-            </span>
+          <Link href="/perfil" aria-label="Tu perfil"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-white/20 text-sm font-bold text-white sm:hidden">
+            <span aria-hidden>{iniciales(me.name)}</span>
           </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-6 sm:py-10">{children}</main>
+      <main className="mx-auto max-w-[calc(640px+3rem)] px-4 py-6 sm:py-10 md:px-6">{children}</main>
 
       <BarraSeccion items={items} />
     </div>

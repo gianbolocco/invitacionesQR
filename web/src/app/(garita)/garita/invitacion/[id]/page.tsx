@@ -57,21 +57,21 @@ function AccionesRegistrado({ onListo, onDeshacer, deshaciendo }: {
       <p role="status" className="flex items-center gap-2 text-lg font-semibold">
         <motion.span initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 520, damping: 26, delay: 0.08 }}
-          className="grid size-7 place-items-center rounded-full bg-pass-ink text-pass-field">
+          className="grid size-7 place-items-center rounded-full bg-ink text-card">
           <Check className="size-4" strokeWidth={3} aria-hidden />
         </motion.span>
         Registrado
       </p>
       <button ref={siguienteRef} onClick={onListo}
-        className="relative min-h-16 overflow-hidden rounded bg-pass-ink text-xl font-bold text-pass-field">
+        className="relative min-h-16 overflow-hidden rounded bg-ink text-xl font-bold text-card">
         {/* La barra que se vacía dice lo mismo que el número, sin tener que leerlo. */}
         <motion.span aria-hidden initial={{ scaleX: 1 }} animate={{ scaleX: 0 }}
           transition={{ duration: SEGUNDOS_CONFIRMACION, ease: 'linear' }}
-          className="absolute inset-x-0 bottom-0 h-1 origin-left bg-pass-field/40" />
+          className="absolute inset-x-0 bottom-0 h-1 origin-left bg-card/45" />
         <span className="tabular">Siguiente ({Math.max(0, restan)})</span>
       </button>
       <button onClick={onDeshacer} disabled={deshaciendo}
-        className="min-h-14 rounded border-2 border-pass-ink/30 text-lg font-bold disabled:opacity-60">
+        className="min-h-14 rounded border-2 border-ink/30 text-lg font-bold disabled:opacity-60">
         {deshaciendo ? 'Deshaciendo…' : 'Deshacer'}
       </button>
       <p className="hidden text-center text-sm opacity-70 lg:block">o escaneá el siguiente</p>
@@ -252,14 +252,14 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const salio = hecho?.esEgreso ? hecho.movimiento.exitedAt : null
 
   const editable = ok && !esEgreso && !hecho
-  const borde = ok ? 'border-pass-ink/15' : 'border-deny-ink/20'
+  const borde = ok ? 'border-ink/15' : 'border-current/20'
   const noCoincide = Boolean(editable && inv.guestDoc && soloDigitos(doc).length >= 7
     && soloDigitos(doc) !== soloDigitos(inv.guestDoc))
   const kbd = 'rounded border border-current/30 px-1.5 py-0.5 font-mono text-xs'
 
   return (
     <main aria-live="assertive"
-      className={`min-h-dvh overflow-x-hidden p-6 sm:p-10 lg:px-14 ${ok ? 'bg-pass-field text-pass-ink' : 'bg-deny-field text-deny-ink'}`}>
+      className={`min-h-dvh overflow-x-hidden p-6 sm:p-10 lg:px-14 ${ok ? 'bg-verde-tint text-ink' : 'bg-no-pasa text-no-pasa-texto'}`}>
       {/* Un solo árbol. Mobile: una columna, la acción al pie. Desde lg: lo que
           decide a la izquierda, para leer de lejos; la ficha y la acción a la
           derecha, para el guardia sentado. Solo cambia la grilla. */}
@@ -298,7 +298,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                   <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
                     aria-describedby={[docLeido && doc.trim() && 'doc-leido', noCoincide && 'doc-no-coincide', !doc.trim() && 'doc-falta'].filter(Boolean).join(' ') || undefined}
                     onChange={(e) => { setDoc(e.target.value); setDocLeido(false) }}
-                    className="tabular h-12 border-pass-ink/20 bg-white/70 text-xl dark:bg-white/70" />
+                    className="tabular h-12 border-control bg-card text-xl" />
                   {docLeido && doc.trim() && <p id="doc-leido" className="mt-1 text-sm font-semibold">Leído del DNI</p>}
                   {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo.
                       Los dos números lado a lado: comparar es más rápido que leer una frase. */}
@@ -313,7 +313,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 <dt className="self-start pt-2.5 opacity-70"><label htmlFor="patente-veredicto">Patente</label></dt>
                 <dd className="min-w-0">
                   <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                    className="tabular h-12 border-pass-ink/20 bg-white/70 text-xl dark:bg-white/70 uppercase" />
+                    className="tabular h-12 border-control bg-card text-xl uppercase" />
                 </dd>
               </>
             ) : (
@@ -364,7 +364,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                   className="flex flex-col gap-3">
                   {/* Los datos se cargan al entrar, no al salir: a la salida ya están. */}
                   <button ref={accionRef} onClick={registrar} disabled={registrando || (!esEgreso && !doc.trim())}
-                    className="flex min-h-16 items-center justify-center gap-2 rounded bg-pass-ink text-xl font-bold text-pass-field transition-colors disabled:bg-pass-ink/40">
+                    className="flex min-h-16 items-center justify-center gap-2 rounded bg-ink text-xl font-bold text-card transition-colors disabled:bg-ink/40">
                     {registrando && <Loader2 className="size-5 animate-spin" aria-hidden />}
                     {registrando ? 'Registrando…' : esEgreso ? 'Registrar egreso' : 'Registrar ingreso'}
                   </button>
@@ -384,12 +384,12 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                   {/* El vecino ya dijo que sí por teléfono. Una anulada no: ahí dijo que no. */}
                   {(check as { reason: string }).reason !== 'revoked' && (
                     <button onClick={(e) => { setDisparadorAlta(e.currentTarget); setAltaAbierta(true) }}
-                      className="min-h-16 w-full rounded bg-deny-ink text-xl font-bold text-deny-field">
+                      className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
                       Autorizar igual
                     </button>
                   )}
                   <button ref={accionRef} onClick={salir}
-                    className="min-h-16 w-full rounded border-2 border-deny-ink/40 text-xl font-bold">
+                    className="min-h-16 w-full rounded border-2 border-current/40 text-xl font-bold">
                     Volver (Esc)
                   </button>
                   {(check as { reason: string }).reason !== 'revoked' && !esEgreso && (

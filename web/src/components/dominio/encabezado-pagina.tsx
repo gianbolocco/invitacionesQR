@@ -17,7 +17,7 @@ export function EncabezadoPagina({ titulo, antetitulo, subtitulo, acciones, clas
     <header className={cn('flex flex-wrap items-end justify-between gap-4', className)}>
       <div className="min-w-0">
         {antetitulo && (
-          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
+          <p className="mb-1.5 text-[13px] font-semibold text-ink-soft">
             {antetitulo}
           </p>
         )}

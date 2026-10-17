@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Info } from 'lucide-react'
+import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -7,17 +7,18 @@ import { cn } from '@/lib/utils'
  * sin que haya que ir a buscarlo.
  */
 export function Nota({ tono, children, className }: {
-  tono: 'error' | 'exito' | 'info'
+  tono: 'error' | 'exito' | 'info' | 'atencion'
   children: React.ReactNode
   className?: string
 }) {
-  const Icono = { error: CircleAlert, exito: CircleCheck, info: Info }[tono]
+  const Icono = { error: CircleAlert, exito: CircleCheck, info: Info, atencion: TriangleAlert }[tono]
   return (
     <p role={tono === 'error' ? 'alert' : 'status'}
-      className={cn('flex items-start gap-2.5 rounded-md px-3.5 py-3 text-sm animate-in fade-in duration-300', {
-        error: 'bg-peligro/10 text-peligro',
-        exito: 'bg-marca-suave text-marca-deep dark:text-marca',
-        info: 'bg-surface-sunk text-ink',
+      className={cn('flex items-start gap-2.5 rounded-sm px-3.5 py-3 text-sm animate-in fade-in duration-200', {
+        error: 'bg-alto-tint text-alto',
+        exito: 'bg-verde-tint text-verde',
+        info: 'bg-azul-tint text-ink',
+        atencion: 'bg-espera-tint text-espera',
       }[tono], className)}>
       <Icono className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>{children}</span>

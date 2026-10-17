@@ -5,7 +5,7 @@ import { quienInvita } from '@/lib/invitations'
 import type { AgendaRow } from '@/lib/queries/garita'
 import { detalleDe, estadoDe } from '@/components/garita/datos-agenda'
 
-const TH = 'py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft'
+const TH = 'py-2 text-[13px] font-semibold text-ink-soft'
 
 /**
  * La misma agenda como tabla densa: cabe el doble de gente en pantalla y se
@@ -18,7 +18,7 @@ export function Compacta({ filas, hoy, onAbrir }: {
   onAbrir: (id: string) => void
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-line bg-card">
+    <div className="overflow-x-auto rounded-md border border-line bg-card">
       <table className="w-full min-w-[640px] border-collapse text-left text-sm">
         <thead className="bg-surface-sunk">
           <tr className="border-b border-line">
@@ -47,7 +47,7 @@ export function Compacta({ filas, hoy, onAbrir }: {
                 {[r.guestDoc, r.plate].filter(Boolean).join(' · ') || '—'}
               </td>
               <td className="px-4 py-2.5 text-right">
-                <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} />
+                <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />
               </td>
             </tr>
           ))}
