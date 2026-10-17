@@ -5,16 +5,17 @@ import { CalendarDays, ClipboardList, LogOut, ScanLine, Settings2 } from 'lucide
 import { useSesion } from '@/lib/sesion-contexto'
 import { logout } from '@/lib/session'
 import { Marca } from '@/components/dominio/marca'
+import { LogoPazzit } from '@/components/dominio/logo-pazzit'
 import { SelectorTema } from '@/components/selector-tema'
-import { BarraSeccion, type ItemBarra } from '@/components/dominio/barra-seccion'
-import { cn } from '@/lib/utils'
+import { BarraSeccion, BOTON_HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
 
 /**
- * El marco de la garita: banda del barrio, quién está de turno — se AFIRMA,
- * no se elige: hace visible una sesión que quedó abierta del turno
- * anterior — y la navegación. El escáner va en el centro de la barra
- * inferior en mobile; en escritorio, el botón grande vive en la columna
- * derecha de la pantalla principal (no acá), así que no es parte de `items`.
+ * El marco de la garita, pensado desde el escritorio: header de Pazzit con el
+ * barrio y el rol, quién está de turno — se AFIRMA, no se elige: hace visible
+ * una sesión que quedó abierta del turno anterior — y la navegación. El
+ * escáner va en el centro de la barra inferior en mobile; en escritorio, el
+ * botón grande vive en la columna derecha de la pantalla principal (no acá),
+ * así que no es parte de `items`.
  *
  * A diferencia de `ChromeVecino`, esto NO se usa desde el layout de la
  * sección: solo lo monta la pantalla principal (`/garita`). Escanear y el
@@ -31,42 +32,42 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
-      <header className="sticky top-0 z-30 bg-marca text-sobre-marca">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
-          <Link href="/garita" aria-label="Inicio" className="min-w-0"><Marca variante="banda" /></Link>
+      <header className="sticky top-0 z-30 border-b border-line bg-card">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-6 px-4 md:px-6 xl:px-8">
+          <Link href="/garita" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
+            <LogoPazzit variante="mark" ancho={24} alt="" />
+            <Marca />
+            <span className="hidden shrink-0 font-semibold text-ink-soft sm:inline">· Portería</span>
+          </Link>
 
           <nav aria-label="Secciones" className="hidden items-center gap-1 sm:flex">
             {items.map((i) => (
-              <Link key={i.href} href={i.href} aria-current={i.activo ? 'page' : undefined}
-                className={cn('rounded-full px-3.5 py-2 text-sm font-semibold transition-colors duration-150',
-                  i.activo ? 'bg-white/20' : 'opacity-80 hover:bg-white/10 hover:opacity-100')}>
+              <Link key={i.href} href={i.href} aria-current={i.activo ? 'page' : undefined} className={claseTab(i.activo)}>
                 {i.etiqueta}
               </Link>
             ))}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="hidden text-sm opacity-85 sm:inline">{me.name}</span>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <span className="hidden text-[15px] text-ink sm:inline">{me.name}</span>
             {me.role === 'admin' && (
-              <Link href="/admin" aria-label="Ir a administración"
-                className="grid size-9 place-items-center rounded-full hover:bg-white/10">
-                <Settings2 className="size-[18px]" aria-hidden />
+              <Link href="/admin" aria-label="Ir a administración" title="Ir a administración" className={BOTON_HEADER}>
+                <Settings2 className="size-5" aria-hidden />
               </Link>
             )}
             <SelectorTema />
-            <button onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión"
-              className="grid size-9 place-items-center rounded-full text-sobre-marca hover:bg-white/10">
-              <LogOut className="size-[18px]" aria-hidden />
+            <button onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión" className={BOTON_HEADER}>
+              <LogOut className="size-5" aria-hidden />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <main className="mx-auto max-w-[1440px] px-4 py-6 md:px-6 sm:py-8 xl:px-8">{children}</main>
 
       <BarraSeccion items={items} central={
         <Link href="/garita/escanear" aria-label="Escanear QR"
-          className="grid size-14 -translate-y-5 place-items-center rounded-full bg-marca text-sobre-marca shadow-flotante">
+          className="grid size-14 -translate-y-5 place-items-center rounded-md bg-azul text-white shadow-(--sombra-flotante)">
           <ScanLine className="size-6" aria-hidden />
         </Link>
       } />
