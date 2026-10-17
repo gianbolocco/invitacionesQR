@@ -118,6 +118,27 @@ vecino). El color del barrio de desarrollo quedó en azul (el que tenía al empe
 No verificado a la vista: el header sin logo (la base de desarrollo tiene logo cargado y no lo borré).
 La barra del navegador (`theme-color`) sigue con el fondo de Pazzit también con color propio.
 
+### Segunda ronda de revisión de la fase a (2026-10-17)
+
+Pedidos del dueño y lo hecho:
+- **Oscuro cálido en todos los modos oscuros** (el de antes del rediseño): `surface #12110e`, `card #201e19`,
+  `surface-sunk #1c1a16`, `line #34312b`, `control #8a8378`, `ink #f2eee6`, `ink-soft #a8a195`, iguales
+  para el azul por defecto y para los colores propios. En oscuro solo el acento sigue al barrio;
+  `azul-tint` pasa a `color-mix(azul 24%, card)`. El escáner y la barra del navegador en oscuro también
+  van a `#12110e`.
+- **"No pasa" en bordó** `#7a1420` con texto `#fff1f0`, igual en los dos temas (tokens `--no-pasa` y
+  `--no-pasa-texto`); "Autorizar igual" invierte los dos. Reemplaza al `alto` del §3.3.
+- **Header con el color del barrio** (en su variante de cada tema), texto, mark, pestañas, tema y botones
+  en blanco; foco blanco en claro y sol en oscuro (`HEADER` en `barra-seccion.tsx`, `SelectorTema
+  sobreColor`, `Marca sobreColor`). La barra del navegador en claro vuelve a llevar el color del barrio
+  (`generateViewport` + `AplicarMarca`). La barra inferior del celular sigue en `card`.
+- **Tablero de la garita con dos columnas**: "Por llegar" y "Adentro". "Se fueron" sale del tablero (sigue
+  en la vista lista y en el filtro); `lib/tablero.ts` no cambia. Se borró la prop `apagada` de
+  `TarjetaInvitado`, que solo usaba esa columna.
+
+Verificación: web `check`, `lint`, `tsc` ok · e2e completo 67 ok, 1 salteado (antes del cambio del
+tablero) y `garita.spec.ts` 29 ok después · capturas 156 sin desborde.
+
 ## Pendiente de decisión
 
 Nada. Siguiente paso: revisión del dueño de la fase a; después, fase b (Pase, vecino e invitado).
