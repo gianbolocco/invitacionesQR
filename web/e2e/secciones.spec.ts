@@ -38,5 +38,6 @@ test('el manifest lleva el nombre del barrio', async ({ request }) => {
   expect(res.ok()).toBe(true)
   const m = await res.json()
   expect(m.name).toBeTruthy()
-  expect(m.name).not.toBe('VisitPass')
+  // 'Pazzit' es el nombre por defecto: si sale ese, no leyó el barrio.
+  expect(m.name).not.toBe('Pazzit')
 })

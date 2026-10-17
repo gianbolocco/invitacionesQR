@@ -2,12 +2,11 @@
 @import 'tw-animate-css';
 
 /*
-  Sistema de VisitPass · "Editorial cálido".
-  Estructura editorial (títulos grandes, filas con línea fina, estados en
-  etiqueta) sobre neutros cálidos. El color es del barrio: entra por
-  --marca-base desde el servidor y todo lo demás se deriva de él.
-  El veredicto de la garita NO usa la marca: se separa por luminancia, que
-  sobrevive al daltonismo y a las pantallas malas.
+  Sistema de Pazzit (PLAN-REDISENO.md §1).
+  La marca es la de Pazzit: azul, navy y sol. El barrio aparece con su nombre
+  y su logo; su color (--marca-base, lo inyecta el servidor) queda solo como
+  acento chico en el pase (--barrio) y en el ícono de la app instalada.
+  Sol: una sola cosa por pantalla y siempre con navy encima.
 */
 
 /*
@@ -26,28 +25,25 @@
   }
 }
 
+/* Hover solo con puntero fino: en pantallas táctiles el tap dejaba el hover pegado. */
+@custom-variant hover-fino {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
 @theme {
-  --color-pass-field: #eaf5ec;
-  --color-pass-ink: #0d3d28;
-  --color-deny-field: #7a1420;
-  --color-deny-ink: #fff1f0;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
 
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
-
-  --shadow-fila: 0 1px 0 rgb(20 19 15 / 0.05), 0 8px 18px -12px rgb(20 19 15 / 0.25);
-  --shadow-flotante: 0 18px 40px -16px rgb(20 19 15 / 0.35);
-
-  --ease-salida: cubic-bezier(0.2, 0.8, 0.2, 1);
-  /* Entradas y cambios de vista: arranca rápido y se asienta. Los built-in
-     de CSS (ease, ease-in-out) son demasiado blandos para una UI de trabajo. */
-  --ease-entrada: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-vista: cubic-bezier(0.77, 0, 0.175, 1);
-
-  --shadow-tarjeta: 0 1px 2px rgb(20 19 15 / 0.06), 0 6px 14px -10px rgb(20 19 15 / 0.28);
-  --shadow-tarjeta-alta: 0 2px 4px rgb(20 19 15 / 0.07), 0 14px 24px -14px rgb(20 19 15 / 0.38);
+  /* Pisan las curvas de Tailwind: `ease-out` y `ease-in-out` ya salen con estas. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  /* Hojas: arranca rápido y se asienta, como un cajón de iOS. */
+  --ease-hoja: cubic-bezier(0.32, 0.72, 0, 1);
 
   --animate-brillo: brillo 1.6s ease-in-out infinite;
   @keyframes brillo {
@@ -57,46 +53,54 @@
 }
 
 /* `inline`: las utilidades leen la variable en tiempo de ejecución, así el
-   color del barrio cambia sin recompilar y sin recargar. */
+   tema y el color del barrio cambian sin recompilar y sin recargar. */
 @theme inline {
   /* Los nombres que esperan las primitivas de shadcn. */
-  --color-background: var(--surface);
+  --color-background: var(--card);
   --color-foreground: var(--ink);
   --color-card: var(--card);
   --color-card-foreground: var(--ink);
   --color-popover: var(--card);
   --color-popover-foreground: var(--ink);
-  --color-primary: var(--marca);
-  --color-primary-foreground: var(--sobre-marca);
+  --color-primary: var(--azul);
+  --color-primary-foreground: #ffffff;
   --color-secondary: var(--surface-sunk);
   --color-secondary-foreground: var(--ink);
   --color-muted: var(--surface-sunk);
   --color-muted-foreground: var(--ink-soft);
-  --color-accent: var(--surface-sunk);
+  --color-accent: var(--azul-tint);
   --color-accent-foreground: var(--ink);
-  --color-destructive: var(--peligro);
+  --color-destructive: var(--alto);
   --color-border: var(--line);
-  --color-input: var(--line);
-  --color-ring: var(--marca);
+  --color-input: var(--control);
+  --color-ring: var(--focus);
 
   /* Los nombres propios. */
-  --color-marca: var(--marca);
-  --color-marca-deep: var(--marca-deep);
-  --color-marca-suave: var(--marca-suave);
-  --color-marca-line: var(--marca-line);
-  --color-sobre-marca: var(--sobre-marca);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-surface: var(--surface);
   --color-surface-sunk: var(--surface-sunk);
   --color-line: var(--line);
-  --color-peligro: var(--peligro);
+  --color-control: var(--control);
+  --color-azul: var(--azul);
+  --color-azul-text: var(--azul-text);
+  --color-azul-tint: var(--azul-tint);
+  --color-navy: var(--navy);
+  --color-sol: var(--sol);
+  --color-verde: var(--verde);
+  --color-verde-tint: var(--verde-tint);
+  --color-espera: var(--espera);
+  --color-espera-tint: var(--espera-tint);
+  --color-alto: var(--alto);
+  --color-alto-tint: var(--alto-tint);
+  --color-focus: var(--focus);
+  --color-barrio: var(--barrio);
   --color-escaner-fondo: var(--escaner-fondo);
   --color-escaner-texto: var(--escaner-texto);
-  --color-escaner-acento: var(--escaner-acento);
+  --color-escaner-marco: var(--escaner-marco);
 
-  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-bricolage), var(--font-geist), ui-sans-serif, sans-serif;
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
@@ -104,72 +108,97 @@
   /* El servidor pisa esto con el color del barrio, y AplicarMarca lo vuelve a
      pisar en vivo cuando el admin lo cambia. */
   --marca-base: #1e6b47;
+  --barrio: var(--marca-base);
 
-  /* Las variantes mueven SOLO la luminosidad: `oklch(from X L c h)` conserva
-     croma y tono. Con color-mix contra blanco el color sale grisáceo. */
-  --marca: var(--marca-base);
-  --marca-deep: oklch(from var(--marca-base) 0.32 c h);
-  --marca-suave: color-mix(in oklab, var(--marca-base) 10%, var(--surface));
-  --marca-line: color-mix(in oklab, var(--marca-base) 8%, white);
-  /* Texto sobre la marca. La paleta cerrada está elegida para que el blanco
-     se lea encima en el tema claro. */
-  --sobre-marca: #ffffff;
-
-  --surface: #f6f3ee;
-  --surface-sunk: #ece7df;
+  --surface: #f3f6ff;
   --card: #ffffff;
-  --line: #e6e0d6;
-  --ink: #14130f;
-  /* 5,3:1 sobre el fondo y 5,9:1 sobre las tarjetas: pasa AA en texto chico. */
-  --ink-soft: #6b645a;
-  --peligro: #a3202f;
+  --surface-sunk: #e8edfb;
+  --line: #e1e6f5;
+  /* 3:1 contra el fondo: es el borde de lo que se toca (inputs, secundario). */
+  --control: #7c86a8;
+  --ink: #0b1640;
+  --ink-soft: #4a5578;
+  --azul: #2f5bff;
+  --azul-text: #2f5bff;
+  --azul-tint: #e3e9ff;
+  --navy: #0b1640;
+  --sol: #ffc933;
+  --verde: #0e7a55;
+  --verde-tint: #e2f6ec;
+  --espera: #8a5a00;
+  --espera-tint: #fff3d1;
+  --alto: #b42318;
+  --alto-tint: #fde7e4;
+  --focus: #2f5bff;
+
+  /* El talón del pase es blanco con QR navy en los dos temas: un QR invertido
+     sobre fondo oscuro no lo lee cualquier lector. */
+  --talon-fondo: #ffffff;
+  --talon-qr: #0b1640;
 
   /* El escáner es un visor de cámara: oscuro SIEMPRE, no sigue el tema. */
-  --escaner-fondo: oklch(from var(--marca-base) 0.27 c h);
-  --escaner-texto: #f2f0e8;
-  /* El marco de escaneo: el tono del barrio, subido para leerse sobre la
-     cámara. El croma se topa para que un color de marca saturado no queme. */
-  --escaner-acento: oklch(from var(--marca-base) 0.88 min(c, 0.13) h);
+  --escaner-fondo: #0a1030;
+  --escaner-texto: #e6ecff;
+  /* El azul de texto del tema oscuro: el visor siempre es oscuro. */
+  --escaner-marco: #7d93ff;
+
+  --sombra-pase: drop-shadow(0 14px 16px rgb(11 22 64 / 0.14));
+  --sombra-flotante: 0 18px 40px -16px rgb(11 22 64 / 0.35);
+
+  --t-press: 120ms;
+  --t-hover: 180ms;
+  --t-ui: 220ms;
 }
 
 /*
   Tema oscuro, escrito dos veces a propósito: una para la elección explícita y
   otra para la preferencia del sistema. CSS no tiene mixins, y encadenar los
   selectores haría que el toggle no le pueda ganar al sistema.
-  En oscuro la marca SUBE de luminosidad (el color de la paleta sobre fondo
-  oscuro no llega a contraste) y el texto sobre ella pasa a ser oscuro.
+  Las sombras se oscurecen: nunca una sombra de color sobre fondo oscuro.
 */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --marca: oklch(from var(--marca-base) 0.74 c h);
-  --marca-deep: oklch(from var(--marca-base) 0.84 c h);
-  --marca-suave: color-mix(in oklab, var(--marca-base) 22%, var(--surface));
-  --marca-line: color-mix(in oklab, var(--marca-base) 6%, white);
-  --sobre-marca: #12110e;
-  --surface: #12110e;
-  --surface-sunk: #1c1a16;
-  --card: #201e19;
-  --line: #ffffff1a;
-  --ink: #f2eee6;
-  --ink-soft: #a8a195;
-  --peligro: #f2727e;
+  --surface: #0a1030;
+  --card: #131b45;
+  --surface-sunk: #1a2357;
+  --line: #24306a;
+  --control: #7480b8;
+  --ink: #e6ecff;
+  --ink-soft: #a6b0d6;
+  --azul-text: #7d93ff;
+  --azul-tint: #24306a;
+  --verde: #5be0a8;
+  --verde-tint: #0f2b26;
+  --espera: #ffd166;
+  --espera-tint: #2e2410;
+  --alto: #ff8a7a;
+  --alto-tint: #3a1620;
+  --focus: #ffc933;
+  --sombra-pase: drop-shadow(0 14px 16px rgb(0 0 0 / 0.35));
+  --sombra-flotante: 0 18px 40px -16px rgb(0 0 0 / 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --marca: oklch(from var(--marca-base) 0.74 c h);
-    --marca-deep: oklch(from var(--marca-base) 0.84 c h);
-    --marca-suave: color-mix(in oklab, var(--marca-base) 22%, var(--surface));
-    --marca-line: color-mix(in oklab, var(--marca-base) 6%, white);
-    --sobre-marca: #12110e;
-    --surface: #12110e;
-    --surface-sunk: #1c1a16;
-    --card: #201e19;
-    --line: #ffffff1a;
-    --ink: #f2eee6;
-    --ink-soft: #a8a195;
-    --peligro: #f2727e;
+    --surface: #0a1030;
+    --card: #131b45;
+    --surface-sunk: #1a2357;
+    --line: #24306a;
+    --control: #7480b8;
+    --ink: #e6ecff;
+    --ink-soft: #a6b0d6;
+    --azul-text: #7d93ff;
+    --azul-tint: #24306a;
+    --verde: #5be0a8;
+    --verde-tint: #0f2b26;
+    --espera: #ffd166;
+    --espera-tint: #2e2410;
+    --alto: #ff8a7a;
+    --alto-tint: #3a1620;
+    --focus: #ffc933;
+    --sombra-pase: drop-shadow(0 14px 16px rgb(0 0 0 / 0.35));
+    --sombra-flotante: 0 18px 40px -16px rgb(0 0 0 / 0.6);
   }
 }
 
@@ -177,30 +206,40 @@ body {
   background: var(--surface);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 24px;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 200ms var(--ease-salida), color 200ms var(--ease-salida);
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--t-ui) var(--ease-out), color var(--t-ui) var(--ease-out);
 }
 
 /* Los inputs van a 16px: con menos, iOS hace zoom al enfocarlos. */
 input, select, textarea { font-size: 16px; }
 
-/* Títulos display: la única voz grande de la interfaz. La palabra en <em> va
-   en el color del barrio ("Hola, <em>Lucía.</em>"). */
+/* Escala tipográfica. Nada por debajo de 12px ni etiquetas en mayúsculas. */
+.t-display { font-size: 32px; line-height: 36px; font-weight: 800; letter-spacing: -1px; }
+@media (min-width: 768px) { .t-display { font-size: 40px; line-height: 44px; } }
+.t-title { font-size: 24px; line-height: 30px; font-weight: 700; letter-spacing: -0.5px; }
+.t-heading { font-size: 20px; line-height: 28px; font-weight: 700; }
+.t-body { font-size: 16px; line-height: 24px; }
+.t-small { font-size: 14px; line-height: 20px; }
+.t-caption { font-size: 13px; line-height: 16px; font-weight: 600; }
+
+/* Títulos grandes de las pantallas que todavía no pasaron a la escala nueva. */
 .titulo-display {
   font-family: var(--font-display);
   font-weight: 800;
   letter-spacing: -0.035em;
   line-height: 0.95;
 }
-.titulo-display em { font-style: normal; color: var(--marca); }
+.titulo-display em { font-style: normal; color: var(--azul-text); }
 
 .tabular { font-variant-numeric: tabular-nums; }
 
-/* Lo que el navegador dibuja por su cuenta, con la marca: la selección y el
-   cursor de los campos, y scrollbars finas que no pelean con el diseño. */
-::selection { background: color-mix(in oklab, var(--marca) 28%, transparent); color: var(--ink); }
-input, textarea { caret-color: var(--marca); }
+/* Lo que el navegador dibuja por su cuenta: la selección es el sol de Pazzit
+   con navy encima, el cursor de los campos va en azul. */
+::selection { background: var(--sol); color: var(--navy); }
+input, textarea { caret-color: var(--azul-text); }
 /* Los buscadores traen su propia X de borrar (WebKit); varios dibujan la suya. */
 input[type='search']::-webkit-search-cancel-button { display: none; }
 * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--ink) 22%, transparent) transparent; }
@@ -209,54 +248,79 @@ input[type='search']::-webkit-search-cancel-button { display: none; }
 h1, h2, h3 { text-wrap: balance; }
 
 /* Presionar se siente: un botón o una fila que cede apenas bajo el dedo.
-   Solo escala (barato) y solo con el cursor encima en pantallas con hover real. */
+   Solo escala (barato); el hover de color, solo con puntero fino. */
 button:not(:disabled), [role='button'], a.presionable {
-  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
-  transition-duration: 150ms;
-  transition-timing-function: var(--ease-entrada);
+  transition-property: color, background-color, border-color, opacity, transform;
+  transition-duration: var(--t-hover), var(--t-hover), var(--t-hover), var(--t-hover), var(--t-press);
+  transition-timing-function: var(--ease-out);
 }
-button:not(:disabled):active, a.presionable:active { transform: scale(0.98); }
-
-/* Una tarjeta del tablero o de las vistas: sube un pelo al pasar el mouse. */
-@media (hover: hover) and (pointer: fine) {
-  .tarjeta-viva { transition: transform 180ms var(--ease-entrada), box-shadow 180ms var(--ease-entrada); }
-  .tarjeta-viva:hover { transform: translateY(-1px); box-shadow: var(--shadow-tarjeta-alta); }
+@media (prefers-reduced-motion: no-preference) {
+  button:not(:disabled):active, a.presionable:active { transform: scale(0.97); }
+  /* Las filas ceden menos: son anchas y una escala grande se nota como salto. */
+  :is(a, button).fila-presionable:active { transform: scale(0.99); }
 }
-.tarjeta-viva:active { transform: scale(0.99); }
 
 /* Cambio de vista: el contenido nuevo entra desde apenas abajo. */
 @keyframes entra-vista {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
-.entra-vista { animation: entra-vista 240ms var(--ease-entrada) both; }
+@media (prefers-reduced-motion: no-preference) {
+  .entra-vista { animation: entra-vista var(--t-ui) var(--ease-out) both; }
+}
 
 /* Skeleton con brillo que recorre: se lee como "está llegando", no como un
-   bloque gris roto. */
+   bloque gris roto. Con movimiento reducido queda quieto. */
 .skeleton-brillo {
   background: linear-gradient(90deg,
     var(--surface-sunk) 0%,
     color-mix(in oklab, var(--surface-sunk) 55%, var(--card)) 50%,
     var(--surface-sunk) 100%);
   background-size: 200% 100%;
-  animation: var(--animate-brillo);
+  border-radius: var(--radius-sm);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-brillo { animation: var(--animate-brillo); }
 }
 
 /* El foco tiene que verse siempre: la garita se opera con teclado. */
 :focus-visible {
-  outline: 3px solid var(--marca);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
+/* El logo de Pazzit: dos <img> (los SVG comparten `mask id`, en línea chocan)
+   y el CSS muestra el del tema. */
+.logo-oscuro { display: none; }
+:root[data-theme='dark'] .logo-claro { display: none; }
+:root[data-theme='dark'] .logo-oscuro { display: inline-block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .logo-claro { display: none; }
+  :root:not([data-theme='light']) .logo-oscuro { display: inline-block; }
+}
+
 /* La librería del escáner dibuja su propio marco y su sombreado; usamos los
-   nuestros, que siguen la marca y no se desalinean al redimensionar. */
+   nuestros, que no se desalinean al redimensionar. */
 #reader #qr-shaded-region { border-color: transparent !important; }
 #reader #qr-shaded-region > div { display: none !important; }
 
+/*
+  Movimiento reducido (PLAN §4.4): fuera los desplazamientos, las escalas y los
+  bucles decorativos; quedan los fundidos cortos. Los `animate-spin` siguen
+  girando: son indicadores de que algo está pasando, no decoración.
+  Las entradas de tw-animate-css (hojas, diálogos, menús) se quedan sin
+  traslado ni escala y duran 150ms.
+*/
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  * {
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-enter-rotate: 0 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-exit-rotate: 0 !important;
   }
+  .animate-in, .animate-out { animation-duration: 150ms !important; }
 }

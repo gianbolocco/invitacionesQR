@@ -39,18 +39,15 @@ export function logoUrl(m: Marca): string | null {
 }
 
 /**
- * Lleva la marca al documento: el color como variable CSS (todo lo demás se
- * deriva de ella), el color de la barra del navegador y el título. No dibuja
- * nada.
+ * Lleva la marca al documento: el color como variable CSS (el punto del barrio
+ * en el pase) y el título. La barra del navegador ya no: es de Pazzit y la fija
+ * el viewport del layout. No dibuja nada.
  */
 export function AplicarMarca() {
   const marca = useMarca()
 
   useEffect(() => {
     document.documentElement.style.setProperty('--marca-base', marca.color)
-    document
-      .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"][media="(prefers-color-scheme: light)"]')
-      .forEach((m) => { m.content = marca.color })
   }, [marca.color])
 
   // generateMetadata ya fija el título inicial; solo se toca si el nombre cambia
