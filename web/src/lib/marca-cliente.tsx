@@ -39,9 +39,9 @@ export function logoUrl(m: Marca): string | null {
 }
 
 /**
- * Lleva la marca al documento: el color como variable CSS (todo lo demás se
- * deriva de ella), el color de la barra del navegador y el título. No dibuja
- * nada.
+ * Lleva la marca al documento: el color como variable CSS (de él sale el
+ * acento de toda la app), el de la barra del navegador en claro y el título.
+ * No dibuja nada.
  */
 export function AplicarMarca() {
   const marca = useMarca()

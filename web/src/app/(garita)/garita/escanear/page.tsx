@@ -13,7 +13,7 @@ type Estado = 'abriendo' | 'listo' | 'sin_camara'
 
 const ESTADO_PILL: Record<Estado, { texto: string; punto: string }> = {
   abriendo: { texto: 'Conectando', punto: 'bg-[#e5c879]' },
-  listo: { texto: 'Lector activo', punto: 'bg-escaner-acento' },
+  listo: { texto: 'Lector activo', punto: 'bg-escaner-marco' },
   sin_camara: { texto: 'Sin cámara', punto: 'bg-[#ff8b82]' },
 }
 
@@ -61,7 +61,7 @@ export default function EscanearPage() {
     })
     let vivo = true
 
-    scanner.start(
+    const arranque = scanner.start(
       { facingMode: 'environment' },
       {
         fps: 12,
@@ -85,7 +85,7 @@ export default function EscanearPage() {
         const l = interpretarLectura(texto)
         if (!l) {
           if (vivo) {
-            setError('Ese código no es de VisitPass. Enfocá el QR de la invitación o el DNI.')
+            setError('Ese código no es un pase de Pazzit. Probá con el QR del pase o con el DNI.')
             setValidando(false)
           }
           procesando.current = false
@@ -110,7 +110,13 @@ export default function EscanearPage() {
 
     return () => {
       vivo = false
-      scanner.stop().catch(() => {})
+      // stop() TIRA (síncrono, y un string) si la cámara todavía no abrió: salir
+      // mientras conecta, o sin permiso, rompía la pantalla con el error de
+      // sección. Se espera a que termine de arrancar: si abre tarde, se apaga
+      // igual y la cámara no queda prendida.
+      arranque.finally(() => {
+        try { scanner.stop().catch(() => {}) } catch { /* no estaba corriendo */ }
+      })
     }
   }, [me, router, abrirQr, dniPendiente])
 
@@ -166,7 +172,7 @@ export default function EscanearPage() {
         <div aria-hidden className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
           <div className="relative rounded-[1.4rem] shadow-[0_0_0_100vmax_rgb(0_0_0/0.42)] transition-[width,height] duration-300"
             style={{ width: marco, height: marco }}>
-            <motion.div className="absolute -inset-1 text-escaner-acento drop-shadow-[0_0_10px_var(--escaner-acento)]"
+            <motion.div className="absolute -inset-1 text-escaner-marco"
               animate={marcoAnim} transition={marcoTrans}>
               <Esquinas />
             </motion.div>

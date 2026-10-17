@@ -16,8 +16,10 @@ test('el guardia busca un invitado, registra el ingreso y lo deshace', async ({ 
   await entrar(g, 'guardia')
 
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await expect(g.getByText(nombre)).toBeVisible()
-  await g.getByText(nombre).click()
+  // .first(): la agenda, que ya no esconde a los frecuentes, también lo nombra;
+  // el resultado del buscador es el primero en el DOM.
+  await expect(g.getByText(nombre).first()).toBeVisible()
+  await g.getByText(nombre).first().click()
   await expect(g).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
   await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
 
@@ -72,7 +74,7 @@ test('una invitación anulada no pasa', async ({ page, browser }) => {
   await guardia.close()
 })
 
-test('el guardia registra el ingreso y después el egreso del mismo invitado', async ({ page, browser }) => {
+test('el guardia registra el ingreso y después el egreso del mismo invitado', async ({ page, browser, isMobile }) => {
   const nombre = `Egreso E2E ${Date.now()}`
   await entrar(page, 'vecino')
   await page.goto('/invitaciones/nueva')
@@ -81,6 +83,8 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await expect(page).toHaveURL(/\/invitaciones\/[0-9a-f-]{36}\?creada=1$/)
 
   const guardia = await browser.newContext()
+  // Estas pruebas leen las secciones de la lista; el tablero es la vista por defecto en escritorio.
+  await guardia.addInitScript(() => localStorage.setItem('visitpass.garita.vista', 'lista'))
   const g = await guardia.newPage()
   await entrar(g, 'guardia')
 
@@ -95,15 +99,21 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
 
   // Siguiente vuelve a la garita, de donde vino, y busca al mismo invitado:
   // ahora tiene que ofrecer el egreso. .first(): la agenda, debajo del
-  // buscador, ya lo muestra en "Ya entraron" desde el ingreso, así que el
+  // buscador, ya lo muestra en "Adentro" desde el ingreso, así que el
   // nombre aparece dos veces en la página; el resultado del buscador es el
   // primero en el DOM.
   await g.getByRole('button', { name: /^Siguiente/ }).click()
   await expect(g).toHaveURL(/\/garita$/)
 
   // El filtro "Adentro" lo muestra y esconde las secciones de la agenda.
+  // En el celular los filtros viven en una hoja detrás del botón "Filtros".
+  if (isMobile) await g.getByRole('button', { name: /^Filtros/ }).click()
   await g.getByRole('button', { name: /^Adentro/ }).click()
-  await expect(g.getByText(/^Ya entraron/)).toBeHidden()
+  if (isMobile) {
+    await g.getByRole('button', { name: /^Ver \d+ resultado/ }).click()
+    await expect(g.getByRole('dialog')).toBeHidden()
+  }
+  await expect(g.getByRole('heading', { name: /^Se fueron/ })).toBeHidden()
   await expect(g.getByText(nombre).first()).toBeVisible()
 
   await g.getByLabel('Buscar invitado').fill(nombre)
@@ -121,7 +131,7 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await expect(g).toHaveURL(/\/garita$/)
   await g.waitForTimeout(1500)
   await expect(g).toHaveURL(/\/garita$/)
-  await expect(g.getByText(/^Ya entraron/)).toBeVisible()
+  await expect(g.getByRole('heading', { name: /^Se fueron/ })).toBeVisible()
   await expect(g.getByText(nombre).first()).toBeVisible()
 
   await guardia.close()
@@ -156,9 +166,11 @@ test('el guardia da de alta una invitación exprés y el ingreso exige documento
 test('una invitación nueva aparece en la garita sin recargar', async ({ page, browser }) => {
   // El guardia ya tiene la garita abierta.
   const guardia = await browser.newContext()
+  // Estas pruebas leen las secciones de la lista; el tablero es la vista por defecto en escritorio.
+  await guardia.addInitScript(() => localStorage.setItem('visitpass.garita.vista', 'lista'))
   const g = await guardia.newPage()
   await entrar(g, 'guardia')
-  await expect(g.getByText(/^Pendientes|Nadie tiene autorización/).first()).toBeVisible()
+  await expect(g.getByRole('heading', { name: /^Por llegar/ }).or(g.getByText('Nadie tiene autorización'))).toBeVisible()
 
   const nombre = `En vivo E2E ${Date.now()}`
   await entrar(page, 'vecino')

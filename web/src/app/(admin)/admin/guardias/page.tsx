@@ -183,7 +183,7 @@ export default function GuardiasPage() {
         ) : (
           <div>
             {guardias.map((g) => (
-              <Fila key={g.id} titulo={g.name}
+              <Fila densa key={g.id} titulo={g.name}
                 meta={[
                   g.username ? `usuario ${g.username}` : g.email ?? 'sin usuario',
                   ESTADO[g.status],

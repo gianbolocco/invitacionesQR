@@ -1,14 +1,13 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Bricolage_Grotesque } from 'next/font/google'
+import { Onest } from 'next/font/google'
 import { SCRIPT_ANTI_PARPADEO } from '@/lib/theme'
 import { leerMarca } from '@/lib/marca'
 import { Proveedores } from '@/components/proveedores'
 import './globals.css'
 
-// Geist para toda la interfaz; Bricolage solo para títulos, el saludo, el
-// nombre en el pase y el veredicto. Dos familias, una para cada voz.
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
-const bricolage = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-bricolage' })
+// Onest, la letra de Pazzit, para toda la interfaz. Bagel Fat One no se carga:
+// solo vive dibujada en los SVG del logo.
+const onest = Onest({ subsets: ['latin'], weight: ['400', '600', '700', '800'], variable: '--font-onest' })
 
 /*
  * El layout se renderiza por request, no en el build.
@@ -35,7 +34,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export async function generateViewport(): Promise<Viewport> {
   const marca = await leerMarca()
   return {
-    // El claro lleva el color del barrio; AplicarMarca lo actualiza en vivo.
+    // En claro la barra del navegador sigue al header, que lleva el color del
+    // barrio (AplicarMarca la actualiza en vivo). En oscuro, el fondo de la app:
+    // el header oscuro es una variante calculada en CSS que acá no se conoce.
     themeColor: [
       { media: '(prefers-color-scheme: light)', color: marca.color },
       { media: '(prefers-color-scheme: dark)', color: '#12110e' },
@@ -50,14 +51,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const marca = await leerMarca()
 
   return (
-    <html lang="es-AR" className={`${geist.variable} ${bricolage.variable}`}
+    <html lang="es-AR" className={onest.variable}
       suppressHydrationWarning>
       <head>
         {/* Antes de pintar: si no, la pantalla arranca clara y salta a oscura. */}
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_ANTI_PARPADEO }} />
-        {/* El color del barrio, en el HTML y no en un fetch del cliente: así no
-            hay un parpadeo del verde por defecto antes de pintarse el propio.
-            Solo se inyecta la base; las variantes las deriva el CSS. */}
+        {/* El color del barrio, en el HTML y no en un fetch del cliente: así el
+            punto del barrio en el pase no parpadea con el verde por defecto. */}
         <style dangerouslySetInnerHTML={{ __html: `:root{--marca-base:${marca.color}}` }} />
       </head>
       <body>

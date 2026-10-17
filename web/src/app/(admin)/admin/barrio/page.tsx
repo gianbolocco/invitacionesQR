@@ -64,7 +64,7 @@ export default function BarrioPage() {
         <EncabezadoPagina titulo={barrio.data?.name ?? 'Barrio'}
           subtitulo="Esto aparece en el link que recibe el invitado, abajo de quién lo invitó." />
 
-        <form onSubmit={guardarForm} className="flex flex-col gap-4 rounded-lg border border-line bg-card p-5">
+        <form onSubmit={guardarForm} className="flex flex-col gap-4 rounded-md border border-line bg-card p-5">
           <Campo id="direccion" etiqueta="Dirección">
             <Input id="direccion" value={address} placeholder="Ruta 8 km 62, Pilar"
               onChange={(e) => setAddress(e.target.value)} />
@@ -76,7 +76,7 @@ export default function BarrioPage() {
           </Campo>
 
           <fieldset className="border-t border-line pt-4">
-            <legend className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Color del barrio</legend>
+            <legend className="mb-2 text-[13px] font-semibold text-ink-soft">Color del barrio</legend>
             <div className="flex flex-wrap gap-2">
               {(barrio.data?.paleta ?? []).map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)}
@@ -96,13 +96,13 @@ export default function BarrioPage() {
           </Button>
         </form>
 
-        <div className="flex flex-col items-start gap-3 rounded-lg border border-line bg-card p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Logo</p>
+        <div className="flex flex-col items-start gap-3 rounded-md border border-line bg-card p-5">
+          <p className="text-[13px] font-semibold text-ink-soft">Logo</p>
           {marcaReal.tieneLogo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl(marcaReal) ?? ''} alt="Logo del barrio" className="h-16 w-auto max-w-[16rem] object-contain" />
           ) : (
-            <p className="text-ink-soft">Sin logo se muestra el nombre del barrio en itálica.</p>
+            <p className="text-ink-soft">Sin logo, mostramos el nombre del barrio.</p>
           )}
 
           <button type="button"
@@ -117,7 +117,7 @@ export default function BarrioPage() {
             }}
             disabled={subirLogo.isPending}
             className={`flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 text-center text-sm
-              ${arrastrando ? 'border-marca bg-marca-suave' : 'border-line'} disabled:opacity-50`}>
+              ${arrastrando ? 'border-azul bg-azul-tint' : 'border-line'} disabled:opacity-50`}>
             <Upload className="size-5 text-ink-soft" aria-hidden />
             <span>{subirLogo.isPending ? 'Subiendo…' : 'Arrastrá un PNG o JPG, o tocá para elegirlo'}</span>
             <span className="text-xs text-ink-soft">Hasta 500 KB</span>
@@ -136,7 +136,7 @@ export default function BarrioPage() {
 
         {barrio.data?.mapUrl && (
           <a href={barrio.data.mapUrl} target="_blank" rel="noopener noreferrer"
-            className="text-sm text-marca underline underline-offset-4">
+            className="text-sm text-azul-text underline underline-offset-4">
             Probar el link de mapas
           </a>
         )}

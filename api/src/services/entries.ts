@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, ilike, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { invitations, entryLogs, units, people } from '../db/schema.js'
 import { canEnter, type EntryCheck } from '../authz.js'
@@ -138,6 +138,96 @@ export async function registerEntry(
 
     return entry
   })
+}
+
+/** Hasta cuántas horas atrás se puede cargar un movimiento a mano. */
+const VENTANA_MANUAL_H = 48
+export const MAX_CARGA_MANUAL = 50
+
+export type CargaManual = {
+  invitationId: string
+  enteredAt: Date
+  /** null = todavía está adentro. */
+  exitedAt: Date | null
+  note?: string
+}
+
+/**
+ * Carga a mano ingresos y egresos que ya pasaron (un corte de luz, una
+ * planilla de papel), con la hora en que ocurrieron.
+ *
+ * Es un registro, no una decisión de acceso: igual que registerExit, NO
+ * valida cupo, fecha ni anulación. Lo que sí valida es que el relato cierre:
+ * nada en el futuro, nada de hace más de 48 h (es lo que separa cargar un
+ * corte de reescribir la historia) y nada que se superponga con otro
+ * movimiento de la misma invitación. Todo o nada: una tanda con un error no
+ * guarda ninguna.
+ *
+ * Quien carga queda como guardia de ingreso y de salida, y en `loaded_by`:
+ * la fila no se hace pasar por un escaneo.
+ */
+export async function registerManual(
+  neighborhoodId: string,
+  loaderId: string,
+  items: CargaManual[],
+) {
+  if (items.length === 0 || items.length > MAX_CARGA_MANUAL) throw new AppError(400, 'tanda_invalida')
+  const ahora = new Date()
+  const desde = new Date(ahora.getTime() - VENTANA_MANUAL_H * 3_600_000)
+
+  const filas = await db.transaction(async (tx) => {
+    const creadas = []
+    for (const it of items) {
+      if (it.enteredAt > ahora || (it.exitedAt && it.exitedAt > ahora)) throw new AppError(400, 'fecha_futura')
+      if (it.enteredAt < desde) throw new AppError(400, 'fuera_de_ventana')
+      if (it.exitedAt && it.exitedAt < it.enteredAt) throw new AppError(400, 'salida_anterior')
+
+      const [target] = await tx.select({
+        unitId: invitations.unitId, guestName: invitations.guestName,
+        guestDoc: invitations.guestDoc, plate: invitations.plate,
+      }).from(invitations)
+        .innerJoin(units, eq(units.id, invitations.unitId))
+        .where(and(eq(invitations.id, it.invitationId), eq(units.neighborhoodId, neighborhoodId)))
+        // Serializa dos tandas simultáneas sobre la misma invitación: sin esto las
+        // dos pasan el chequeo de superposición y se pisan.
+        .for('update', { of: invitations })
+        .limit(1)
+      if (!target) throw new AppError(404, 'not_found')
+
+      // Un movimiento ocupa [ingreso, salida) y una fila abierta ocupa hasta hoy.
+      // Se superponen si cada uno empieza antes de que el otro termine.
+      const [choque] = await tx.select({ id: entryLogs.id }).from(entryLogs).where(and(
+        eq(entryLogs.invitationId, it.invitationId),
+        or(isNull(entryLogs.exitedAt), gt(entryLogs.exitedAt, it.enteredAt)),
+        it.exitedAt ? lt(entryLogs.enteredAt, it.exitedAt) : undefined,
+      )).limit(1)
+      if (choque) throw new AppError(409, 'se_superpone')
+
+      const [fila] = await tx.insert(entryLogs).values({
+        invitationId: it.invitationId,
+        unitId: target.unitId,
+        guardId: loaderId,
+        enteredAt: it.enteredAt,
+        exitedAt: it.exitedAt,
+        exitGuardId: it.exitedAt ? loaderId : null,
+        guestName: target.guestName,
+        guestDoc: target.guestDoc,
+        plate: target.plate,
+        note: it.note?.trim() || null,
+        source: 'manual',
+        loadedBy: loaderId,
+      }).returning()
+      creadas.push(fila)
+    }
+    return creadas
+  })
+
+  for (const f of filas) {
+    await audit(loaderId, neighborhoodId, 'entry.manual', 'entry_log', f.id, {
+      invitationId: f.invitationId, enteredAt: f.enteredAt, exitedAt: f.exitedAt, note: f.note,
+    })
+  }
+  return filas
 }
 
 /**
@@ -421,6 +511,10 @@ export type AuditRow = {
   guardName: string | null
   exitedAt: Date | null
   exitGuardName: string | null
+  /** Algún movimiento de esta invitación se cargó a mano. */
+  manual: boolean
+  /** null = no la anuló la portería. '' = la anuló sin dejar motivo. */
+  revokedReason: string | null
 }
 
 export type AuditStatus = AuditRow['status']
@@ -430,6 +524,9 @@ export type AuditFilters = {
   to?: string
   unitId?: string
   status?: AuditStatus
+  kind?: 'visita' | 'frecuente' | 'proveedor'
+  /** Texto libre: nombre, documento, patente, unidad o quién invita. */
+  q?: string
   page?: number
   pageSize?: number
 }
@@ -479,6 +576,35 @@ export function auditAll(neighborhoodId: string, f: AuditFilters): Promise<Audit
   return auditRows(neighborhoodId, f, 5000, 0)
 }
 
+
+/**
+ * Los filtros que comparten las filas y los contadores: con paginación, un
+ * contador que no mira la búsqueda mostraría números de otra lista.
+ * El estado NO entra acá: los contadores cuentan todos los estados a la vez.
+ */
+function filtrosAuditoria(neighborhoodId: string, f: AuditFilters) {
+  const q = f.q?.trim() ?? ''
+  // % y _ son comodines de LIKE: se escapan para que "Lote_1" busque ese texto.
+  const patron = q ? `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null
+  // El documento se guarda como lo escribió quien invitó ("30.123.456"): se
+  // compara solo por dígitos, y solo si lo buscado tiene alguno.
+  const digitos = q.replace(/\D/g, '')
+  const patronDoc = digitos ? `%${digitos}%` : null
+  return sql`
+    u.neighborhood_id = ${neighborhoodId}
+    and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
+    and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
+    and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+    and (${f.kind ?? null}::text is null or i.kind = ${f.kind ?? null}::text)
+    and (${patron}::text is null
+      or i.guest_name ilike ${patron}::text
+      or i.plate ilike ${patron}::text
+      or u.label ilike ${patron}::text
+      or p.name ilike ${patron}::text
+      or regexp_replace(coalesce(i.guest_doc, ''), '\\D', '', 'g') like ${patronDoc}::text)
+  `
+}
+
 async function auditCounts(
   neighborhoodId: string,
   f: AuditFilters,
@@ -501,11 +627,9 @@ async function auditCounts(
       end as status
       from invitation i
       join unit u on u.id = i.unit_id
+      join person p on p.id = i.created_by
       left join uso on uso.invitation_id = i.id
-      where u.neighborhood_id = ${neighborhoodId}
-        and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
-        and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
-        and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+      where ${filtrosAuditoria(neighborhoodId, f)}
     )
     select
       count(*) filter (where status = 'adentro')::int    as adentro,
@@ -530,7 +654,8 @@ async function auditRows(
     with uso as (
       select e.invitation_id,
              count(*)::int as veces,
-             count(*) filter (where e.exited_at is null)::int as abiertas
+             count(*) filter (where e.exited_at is null)::int as abiertas,
+             bool_or(e.source = 'manual') as manual
       from entry_log e
       group by e.invitation_id
     ),
@@ -570,16 +695,15 @@ async function auditRows(
       coalesce(uso.veces, 0)      as "enteredCount",
       ultimo.guardia              as "guardName",
       ultimo.exited_at            as "exitedAt",
-      ultimo.guardia_salida       as "exitGuardName"
+      ultimo.guardia_salida       as "exitGuardName",
+      coalesce(uso.manual, false) as manual,
+      i.revoked_reason            as "revokedReason"
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
     left join uso on uso.invitation_id = i.id
     left join ultimo on ultimo.invitation_id = i.id
-    where u.neighborhood_id = ${neighborhoodId}
-      and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
-      and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
-      and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+    where ${filtrosAuditoria(neighborhoodId, f)}
       and (${f.status ?? null}::text is null or ${f.status ?? null}::text = case
         when i.revoked_at is not null then 'anulada'
         when coalesce(uso.abiertas, 0) > 0 then 'adentro'

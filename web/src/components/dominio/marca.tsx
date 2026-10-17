@@ -1,22 +1,26 @@
 'use client'
 import { logoUrl, useMarca } from '@/lib/marca-cliente'
 import type { Marca as DatosMarca } from '@/lib/marca'
+import { LogoPazzit } from '@/components/dominio/logo-pazzit'
 import { cn } from '@/lib/utils'
 
 /**
  * El logo o el nombre del barrio. Es el único componente que sabe cómo se
- * pinta la marca: si hay logo lo muestra, si no, el nombre en display.
+ * pinta el barrio: si hay logo lo muestra, si no, el nombre.
  *
- * - normal: sobre el fondo, el nombre va en el color del barrio.
- * - banda: sobre la banda de color; el logo va en una pastilla blanca para
- *   que uno oscuro no desaparezca sobre el fondo.
+ * - normal: en los headers. Con `conPazzit` y sin logo, el nombre va
+ *   acompañado del mark de Pazzit (en blanco sobre el color del barrio); con
+ *   logo cargado va solo el logo, que ya es la identidad del barrio.
  * - grande: arranque y pantallas de acceso.
  *
  * `marcaOverride` la usa la vista previa de /admin/barrio: en vez de leer
  * la marca guardada, muestra la que se está editando, antes de guardar.
  */
-export function Marca({ variante = 'normal', className, marcaOverride }: {
-  variante?: 'normal' | 'banda' | 'grande'
+export function Marca({ variante = 'normal', conPazzit = false, sobreColor = false, className, marcaOverride }: {
+  variante?: 'normal' | 'grande'
+  conPazzit?: boolean
+  /** Sobre el color del barrio (headers): nombre y mark en blanco. */
+  sobreColor?: boolean
   className?: string
   marcaOverride?: DatosMarca
 }) {
@@ -25,23 +29,28 @@ export function Marca({ variante = 'normal', className, marcaOverride }: {
   const url = logoUrl(marca)
 
   if (url) {
-    const alto = { normal: 'h-8', banda: 'h-6', grande: 'h-14' }[variante]
+    const alto = { normal: 'h-9', grande: 'h-14' }[variante]
     return (
-      <span className={cn('inline-flex shrink-0 items-center',
-        variante === 'banda' && 'rounded-md bg-white px-2 py-1', className)}>
+      <span className={cn('inline-flex shrink-0 items-center', className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt={marca.nombre} className={cn(alto, 'w-auto max-w-48 object-contain')} />
       </span>
     )
   }
 
-  return (
-    <span className={cn('truncate font-display font-extrabold tracking-[-0.02em]', {
-      normal: 'text-xl text-marca',
-      banda: 'text-[15px] text-sobre-marca',
-      grande: 'text-[32px] text-marca',
-    }[variante], className)}>
+  const nombre = (
+    <span className={cn('truncate', sobreColor ? 'text-white' : 'text-ink', {
+      normal: 'text-base font-bold',
+      grande: 't-heading',
+    }[variante], !conPazzit && className)}>
       {marca.nombre}
+    </span>
+  )
+  if (!conPazzit) return nombre
+  return (
+    <span className={cn('flex min-w-0 items-center gap-2.5', className)}>
+      <LogoPazzit variante="mark" ancho={variante === 'grande' ? 40 : 24} alt="" className={sobreColor ? 'bg-white' : undefined} />
+      {nombre}
     </span>
   )
 }

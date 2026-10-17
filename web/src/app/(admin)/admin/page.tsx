@@ -59,7 +59,7 @@ export default function TableroPage() {
 
             {hayAtencion && (
               <div className="flex flex-col gap-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Atención</p>
+                <p className="text-[13px] font-semibold text-ink-soft">Atención</p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {k.unitsWithoutResidents > 0 && (
                     <Kpi tono="atencion" etiqueta="Unidades sin vecinos" valor={k.unitsWithoutResidents} />
@@ -83,13 +83,13 @@ export default function TableroPage() {
 
         <div className="grid gap-8 lg:grid-cols-2">
           <section className="flex flex-col gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Invitaciones por vecino</p>
+            <p className="text-[13px] font-semibold text-ink-soft">Invitaciones por vecino</p>
             {(porPersona.data ?? []).length === 0 && <p className="text-sm text-ink-soft">Sin invitaciones.</p>}
             <ul className="flex flex-col gap-1.5">
               {(porPersona.data ?? []).slice(0, 12).map((p) => (
                 <li key={p.id} className="flex items-center gap-3">
                   <span className="w-24 shrink-0 truncate text-sm sm:w-40">{p.name}</span>
-                  <span className="h-2.5 rounded-full bg-marca" style={{ width: `${(p.total / maxInvit) * 100}%`, minWidth: '4px' }} />
+                  <span className="h-2.5 rounded-full bg-azul" style={{ width: `${(p.total / maxInvit) * 100}%`, minWidth: '4px' }} />
                   <span className="text-sm text-ink-soft tabular">{p.total}</span>
                 </li>
               ))}
@@ -97,10 +97,10 @@ export default function TableroPage() {
           </section>
 
           <section className="flex flex-col gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Actividad por guardia</p>
+            <p className="text-[13px] font-semibold text-ink-soft">Actividad por guardia</p>
             {(porGuardia.data ?? []).length === 0 && <p className="text-sm text-ink-soft">Sin ingresos.</p>}
             {(porGuardia.data ?? []).map((g) => (
-              <Fila key={g.id ?? 'sin'} titulo={g.name ?? 'Sin asignar'}
+              <Fila densa key={g.id ?? 'sin'} titulo={g.name ?? 'Sin asignar'}
                 meta={g.lastAt ? `Último: ${fechaHora(g.lastAt)}` : undefined}
                 extremo={<span className="tabular text-sm font-semibold">{g.total}</span>} />
             ))}

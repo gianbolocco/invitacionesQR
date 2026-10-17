@@ -82,6 +82,10 @@ export const invitations = pgTable('invitation', {
   capacity: integer('capacity').notNull().default(1),
   token: text('token').notNull(),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  // null = no la anuló la portería (la anuló el vecino, o no está anulada).
+  // Distinto de null = la anuló un guardia; '' es "sin motivo", porque el motivo
+  // es opcional. Es lo que el vecino lee después: "anulada por portería".
+  revokedReason: text('revoked_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex('invitation_token_uq').on(t.token),
@@ -110,9 +114,14 @@ export const entryLogs = pgTable('entry_log', {
   guestDoc: text('guest_doc'),
   plate: text('plate'),
   note: text('note'),
+  // 'manual' = cargado después a mano (un corte de luz, una planilla de papel).
+  // La hora es la que se declaró, no la del servidor: la auditoría lo marca.
+  source: text('source').notNull().default('normal'),
+  loadedBy: uuid('loaded_by').references(() => people.id),
 }, (t) => [
   index('entry_unit_idx').on(t.unitId, t.enteredAt),
   index('entry_invitation_idx').on(t.invitationId),
+  check('entry_source_ck', sql`${t.source} in ('normal','manual')`),
 ])
 
 export const auditLogs = pgTable('audit_log', {

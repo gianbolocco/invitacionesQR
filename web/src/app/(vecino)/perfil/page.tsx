@@ -10,7 +10,7 @@ import { SelectorTema } from '@/components/selector-tema'
 function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3 border-t border-line pt-6">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">{titulo}</h2>
+      <h2 className="text-[13px] font-semibold text-ink-soft">{titulo}</h2>
       {children}
     </section>
   )
@@ -28,7 +28,7 @@ export default function PerfilPage() {
         ) : (
           <ul className="flex flex-wrap gap-2">
             {me.units.map((u) => (
-              <li key={u.id} className="rounded-full bg-surface-sunk px-4 py-2 text-sm font-semibold tabular">{u.label}</li>
+              <li key={u.id} className="rounded-sm bg-surface-sunk px-4 py-2 text-sm font-semibold tabular">{u.label}</li>
             ))}
           </ul>
         )}
@@ -50,7 +50,7 @@ export default function PerfilPage() {
       )}
 
       <Seccion titulo="Sesión">
-        <Button variant="outline" className="self-start text-peligro hover:text-peligro" onClick={logout}>
+        <Button variant="outline" className="self-start text-alto hover:text-alto" onClick={logout}>
           <LogOut aria-hidden />Cerrar sesión
         </Button>
       </Seccion>

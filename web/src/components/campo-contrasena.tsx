@@ -39,7 +39,7 @@ export function CampoContrasena({ id, value, onChange, autoComplete, medidor = f
         <div className="flex items-center gap-3" aria-live="polite">
           <span aria-hidden className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-sunk">
             <span className={cn('block h-full rounded-full transition-[width,background-color] duration-300',
-              faltan === 0 ? 'bg-marca' : 'bg-ink-soft/50')}
+              faltan === 0 ? 'bg-azul' : 'bg-ink-soft/50')}
               style={{ width: `${Math.min(100, (value.length / MIN_CONTRASENA) * 100)}%` }} />
           </span>
           <span className="shrink-0 text-xs text-ink-soft tabular">

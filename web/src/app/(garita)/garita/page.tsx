@@ -131,13 +131,19 @@ export default function GaritaHoy() {
 
   return (
     <ChromeGarita>
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-[1fr_20rem]">
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <BuscarInvitado q={q} onQ={(v) => { setQ(v); setDniLista(null) }} onAbrir={abrirDeLista} onLectura={leer} />
-          <Button type="button" variant="outline"
-            onClick={(e) => { setDisparador(e.currentTarget); setAltaAbierta(true) }}>
-            <UserPlus aria-hidden />Autorizar sin invitación
-          </Button>
+          <div className="flex flex-col gap-1">
+            <Button type="button" variant="outline"
+              onClick={(e) => { setDisparador(e.currentTarget); setAltaAbierta(true) }}>
+              <UserPlus aria-hidden />Autorizar sin invitación
+            </Button>
+            {/* Solo se usa después de un corte de luz: a la vista, pero sin competir con lo de todos los días. */}
+            <Link href="/garita/cargar" className="self-end rounded px-1 py-1.5 text-xs text-ink-soft underline underline-offset-4 hover:text-ink">
+              Cargar movimientos de un corte
+            </Link>
+          </div>
           <AgendaDia onAbrir={abrir} />
         </div>
         <aside className="hidden flex-col gap-6 md:flex">

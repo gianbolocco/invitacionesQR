@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button'
  */
 export type AccionFila = {
   etiqueta: string
+  /** Para donde hay poco lugar por botón (la tabla): "Reenviar" en vez de "Reenviar invitación". */
+  corta?: string
   onClick: (disparador: HTMLButtonElement) => void
   destructiva?: boolean
   deshabilitada?: boolean
@@ -26,14 +28,14 @@ export function MenuFila({ acciones }: { acciones: AccionFila[] }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button ref={disparadorRef} variant="ghost" size="icon-sm" aria-label="Más acciones">
+        <Button ref={disparadorRef} variant="ghost" size="icon" aria-label="Más acciones">
           <MoreVertical aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {acciones.map((a) => (
           <DropdownMenuItem key={a.etiqueta} onClick={() => a.onClick(disparadorRef.current!)} disabled={a.deshabilitada}
-            className={a.destructiva ? 'text-peligro focus:bg-peligro/10 focus:text-peligro' : undefined}>
+            className={a.destructiva ? 'text-alto focus:bg-alto-tint focus:text-alto' : undefined}>
             {a.etiqueta}
           </DropdownMenuItem>
         ))}
