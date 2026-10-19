@@ -25,6 +25,10 @@ export type AgendaRow = {
   lastEntryAt: string | null
   lastExitAt: string | null
   adentro: boolean
+  /** Solo en /gate/adentro: cuándo vence su tiempo adentro; null = su tipo no alerta. */
+  alertaDesde?: string | null
+  /** Solo en /gate/adentro: un guardia ya marcó "Ya lo vi". */
+  alertaVista?: boolean
 }
 
 /*
