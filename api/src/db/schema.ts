@@ -26,8 +26,15 @@ export const neighborhoods = pgTable('neighborhood', {
   // Cuándo se cambió el logo por última vez. Viaja como versión en la URL del
   // logo: la respuesta se cachea una hora y sin esto se vería el anterior.
   logoUpdatedAt: timestamp('logo_updated_at', { withTimezone: true }),
+  // Horas adentro antes de que la garita avise, por tipo. NULL = ese tipo no
+  // alerta. Los frecuentes no tienen columna: pasan la jornada entera adentro.
+  overstayHoursVisita: smallint('overstay_hours_visita'),
+  overstayHoursProveedor: smallint('overstay_hours_proveedor'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [
+  check('neighborhood_overstay_visita_ck', sql`${t.overstayHoursVisita} between 1 and 72`),
+  check('neighborhood_overstay_proveedor_ck', sql`${t.overstayHoursProveedor} between 1 and 72`),
+])
 
 export const units = pgTable('unit', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -120,6 +127,10 @@ export const entryLogs = pgTable('entry_log', {
   loadedBy: uuid('loaded_by').references(() => people.id),
   // Cuándo se cargó a mano. La hora del movimiento es la declarada; esta es la real.
   loadedAt: timestamp('loaded_at', { withTimezone: true }),
+  // El "Ya lo vi" de la alerta de permanencia. Va en el ingreso y no en la
+  // invitación: si sale y vuelve a entrar, es otra fila y vuelve a alertar.
+  overstaySeenAt: timestamp('overstay_seen_at', { withTimezone: true }),
+  overstaySeenBy: uuid('overstay_seen_by').references(() => people.id),
 }, (t) => [
   index('entry_unit_idx').on(t.unitId, t.enteredAt),
   index('entry_invitation_idx').on(t.invitationId),

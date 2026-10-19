@@ -92,6 +92,13 @@
       "when": 1792379704761,
       "tag": "0012_carga_cargada_el",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792449820622,
+      "tag": "0013_alerta_permanencia",
+      "breakpoints": true
     }
   ]
 }

@@ -123,6 +123,10 @@ adminRoutes.patch('/neighborhood', async (req, res) => {
     mapUrl: z.union([z.string().url().startsWith('http'), z.literal('')]).optional(),
     // La validación contra la paleta la hace el servicio, que es donde vive.
     brandColor: z.string().optional(),
+    overstayHours: z.object({
+      visita: z.number().int().min(1).max(72).nullable().optional(),
+      proveedor: z.number().int().min(1).max(72).nullable().optional(),
+    }).optional(),
   }).parse(req.body)
 
   res.json(await updateNeighborhood(req.person!.neighborhoodId, req.person!.id, body))
