@@ -10,9 +10,11 @@ async function marcaDeCorreo() {
   return {
     name: brand.nombre,
     color: brand.color,
+    // Sin logo propio, el ícono de Pazzit que dibuja la web en el color del
+    // barrio: es PNG, que es lo único que Gmail y Outlook muestran seguro.
     logoUrl: brand.tieneLogo
       ? `${apiOrigin}/branding/logo${brand.logoVersion ? `?v=${brand.logoVersion}` : ''}`
-      : null,
+      : `${webOrigin}/icon/192`,
   }
 }
 

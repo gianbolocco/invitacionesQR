@@ -25,7 +25,7 @@ export async function getBranding() {
   return {
     // Sin barrio es una instalación recién levantada, antes del seed. No es un
     // error: la página tiene que dibujarse igual.
-    nombre: row?.name ?? 'VisitPass',
+    nombre: row?.name ?? 'Pazzit',
     color: row?.brandColor ?? COLOR_DEFAULT,
     tieneLogo: Boolean(row?.logoMime),
     logoVersion: row?.logoMime && row.logoUpdatedAt ? row.logoUpdatedAt.getTime() : null,
