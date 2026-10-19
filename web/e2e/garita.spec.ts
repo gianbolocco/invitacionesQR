@@ -218,7 +218,7 @@ test('un DNI sin invitación abre el alta exprés con nombre y documento', async
   await leerConLectora(page, dni(doc, `ZZSINVIT${doc}`))
   await expect(page.getByRole('heading', { name: 'Autorizar sin invitación' })).toBeVisible()
   await expect(page.getByLabel('Nombre del invitado')).toHaveValue(`Juan Zzsinvit${doc}`)
-  await expect(page.getByLabel('Documento (opcional)')).toHaveValue(doc)
+  await expect(page.getByLabel('Documento', { exact: true })).toHaveValue(doc)
 })
 
 test('el Enter de la lectora nunca registra: ni doble (CR+LF) ni tardío', async ({ page, browser }) => {
@@ -305,7 +305,7 @@ test('un NO PASA por cupo se puede autorizar igual, con todo precargado', async 
   await g.getByRole('button', { name: 'Autorizar igual' }).click()
 
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
-  await expect(g.getByLabel('Documento (opcional)')).toHaveValue('30111222')
+  await expect(g.getByLabel('Documento', { exact: true })).toHaveValue('30111222')
   await expect(g.getByRole('button', { name: 'Cambiar' })).toBeVisible() // el lote ya está elegido
   await g.getByRole('button', { name: 'Autorizar ingreso' }).click()
 
@@ -350,7 +350,7 @@ test('un DNI leído con el sheet precargado abierto reemplaza el nombre de la in
   const doc = String(Date.now()).slice(-8)
   await leerConLectora(g, dni(doc, 'MEZCLA'))
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue('Juan Mezcla')
-  await expect(g.getByLabel('Documento (opcional)')).toHaveValue(doc)
+  await expect(g.getByLabel('Documento', { exact: true })).toHaveValue(doc)
 })
 
 test('dos DNI seguidos en el alta exprés no mezclan nombre y documento', async ({ page }) => {
@@ -362,8 +362,8 @@ test('dos DNI seguidos en el alta exprés no mezclan nombre y documento', async 
   await expect(page.getByRole('dialog')).toBeVisible()
   // El sheet autofocusea Nombre; leerConLectora hace blur para que la lectura caiga en el hook de ventana.
   await leerConLectora(page, dni(docA, `ZZAAA${docA}`))
-  await expect(page.getByLabel('Documento (opcional)')).toHaveValue(docA)
+  await expect(page.getByLabel('Documento', { exact: true })).toHaveValue(docA)
   await leerConLectora(page, dni(docB, `ZZBBB${docB}`))
-  await expect(page.getByLabel('Documento (opcional)')).toHaveValue(docB)
+  await expect(page.getByLabel('Documento', { exact: true })).toHaveValue(docB)
   await expect(page.getByLabel('Nombre del invitado')).toHaveValue(`Juan Zzbbb${docB}`)
 })
