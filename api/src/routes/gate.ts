@@ -88,15 +88,19 @@ gateRoutes.post('/exits', async (req, res) => {
 gateRoutes.post('/manual', async (req, res) => {
   const { items } = z.object({
     items: z.array(z.object({
-      invitationId: z.string().uuid(),
+      invitationId: z.string().uuid().optional(),
+      guest: z.object({ name: z.string().trim().min(1).max(120), unitId: z.string().uuid() }).optional(),
+      guestDoc: z.string().trim().min(1).max(20),
       enteredAt: z.string().datetime({ offset: true }),
       exitedAt: z.string().datetime({ offset: true }).nullish(),
       note: z.string().trim().max(200).optional(),
-    })).min(1).max(MAX_CARGA_MANUAL),
+    }).refine((i) => Boolean(i.invitationId) !== Boolean(i.guest))).min(1).max(MAX_CARGA_MANUAL),
   }).parse(req.body)
 
   const filas = await registerManual(req.person!.neighborhoodId, req.person!.id, items.map((i) => ({
     invitationId: i.invitationId,
+    guest: i.guest,
+    guestDoc: i.guestDoc,
     enteredAt: new Date(i.enteredAt),
     exitedAt: i.exitedAt ? new Date(i.exitedAt) : null,
     note: i.note,

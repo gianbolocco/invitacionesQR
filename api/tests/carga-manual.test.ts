@@ -37,8 +37,9 @@ async function inv(ctx: Awaited<ReturnType<typeof base>>, over: Record<string, u
   return row
 }
 
-const cargar = (ctx: Awaited<ReturnType<typeof base>>, items: unknown[]) =>
-  request(app).post('/gate/manual').set('Cookie', ctx.cookie).send({ items })
+const cargar = (ctx: Awaited<ReturnType<typeof base>>, items: Record<string, unknown>[]) =>
+  request(app).post('/gate/manual').set('Cookie', ctx.cookie)
+    .send({ items: items.map((i) => ({ guestDoc: '30123456', ...i })) })
 
 describe('carga manual de movimientos', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
@@ -174,6 +175,67 @@ describe('carga manual de movimientos', () => {
     expect(aud.body.rows[0].manual).toBe(true)
     const det = await request(app).get(`/gate/audit/${i.id}/entries`).set('Cookie', ctx.cookie)
     expect(det.body[0].manual).toBe(true)
+  })
+
+  it('carga a alguien sin invitación: crea la invitación de portería del día del ingreso', async () => {
+    const ctx = await base()
+    const res = await cargar(ctx, [{ guest: { name: 'Juan Pérez', unitId: ctx.u.id }, enteredAt: haceH(30) }])
+    expect(res.status).toBe(201)
+    const [i] = await db.select().from(invitations)
+    const dia = todayInBuenosAires(new Date(haceH(30)))
+    expect(i.createdBy).toBe(ctx.quien.id)
+    expect(i.capacity).toBe(1)
+    expect(i.kind).toBe('visita')
+    expect(i.validFrom).toBe(dia)
+    expect(i.validTo).toBe(dia)
+    expect(i.guestName).toBe('Juan Pérez')
+    const [f] = await db.select().from(entryLogs)
+    expect(f.invitationId).toBe(i.id)
+  })
+
+  it('rechaza una unidad de otro barrio para alguien sin invitación', async () => {
+    const ctx = await base()
+    const [otro] = await db.insert(neighborhoods).values({ name: 'Otro' }).returning()
+    const [uo] = await db.insert(units).values({ neighborhoodId: otro.id, label: 'Lote 1' }).returning()
+    const res = await cargar(ctx, [{ guest: { name: 'Juan', unitId: uo.id }, enteredAt: haceH(2) }])
+    expect(res.status).toBe(403)
+  })
+
+  it('rechaza un ítem sin DNI', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    const res = await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(2), guestDoc: '' }])
+    expect(res.status).toBe(400)
+  })
+
+  it('completa el DNI de la invitación que no lo tenía', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestDoc: null })
+    await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(2), guestDoc: '28999111' }])
+    const [after] = await db.select().from(invitations).where(eq(invitations.id, i.id))
+    const [f] = await db.select().from(entryLogs)
+    expect(after.guestDoc).toBe('28999111')
+    expect(f.guestDoc).toBe('28999111')
+  })
+
+  it('si falla una fila no queda nada, tampoco la invitación de portería', async () => {
+    const ctx = await base()
+    const res = await cargar(ctx, [
+      { guest: { name: 'Juan', unitId: ctx.u.id }, enteredAt: haceH(5) },
+      { invitationId: '00000000-0000-4000-8000-000000000000', enteredAt: haceH(2) },
+    ])
+    expect(res.status).toBe(404)
+    expect(res.body.fila).toBe(1)
+    expect(await db.select().from(invitations)).toHaveLength(0)
+    expect(await db.select().from(entryLogs)).toHaveLength(0)
+  })
+
+  it('marca loaded_at en la carga manual', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(5) }])
+    const [f] = await db.select().from(entryLogs)
+    expect(Math.abs(Date.now() - f.loadedAt!.getTime())).toBeLessThan(10_000)
   })
 
   it('una tanda vacía se rechaza', async () => {

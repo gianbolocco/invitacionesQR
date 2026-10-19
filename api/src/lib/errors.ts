@@ -1,7 +1,7 @@
 import type { ErrorRequestHandler } from 'express'
 
 export class AppError extends Error {
-  constructor(public status: number, public code: string, message?: string) {
+  constructor(public status: number, public code: string, message?: string, public fila?: number) {
     super(message ?? code)
   }
 }
@@ -18,7 +18,7 @@ export function violates(err: unknown, constraint: string): boolean {
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof AppError) {
-    res.status(err.status).json({ error: err.code })
+    res.status(err.status).json(err.fila === undefined ? { error: err.code } : { error: err.code, fila: err.fila })
     return
   }
   /*
