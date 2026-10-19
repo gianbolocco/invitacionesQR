@@ -37,7 +37,7 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
     <AlertasProvider>
       <div className="min-h-dvh pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
         <header className={HEADER}>
-          <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-6 px-4 md:px-6 xl:px-8">
+          <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-4 sm:gap-6 md:px-6 xl:px-8">
             <Link href="/garita" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
               <Marca conPazzit sobreColor />
               <span className="hidden shrink-0 font-semibold text-white/80 sm:inline">· Portería</span>
@@ -52,7 +52,7 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
             </nav>
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              <div className="hidden sm:flex"><AvisoAlertas /></div>
+              <AvisoAlertas />
               <span className="hidden text-[15px] text-white/90 sm:inline">{me.name}</span>
               {me.role === 'admin' && (
                 <Link href="/admin" aria-label="Ir a administración" title="Ir a administración" className={BOTON_HEADER}>
@@ -65,7 +65,6 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           </div>
-          <div className="sm:hidden"><AvisoAlertas franja /></div>
         </header>
 
         <main className="mx-auto max-w-[1440px] px-4 py-6 md:px-6 sm:py-8 xl:px-8">{children}</main>

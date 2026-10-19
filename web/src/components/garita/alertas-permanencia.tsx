@@ -1,11 +1,13 @@
 'use client'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Check, TriangleAlert } from 'lucide-react'
 import { useAdentro, useMarcarVista } from '@/lib/queries/garita'
 import { excedidas as calcular, sinVer, aparecieron, type Excedida } from '@/lib/permanencia'
 import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
 import { quienInvita } from '@/lib/invitations'
+import { formatearDni } from '@/lib/lectora'
 import { usePreferencia } from '@/lib/use-preferencia'
 import { TagTipo } from '@/components/dominio/tag-tipo'
 import { BOTON_HEADER } from '@/components/dominio/barra-seccion'
@@ -87,37 +89,30 @@ export function AlertasProvider({ children }: { children: React.ReactNode }) {
 const personas = (n: number) => (n === 1 ? '1 persona pasó' : `${n} personas pasaron`)
 
 /**
- * El aviso de la garita: cuántas alertas hay sin ver, y abre el panel. En
- * escritorio es un botón del header; en el celular no entra ahí, y va como
- * franja debajo, de lado a lado, que además se ve y se toca mejor. Sin
- * excedidos no se muestra; con todos vistos, el de escritorio queda tenue
- * para volver a la lista (en el celular, el chip de la agenda cumple eso).
+ * El aviso del header: un ícono más, como el tema o salir, con un número chico
+ * de las alertas sin ver. Discreto a propósito: el que llama la atención es el
+ * pitido, no el header. Sin excedidos no se muestra; con todos vistos queda
+ * sin número, para poder volver a la lista.
  */
-export function AvisoAlertas({ franja = false }: { franja?: boolean }) {
+export function AvisoAlertas() {
   const { excedidas, pendientes } = useAlertas()
   const [abierto, setAbierto] = useState(false)
-  const n = pendientes.length
-  if (!excedidas.length || (franja && !n)) return null
+  if (!excedidas.length) return null
 
-  const etiqueta = n ? `${personas(n)} su tiempo adentro` : 'Alertas de permanencia, todas vistas'
+  const n = pendientes.length
   return (
     <>
-      {franja ? (
-        <button type="button" onClick={() => setAbierto(true)} aria-label={etiqueta}
-          className="flex min-h-11 w-full items-center gap-2 border-b border-espera bg-espera-tint px-4 text-left text-sm font-semibold text-espera">
-          <TriangleAlert className="size-4 shrink-0" aria-hidden />
-          <span className="min-w-0 flex-1 truncate tabular">{personas(n)} su tiempo</span>
-          <span className="flex shrink-0 items-center underline underline-offset-4">Ver</span>
-        </button>
-      ) : (
-        <button type="button" onClick={() => setAbierto(true)} aria-label={etiqueta}
-          className={cn(BOTON_HEADER, 'flex w-auto items-center gap-1.5 whitespace-nowrap px-2.5 font-semibold tabular',
-            n ? 'bg-card text-ink hover-fino:bg-card/90' : 'text-white/80')}>
-          <TriangleAlert className={cn('size-5', n && 'text-espera')} aria-hidden />
-          {n > 0 && <span>{n}</span>}
-          {n > 0 && <span className="hidden lg:inline">{n === 1 ? 'pasó su tiempo' : 'pasaron su tiempo'}</span>}
-        </button>
-      )}
+      <button type="button" onClick={() => setAbierto(true)}
+        aria-label={n ? `${personas(n)} su tiempo adentro` : 'Alertas de permanencia, todas vistas'}
+        title={n ? `${personas(n)} su tiempo adentro` : 'Alertas de permanencia'}
+        className={cn(BOTON_HEADER, 'relative', !n && 'text-white/70')}>
+        <TriangleAlert className="size-5" aria-hidden />
+        {n > 0 && (
+          <span aria-hidden className="absolute right-0.5 top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-card px-1 text-[11px] font-bold leading-none text-ink tabular">
+            {n > 99 ? '99+' : n}
+          </span>
+        )}
+      </button>
       <HojaAlertas abierto={abierto} onCerrar={() => setAbierto(false)} />
     </>
   )
@@ -127,6 +122,7 @@ function HojaAlertas({ abierto, onCerrar }: { abierto: boolean; onCerrar: () => 
   const { ahora, excedidas, pendientes } = useAlertas()
   const [sonido, setSonido] = usePreferencia<'si' | 'no'>(CLAVE_SONIDO)
   const vistas = excedidas.filter((f) => f.alertaVista)
+  const router = useRouter()
 
   return (
     // Si se resolvieron todas mientras estaba abierto, se cierra solo.
@@ -135,10 +131,17 @@ function HojaAlertas({ abierto, onCerrar }: { abierto: boolean; onCerrar: () => 
         <SheetHeader className="border-b border-line">
           <SheetTitle>Pasaron su tiempo</SheetTitle>
           <SheetDescription>Siguen adentro sin salida registrada, más horas de las que fijó el barrio.</SheetDescription>
-          <label className="mt-2 flex min-h-11 items-center gap-3 text-sm font-semibold">
-            <Switch checked={sonido !== 'no'} onCheckedChange={(on) => setSonido(on ? 'si' : 'no')} />
-            Sonido al aparecer una nueva
-          </label>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
+              <Switch checked={sonido !== 'no'} onCheckedChange={(on) => setSonido(on ? 'si' : 'no')} />
+              Sonido al aparecer una nueva
+            </label>
+            {/* La agenda con el filtro puesto: ahí están el DNI, quién invita y las otras vistas. */}
+            <Button variant="outline" className="h-11"
+              onClick={() => { onCerrar(); router.push('/garita?ver=excedidos') }}>
+              Ver todos
+            </Button>
+          </div>
         </SheetHeader>
         <div className="flex flex-col gap-5 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
           {pendientes.length > 0 && (
@@ -176,8 +179,14 @@ function FilaAlerta({ fila, ahora, onCerrar }: { fila: Excedida; ahora: Date; on
         <TagTipo kind={fila.kind} />
       </div>
       <span className="text-[13px] text-ink-soft">
-        {fila.unitLabel} · {quienInvita(fila.inviterName)}{fila.plate ? ` · ${fila.plate}` : ''}
+        {fila.unitLabel} · {quienInvita(fila.inviterName)}
       </span>
+      {(fila.guestDoc || fila.plate) && (
+        <span className="flex flex-wrap gap-x-3 text-[13px] font-medium tabular">
+          {fila.guestDoc && <span>DNI {formatearDni(fila.guestDoc)}</span>}
+          {fila.plate && <span>{fila.plate}</span>}
+        </span>
+      )}
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] tabular">
         {fila.lastEntryAt && <span className="text-ink-soft">Entró {horaODia(fila.lastEntryAt, hoyISO(ahora))}</span>}
         <span className="flex items-center gap-1 font-semibold text-espera">

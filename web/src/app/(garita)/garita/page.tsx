@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { use, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -27,7 +27,8 @@ import { cn } from '@/lib/utils'
  * escanear + buscar + últimos movimientos a la derecha—, porque antes de ese
  * ancho la columna se aprieta.
  */
-export default function GaritaHoy() {
+export default function GaritaHoy({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+  const { ver } = use(searchParams)
   const router = useRouter()
   const qc = useQueryClient()
   const abrirQr = useAbrirQr()
@@ -144,7 +145,7 @@ export default function GaritaHoy() {
               Cargar movimientos de un corte
             </Link>
           </div>
-          <AgendaDia onAbrir={abrir} />
+          <AgendaDia onAbrir={abrir} verExcedidos={ver === 'excedidos'} />
         </div>
         <aside className="hidden flex-col gap-6 md:flex">
           {/* Táctil (una tablet desde 768 px): la cámara al frente, como siempre.

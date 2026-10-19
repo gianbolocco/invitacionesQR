@@ -71,14 +71,15 @@ una alerta que no se calla termina ignorada.
    pantalla completa y sin el marco de la garita. Son pantallas de paso: al
    volver, el aviso está ahí.
 
-## Celular
+## Celular y revisión del dueño (19/10)
 
-En el header del celular no entran el logo, el aviso, el tema y salir. Por eso
-el aviso va como **franja** debajo del header, de lado a lado ("⚠ N personas
-pasaron su tiempo · Ver"), en `espera-tint`, y se ve solo si hay alertas sin
-ver. Con todas vistas, al panel se llega desde el chip de la agenda. El panel
-sube desde abajo y las acciones de cada fila tienen 44 px de alto. Se verifica
-primero a 1280 px y después a 390 px, en claro y oscuro.
+- El aviso del header es un ícono más (como el tema o salir) con un número chico
+  de las sin ver: discreto, porque el que llama la atención es el pitido. Entra
+  igual en el celular, así que no hay franja.
+- El panel tiene **"Ver todos"**, que lleva a `/garita?ver=excedidos`: la agenda
+  de hoy con el chip "Pasaron su tiempo" puesto (en lista si estaba en tablero).
+- Las tarjetas amarillas (panel y tablero) muestran el **DNI**.
+- Se verifica a 1280 px y a 390 px, en claro y oscuro.
 
 ## Datos
 

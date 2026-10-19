@@ -5,6 +5,7 @@ import type { AgendaRow } from '@/lib/queries/garita'
 import { pieDe } from './datos-agenda'
 import { useExceso } from './alertas-permanencia'
 import { cn } from '@/lib/utils'
+import { formatearDni } from '@/lib/lectora'
 
 /**
  * Una persona en el tablero. Es un botón entero: abre el veredicto. Nombre
@@ -34,7 +35,10 @@ export function TarjetaInvitado({ fila, hoy, onAbrir }: {
       </span>
       {(fila.plate || pie) && (
         <span className="mt-0.5 flex items-center justify-between gap-2 text-xs tabular text-ink-soft">
-          <span className="truncate font-medium text-ink">{fila.plate ?? ''}</span>
+          <span className="truncate font-medium text-ink">
+            {/* El que se pasó de su tiempo lleva el DNI: es con lo que se lo busca o se llama a la casa. */}
+            {[exceso && fila.guestDoc ? `DNI ${formatearDni(fila.guestDoc)}` : null, fila.plate].filter(Boolean).join(' · ')}
+          </span>
           <span className="shrink-0">{pie}</span>
         </span>
       )}

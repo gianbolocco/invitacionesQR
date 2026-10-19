@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Building2, CalendarX, ChevronLeft, ChevronRight, Columns3, List, SearchX, Table2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
@@ -48,7 +49,11 @@ const VACIAS: Columnas = { porLlegar: [], adentro: [], seFueron: [], vencidas: [
  * adentro es quién está en el barrio ahora, aunque haya entrado ayer con una
  * invitación de ayer. Por eso es otra consulta, y solo se mezcla mirando hoy.
  */
-export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
+export function AgendaDia({ onAbrir, verExcedidos = false }: {
+  onAbrir: (id: string) => void
+  /** Viene del "Ver todos" del panel de alertas (`/garita?ver=excedidos`). */
+  verExcedidos?: boolean
+}) {
   /*
    * null = "hoy", no una fecha fija: la garita queda abierta toda la noche y
    * a las 00:00 tiene que pasar sola al día nuevo. Con la fecha guardada al
@@ -69,13 +74,28 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const [elegido, setEstado] = useState<FiltroEstado>('todos')
   const { porId } = useAlertas()
 
+  // "Ver todos" del panel: hoy, con el filtro de excedidos. Se aplica una vez
+  // durante el render (como la precarga de los formularios) y la URL se limpia,
+  // así un segundo "Ver todos" vuelve a funcionar.
+  const router = useRouter()
+  const [pedidoAplicado, setPedidoAplicado] = useState(false)
+  if (verExcedidos !== pedidoAplicado) {
+    setPedidoAplicado(verExcedidos)
+    if (verExcedidos) { setEstado('excedidos'); setElegida(null) }
+  }
+  useEffect(() => {
+    if (!verExcedidos) return
+    router.replace('/garita', { scroll: false })
+    document.getElementById('agenda-dia')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [verExcedidos, router])
+
   const ancho = useMedia('(min-width: 1280px)')
   const medio = useMedia('(min-width: 768px)')
   const [guardada, guardar] = usePreferencia<Vista>('visitpass.garita.vista')
   const disponible: Record<Vista, boolean> = { tablero: ancho, lista: true, compacta: medio, unidad: true }
   const preferida: Vista = guardada ?? 'lista'
   // Una vista guardada que esta pantalla no puede mostrar (el tablero en un celular) cae a la lista.
-  const vista: Vista = disponible[preferida] ? preferida : 'lista'
+  const vistaElegida: Vista = disponible[preferida] ? preferida : 'lista'
 
   const q = useAgenda(fecha)
   const adentro = useAdentro(esHoy)
@@ -93,6 +113,8 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const excedidos = esHoy ? columnas.adentro.filter((r) => porId.has(r.id)) : []
   // Si se resolvieron todos con el chip elegido, se vuelve a "Todos" en vez de dejar una lista vacía.
   const estado: FiltroEstado = elegido === 'excedidos' && !excedidos.length ? 'todos' : elegido
+  // El tablero no tiene chips de estado: para ver solo a los excedidos se pasa a la lista, sin guardarlo.
+  const vista: Vista = estado === 'excedidos' && vistaElegida === 'tablero' ? 'lista' : vistaElegida
 
   const total = columnas.porLlegar.length + columnas.adentro.length + columnas.seFueron.length + columnas.vencidas.length
   // El filtro de estado no existe en el tablero: ahí los tres estados ya son las columnas.
@@ -131,11 +153,12 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
           </SeccionFiltro>
         </HojaFiltros>
         <div className="ml-auto">
-          <SelectorVista etiqueta="Vista de la agenda" opciones={opciones} valor={vista} onCambio={guardar} />
+          <SelectorVista etiqueta="Vista de la agenda" opciones={opciones} valor={vista}
+            onCambio={(v) => { guardar(v); if (v === 'tablero') setEstado('todos') }} />
         </div>
       </div>
 
-      <h2 className="font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha, hoy)}</h2>
+      <h2 id="agenda-dia" className="scroll-mt-20 font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha, hoy)}</h2>
 
       {aplicados.length > 0 && <FiltrosAplicados aplicados={aplicados} onLimpiar={() => setTipo('todos')} />}
 
