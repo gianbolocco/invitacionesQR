@@ -23,6 +23,9 @@ const CLAVE_BORRADOR = 'pazzit.garita.planilla'
 /** El mismo tope que MAX_CARGA_MANUAL en la API. */
 const MAX_FILAS = 50
 
+/** Las claves de las filas con algo tipeado. */
+const conClaves = (filas: FilaPlanilla[]) => new Set(filas.filter((f) => !filaVacia(f)).map((f) => f.clave))
+
 const filaNueva = (): FilaPlanilla => ({ clave: crypto.randomUUID(), ingreso: '', persona: null, dni: '', salida: '', nota: '' })
 
 /**
@@ -59,6 +62,8 @@ export default function CargarMovimientosPage() {
     if (window.matchMedia('(min-width: 1024px)').matches) focoPendiente.current = inicial.filas.at(-1)!.clave
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlanilla(inicial)
+    // Un borrador recuperado ya se tipeó: sus errores se ven sin tener que pasar por cada fila.
+    setVistas(conClaves(inicial.filas))
   }, [])
 
   useEffect(() => {
@@ -76,7 +81,7 @@ export default function CargarMovimientosPage() {
 
   const errores = new Map(filas.map((f) => [f.clave, filaVacia(f) ? null : errorDeFila(fecha, f, filas)]))
   const conDatos = filas.filter((f) => !filaVacia(f))
-  const aCorregir = conDatos.filter((f) => errores.get(f.clave)).length
+  const aCorregir = conDatos.filter((f) => errores.get(f.clave) || errorApi?.clave === f.clave).length
   const n = conDatos.length
 
   function cambiar(clave: string, cambios: Partial<FilaPlanilla>) {
@@ -123,8 +128,9 @@ export default function CargarMovimientosPage() {
       },
       onError: (e) => {
         // El índice es de los ítems mandados, que saltean las filas en blanco.
-        const fila = e instanceof ApiError && e.fila !== undefined ? conDatos[e.fila] : undefined
-        if (!fila) return
+        if (!(e instanceof ApiError && e.fila !== undefined)) return // el hook ya mostró el toast
+        const fila = conDatos[e.fila]
+        if (!fila) { toast.error(mensajeCargaManual(e)); return }
         setErrorApi({ clave: fila.clave, mensaje: mensajeCargaManual(e) })
         enfocar(fila.clave)
       },
@@ -133,6 +139,8 @@ export default function CargarMovimientosPage() {
 
   const renglones = filas.map((f, i) => (
     <RenglonPlanilla key={f.clave} fila={f} numero={i + 1} fecha={fecha} escritorio={escritorio}
+      // Lo que se tipee mientras guarda se perdería: al guardar bien la planilla vuelve a una fila vacía.
+      bloqueada={cargar.isPending}
       error={errorApi?.clave === f.clave ? errorApi.mensaje : vistas.has(f.clave) ? errores.get(f.clave) ?? null : null}
       refIngreso={refIngreso(f.clave)}
       onCambio={(c) => cambiar(f.clave, c)}
@@ -154,7 +162,11 @@ export default function CargarMovimientosPage() {
           <div className="w-60">
             <Campo id="fecha-planilla" etiqueta="Fecha de la planilla">
               <CampoFecha id="fecha-planilla" valor={fecha} min={sumarDias(hoyISO(), -2)}
-                onCambio={(f) => setPlanilla((p) => p && { ...p, fecha: f })} />
+                onCambio={(f) => {
+                  setPlanilla((p) => p && { ...p, fecha: f })
+                  // Otra fecha cambia la validez de todas las filas, también las que no se tocaron.
+                  setVistas(conClaves(filas))
+                }} />
             </Campo>
           </div>
           <p className="max-w-xl pb-1 text-sm text-ink-soft">
@@ -187,7 +199,7 @@ export default function CargarMovimientosPage() {
         )}
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <Button variant="secondary" onClick={agregar} disabled={filas.length >= MAX_FILAS}>
+          <Button variant="secondary" onClick={agregar} disabled={filas.length >= MAX_FILAS || cargar.isPending}>
             <Plus aria-hidden />Agregar fila
           </Button>
           <p className="text-sm text-ink-soft" aria-live="polite">

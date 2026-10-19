@@ -45,6 +45,7 @@ function Buscador({ id, valor, onTexto, opciones, className, ...resto }: {
   }
 
   function tecla(e: KeyboardEvent<HTMLInputElement>) {
+    if (resto.readOnly) return
     if (e.key === 'Escape') setAbierto(false)
     if (!visible) {
       if (e.key === 'ArrowDown' && valor.trim()) { e.preventDefault(); setAbierto(true) }
@@ -58,7 +59,7 @@ function Buscador({ id, valor, onTexto, opciones, className, ...resto }: {
   return (
     <div className="relative">
       <Input id={id} role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={visible}
-        aria-controls={lista} aria-activedescendant={visible ? `${lista}-${i}` : undefined}
+        aria-controls={visible ? lista : undefined} aria-activedescendant={visible ? `${lista}-${i}` : undefined}
         value={valor} className={className} {...resto}
         onChange={(e) => { onTexto(e.target.value); setAbierto(true); setActiva(null) }}
         onBlur={() => setAbierto(false)} onKeyDown={tecla} />
@@ -100,13 +101,15 @@ type Invitacion = { id: string; guestName: string; guestDoc: string | null; unit
  * el celular, con los campos en el orden del papel (es el orden de Tab).
  * El lote de una invitación no es un campo: viene con ella y Tab lo saltea.
  */
-export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, refIngreso, onCambio, onQuitar, onEnterFinal, onSalir }: {
+export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, bloqueada, refIngreso, onCambio, onQuitar, onEnterFinal, onSalir }: {
   fila: FilaPlanilla
   numero: number
   fecha: string
   /** Ya filtrado por la página: solo llega si hay que mostrarlo. */
   error: string | null
   escritorio: boolean
+  /** readOnly y no disabled: si la API marca una fila, su Ingreso tiene que poder tomar el foco. */
+  bloqueada: boolean
   refIngreso: (el: HTMLInputElement | null) => void
   onCambio: (cambios: Partial<FilaPlanilla>) => void
   onQuitar: () => void
@@ -183,24 +186,24 @@ export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, refIng
   const celda = escritorio ? CELDA : undefined
 
   const ingreso = (
-    <CampoHoraTexto id={id('ingreso')} ref={refIngreso} aria-label={etiqueta('Ingreso')} className={celda}
+    <CampoHoraTexto id={id('ingreso')} readOnly={bloqueada} ref={refIngreso} aria-label={etiqueta('Ingreso')} className={celda}
       valor={fila.ingreso} onValor={(ingreso) => onCambio({ ingreso })} />
   )
   const tagSinInvitacion = sinInvitacion && <span className={cn(TAG, 'border border-dashed border-control text-ink-soft')}>Sin invitación</span>
   const campoPersona = (
     <div className="relative">
-      <Buscador id={id('persona')} aria-label={etiqueta('Persona')} placeholder="Nombre, DNI o lote"
+      <Buscador id={id('persona')} readOnly={bloqueada} aria-label={etiqueta('Persona')} placeholder="Nombre, DNI o lote"
         className={cn(celda, 'font-semibold', escritorio && sinInvitacion && 'pr-28')}
         valor={persona?.nombre ?? texto} onTexto={tipearPersona} opciones={opcionesPersona} />
       {escritorio && tagSinInvitacion && <span className="absolute right-2 top-1/2 -translate-y-1/2">{tagSinInvitacion}</span>}
     </div>
   )
   const dni = (
-    <Input id={id('dni')} aria-label={etiqueta('DNI')} placeholder="DNI" autoComplete="off" className={cn(celda, 'tabular')}
+    <Input id={id('dni')} readOnly={bloqueada} aria-label={etiqueta('DNI')} placeholder="DNI" autoComplete="off" className={cn(celda, 'tabular')}
       value={fila.dni} onChange={(e) => onCambio({ dni: e.target.value })} />
   )
   const lote = sinInvitacion ? (
-    <Buscador id={id('lote')} aria-label={etiqueta('Lote')} placeholder="Lote o vecino" className={celda}
+    <Buscador id={id('lote')} readOnly={bloqueada} aria-label={etiqueta('Lote')} placeholder="Lote o vecino" className={celda}
       valor={sinInvitacion.unitId ? sinInvitacion.lote : qLote} opciones={opcionesLote}
       onTexto={(v) => {
         setQLote(v)
@@ -213,16 +216,16 @@ export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, refIng
   )
   const masUno = masUnDia && <span className={cn(TAG, 'bg-azul-tint text-ink')} title="La salida es del día siguiente">+1 día</span>
   const salida = (
-    <CampoHoraTexto id={id('salida')} aria-label={etiqueta('Salida')} placeholder={escritorio ? '—' : 'Adentro'}
+    <CampoHoraTexto id={id('salida')} readOnly={bloqueada} aria-label={etiqueta('Salida')} placeholder={escritorio ? '—' : 'Adentro'}
       className={cn(celda, escritorio && 'w-[4.75rem] shrink-0')} valor={fila.salida} onValor={(salida) => onCambio({ salida })} />
   )
   const nota = (
-    <Input id={id('nota')} aria-label={etiqueta('Nota')} placeholder="Opcional" maxLength={200} autoComplete="off" className={celda}
+    <Input id={id('nota')} readOnly={bloqueada} aria-label={etiqueta('Nota')} placeholder="Opcional" maxLength={200} autoComplete="off" className={celda}
       value={fila.nota} onChange={(e) => onCambio({ nota: e.target.value })}
-      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onEnterFinal() } }} />
+      onKeyDown={(e) => { if (e.key === 'Enter' && !bloqueada) { e.preventDefault(); onEnterFinal() } }} />
   )
   const quitar = (
-    <Button variant="ghost" size="icon" aria-label={`Quitar la fila ${numero}`} onClick={onQuitar}
+    <Button variant="ghost" size="icon" aria-label={`Quitar la fila ${numero}`} disabled={bloqueada} onClick={onQuitar}
       className={cn('text-ink-soft', escritorio && 'size-9')}>
       <X aria-hidden />
     </Button>
