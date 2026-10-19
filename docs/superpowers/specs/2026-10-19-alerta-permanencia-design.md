@@ -73,10 +73,12 @@ una alerta que no se calla termina ignorada.
 
 ## Celular
 
-Es la misma pieza en los dos tamaños. En el celular el botón del header muestra
-solo el ícono y el número, el panel sube desde abajo y las acciones de cada
-fila tienen al menos 44 px de alto. Se verifica primero a 1280 px y después a
-390 px.
+En el header del celular no entran el logo, el aviso, el tema y salir. Por eso
+el aviso va como **franja** debajo del header, de lado a lado ("⚠ N personas
+pasaron su tiempo · Ver"), en `espera-tint`, y se ve solo si hay alertas sin
+ver. Con todas vistas, al panel se llega desde el chip de la agenda. El panel
+sube desde abajo y las acciones de cada fila tienen 44 px de alto. Se verifica
+primero a 1280 px y después a 390 px, en claro y oscuro.
 
 ## Datos
 
