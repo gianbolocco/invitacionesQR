@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
+import ExcelJS from 'exceljs'
 import { eq } from 'drizzle-orm'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
@@ -236,6 +237,42 @@ describe('carga manual de movimientos', () => {
     await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(5) }])
     const [f] = await db.select().from(entryLogs)
     expect(Math.abs(Date.now() - f.loadedAt!.getTime())).toBeLessThan(10_000)
+  })
+
+  it('el detalle de movimientos trae la nota, quién cargó y cuándo', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(5), note: 'corte de luz' }])
+    const res = await request(app).get(`/gate/audit/${i.id}/entries`).set('Cookie', ctx.cookie)
+    expect(res.status).toBe(200)
+    expect(res.body[0].note).toBe('corte de luz')
+    expect(res.body[0].loaderName).toBe('Rulo')
+    expect(res.body[0].loadedAt).not.toBeNull()
+  })
+
+  it('el excel marca el origen', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(5), note: 'corte de luz' }])
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const celda = (hoja: string, titulo: string) => {
+      const ws = wb.getWorksheet(hoja)!
+      const col = (ws.getRow(1).values as unknown[]).map(String).indexOf(titulo)
+      expect(col, `${hoja}/${titulo}`).toBeGreaterThan(0)
+      return ws.getRow(2).getCell(col).value
+    }
+    expect(celda('Ingresos', 'Origen')).toBe('Carga manual')
+    expect(celda('Ingresos', 'Cargado el')).toBeTruthy()
+    expect(celda('Ingresos', 'Nota')).toBe('corte de luz')
+    expect(celda('Ingresos', 'Guardia ingreso')).toBe('Carga manual · Rulo')
+    expect(celda('Invitaciones', 'Carga manual')).toBe('Sí')
   })
 
   it('una tanda vacía se rechaza', async () => {

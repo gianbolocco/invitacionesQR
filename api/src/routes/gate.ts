@@ -160,6 +160,9 @@ const KIND_EXCEL: Record<string, string> = {
   proveedor: 'Proveedor',
 }
 
+const guardia = (nombre: string | null, manual: boolean) =>
+  manual ? `Carga manual · ${nombre ?? ''}` : nombre ?? ''
+
 const dd = (iso: string) => iso.split('-').reverse().join('/')
 
 /**
@@ -240,6 +243,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Guardia ingreso', key: 'guardiaIngreso', width: 20 },
           { header: 'Salida', key: 'salida', width: 18, formato: 'fechaHora' },
           { header: 'Guardia salida', key: 'guardiaSalida', width: 20 },
+          { header: 'Carga manual', key: 'manual' },
         ],
         filas: auditoria.map((r) => ({
           invitado: r.guestName,
@@ -252,9 +256,10 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           hasta: diaExcel(r.validTo),
           estado: ESTADO_EXCEL[r.status] ?? r.status,
           ingreso: r.enteredAt ? fechaExcel(r.enteredAt) : '',
-          guardiaIngreso: r.guardName ?? '',
+          guardiaIngreso: guardia(r.guardName, r.manual),
           salida: r.exitedAt ? fechaExcel(r.exitedAt) : '',
-          guardiaSalida: r.exitGuardName ?? '',
+          guardiaSalida: guardia(r.exitGuardName, r.manual),
+          manual: r.manual ? 'Sí' : 'No',
         })),
       },
       {
@@ -268,16 +273,22 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'DNI', key: 'dni' },
           { header: 'Patente', key: 'patente' },
           { header: 'Unidad', key: 'unidad' },
+          { header: 'Origen', key: 'origen' },
+          { header: 'Cargado el', key: 'cargado', width: 18, formato: 'fechaHora' },
+          { header: 'Nota', key: 'nota', width: 30 },
         ],
         filas: ingresos.map((e) => ({
           ingreso: fechaExcel(e.enteredAt),
-          guardiaIngreso: e.guardName ?? '',
+          guardiaIngreso: guardia(e.guardName, e.manual),
           salida: e.exitedAt ? fechaExcel(e.exitedAt) : '',
-          guardiaSalida: e.exitGuardName ?? '',
+          guardiaSalida: guardia(e.exitGuardName, e.manual),
           invitado: e.guestName,
           dni: e.guestDoc ?? '',
           patente: e.plate ?? '',
           unidad: e.unitLabel,
+          origen: e.manual ? 'Carga manual' : 'Garita',
+          cargado: e.loadedAt ? fechaExcel(e.loadedAt) : '',
+          nota: e.note ?? '',
         })),
       },
     ],
