@@ -27,7 +27,7 @@ export const neighborhoods = pgTable('neighborhood', {
   // logo: la respuesta se cachea una hora y sin esto se vería el anterior.
   logoUpdatedAt: timestamp('logo_updated_at', { withTimezone: true }),
   // Horas adentro antes de que la garita avise, por tipo. NULL = ese tipo no
-  // alerta. Los frecuentes no tienen columna: pasan la jornada entera adentro.
+  // alerta. Una frecuente usa la de su subtipo (`invitation.frequent_as`).
   overstayHoursVisita: smallint('overstay_hours_visita'),
   overstayHoursProveedor: smallint('overstay_hours_proveedor'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
