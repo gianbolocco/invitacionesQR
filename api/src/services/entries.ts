@@ -6,6 +6,7 @@ import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { audit } from '../lib/audit.js'
 import { PORTERIA } from '../lib/porteria.js'
+import { assertUnitInNeighborhood, valoresDePorteria } from './invitations.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -145,7 +146,10 @@ const VENTANA_MANUAL_H = 48
 export const MAX_CARGA_MANUAL = 50
 
 export type CargaManual = {
-  invitationId: string
+  /** Una invitación existente, o `guest` para alguien que entró sin ninguna. */
+  invitationId?: string
+  guest?: { name: string; unitId: string }
+  guestDoc: string
   enteredAt: Date
   /** null = todavía está adentro. */
   exitedAt: Date | null
@@ -161,10 +165,11 @@ export type CargaManual = {
  * nada en el futuro, nada de hace más de 48 h (es lo que separa cargar un
  * corte de reescribir la historia) y nada que se superponga con otro
  * movimiento de la misma invitación. Todo o nada: una tanda con un error no
- * guarda ninguna.
+ * guarda ninguna, y el error dice qué fila (`fila`, desde 0) lo causó.
  *
- * Quien carga queda como guardia de ingreso y de salida, y en `loaded_by`:
- * la fila no se hace pasar por un escaneo.
+ * Quien no tenía invitación (`guest`) recibe una de portería del día en que
+ * entró. Quien carga queda como guardia de ingreso y de salida, y en
+ * `loaded_by`/`loaded_at`: la fila no se hace pasar por un escaneo.
  */
 export async function registerManual(
   neighborhoodId: string,
@@ -177,47 +182,13 @@ export async function registerManual(
 
   const filas = await db.transaction(async (tx) => {
     const creadas = []
-    for (const it of items) {
-      if (it.enteredAt > ahora || (it.exitedAt && it.exitedAt > ahora)) throw new AppError(400, 'fecha_futura')
-      if (it.enteredAt < desde) throw new AppError(400, 'fuera_de_ventana')
-      if (it.exitedAt && it.exitedAt < it.enteredAt) throw new AppError(400, 'salida_anterior')
-
-      const [target] = await tx.select({
-        unitId: invitations.unitId, guestName: invitations.guestName,
-        guestDoc: invitations.guestDoc, plate: invitations.plate,
-      }).from(invitations)
-        .innerJoin(units, eq(units.id, invitations.unitId))
-        .where(and(eq(invitations.id, it.invitationId), eq(units.neighborhoodId, neighborhoodId)))
-        // Serializa dos tandas simultáneas sobre la misma invitación: sin esto las
-        // dos pasan el chequeo de superposición y se pisan.
-        .for('update', { of: invitations })
-        .limit(1)
-      if (!target) throw new AppError(404, 'not_found')
-
-      // Un movimiento ocupa [ingreso, salida) y una fila abierta ocupa hasta hoy.
-      // Se superponen si cada uno empieza antes de que el otro termine.
-      const [choque] = await tx.select({ id: entryLogs.id }).from(entryLogs).where(and(
-        eq(entryLogs.invitationId, it.invitationId),
-        or(isNull(entryLogs.exitedAt), gt(entryLogs.exitedAt, it.enteredAt)),
-        it.exitedAt ? lt(entryLogs.enteredAt, it.exitedAt) : undefined,
-      )).limit(1)
-      if (choque) throw new AppError(409, 'se_superpone')
-
-      const [fila] = await tx.insert(entryLogs).values({
-        invitationId: it.invitationId,
-        unitId: target.unitId,
-        guardId: loaderId,
-        enteredAt: it.enteredAt,
-        exitedAt: it.exitedAt,
-        exitGuardId: it.exitedAt ? loaderId : null,
-        guestName: target.guestName,
-        guestDoc: target.guestDoc,
-        plate: target.plate,
-        note: it.note?.trim() || null,
-        source: 'manual',
-        loadedBy: loaderId,
-      }).returning()
-      creadas.push(fila)
+    for (const [n, it] of items.entries()) {
+      try {
+        creadas.push(await cargarUna(tx, neighborhoodId, loaderId, it, ahora, desde))
+      } catch (e) {
+        if (e instanceof AppError) throw new AppError(e.status, e.code, e.message, n)
+        throw e
+      }
     }
     return creadas
   })
@@ -228,6 +199,80 @@ export async function registerManual(
     })
   }
   return filas
+}
+
+async function cargarUna(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  neighborhoodId: string,
+  loaderId: string,
+  it: CargaManual,
+  ahora: Date,
+  desde: Date,
+) {
+  if (it.enteredAt > ahora || (it.exitedAt && it.exitedAt > ahora)) throw new AppError(400, 'fecha_futura')
+  if (it.enteredAt < desde) throw new AppError(400, 'fuera_de_ventana')
+  if (it.exitedAt && it.exitedAt < it.enteredAt) throw new AppError(400, 'salida_anterior')
+  if (!it.invitationId && !it.guest) throw new AppError(400, 'tanda_invalida')
+
+  const guestDoc = it.guestDoc.trim()
+  let invitationId: string
+  let target: { unitId: string; guestName: string; guestDoc: string | null; plate: string | null }
+
+  if (it.guest) {
+    await assertUnitInNeighborhood(it.guest.unitId, neighborhoodId, tx)
+    // Recién creada y sin otros movimientos: no hay con qué superponerse.
+    const [inv] = await tx.insert(invitations).values(valoresDePorteria({
+      unitId: it.guest.unitId, guestName: it.guest.name, guestDoc,
+      createdBy: loaderId, neighborhoodId,
+    }, todayInBuenosAires(it.enteredAt))).returning()
+    invitationId = inv.id
+    target = inv
+  } else {
+    invitationId = it.invitationId!
+    const [encontrada] = await tx.select({
+      unitId: invitations.unitId, guestName: invitations.guestName,
+      guestDoc: invitations.guestDoc, plate: invitations.plate,
+    }).from(invitations)
+      .innerJoin(units, eq(units.id, invitations.unitId))
+      .where(and(eq(invitations.id, invitationId), eq(units.neighborhoodId, neighborhoodId)))
+      // Serializa dos tandas simultáneas sobre la misma invitación: sin esto las
+      // dos pasan el chequeo de superposición y se pisan.
+      .for('update', { of: invitations })
+      .limit(1)
+    if (!encontrada) throw new AppError(404, 'not_found')
+    target = encontrada
+
+    // Un movimiento ocupa [ingreso, salida) y una fila abierta ocupa hasta hoy.
+    // Se superponen si cada uno empieza antes de que el otro termine.
+    const [choque] = await tx.select({ id: entryLogs.id }).from(entryLogs).where(and(
+      eq(entryLogs.invitationId, invitationId),
+      or(isNull(entryLogs.exitedAt), gt(entryLogs.exitedAt, it.enteredAt)),
+      it.exitedAt ? lt(entryLogs.enteredAt, it.exitedAt) : undefined,
+    )).limit(1)
+    if (choque) throw new AppError(409, 'se_superpone')
+
+    // Igual que registerEntry: el DNI cargado queda en la invitación.
+    if (!target.guestDoc) {
+      await tx.update(invitations).set({ guestDoc }).where(eq(invitations.id, invitationId))
+    }
+  }
+
+  const [fila] = await tx.insert(entryLogs).values({
+    invitationId,
+    unitId: target.unitId,
+    guardId: loaderId,
+    enteredAt: it.enteredAt,
+    exitedAt: it.exitedAt,
+    exitGuardId: it.exitedAt ? loaderId : null,
+    guestName: target.guestName,
+    guestDoc,
+    plate: target.plate,
+    note: it.note?.trim() || null,
+    source: 'manual',
+    loadedBy: loaderId,
+    loadedAt: ahora,
+  }).returning()
+  return fila
 }
 
 /**

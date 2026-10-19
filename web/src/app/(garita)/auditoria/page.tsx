@@ -11,9 +11,9 @@ import { paramsDe, useAuditoria, type FiltrosAuditoria } from '@/lib/queries/aud
 import { ChromeAdmin } from '@/components/admin/chrome'
 import { ChromeGarita } from '@/components/garita/chrome'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
-import { CampoFecha } from '@/components/dominio/campo-fecha'
+import { CampoFecha, textoFecha } from '@/components/dominio/campo-fecha'
 import { Chips } from '@/components/dominio/chips'
-import { HojaFiltros } from '@/components/dominio/hoja-filtros'
+import { FiltrosAplicados, HojaFiltros, SeccionFiltro, type FiltroAplicado } from '@/components/dominio/hoja-filtros'
 import { SelectorVista, type OpcionVista } from '@/components/dominio/selector-vista'
 import { Vacio } from '@/components/dominio/vacio'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
@@ -32,6 +32,12 @@ const RANGOS: { valor: Exclude<Rango, 'otro'>; etiqueta: string }[] = [
   { valor: 'hoy', etiqueta: 'Hoy' },
   { valor: '7', etiqueta: '7 días' },
   { valor: '30', etiqueta: '30 días' },
+]
+const TIPOS: { valor: FiltrosAuditoria['tipo']; etiqueta: string }[] = [
+  { valor: 'todos', etiqueta: 'Todos' },
+  { valor: 'visita', etiqueta: 'Visitas' },
+  { valor: 'frecuente', etiqueta: 'Frecuentes' },
+  { valor: 'proveedor', etiqueta: 'Proveedores' },
 ]
 
 /** Qué atajo está puesto, o 'otro' si las fechas se tocaron a mano. */
@@ -71,11 +77,21 @@ export default function AuditoriaPage() {
     setFrom(valor === 'hoy' ? hoyISO() : sumarDias(hoyISO(), -Number(valor)))
     setPage(1)
   }
-  const hayFiltros = texto !== '' || tipo !== 'todos' || estado !== 'todos'
-  function limpiar() { setTexto(''); setTipo('todos'); setEstado('todos'); setPage(1) }
-  // El rango por defecto son 7 días: otro rango también cuenta como filtro puesto.
-  const activos = (tipo !== 'todos' ? 1 : 0) + (estado !== 'todos' ? 1 : 0) + (rangoActivo(from, to) !== '7' ? 1 : 0)
-  function limpiarTodo() { setTipo('todos'); setEstado('todos'); aplicarRango('7') }
+  // Lo que está en el panel. El rango por defecto son 7 días: otro rango cuenta como filtro puesto.
+  const rango = rangoActivo(from, to)
+  const aplicados: FiltroAplicado[] = []
+  if (rango !== '7') aplicados.push({
+    clave: 'rango',
+    etiqueta: rango === 'hoy' ? 'Hoy' : rango === '30' ? 'Últimos 30 días' : `${textoFecha(from)} → ${textoFecha(to)}`,
+    quitar: () => aplicarRango('7'),
+  })
+  if (tipo !== 'todos') aplicados.push({
+    clave: 'tipo', etiqueta: TIPOS.find((t) => t.valor === tipo)!.etiqueta, quitar: () => cambiar(setTipo)('todos'),
+  })
+  function limpiarPanel() { setTipo('todos'); aplicarRango('7') }
+
+  const hayFiltros = texto !== '' || estado !== 'todos' || aplicados.length > 0
+  function limpiar() { setTexto(''); setEstado('todos'); limpiarPanel() }
 
   if (!me) return <main className="p-6">Cargando…</main>
   if (me.role !== 'guard' && me.role !== 'admin') {
@@ -108,54 +124,45 @@ export default function AuditoriaPage() {
           </>
         } />
 
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" aria-hidden />
-          <Input type="search" value={texto} onChange={(e) => cambiar(setTexto)(e.target.value)}
-            placeholder="Nombre, DNI, patente o unidad" aria-label="Buscar en la auditoría"
-            className="h-12 pl-10 pr-10 text-base" />
-          {texto && (
-            <button type="button" aria-label="Borrar la búsqueda" onClick={() => cambiar(setTexto)('')}
-              className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-ink-soft hover:bg-surface-sunk hover:text-ink">
-              <X className="size-4" aria-hidden />
-            </button>
-          )}
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" aria-hidden />
+              <Input type="search" value={texto} onChange={(e) => cambiar(setTexto)(e.target.value)}
+                placeholder="Nombre, DNI, patente o unidad" aria-label="Buscar en la auditoría"
+                className="h-12 pl-10 pr-10 text-base" />
+              {texto && (
+                <button type="button" aria-label="Borrar la búsqueda" onClick={() => cambiar(setTexto)('')}
+                  className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-ink-soft hover:bg-surface-sunk hover:text-ink">
+                  <X className="size-4" aria-hidden />
+                </button>
+              )}
+            </div>
+            <HojaFiltros aplicados={aplicados} resultados={consulta.data ? total : undefined} onLimpiar={limpiarPanel}>
+              <SeccionFiltro titulo="Fecha">
+                <Chips etiqueta="Rango rápido" valor={rango} onCambio={(v) => v !== 'otro' && aplicarRango(v)} opciones={RANGOS} />
+                <div className="flex items-center gap-2">
+                  <CampoFecha id="desde" valor={from} onCambio={cambiar(setFrom)} className="flex-1" />
+                  <span aria-hidden className="text-ink-soft">→</span>
+                  <CampoFecha id="hasta" valor={to} onCambio={cambiar(setTo)} className="flex-1" />
+                </div>
+              </SeccionFiltro>
+              <SeccionFiltro titulo="Tipo de invitación">
+                <Chips etiqueta="Tipo de invitación" valor={tipo} onCambio={cambiar(setTipo)} opciones={TIPOS} />
+              </SeccionFiltro>
+            </HojaFiltros>
+          </div>
+          <FiltrosAplicados aplicados={aplicados} onLimpiar={limpiarPanel} />
         </div>
 
-        <HojaFiltros activos={activos} resultados={consulta.data ? total : undefined} onLimpiar={limpiarTodo}>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <Chips etiqueta="Rango rápido" valor={rangoActivo(from, to)} onCambio={(v) => v !== 'otro' && aplicarRango(v)}
-              opciones={RANGOS} />
-            <div className="flex items-center gap-2">
-              <CampoFecha id="desde" valor={from} onCambio={cambiar(setFrom)} className="w-40" />
-              <span aria-hidden className="text-ink-soft">→</span>
-              <CampoFecha id="hasta" valor={to} onCambio={cambiar(setTo)} className="w-40" />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Chips etiqueta="Tipo de invitación" valor={tipo} onCambio={cambiar(setTipo)} opciones={[
-              { valor: 'todos', etiqueta: 'Todos' },
-              { valor: 'visita', etiqueta: 'Visitas' },
-              { valor: 'frecuente', etiqueta: 'Frecuentes' },
-              { valor: 'proveedor', etiqueta: 'Proveedores' },
-            ]} />
-            <Chips etiqueta="Estado" valor={estado} onCambio={cambiar(setEstado)} opciones={[
-              { valor: 'todos', etiqueta: 'Todos', contador: counts ? todos : undefined },
-              { valor: 'adentro', etiqueta: 'Adentro', contador: counts?.adentro },
-              { valor: 'concluida', etiqueta: 'Concluidas', contador: counts?.concluida },
-              { valor: 'esperando', etiqueta: 'Pendientes', contador: counts?.esperando },
-              { valor: 'vencida', etiqueta: 'Vencidas', contador: counts?.vencida },
-              { valor: 'anulada', etiqueta: 'Anuladas', contador: counts?.anulada },
-            ]} />
-          </div>
-        </HojaFiltros>
-
-        {hayFiltros && consulta.data && (
-          <p className="flex flex-wrap items-center gap-3 text-sm text-ink-soft" aria-live="polite">
-            <span className="tabular">{total} {total === 1 ? 'resultado' : 'resultados'}</span>
-            <Button variant="ghost" size="sm" onClick={limpiar}>Quitar filtros</Button>
-          </p>
-        )}
+        <Chips etiqueta="Estado" desplaza valor={estado} onCambio={cambiar(setEstado)} opciones={[
+          { valor: 'todos', etiqueta: 'Todos', contador: counts ? todos : undefined },
+          { valor: 'adentro', etiqueta: 'Adentro', contador: counts?.adentro },
+          { valor: 'concluida', etiqueta: 'Concluidas', contador: counts?.concluida },
+          { valor: 'esperando', etiqueta: 'Pendientes', contador: counts?.esperando },
+          { valor: 'vencida', etiqueta: 'Vencidas', contador: counts?.vencida },
+          { valor: 'anulada', etiqueta: 'Anuladas', contador: counts?.anulada },
+        ]} />
 
         {consulta.isPending ? (
           <SkeletonFilas filas={6} />

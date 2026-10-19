@@ -88,15 +88,19 @@ gateRoutes.post('/exits', async (req, res) => {
 gateRoutes.post('/manual', async (req, res) => {
   const { items } = z.object({
     items: z.array(z.object({
-      invitationId: z.string().uuid(),
+      invitationId: z.string().uuid().optional(),
+      guest: z.object({ name: z.string().trim().min(1).max(120), unitId: z.string().uuid() }).optional(),
+      guestDoc: z.string().trim().min(1).max(20),
       enteredAt: z.string().datetime({ offset: true }),
       exitedAt: z.string().datetime({ offset: true }).nullish(),
       note: z.string().trim().max(200).optional(),
-    })).min(1).max(MAX_CARGA_MANUAL),
+    }).refine((i) => Boolean(i.invitationId) !== Boolean(i.guest))).min(1).max(MAX_CARGA_MANUAL),
   }).parse(req.body)
 
   const filas = await registerManual(req.person!.neighborhoodId, req.person!.id, items.map((i) => ({
     invitationId: i.invitationId,
+    guest: i.guest,
+    guestDoc: i.guestDoc,
     enteredAt: new Date(i.enteredAt),
     exitedAt: i.exitedAt ? new Date(i.exitedAt) : null,
     note: i.note,
@@ -155,6 +159,9 @@ const KIND_EXCEL: Record<string, string> = {
   frecuente: 'Frecuente',
   proveedor: 'Proveedor',
 }
+
+const guardia = (nombre: string | null, manual: boolean) =>
+  nombre && manual ? `Carga manual · ${nombre}` : nombre ?? ''
 
 const dd = (iso: string) => iso.split('-').reverse().join('/')
 
@@ -236,6 +243,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Guardia ingreso', key: 'guardiaIngreso', width: 20 },
           { header: 'Salida', key: 'salida', width: 18, formato: 'fechaHora' },
           { header: 'Guardia salida', key: 'guardiaSalida', width: 20 },
+          { header: 'Carga manual', key: 'manual' },
         ],
         filas: auditoria.map((r) => ({
           invitado: r.guestName,
@@ -248,9 +256,10 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           hasta: diaExcel(r.validTo),
           estado: ESTADO_EXCEL[r.status] ?? r.status,
           ingreso: r.enteredAt ? fechaExcel(r.enteredAt) : '',
-          guardiaIngreso: r.guardName ?? '',
+          guardiaIngreso: guardia(r.guardName, r.manual),
           salida: r.exitedAt ? fechaExcel(r.exitedAt) : '',
-          guardiaSalida: r.exitGuardName ?? '',
+          guardiaSalida: guardia(r.exitGuardName, r.manual),
+          manual: r.manual ? 'Sí' : 'No',
         })),
       },
       {
@@ -264,16 +273,22 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'DNI', key: 'dni' },
           { header: 'Patente', key: 'patente' },
           { header: 'Unidad', key: 'unidad' },
+          { header: 'Origen', key: 'origen' },
+          { header: 'Cargado el', key: 'cargado', width: 18, formato: 'fechaHora' },
+          { header: 'Nota', key: 'nota', width: 30 },
         ],
         filas: ingresos.map((e) => ({
           ingreso: fechaExcel(e.enteredAt),
-          guardiaIngreso: e.guardName ?? '',
+          guardiaIngreso: guardia(e.guardName, e.manual),
           salida: e.exitedAt ? fechaExcel(e.exitedAt) : '',
-          guardiaSalida: e.exitGuardName ?? '',
+          guardiaSalida: guardia(e.exitGuardName, e.manual),
           invitado: e.guestName,
           dni: e.guestDoc ?? '',
           patente: e.plate ?? '',
           unidad: e.unitLabel,
+          origen: e.manual ? 'Carga manual' : 'Escaneo',
+          cargado: e.loadedAt ? fechaExcel(e.loadedAt) : '',
+          nota: e.note ?? '',
         })),
       },
     ],

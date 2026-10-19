@@ -100,7 +100,8 @@ export default function BarrioPage() {
           <p className="text-[13px] font-semibold text-ink-soft">Logo</p>
           {marcaReal.tieneLogo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl(marcaReal) ?? ''} alt="Logo del barrio" className="h-16 w-auto max-w-[16rem] object-contain" />
+            <img src={logoUrl(marcaReal) ?? ''} alt="Logo del barrio"
+              className="h-16 w-auto max-w-[16rem] rounded-md bg-white object-contain px-3 py-2 shadow-sm ring-1 ring-black/5" />
           ) : (
             <p className="text-ink-soft">Sin logo, mostramos el nombre del barrio.</p>
           )}
@@ -120,7 +121,7 @@ export default function BarrioPage() {
               ${arrastrando ? 'border-azul bg-azul-tint' : 'border-line'} disabled:opacity-50`}>
             <Upload className="size-5 text-ink-soft" aria-hidden />
             <span>{subirLogo.isPending ? 'Subiendo…' : 'Arrastrá un PNG o JPG, o tocá para elegirlo'}</span>
-            <span className="text-xs text-ink-soft">Hasta 500 KB</span>
+            <span className="text-xs text-ink-soft">Hasta 500 KB. Se muestra sobre una placa blanca, en tema claro y oscuro.</span>
           </button>
           <input ref={inputArchivo} type="file" accept="image/png,image/jpeg" className="sr-only"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(f); e.target.value = '' }} />

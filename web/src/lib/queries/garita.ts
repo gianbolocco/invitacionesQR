@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api, apiBase } from '@/lib/api'
+import { api, apiBase, ApiError } from '@/lib/api'
 import { hoyISO } from '@/lib/fechas'
 import {
   porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres,
@@ -232,12 +232,15 @@ export function useAltaExpres() {
   })
 }
 
-/** La tanda se guarda entera o no se guarda: el error dice por qué. */
+/**
+ * La tanda se guarda entera o no se guarda: el error dice por qué. Si la API
+ * dice qué fila falló, lo muestra la planilla en esa fila y no un toast.
+ */
 export function useCargarManual() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: cargarManual,
-    onError: (e) => toast.error(mensajeCargaManual(e)),
+    onError: (e) => { if (!(e instanceof ApiError && e.fila !== undefined)) toast.error(mensajeCargaManual(e)) },
     // La auditoría también: las filas nuevas aparecen ahí marcadas como manuales.
     onSuccess: () => Promise.all([invalidarGarita(qc), qc.invalidateQueries({ queryKey: ['auditoria'] })]),
   })

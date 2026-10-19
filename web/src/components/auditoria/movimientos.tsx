@@ -5,6 +5,9 @@ import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { fechaHora } from '@/lib/fechas'
 import { useMovimientos } from '@/lib/queries/auditoria'
 
+const guardia = (manual: boolean, nombre: string | null) =>
+  manual && nombre ? `Carga manual · ${nombre}` : nombre ?? 'guardia sin registrar'
+
 /**
  * Cada ingreso de una invitación con su salida y sus dos guardias: la fila de
  * la auditoría resume el último; acá están todos. Se pide recién al desplegar.
@@ -21,16 +24,22 @@ export function Movimientos({ id }: { id: string }) {
           {/* fechaHora y no enteredAt.slice(0, 10): esa es la fecha UTC, y a
               las 22 acá ya es el día siguiente allá. */}
           <p><span className="text-ink-soft">Ingresó </span><span className="tabular font-medium">{fechaHora(m.enteredAt)}</span>
-            <span className="text-ink-soft"> · {m.guardName ?? 'guardia sin registrar'}</span>
-            {m.manual && <TagManual className="ml-2 align-middle" />}</p>
+            <span className="text-ink-soft"> · {guardia(m.manual, m.guardName)}</span>
+            {m.manual && !m.guardName && <TagManual className="ml-2 align-middle" />}</p>
           <p><span className="text-ink-soft">Salió </span>
             {m.exitedAt
-              ? <><span className="tabular font-medium">{fechaHora(m.exitedAt)}</span><span className="text-ink-soft"> · {m.exitGuardName ?? 'guardia sin registrar'}</span></>
+              ? <><span className="tabular font-medium">{fechaHora(m.exitedAt)}</span><span className="text-ink-soft"> · {guardia(m.manual, m.exitGuardName)}</span></>
               : <span className="font-semibold">Sigue adentro</span>}
           </p>
           {(m.guestName || m.guestDoc || m.plate) && (
             <p className="text-ink-soft sm:col-span-2">
               {[m.guestName, m.guestDoc && `DNI ${m.guestDoc}`, m.plate].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          {m.manual && (m.loadedAt || m.note) && (
+            <p className="text-ink-soft sm:col-span-2">
+              {[m.loadedAt && `Cargado a mano por ${m.loaderName ?? 'guardia sin registrar'} el ${fechaHora(m.loadedAt)}`, m.note]
+                .filter(Boolean).join(' · ')}
             </p>
           )}
         </li>

@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
+import ExcelJS from 'exceljs'
 import { eq } from 'drizzle-orm'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
 import { neighborhoods, units, people, unitMembers, invitations, entryLogs, auditLogs } from '../src/db/schema.js'
 import { hashPassword, randomToken } from '../src/lib/crypto.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
+import { registerEntry } from '../src/services/entries.js'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
 
@@ -37,8 +39,9 @@ async function inv(ctx: Awaited<ReturnType<typeof base>>, over: Record<string, u
   return row
 }
 
-const cargar = (ctx: Awaited<ReturnType<typeof base>>, items: unknown[]) =>
-  request(app).post('/gate/manual').set('Cookie', ctx.cookie).send({ items })
+const cargar = (ctx: Awaited<ReturnType<typeof base>>, items: Record<string, unknown>[]) =>
+  request(app).post('/gate/manual').set('Cookie', ctx.cookie)
+    .send({ items: items.map((i) => ({ guestDoc: '30123456', ...i })) })
 
 describe('carga manual de movimientos', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
@@ -174,6 +177,128 @@ describe('carga manual de movimientos', () => {
     expect(aud.body.rows[0].manual).toBe(true)
     const det = await request(app).get(`/gate/audit/${i.id}/entries`).set('Cookie', ctx.cookie)
     expect(det.body[0].manual).toBe(true)
+  })
+
+  it('carga a alguien sin invitación: crea la invitación de portería del día del ingreso', async () => {
+    const ctx = await base()
+    const res = await cargar(ctx, [{ guest: { name: 'Juan Pérez', unitId: ctx.u.id }, enteredAt: haceH(30) }])
+    expect(res.status).toBe(201)
+    const [i] = await db.select().from(invitations)
+    const dia = todayInBuenosAires(new Date(haceH(30)))
+    expect(i.createdBy).toBe(ctx.quien.id)
+    expect(i.capacity).toBe(1)
+    expect(i.kind).toBe('visita')
+    expect(i.validFrom).toBe(dia)
+    expect(i.validTo).toBe(dia)
+    expect(i.guestName).toBe('Juan Pérez')
+    const [f] = await db.select().from(entryLogs)
+    expect(f.invitationId).toBe(i.id)
+  })
+
+  it('rechaza una unidad de otro barrio para alguien sin invitación', async () => {
+    const ctx = await base()
+    const [otro] = await db.insert(neighborhoods).values({ name: 'Otro' }).returning()
+    const [uo] = await db.insert(units).values({ neighborhoodId: otro.id, label: 'Lote 1' }).returning()
+    const res = await cargar(ctx, [{ guest: { name: 'Juan', unitId: uo.id }, enteredAt: haceH(2) }])
+    expect(res.status).toBe(403)
+  })
+
+  it('rechaza un ítem sin DNI', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    const res = await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(2), guestDoc: '' }])
+    expect(res.status).toBe(400)
+  })
+
+  it('completa el DNI de la invitación que no lo tenía', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestDoc: null })
+    await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(2), guestDoc: '28999111' }])
+    const [after] = await db.select().from(invitations).where(eq(invitations.id, i.id))
+    const [f] = await db.select().from(entryLogs)
+    expect(after.guestDoc).toBe('28999111')
+    expect(f.guestDoc).toBe('28999111')
+  })
+
+  it('si falla una fila no queda nada, tampoco la invitación de portería', async () => {
+    const ctx = await base()
+    const res = await cargar(ctx, [
+      { guest: { name: 'Juan', unitId: ctx.u.id }, enteredAt: haceH(5) },
+      { invitationId: '00000000-0000-4000-8000-000000000000', enteredAt: haceH(2) },
+    ])
+    expect(res.status).toBe(404)
+    expect(res.body.fila).toBe(1)
+    expect(await db.select().from(invitations)).toHaveLength(0)
+    expect(await db.select().from(entryLogs)).toHaveLength(0)
+  })
+
+  it('marca loaded_at en la carga manual', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(5) }])
+    const [f] = await db.select().from(entryLogs)
+    expect(Math.abs(Date.now() - f.loadedAt!.getTime())).toBeLessThan(10_000)
+  })
+
+  it('el detalle de movimientos trae la nota, quién cargó y cuándo', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(5), note: 'corte de luz' }])
+    const res = await request(app).get(`/gate/audit/${i.id}/entries`).set('Cookie', ctx.cookie)
+    expect(res.status).toBe(200)
+    expect(res.body[0].note).toBe('corte de luz')
+    expect(res.body[0].loaderName).toBe('Rulo')
+    expect(res.body[0].loadedAt).not.toBeNull()
+  })
+
+  it('el excel marca el origen', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(5), note: 'corte de luz' }])
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const celda = (hoja: string, titulo: string) => {
+      const ws = wb.getWorksheet(hoja)!
+      const col = (ws.getRow(1).values as unknown[]).map(String).indexOf(titulo)
+      expect(col, `${hoja}/${titulo}`).toBeGreaterThan(0)
+      return ws.getRow(2).getCell(col).value
+    }
+    expect(celda('Ingresos', 'Origen')).toBe('Carga manual')
+    expect(celda('Ingresos', 'Cargado el')).toBeTruthy()
+    expect(celda('Ingresos', 'Nota')).toBe('corte de luz')
+    expect(celda('Ingresos', 'Guardia ingreso')).toBe('Carga manual · Rulo')
+    expect(celda('Invitaciones', 'Carga manual')).toBe('Sí')
+    // Sin salida cargada no hay guardia de salida: no queda el prefijo colgando.
+    expect(celda('Ingresos', 'Guardia salida')).toBe('')
+  })
+
+  it('el excel marca como escaneo lo que no es carga manual', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    await registerEntry(i.id, ctx.quien.id, { guestName: 'Visita' })
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const celda = (hoja: string, titulo: string) => {
+      const ws = wb.getWorksheet(hoja)!
+      const col = (ws.getRow(1).values as unknown[]).map(String).indexOf(titulo)
+      expect(col, `${hoja}/${titulo}`).toBeGreaterThan(0)
+      return ws.getRow(2).getCell(col).value
+    }
+    expect(celda('Ingresos', 'Origen')).toBe('Escaneo')
+    expect(celda('Ingresos', 'Guardia ingreso')).toBe('Rulo')
+    expect(celda('Invitaciones', 'Carga manual')).toBe('No')
   })
 
   it('una tanda vacía se rechaza', async () => {

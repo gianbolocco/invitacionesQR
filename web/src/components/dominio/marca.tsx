@@ -28,12 +28,15 @@ export function Marca({ variante = 'normal', conPazzit = false, sobreColor = fal
   const marca = marcaOverride ?? marcaReal
   const url = logoUrl(marca)
 
+  // El logo va siempre sobre una placa blanca: los barrios suben JPG o PNG con
+  // fondo blanco (que suelto queda como un recorte) o transparentes con letra
+  // oscura (que en el tema oscuro desaparecen). La placa resuelve los dos.
   if (url) {
-    const alto = { normal: 'h-9', grande: 'h-14' }[variante]
+    const placa = { normal: 'h-9 rounded-[10px] px-2 py-1', grande: 'h-14 rounded-md px-3 py-1.5' }[variante]
     return (
-      <span className={cn('inline-flex shrink-0 items-center', className)}>
+      <span className={cn('inline-flex shrink-0 items-center bg-white shadow-sm ring-1 ring-black/5', placa, className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt={marca.nombre} className={cn(alto, 'w-auto max-w-48 object-contain')} />
+        <img src={url} alt={marca.nombre} className="h-full w-auto max-w-48 object-contain" />
       </span>
     )
   }

@@ -4,7 +4,7 @@ import { Building2, CalendarX, ChevronLeft, ChevronRight, Columns3, List, Search
 import { Button } from '@/components/ui/button'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
 import { Chips } from '@/components/dominio/chips'
-import { HojaFiltros } from '@/components/dominio/hoja-filtros'
+import { FiltrosAplicados, HojaFiltros, SeccionFiltro, type FiltroAplicado } from '@/components/dominio/hoja-filtros'
 import { SelectorVista, type OpcionVista } from '@/components/dominio/selector-vista'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
@@ -22,6 +22,13 @@ import { Compacta } from './vistas/compacta'
 import { PorUnidad } from './vistas/por-unidad'
 
 type Vista = 'tablero' | 'lista' | 'compacta' | 'unidad'
+
+const TIPOS: { valor: FiltroTipo; etiqueta: string }[] = [
+  { valor: 'todos', etiqueta: 'Todos' },
+  { valor: 'visita', etiqueta: 'Visitas' },
+  { valor: 'frecuente', etiqueta: 'Frecuentes' },
+  { valor: 'proveedor', etiqueta: 'Proveedores' },
+]
 
 const VACIAS: Columnas = { porLlegar: [], adentro: [], seFueron: [], vencidas: [] }
 
@@ -81,6 +88,10 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const visibles: Columnas = vista === 'tablero' || estado === 'todos' ? columnas : { ...VACIAS, [estado]: columnas[estado] }
   const planas = [...visibles.adentro, ...visibles.porLlegar, ...visibles.seFueron, ...visibles.vencidas]
 
+  const aplicados: FiltroAplicado[] = tipo === 'todos'
+    ? []
+    : [{ clave: 'tipo', etiqueta: TIPOS.find((t) => t.valor === tipo)!.etiqueta, quitar: () => setTipo('todos') }]
+
   const opciones: OpcionVista<Vista>[] = [
     { valor: 'tablero', etiqueta: 'Tablero', icono: Columns3, disponible: ancho },
     { valor: 'lista', etiqueta: 'Lista', icono: List },
@@ -101,6 +112,11 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
           <ChevronRight aria-hidden />
         </Button>
         <CampoFecha id="agenda-fecha" valor={fecha} onCambio={setFecha} className="w-44" />
+        <HojaFiltros aplicados={aplicados} resultados={q.data ? planas.length : undefined} onLimpiar={() => setTipo('todos')}>
+          <SeccionFiltro titulo="Tipo de invitación">
+            <Chips etiqueta="Tipo de invitación" valor={tipo} onCambio={setTipo} opciones={TIPOS} />
+          </SeccionFiltro>
+        </HojaFiltros>
         <div className="ml-auto">
           <SelectorVista etiqueta="Vista de la agenda" opciones={opciones} valor={vista} onCambio={guardar} />
         </div>
@@ -108,23 +124,16 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
 
       <h2 className="font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha, hoy)}</h2>
 
-      <HojaFiltros activos={(tipo !== 'todos' ? 1 : 0) + (vista !== 'tablero' && estado !== 'todos' ? 1 : 0)}
-        resultados={q.data ? planas.length : undefined} onLimpiar={() => { setTipo('todos'); setEstado('todos') }}>
-        <Chips etiqueta="Tipo de invitación" valor={tipo} onCambio={setTipo} opciones={[
-          { valor: 'todos', etiqueta: 'Todos' },
-          { valor: 'visita', etiqueta: 'Visitas' },
-          { valor: 'frecuente', etiqueta: 'Frecuentes' },
-          { valor: 'proveedor', etiqueta: 'Proveedores' },
+      {aplicados.length > 0 && <FiltrosAplicados aplicados={aplicados} onLimpiar={() => setTipo('todos')} />}
+
+      {vista !== 'tablero' && (
+        <Chips etiqueta="Estado" desplaza valor={estado} onCambio={setEstado} opciones={[
+          { valor: 'todos', etiqueta: 'Todos', contador: q.data ? total : undefined },
+          { valor: 'porLlegar', etiqueta: 'Por llegar', contador: q.data ? columnas.porLlegar.length : undefined },
+          { valor: 'adentro', etiqueta: 'Adentro', contador: q.data ? columnas.adentro.length : undefined },
+          { valor: 'seFueron', etiqueta: 'Se fueron', contador: q.data ? columnas.seFueron.length : undefined },
         ]} />
-        {vista !== 'tablero' && (
-          <Chips etiqueta="Estado" valor={estado} onCambio={setEstado} opciones={[
-            { valor: 'todos', etiqueta: 'Todos', contador: q.data ? total : undefined },
-            { valor: 'porLlegar', etiqueta: 'Por llegar', contador: q.data ? columnas.porLlegar.length : undefined },
-            { valor: 'adentro', etiqueta: 'Adentro', contador: q.data ? columnas.adentro.length : undefined },
-            { valor: 'seFueron', etiqueta: 'Se fueron', contador: q.data ? columnas.seFueron.length : undefined },
-          ]} />
-        )}
-      </HojaFiltros>
+      )}
 
       {guardada === undefined || q.isPending ? (
         <SkeletonFilas filas={4} />
