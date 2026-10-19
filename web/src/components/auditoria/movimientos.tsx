@@ -25,7 +25,7 @@ export function Movimientos({ id }: { id: string }) {
               las 22 acá ya es el día siguiente allá. */}
           <p><span className="text-ink-soft">Ingresó </span><span className="tabular font-medium">{fechaHora(m.enteredAt)}</span>
             <span className="text-ink-soft"> · {guardia(m.manual, m.guardName)}</span>
-            {m.manual && <TagManual className="ml-2 align-middle" />}</p>
+            {m.manual && !m.guardName && <TagManual className="ml-2 align-middle" />}</p>
           <p><span className="text-ink-soft">Salió </span>
             {m.exitedAt
               ? <><span className="tabular font-medium">{fechaHora(m.exitedAt)}</span><span className="text-ink-soft"> · {guardia(m.manual, m.exitGuardName)}</span></>

@@ -57,7 +57,9 @@ Debajo, una tabla con estas columnas fijas, igual que el papel:
 - **Guardar:** "Guardar 12 movimientos". Si la API rechaza la tanda, el error
   se pinta en la fila que indica la respuesta y no se pierde nada.
 
-En el celular, cada fila se apila como una tarjeta con los mismos campos.
+En el celular, cada fila se apila como una tarjeta con los mismos campos. La
+tabla empieza en 1024 px de ancho; por debajo van las tarjetas. Toda fila sin
+invitación también exige un lote.
 
 ## API `POST /gate/manual`
 
@@ -100,6 +102,9 @@ Lo usa solo `registerManual`.
   se muestra "Cargado a mano por Juan Pérez el 19/10 10:40" y la nota.
 - **"Guardia ingreso" y "Guardia salida":** en las manuales dicen
   "Carga manual · Juan Pérez", en pantalla y en el Excel.
+- **Fila principal de la auditoría** (tabla/tarjetas): mantiene el nombre plano
+  del guardia más el tag "Manual", porque resume varios movimientos; "Carga
+  manual · X" se muestra por movimiento, en el detalle y en el Excel.
 - **Excel, hoja "Ingresos":** se agregan las columnas **Origen**
   ("Escaneo" o "Carga manual"), **Cargado el** y **Nota**. **Hoja
   "Invitaciones":** se agrega la columna **Carga manual** (sí/no), que es el mismo

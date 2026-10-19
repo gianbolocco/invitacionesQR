@@ -111,6 +111,8 @@ export function errorDeFila(fecha: string, f: FilaPlanilla, todas: FilaPlanilla[
   if (!f.persona) return 'Elegí a la persona.'
   if (!('invitationId' in f.persona) && !f.persona.unitId) return 'Elegí el lote al que va.'
   if (!f.dni.trim()) return 'Falta el DNI: en la puerta siempre se pide.'
+  // Mismo tope que guestDoc en la API; pegar puede saltear el maxLength del input.
+  if (f.dni.trim().length > 20) return 'El DNI tiene más de 20 caracteres.'
   const { entrada, salida } = momentosDe(fecha, f)
   const error = validarCarga({ entrada, salida }, ahora)
   if (error) return error

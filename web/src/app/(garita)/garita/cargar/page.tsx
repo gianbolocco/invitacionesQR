@@ -116,7 +116,14 @@ export default function CargarMovimientosPage() {
   }
 
   function guardar() {
-    const items = aItems(planilla!)
+    let items
+    try {
+      items = aItems(planilla!)
+    } catch {
+      // Una fila pudo salir de la ventana de 48 h desde el último render: se muestran sus errores.
+      setVistas(conClaves(filas))
+      return
+    }
     cargar.mutate(items, {
       onSuccess: () => {
         toast.success(n === 1 ? 'Se cargó 1 movimiento.' : `Se cargaron ${n} movimientos.`)

@@ -117,11 +117,11 @@ export const cargarManual = (items: ItemManual[]) =>
 export function mensajeCargaManual(error: unknown): string {
   const codigo = error instanceof ApiError ? error.code : ''
   return ({
-    fecha_futura: 'Una de las horas todavía no pasó.',
+    fecha_futura: 'Esa hora todavía no pasó.',
     fuera_de_ventana: 'Solo se puede cargar lo de las últimas 48 horas.',
-    salida_anterior: 'Una salida es anterior a su ingreso.',
-    se_superpone: 'Uno de los movimientos se superpone con otro ya registrado de esa persona.',
-    not_found: 'No se encontró una de las invitaciones.',
+    salida_anterior: 'La salida es anterior al ingreso.',
+    se_superpone: 'Se superpone con otro movimiento ya registrado de esa persona.',
+    not_found: 'No se encontró esa invitación.',
     tanda_invalida: 'Se guardan de 1 a 50 movimientos por vez, cada uno con su persona.',
     not_your_neighborhood: 'Ese lote no es de este barrio.',
   } as Record<string, string>)[codigo] ?? 'No se pudo guardar. No se cargó nada: probá de nuevo.'

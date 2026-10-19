@@ -192,14 +192,14 @@ export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, bloque
   const tagSinInvitacion = sinInvitacion && <span className={cn(TAG, 'border border-dashed border-control text-ink-soft')}>Sin invitación</span>
   const campoPersona = (
     <div className="relative">
-      <Buscador id={id('persona')} readOnly={bloqueada} aria-label={etiqueta('Persona')} placeholder="Nombre, DNI o lote"
+      <Buscador id={id('persona')} readOnly={bloqueada} aria-label={etiqueta('Persona')} placeholder="Nombre, DNI o lote" maxLength={120}
         className={cn(celda, 'font-semibold', escritorio && sinInvitacion && 'pr-28')}
         valor={persona?.nombre ?? texto} onTexto={tipearPersona} opciones={opcionesPersona} />
       {escritorio && tagSinInvitacion && <span className="absolute right-2 top-1/2 -translate-y-1/2">{tagSinInvitacion}</span>}
     </div>
   )
   const dni = (
-    <Input id={id('dni')} readOnly={bloqueada} aria-label={etiqueta('DNI')} placeholder="DNI" autoComplete="off" className={cn(celda, 'tabular')}
+    <Input id={id('dni')} readOnly={bloqueada} aria-label={etiqueta('DNI')} placeholder="DNI" maxLength={20} autoComplete="off" className={cn(celda, 'tabular')}
       value={fila.dni} onChange={(e) => onCambio({ dni: e.target.value })} />
   )
   const lote = sinInvitacion ? (
@@ -263,7 +263,10 @@ export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, bloque
   const campo = (nombre: string, control: ReactNode, accesorio?: ReactNode, clase?: string) => (
     <div className={cn('flex min-w-0 flex-col gap-1.5', clase)}>
       <div className="flex items-center justify-between gap-2">
-        <Label htmlFor={id(nombre.toLowerCase())} className="text-sm text-ink">{nombre}</Label>
+        {nombre === 'Lote' && conInvitacion
+          // Con invitación el lote es un texto, no un campo: una Label apuntaría a un span.
+          ? <span className="text-sm font-medium text-ink">{nombre}</span>
+          : <Label htmlFor={id(nombre.toLowerCase())} className="text-sm text-ink">{nombre}</Label>}
         {accesorio}
       </div>
       {control}
