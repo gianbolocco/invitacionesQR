@@ -28,7 +28,7 @@ assert.equal(normalizarHora('9'), '09:00')
 assert.equal(normalizarHora('21:4'), '21:04')
 assert.equal(normalizarHora('25:00'), '')
 const f = (o: Partial<FilaPlanilla>): FilaPlanilla => ({
-  clave: 'x', ingreso: '23:30', persona: { nombre: 'Juan', unitId: 'u', lote: 'Lote 1' }, dni: '30123456', salida: '00:40', nota: '', ...o,
+  clave: 'x', ingreso: '23:30', persona: { nombre: 'Juan', unitId: 'u', lote: 'Lote 1' }, dni: '30123456', salida: '00:40', patente: '', ...o,
 })
 const mo = momentosDe('2026-10-15', f({}))
 assert.equal(mo.masUnDia, true)
@@ -39,9 +39,9 @@ assert.equal(errorDeFila('2026-10-15', f({ dni: '1'.repeat(20) }), [], AHORA), n
 assert.match(errorDeFila('2026-10-15', f({ persona: null }), [], AHORA)!, /persona/)
 assert.match(errorDeFila('2026-10-15', f({ persona: { nombre: 'Juan', unitId: '', lote: '' } }), [], AHORA)!, /lote/)
 assert.equal(errorDeFila('2026-10-15', f({}), [], AHORA), null)
-assert.deepEqual(aItems({ fecha: '2026-10-15', filas: [f({ nota: 'corte' })] }, AHORA)[0], {
-  guest: { name: 'Juan', unitId: 'u' }, guestDoc: '30123456',
-  enteredAt: '2026-10-15T23:30:00-03:00', exitedAt: '2026-10-16T00:40:00-03:00', note: 'corte',
+assert.deepEqual(aItems({ fecha: '2026-10-15', filas: [f({ patente: ' ab123cd ' })] }, AHORA)[0], {
+  guest: { name: 'Juan', unitId: 'u' }, guestDoc: '30123456', plate: 'AB123CD',
+  enteredAt: '2026-10-15T23:30:00-03:00', exitedAt: '2026-10-16T00:40:00-03:00',
 })
 assert.equal(leerBorrador('{roto'), null)
 assert.deepEqual(leerBorrador(JSON.stringify({ fecha: '2026-10-15', filas: [f({})] }))?.filas.length, 1)
@@ -56,7 +56,7 @@ assert.equal(aItems({ fecha: '2026-10-16', filas: [inv('a', '08:00', '')] }, AHO
 assert.equal(aItems({ fecha: '2026-10-16', filas: [inv('a', '08:00', '')] }, AHORA)[0].invitationId, 'i1')
 
 // aItems no calla errores; la fila en blanco se saltea.
-const vacia = f({ ingreso: '', persona: null, dni: '', salida: '', nota: '' })
+const vacia = f({ ingreso: '', persona: null, dni: '', salida: '', patente: '' })
 assert.equal(filaVacia(vacia), true)
 assert.equal(aItems({ fecha: '2026-10-15', filas: [f({}), vacia] }, AHORA).length, 1)
 assert.throws(() => aItems({ fecha: '2026-10-15', filas: [f({ persona: null })] }, AHORA), /fila 1/)

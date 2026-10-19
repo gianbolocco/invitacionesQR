@@ -150,6 +150,8 @@ export type CargaManual = {
   invitationId?: string
   guest?: { name: string; unitId: string }
   guestDoc: string
+  /** La anotada en la planilla. Sin ella, la de la invitación. */
+  plate?: string
   enteredAt: Date
   /** null = todavía está adentro. */
   exitedAt: Date | null
@@ -215,6 +217,7 @@ async function cargarUna(
   if (!it.invitationId && !it.guest) throw new AppError(400, 'tanda_invalida')
 
   const guestDoc = it.guestDoc.trim()
+  const plate = it.plate?.trim().toUpperCase() || null
   let invitationId: string
   let target: { unitId: string; guestName: string; guestDoc: string | null; plate: string | null }
 
@@ -222,7 +225,7 @@ async function cargarUna(
     await assertUnitInNeighborhood(it.guest.unitId, neighborhoodId, tx)
     // Recién creada y sin otros movimientos: no hay con qué superponerse.
     const [inv] = await tx.insert(invitations).values(valoresDePorteria({
-      unitId: it.guest.unitId, guestName: it.guest.name, guestDoc,
+      unitId: it.guest.unitId, guestName: it.guest.name, guestDoc, plate: plate ?? undefined,
       createdBy: loaderId, neighborhoodId,
     }, todayInBuenosAires(it.enteredAt))).returning()
     invitationId = inv.id
@@ -266,7 +269,7 @@ async function cargarUna(
     exitGuardId: it.exitedAt ? loaderId : null,
     guestName: target.guestName,
     guestDoc,
-    plate: target.plate,
+    plate: plate ?? target.plate,
     note: it.note?.trim() || null,
     source: 'manual',
     loadedBy: loaderId,
