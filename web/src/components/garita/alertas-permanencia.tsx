@@ -24,11 +24,23 @@ const SIN_ALERTAS: Alertas = { ahora: new Date(0), excedidas: [], pendientes: []
 /** Las alertas de permanencia de la garita. Fuera de `AlertasProvider`, ninguna. */
 export const useAlertas = () => useContext(AlertasContexto) ?? SIN_ALERTAS
 
-/** "1 h 20 min" si esa invitación pasó su tiempo adentro; si no, null. */
-export function useExceso(id: string): string | null {
+/**
+ * Si esa invitación pasó su tiempo, "Hace 7 h 20 min adentro"; si no, null.
+ * Dice cuánto lleva, no cuánto se pasó: es el dato que el guardia usa al llamar.
+ */
+export function useTiempoExcedido(fila: { id: string; lastEntryAt: string | null }): string | null {
   const { porId, ahora } = useAlertas()
-  const e = porId.get(id)
-  return e ? tiempoDesde(e.alertaDesde, ahora) : null
+  if (!porId.has(fila.id)) return null
+  return fila.lastEntryAt ? `Hace ${tiempoDesde(fila.lastEntryAt, ahora)} adentro` : 'Adentro'
+}
+
+/** El aviso en amarillo de quien pasó su tiempo: ícono y texto, sin caja. */
+export function TextoExcedido({ texto, className }: { texto: string; className?: string }) {
+  return (
+    <span className={cn('inline-flex items-center gap-1 whitespace-nowrap font-semibold text-espera', className)}>
+      <TriangleAlert className="size-3.5 shrink-0" aria-hidden />{texto}
+    </span>
+  )
 }
 
 /** Cada cuánto se mira el reloj. La red no participa: el vencimiento ya vino calculado. */
@@ -188,10 +200,8 @@ function FilaAlerta({ fila, ahora, onCerrar }: { fila: Excedida; ahora: Date; on
         </span>
       )}
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] tabular">
+        {fila.lastEntryAt && <TextoExcedido texto={`Hace ${tiempoDesde(fila.lastEntryAt, ahora)} adentro`} />}
         {fila.lastEntryAt && <span className="text-ink-soft">Entró {horaODia(fila.lastEntryAt, hoyISO(ahora))}</span>}
-        <span className="flex items-center gap-1 font-semibold text-espera">
-          <TriangleAlert className="size-3.5" aria-hidden />Se pasó {tiempoDesde(fila.alertaDesde, ahora)}
-        </span>
       </span>
       <div className="mt-1 flex gap-2">
         <Button asChild variant="outline" className="h-11 flex-1">

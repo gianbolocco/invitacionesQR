@@ -85,8 +85,9 @@ export function AgendaDia({ onAbrir, verExcedidos = false }: {
   }
   useEffect(() => {
     if (!verExcedidos) return
+    // Primero bajar a la agenda y después limpiar la URL: al revés, la navegación cortaba el scroll.
+    document.getElementById('agenda-dia')?.scrollIntoView({ block: 'start' })
     router.replace('/garita', { scroll: false })
-    document.getElementById('agenda-dia')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [verExcedidos, router])
 
   const ancho = useMedia('(min-width: 1280px)')
@@ -165,12 +166,13 @@ export function AgendaDia({ onAbrir, verExcedidos = false }: {
       {vista !== 'tablero' && (
         <Chips etiqueta="Estado" desplaza valor={estado} onCambio={setEstado} opciones={[
           { valor: 'todos', etiqueta: 'Todos', contador: q.data ? total : undefined },
-          { valor: 'porLlegar', etiqueta: 'Por llegar', contador: q.data ? columnas.porLlegar.length : undefined },
-          { valor: 'adentro', etiqueta: 'Adentro', contador: q.data ? columnas.adentro.length : undefined },
-          { valor: 'seFueron', etiqueta: 'Se fueron', contador: q.data ? columnas.seFueron.length : undefined },
+          // Segundo y no al final: en el celular los chips se desplazan, y elegido desde "Ver todos" tiene que verse.
           ...(excedidos.length
             ? [{ valor: 'excedidos' as const, etiqueta: 'Pasaron su tiempo', contador: excedidos.length }]
             : []),
+          { valor: 'porLlegar', etiqueta: 'Por llegar', contador: q.data ? columnas.porLlegar.length : undefined },
+          { valor: 'adentro', etiqueta: 'Adentro', contador: q.data ? columnas.adentro.length : undefined },
+          { valor: 'seFueron', etiqueta: 'Se fueron', contador: q.data ? columnas.seFueron.length : undefined },
         ]} />
       )}
 

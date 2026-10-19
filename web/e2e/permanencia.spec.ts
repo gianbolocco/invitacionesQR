@@ -37,7 +37,7 @@ test('la garita avisa quién pasó su tiempo adentro y el guardia lo marca visto
     await g.getByRole('button', { name: /pasaron? su tiempo adentro/ }).click()
     const panel = g.getByRole('dialog', { name: 'Pasaron su tiempo' })
     const fila = panel.getByRole('listitem').filter({ hasText: nombre })
-    await expect(fila.getByText(/Se pasó/)).toBeVisible()
+    await expect(fila.getByText(/Hace .+ adentro/)).toBeVisible()
 
     await fila.getByRole('button', { name: 'Ya lo vi' }).click()
     // Pasa a "Ya vistas": sigue en la lista, sin el botón.
@@ -47,7 +47,7 @@ test('la garita avisa quién pasó su tiempo adentro y el guardia lo marca visto
 
     // En la agenda sigue marcado, y el chip deja ver solo a los excedidos.
     await g.getByRole('button', { name: /^Pasaron su tiempo/ }).click()
-    await expect(g.getByRole('button', { name: new RegExp(nombre) })).toContainText('Se pasó')
+    await expect(g.getByRole('button', { name: new RegExp(nombre) })).toContainText(/Hace .+ adentro/)
   } finally {
     await guardia.close()
   }

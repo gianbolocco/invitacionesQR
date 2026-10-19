@@ -78,7 +78,12 @@ una alerta que no se calla termina ignorada.
   igual en el celular, así que no hay franja.
 - El panel tiene **"Ver todos"**, que lleva a `/garita?ver=excedidos`: la agenda
   de hoy con el chip "Pasaron su tiempo" puesto (en lista si estaba en tablero).
-- Las tarjetas amarillas (panel y tablero) muestran el **DNI**.
+- La tarjeta del tablero es la misma que la de cualquiera adentro: solo el pie va
+  en amarillo, con ícono, "Hace 7 h 20 min adentro", y suma el **DNI**. Igual en
+  la lista y en el panel (que además muestra la hora de ingreso). No se dice
+  "se pasó": cuánto lleva es lo que el guardia usa al llamar a la casa.
+- El chip "Pasaron su tiempo" va segundo, después de "Todos", para que se vea
+  en el celular.
 - Se verifica a 1280 px y a 390 px, en claro y oscuro.
 
 ## Datos

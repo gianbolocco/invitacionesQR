@@ -1,16 +1,15 @@
 'use client'
 import { AnimatePresence, motion } from 'motion/react'
-import { TriangleAlert } from 'lucide-react'
 import { Fila } from '@/components/dominio/fila'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { TagTipo } from '@/components/dominio/tag-tipo'
 import type { AgendaRow } from '@/lib/queries/garita'
 import type { Columnas } from '@/lib/tablero'
 import { detalleDe, estadoDe, metaDe } from '@/components/garita/datos-agenda'
-import { useExceso } from '@/components/garita/alertas-permanencia'
+import { TextoExcedido, useTiempoExcedido } from '@/components/garita/alertas-permanencia'
 
 export function FilaAgenda({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onAbrir: (id: string) => void }) {
-  const exceso = useExceso(r.id)
+  const excedido = useTiempoExcedido(r)
   return (
     <Fila densa titulo={
       <span className="flex items-center gap-2">
@@ -18,11 +17,7 @@ export function FilaAgenda({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onA
         <TagTipo kind={r.kind} />
       </span>
     } meta={metaDe(r)} onClick={() => onAbrir(r.id)}
-      extremo={exceso ? (
-        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-espera bg-espera-tint px-2 py-1 text-[13px] font-semibold leading-4 text-espera">
-          <TriangleAlert className="size-3.5" aria-hidden />Se pasó {exceso}
-        </span>
-      ) : <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />} />
+      extremo={excedido ? <TextoExcedido texto={excedido} className="text-[13px]" /> : <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />} />
   )
 }
 
