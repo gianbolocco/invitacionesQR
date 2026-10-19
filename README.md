@@ -32,8 +32,15 @@ sistema resuelve solo si el movimiento es un ingreso o un egreso según haya o n
 una fila abierta. Un egreso nunca se rechaza —el que está adentro tiene que
 poder salir— y no libera cupo, así que un reingreso rebota igual que antes.
 
+Si una visita o un proveedor lleva adentro más horas de las que fijó el admin
+para su tipo, la garita lo **avisa**: un contador en el header con un pitido
+corto, los excedidos primero en "Adentro" y un filtro para verlos juntos. El
+guardia registra la salida o marca "Ya lo vi", que la calla en todas las garitas
+y queda en la auditoría. La cuenta se hace en la garita contra su reloj: no hay
+job en el servidor. Los frecuentes no alertan.
+
 **El admin** da de alta vecinos y guardias, corrige lotes, edita los datos del
-barrio y ve el tablero.
+barrio (las horas de la alerta de permanencia incluidas) y ve el tablero.
 
 ## Correr en desarrollo
 

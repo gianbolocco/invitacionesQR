@@ -7,7 +7,7 @@ import { logout } from '@/lib/session'
 import { Marca } from '@/components/dominio/marca'
 import { SelectorTema } from '@/components/selector-tema'
 import { BarraSeccion, HEADER, BOTON_HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
-import { AlertasProvider, BotonAlertas } from './alertas-permanencia'
+import { AlertasProvider, AvisoAlertas } from './alertas-permanencia'
 
 /**
  * El marco de la garita, pensado desde el escritorio: header de Pazzit con el
@@ -52,7 +52,7 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
             </nav>
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              <BotonAlertas />
+              <div className="hidden sm:flex"><AvisoAlertas /></div>
               <span className="hidden text-[15px] text-white/90 sm:inline">{me.name}</span>
               {me.role === 'admin' && (
                 <Link href="/admin" aria-label="Ir a administración" title="Ir a administración" className={BOTON_HEADER}>
@@ -65,6 +65,7 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           </div>
+          <div className="sm:hidden"><AvisoAlertas franja /></div>
         </header>
 
         <main className="mx-auto max-w-[1440px] px-4 py-6 md:px-6 sm:py-8 xl:px-8">{children}</main>

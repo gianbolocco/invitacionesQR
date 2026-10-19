@@ -87,26 +87,37 @@ export function AlertasProvider({ children }: { children: React.ReactNode }) {
 const personas = (n: number) => (n === 1 ? '1 persona pasó' : `${n} personas pasaron`)
 
 /**
- * El aviso del header: el número de alertas sin ver, y abre el panel. Sin
- * ninguna excedida no se muestra; con todas vistas queda tenue, para poder
- * volver a la lista.
+ * El aviso de la garita: cuántas alertas hay sin ver, y abre el panel. En
+ * escritorio es un botón del header; en el celular no entra ahí, y va como
+ * franja debajo, de lado a lado, que además se ve y se toca mejor. Sin
+ * excedidos no se muestra; con todos vistos, el de escritorio queda tenue
+ * para volver a la lista (en el celular, el chip de la agenda cumple eso).
  */
-export function BotonAlertas() {
+export function AvisoAlertas({ franja = false }: { franja?: boolean }) {
   const { excedidas, pendientes } = useAlertas()
   const [abierto, setAbierto] = useState(false)
-  if (!excedidas.length) return null
-
   const n = pendientes.length
+  if (!excedidas.length || (franja && !n)) return null
+
+  const etiqueta = n ? `${personas(n)} su tiempo adentro` : 'Alertas de permanencia, todas vistas'
   return (
     <>
-      <button type="button" onClick={() => setAbierto(true)}
-        aria-label={n ? `${personas(n)} su tiempo adentro` : 'Alertas de permanencia, todas vistas'}
-        className={cn(BOTON_HEADER, 'w-auto gap-1.5 px-2.5 font-semibold tabular',
-          n ? 'bg-white text-ink hover-fino:bg-white/90' : 'text-white/80')}>
-        <TriangleAlert className={cn('size-5', n && 'text-espera')} aria-hidden />
-        {n > 0 && <span>{n}</span>}
-        {n > 0 && <span className="hidden lg:inline">{n === 1 ? 'pasó su tiempo' : 'pasaron su tiempo'}</span>}
-      </button>
+      {franja ? (
+        <button type="button" onClick={() => setAbierto(true)} aria-label={etiqueta}
+          className="flex min-h-11 w-full items-center gap-2 border-b border-espera bg-espera-tint px-4 text-left text-sm font-semibold text-espera">
+          <TriangleAlert className="size-4 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1 truncate tabular">{personas(n)} su tiempo</span>
+          <span className="flex shrink-0 items-center underline underline-offset-4">Ver</span>
+        </button>
+      ) : (
+        <button type="button" onClick={() => setAbierto(true)} aria-label={etiqueta}
+          className={cn(BOTON_HEADER, 'flex w-auto items-center gap-1.5 whitespace-nowrap px-2.5 font-semibold tabular',
+            n ? 'bg-card text-ink hover-fino:bg-card/90' : 'text-white/80')}>
+          <TriangleAlert className={cn('size-5', n && 'text-espera')} aria-hidden />
+          {n > 0 && <span>{n}</span>}
+          {n > 0 && <span className="hidden lg:inline">{n === 1 ? 'pasó su tiempo' : 'pasaron su tiempo'}</span>}
+        </button>
+      )}
       <HojaAlertas abierto={abierto} onCerrar={() => setAbierto(false)} />
     </>
   )
