@@ -37,7 +37,8 @@ para su tipo, la garita lo **avisa**: un contador en el header con un pitido
 corto, los excedidos primero en "Adentro" y un filtro para verlos juntos. El
 guardia registra la salida o marca "Ya lo vi", que la calla en todas las garitas
 y queda en la auditoría. La cuenta se hace en la garita contra su reloj: no hay
-job en el servidor. Los frecuentes no alertan.
+job en el servidor. Una frecuente usa
+las horas de lo que es: visita o proveedor, según eligió el vecino.
 
 **El admin** da de alta vecinos y guardias, corrige lotes, edita los datos del
 barrio (las horas de la alerta de permanencia incluidas) y ve el tablero.

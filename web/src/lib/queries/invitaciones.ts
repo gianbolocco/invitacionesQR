@@ -15,6 +15,8 @@ export type FiltrosHistorial = {
 
 export type DatosInvitacion = {
   kind: Invitation['kind']
+  /** Solo se manda en las frecuentes. */
+  frequentAs?: 'visita' | 'proveedor'
   guestName: string
   guestDoc: string | null
   plate: string | null

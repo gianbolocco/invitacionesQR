@@ -17,6 +17,8 @@ export type AgendaRow = {
   guestDoc: string | null
   plate: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
+  /** Solo en las frecuentes: si viene de visita o como proveedor. */
+  frequentAs?: 'visita' | 'proveedor' | null
   unitLabel: string
   inviterName: string
   capacity: number

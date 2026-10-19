@@ -38,6 +38,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   const mutacion = editando ? editar : crear
 
   const [kind, setKind] = useState<Kind>(invitacion?.kind ?? inicial?.kind ?? 'visita')
+  const [frecuenteComo, setFrecuenteComo] = useState<'visita' | 'proveedor'>(invitacion?.frequentAs ?? 'visita')
   const [unitId, setUnitId] = useState(invitacion?.unitId ?? units[0]?.id ?? '')
   const [guestName, setGuestName] = useState(invitacion?.guestName ?? inicial?.guestName ?? '')
   const [guestDoc, setGuestDoc] = useState(invitacion?.guestDoc ?? inicial?.guestDoc ?? '')
@@ -68,6 +69,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
 
     const datos: DatosInvitacion = {
       kind,
+      ...(frecuente ? { frequentAs: frecuenteComo } : {}),
       guestName: guestName.trim(),
       guestDoc: guestDoc.trim() || null,
       plate: plate.trim().toUpperCase() || null,
@@ -119,6 +121,13 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
 
         {frecuente ? (
           <>
+            <Campo id="frecuente-como" etiqueta="¿Viene de visita o a trabajar?"
+              ayuda={frecuenteComo === 'visita'
+                ? 'La empleada, la niñera, el profesor.'
+                : 'El jardinero, el pintor, el de la pileta: en la garita se marca como proveedor.'}>
+              <Chips etiqueta="Viene de visita o a trabajar" valor={frecuenteComo} onCambio={setFrecuenteComo}
+                opciones={[{ valor: 'visita', etiqueta: 'Visita' }, { valor: 'proveedor', etiqueta: 'Proveedor' }]} />
+            </Campo>
             <div className="grid gap-4 sm:grid-cols-2">
               <Campo id="desde" etiqueta="Desde" error={mostrar('validFrom')}>
                 <CampoFecha id="desde" valor={validFrom} min={editando ? undefined : hoy}

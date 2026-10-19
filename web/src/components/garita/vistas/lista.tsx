@@ -14,7 +14,7 @@ export function FilaAgenda({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onA
     <Fila densa titulo={
       <span className="flex items-center gap-2">
         <span className="min-w-0 truncate">{r.guestName}</span>
-        <TagTipo kind={r.kind} />
+        <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
       </span>
     } meta={metaDe(r)} onClick={() => onAbrir(r.id)}
       extremo={excedido ? <TextoExcedido texto={excedido} className="text-[13px]" /> : <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />} />

@@ -188,7 +188,7 @@ function FilaAlerta({ fila, ahora, onCerrar }: { fila: Excedida; ahora: Date; on
       fila.alertaVista ? 'border-line bg-card' : 'border-espera bg-espera-tint')}>
       <div className="flex items-start justify-between gap-2">
         <span className="min-w-0 text-[15px] font-semibold leading-snug">{fila.guestName}</span>
-        <TagTipo kind={fila.kind} />
+        <TagTipo kind={fila.kind} frequentAs={fila.frequentAs} />
       </div>
       <span className="text-[13px] text-ink-soft">
         {fila.unitLabel} · {quienInvita(fila.inviterName)}

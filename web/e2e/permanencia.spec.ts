@@ -52,3 +52,27 @@ test('la garita avisa quién pasó su tiempo adentro y el guardia lo marca visto
     await guardia.close()
   }
 })
+
+test('una frecuente que viene a trabajar se marca como frecuente y como proveedor en la garita', async ({ page, browser }) => {
+  const nombre = `Jardinero E2E ${test.info().project.name} ${Date.now()}`
+  await entrar(page, 'vecino')
+  await page.goto('/invitaciones/nueva')
+  await page.getByRole('group', { name: 'Tipo de invitación' }).getByRole('button', { name: 'Frecuente' }).click()
+  await page.getByRole('group', { name: 'Viene de visita o a trabajar' }).getByRole('button', { name: 'Proveedor' }).click()
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await expect(page).toHaveURL(/\/invitaciones\/[0-9a-f-]{36}\?creada=1$/)
+
+  const { viewport, userAgent, isMobile, hasTouch, deviceScaleFactor } = test.info().project.use
+  const guardia = await browser.newContext({ viewport, userAgent, isMobile, hasTouch, deviceScaleFactor })
+  const g = await guardia.newPage()
+  try {
+    await entrar(g, 'guardia')
+    await g.goto('/garita')
+    const fila = g.getByRole('button', { name: new RegExp(nombre) })
+    await expect(fila).toContainText('Frecuente')
+    await expect(fila).toContainText('Proveedor')
+  } finally {
+    await guardia.close()
+  }
+})

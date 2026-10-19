@@ -147,7 +147,7 @@ export default function BarrioPage() {
               )
             })}
             <p className="text-sm text-ink-soft">
-              La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Los frecuentes no alertan.
+              La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Una frecuente usa las horas de lo que es: visita o proveedor.
             </p>
           </fieldset>
 

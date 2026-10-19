@@ -30,8 +30,13 @@ una alerta que no se calla termina ignorada.
    Barrio*: uno para visita y otro para proveedor, en horas enteras de 1 a 72.
    Cada uno puede estar apagado (NULL). Una instalación nueva arranca con los
    dos apagados: nada cambia hasta que el admin lo decide.
-2. **Los frecuentes nunca alertan.** Son el personal de la casa y pasan la
-   jornada entera adentro.
+2. **Una frecuente alerta según lo que es** (cambio del 19/10). La frecuente
+   lleva un subtipo, `invitation.frequent_as` (`visita` | `proveedor`), que el
+   vecino elige al crearla ("¿Viene de visita o a trabajar?") y puede editar
+   mientras no se usó. Usa el umbral de ese subtipo. Las que ya existían
+   quedaron como visita; una frecuente sin subtipo (un insert crudo) cuenta como
+   visita. En la garita, una frecuente proveedor lleva las dos marcas:
+   "Frecuente" y "Proveedor".
 3. **El reloj corre desde el ingreso más viejo que sigue abierto** de esa
    invitación (una invitación con cupo 3 puede tener a tres personas adentro).
 4. **La cuenta es en vivo y no se guarda.** La API devuelve en `/gate/adentro`

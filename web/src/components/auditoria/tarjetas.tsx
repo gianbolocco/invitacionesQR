@@ -36,7 +36,7 @@ export function Tarjetas({ filas }: { filas: AuditRow[] }) {
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2">
                   <span className="min-w-0 text-[15px] font-semibold leading-snug">{r.guestName}</span>
-                  <TagTipo kind={r.kind} />
+                  <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
                   {r.manual && <TagManual />}
                 </p>
                 <p className="mt-0.5 truncate text-[13px] text-ink-soft">
