@@ -14,7 +14,7 @@ import { usePreferencia } from '@/lib/use-preferencia'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { SelectorVista, type OpcionVista } from '@/components/dominio/selector-vista'
 import { Chips } from '@/components/dominio/chips'
-import { HojaFiltros } from '@/components/dominio/hoja-filtros'
+import { FiltrosAplicados, HojaFiltros, SeccionFiltro, type FiltroAplicado } from '@/components/dominio/hoja-filtros'
 import { VistaPorLote } from '@/components/admin/vista-por-lote'
 import { TablaVecinos } from '@/components/admin/tabla-vecinos'
 import { useMedia } from '@/lib/use-media'
@@ -184,6 +184,9 @@ export default function VecinosPage() {
   const porCuenta = filtrarVecinos(vecinos, filtros, 'cuenta')
   const cuentas = (estado: FiltroCuenta) => porCuenta.filter((p) => estado === 'todas' || p.status === estado).length
   const hayFiltros = cuenta !== 'todas' || lote !== 'todos'
+  const aplicados: FiltroAplicado[] = lote === 'sinLote'
+    ? [{ clave: 'lote', etiqueta: 'Sin lote', quitar: () => setLote('todos') }]
+    : []
 
   function accionesDe(p: Person): AccionFila[] {
     const acciones: AccionFila[] = []
@@ -224,40 +227,44 @@ export default function VecinosPage() {
           titulo="Vecinos"
           acciones={<AltaVecino abierto={altaAbierta} onAbiertoChange={setAltaAbierta} />} />
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1 sm:max-w-sm">
-            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-            <Input type="text" value={busqueda} placeholder="Buscar por nombre o lote"
-              aria-label="Buscar vecinos por nombre o lote" className="h-11 pl-9 pr-10"
-              onChange={(e) => setBusqueda(e.target.value)} />
-            {busqueda && (
-              <button type="button" aria-label="Limpiar búsqueda" onClick={() => setBusqueda('')}
-                className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded text-ink-soft hover:bg-surface-sunk hover:text-ink">
-                <X aria-hidden className="size-4" />
-              </button>
-            )}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1 basis-56 sm:max-w-sm">
+              <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+              <Input type="text" value={busqueda} placeholder="Buscar por nombre o lote"
+                aria-label="Buscar vecinos por nombre o lote" className="h-12 pl-9 pr-10"
+                onChange={(e) => setBusqueda(e.target.value)} />
+              {busqueda && (
+                <button type="button" aria-label="Limpiar búsqueda" onClick={() => setBusqueda('')}
+                  className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded text-ink-soft hover:bg-surface-sunk hover:text-ink">
+                  <X aria-hidden className="size-4" />
+                </button>
+              )}
+            </div>
+            <HojaFiltros aplicados={aplicados} resultados={personas.data ? filtrados.length : undefined}
+              onLimpiar={() => setLote('todos')}>
+              <SeccionFiltro titulo="Lote">
+                <Chips etiqueta="Lote" valor={lote} onCambio={setLote} opciones={[
+                  { valor: 'todos', etiqueta: 'Todos los lotes' },
+                  { valor: 'sinLote', etiqueta: 'Sin lote asignado',
+                    contador: personas.data ? filtrarVecinos(vecinos, { ...filtros, lote: 'sinLote' }).length : undefined },
+                ]} />
+              </SeccionFiltro>
+            </HojaFiltros>
+            <ImportarVecinos onImported={() => personas.refetch()} />
+            <div className="sm:ml-auto">
+              <SelectorVista etiqueta="Vista del padrón" opciones={VISTAS} valor={vista} onCambio={guardar} />
+            </div>
           </div>
-          <ImportarVecinos onImported={() => personas.refetch()} />
-          <div className="sm:ml-auto">
-            <SelectorVista etiqueta="Vista del padrón" opciones={VISTAS} valor={vista} onCambio={guardar} />
-          </div>
+          <FiltrosAplicados aplicados={aplicados} onLimpiar={() => setLote('todos')} />
         </div>
 
-        <HojaFiltros className="flex-row flex-wrap items-center gap-x-6 gap-y-2" activos={(cuenta !== 'todas' ? 1 : 0) + (lote !== 'todos' ? 1 : 0)}
-          resultados={personas.data ? filtrados.length : undefined}
-          onLimpiar={() => { setCuenta('todas'); setLote('todos') }}>
-          <Chips etiqueta="Estado de la cuenta" valor={cuenta} onCambio={setCuenta} opciones={[
-            { valor: 'todas', etiqueta: 'Todos', contador: personas.data ? cuentas('todas') : undefined },
-            { valor: 'active', etiqueta: 'Con cuenta', contador: personas.data ? cuentas('active') : undefined },
-            { valor: 'invited', etiqueta: 'Sin activar', contador: personas.data ? cuentas('invited') : undefined },
-            { valor: 'disabled', etiqueta: 'De baja', contador: personas.data ? cuentas('disabled') : undefined },
-          ]} />
-          <Chips etiqueta="Lote" valor={lote} onCambio={setLote} opciones={[
-            { valor: 'todos', etiqueta: 'Todos los lotes' },
-            { valor: 'sinLote', etiqueta: 'Sin lote',
-              contador: personas.data ? filtrarVecinos(vecinos, { ...filtros, lote: 'sinLote' }).length : undefined },
-          ]} />
-        </HojaFiltros>
+        <Chips etiqueta="Estado de la cuenta" desplaza valor={cuenta} onCambio={setCuenta} opciones={[
+          { valor: 'todas', etiqueta: 'Todos', contador: personas.data ? cuentas('todas') : undefined },
+          { valor: 'active', etiqueta: 'Con cuenta', contador: personas.data ? cuentas('active') : undefined },
+          { valor: 'invited', etiqueta: 'Sin activar', contador: personas.data ? cuentas('invited') : undefined },
+          { valor: 'disabled', etiqueta: 'De baja', contador: personas.data ? cuentas('disabled') : undefined },
+        ]} />
 
         {personas.isPending ? (
           <SkeletonFilas filas={5} />

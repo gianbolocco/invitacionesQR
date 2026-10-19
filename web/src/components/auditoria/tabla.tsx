@@ -82,11 +82,11 @@ export function Tabla({ filas }: { filas: AuditRow[] }) {
                       <>
                         <span className="flex items-center gap-1.5 tabular">
                           {fechaHora(r.enteredAt!)}
-                          {r.enteredCount > 1 && (
+                          {(r.enteredCount > 1 || r.manual) && (
                             <button type="button" onClick={() => setAbierta(abierto ? null : r.id)}
-                              aria-expanded={abierto} aria-label={`Ver los ${r.enteredCount} ingresos de ${r.guestName}`}
+                              aria-expanded={abierto} aria-label={r.enteredCount > 1 ? `Ver los ${r.enteredCount} ingresos de ${r.guestName}` : `Ver el ingreso de ${r.guestName}`}
                               className="inline-flex min-h-7 items-center gap-0.5 rounded-sm bg-surface-sunk px-1.5 text-xs font-bold hover:bg-line">
-                              ×{r.enteredCount}
+                              {r.enteredCount > 1 ? `×${r.enteredCount}` : 'Detalle'}
                               <ChevronDown className={cn('size-3 transition-transform duration-200', abierto && 'rotate-180')} aria-hidden />
                             </button>
                           )}

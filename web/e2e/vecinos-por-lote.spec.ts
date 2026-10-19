@@ -17,16 +17,14 @@ test('el admin ve el padrón agrupado por lote y ya no existe la página de unid
   await expect(page.getByText(/no existe|No encontramos|404/i).first()).toBeVisible()
 })
 
-test('el admin filtra el padrón por cuenta sin activar y por sin lote', async ({ page, isMobile }) => {
+test('el admin filtra el padrón por cuenta sin activar y por sin lote', async ({ page }) => {
   await entrar(page, 'admin')
   await page.goto('/admin/vecinos')
-  // En el celular los filtros viven en una hoja detrás del botón "Filtros".
-  const abrir = async () => { if (isMobile) await page.getByRole('button', { name: /^Filtros/ }).click() }
-  const cerrar = async () => { if (isMobile) await page.getByRole('button', { name: /^Ver \d+ (resultado|resultados)/ }).click() }
+  // El estado de la cuenta queda a la vista; el lote vive en el panel de "Filtros".
+  const abrir = () => page.getByRole('button', { name: /^Filtros/ }).click()
+  const cerrar = () => page.getByRole('button', { name: /^Ver \d+ (resultado|resultados)/ }).click()
 
-  await abrir()
   await page.getByRole('button', { name: /^Sin activar/ }).click()
-  await cerrar()
   // La cuenta sin activar se marca con su estado; el chip del filtro dice lo mismo y no cuenta.
   const fueraDeBotones = page.locator(':not(button *)')
   await expect(page.getByText(/Sin activar/).and(fueraDeBotones).first()).toBeVisible()
@@ -37,11 +35,10 @@ test('el admin filtra el padrón por cuenta sin activar y por sin lote', async (
   await page.getByRole('button', { name: /^Sin lote/ }).click()
   await cerrar()
   await expect(page.getByText(/Lote \d+/)).toHaveCount(0)
+  // El filtro puesto queda a la vista y se saca desde ahí.
+  await page.getByRole('button', { name: 'Quitar Sin lote' }).click()
 
-  await abrir()
   // El contador va pegado a la etiqueta ("Todos12"), sin espacio en el nombre accesible.
   await page.getByRole('button', { name: /^Todos\d*$/ }).click()
-  await page.getByRole('button', { name: /^Todos los lotes/ }).click()
-  await cerrar()
   await expect(page.getByText(/\bActiva\b/).first()).toBeVisible()
 })

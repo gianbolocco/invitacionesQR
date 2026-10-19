@@ -44,6 +44,10 @@ export type Movimiento = {
   guardName: string | null
   exitGuardName: string | null
   manual: boolean
+  note: string | null
+  /** ISO. Solo en cargas manuales. */
+  loadedAt: string | null
+  loaderName: string | null
 }
 
 export type FiltrosAuditoria = {

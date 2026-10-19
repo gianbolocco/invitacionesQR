@@ -135,7 +135,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
             )}
           </Campo>
 
-          <Campo id="doc-expres" etiqueta="Documento (opcional)" ayuda="Si no lo cargás acá, se pide al registrar el ingreso.">
+          <Campo id="doc-expres" etiqueta="Documento">
             <Input id="doc-expres" onKeyDown={teclaDoc} value={guestDoc} className="tabular" placeholder="30.123.456"
               onChange={(e) => setGuestDoc(e.target.value)} />
           </Campo>

@@ -118,6 +118,8 @@ export const entryLogs = pgTable('entry_log', {
   // La hora es la que se declaró, no la del servidor: la auditoría lo marca.
   source: text('source').notNull().default('normal'),
   loadedBy: uuid('loaded_by').references(() => people.id),
+  // Cuándo se cargó a mano. La hora del movimiento es la declarada; esta es la real.
+  loadedAt: timestamp('loaded_at', { withTimezone: true }),
 }, (t) => [
   index('entry_unit_idx').on(t.unitId, t.enteredAt),
   index('entry_invitation_idx').on(t.invitationId),

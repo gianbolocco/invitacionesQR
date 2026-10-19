@@ -69,11 +69,11 @@ export function Tarjetas({ filas }: { filas: AuditRow[] }) {
                   {r.guardName ? `Ingreso: ${r.guardName}` : 'Guardia sin registrar'}
                   {r.exitedAt && ` · Salida: ${r.exitGuardName ?? 'sin registrar'}`}
                 </p>
-                {r.enteredCount > 1 && (
+                {(r.enteredCount > 1 || r.manual) && (
                   <>
                     <button type="button" onClick={() => setAbierta(abierto ? null : r.id)} aria-expanded={abierto}
                       className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-md text-sm font-semibold">
-                      {abierto ? 'Ocultar' : 'Ver'} los {r.enteredCount} ingresos
+                      {abierto ? 'Ocultar' : 'Ver'} {r.enteredCount > 1 ? `los ${r.enteredCount} ingresos` : 'el ingreso'}
                       <ChevronDown className={cn('size-4 transition-transform duration-200', abierto && 'rotate-180')} aria-hidden />
                     </button>
                     {abierto && <Movimientos id={r.id} />}

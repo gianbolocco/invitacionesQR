@@ -27,8 +27,12 @@ export async function assertMemberOfUnit(personId: string, unitId: string): Prom
   if (!row) throw new AppError(403, 'not_your_unit')
 }
 
-export async function assertUnitInNeighborhood(unitId: string, neighborhoodId: string): Promise<void> {
-  const [row] = await db.select().from(units)
+export async function assertUnitInNeighborhood(
+  unitId: string,
+  neighborhoodId: string,
+  ejecutor: Pick<typeof db, 'select'> = db,
+): Promise<void> {
+  const [row] = await ejecutor.select().from(units)
     .where(and(eq(units.id, unitId), eq(units.neighborhoodId, neighborhoodId)))
     .limit(1)
   if (!row) throw new AppError(403, 'not_your_neighborhood')
@@ -56,22 +60,28 @@ export type CreateExpressInvitationInput = {
  */
 export async function createExpressInvitation(input: CreateExpressInvitationInput) {
   await assertUnitInNeighborhood(input.unitId, input.neighborhoodId)
-  const hoy = todayInBuenosAires()
 
-  const [inv] = await db.insert(invitations).values({
+  const [inv] = await db.insert(invitations)
+    .values(valoresDePorteria(input, todayInBuenosAires()))
+    .returning()
+
+  return inv
+}
+
+/** Los valores de una invitación de portería: de un día, una vez, una persona. */
+export function valoresDePorteria(input: CreateExpressInvitationInput, dia: string) {
+  return {
     unitId: input.unitId,
     createdBy: input.createdBy,
-    kind: 'visita',
+    kind: 'visita' as const,
     guestName: input.guestName.trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
-    validFrom: hoy,
-    validTo: hoy,
+    validFrom: dia,
+    validTo: dia,
     capacity: 1,
     token: randomToken(16),
-  }).returning()
-
-  return inv
+  }
 }
 
 export async function createInvitation(input: CreateInvitationInput) {
