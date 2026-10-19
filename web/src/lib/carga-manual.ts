@@ -57,12 +57,15 @@ function rango(c: Pick<Carga, 'entrada' | 'salida'>): [number, number] {
 
 /** Si una carga nueva pisa a otra ya agregada de la misma persona. Se tocan en el borde: no se pisan. */
 export function pisaOtra(nueva: Carga, tanda: Carga[]): boolean {
-  const [a1, a2] = rango(nueva)
   return tanda.some((o) => {
     if (o.invitationId !== nueva.invitationId) return false
-    const [b1, b2] = rango(o)
-    return a1 < b2 && b1 < a2
+    return seSolapan(rango(nueva), rango(o))
   })
+}
+
+/** Dos rangos se pisan si se cruzan; tocarse en el borde no cuenta. */
+function seSolapan([a1, a2]: [number, number], [b1, b2]: [number, number]): boolean {
+  return a1 < b2 && b1 < a2
 }
 
 /** Las dos horas de una carga en una línea: "Ingresó 21:10 · Salió 22:40". */
@@ -71,4 +74,108 @@ export function resumenCarga(c: Pick<Carga, 'entrada' | 'salida'>, hoy: string):
   return c.salida
     ? `Ingresó ${texto(c.entrada)} · Salió ${texto(c.salida)}`
     : `Ingresó ${texto(c.entrada)} · Sigue adentro`
+}
+
+// ---- La planilla: filas que se tipean con el teclado ----
+
+export type FilaPlanilla = {
+  clave: string
+  /** 'HH:MM' o lo que se tipeó. */
+  ingreso: string
+  persona:
+    | { invitationId: string; nombre: string; lote: string; dniInvitacion: string | null }
+    | { nombre: string; unitId: string; lote: string }
+    | null
+  dni: string
+  /** '' = sigue adentro. */
+  salida: string
+  nota: string
+}
+export type Planilla = { fecha: string; filas: FilaPlanilla[] }
+
+/** Lo que manda la API de carga manual (ver api/src/services/entries.ts). */
+export type ItemManual = {
+  invitationId?: string
+  guest?: { name: string; unitId: string }
+  guestDoc: string
+  enteredAt: string
+  exitedAt: string | null
+  note?: string
+}
+
+/** '2140' → '21:40', '9' → '09:00', '21:4' → '21:04'; lo que no es una hora → ''. */
+export function normalizarHora(texto: string): string {
+  const t = texto.trim()
+  let h: string, mi: string
+  let m = /^(\d{1,2})(?::(\d{1,2}))?$/.exec(t)
+  if (m) [, h, mi = '0'] = m
+  else if ((m = /^(\d{1,2})(\d{2})$/.exec(t))) [, h, mi] = m
+  else return ''
+  if (Number(h) > 23 || Number(mi) > 59) return ''
+  return `${h.padStart(2, '0')}:${mi.padStart(2, '0')}`
+}
+
+/** El día siguiente de una fecha 'YYYY-MM-DD' (aritmética de calendario, sin zona). */
+function diaSiguiente(fecha: string): string {
+  const d = new Date(`${fecha}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Una salida más temprana que el ingreso es de la madrugada del día siguiente. */
+export function momentosDe(fecha: string, f: FilaPlanilla): { entrada: Momento; salida: Momento | null; masUnDia: boolean } {
+  const entrada = { fecha, hora: normalizarHora(f.ingreso) }
+  if (!f.salida.trim()) return { entrada, salida: null, masUnDia: false }
+  const hora = normalizarHora(f.salida)
+  const masUnDia = !!hora && !!entrada.hora && hora < entrada.hora
+  return { entrada, salida: { fecha: masUnDia ? diaSiguiente(fecha) : fecha, hora }, masUnDia }
+}
+
+/** Qué corregir en una fila, o null si está bien. `todas` incluye a la propia fila. */
+export function errorDeFila(fecha: string, f: FilaPlanilla, todas: FilaPlanilla[], ahora: Date = new Date()): string | null {
+  if (!f.persona) return 'Elegí a la persona.'
+  if (!f.dni.trim()) return 'Falta el DNI: en la puerta siempre se pide.'
+  const { entrada, salida } = momentosDe(fecha, f)
+  const error = validarCarga({ entrada, salida }, ahora)
+  if (error) return error
+  if ('invitationId' in f.persona) {
+    const id = f.persona.invitationId
+    const mia = rango({ entrada, salida })
+    const pisa = todas.some((o) => {
+      if (o.clave === f.clave || !o.persona || !('invitationId' in o.persona) || o.persona.invitationId !== id) return false
+      const m = momentosDe(fecha, o)
+      return m.entrada.hora !== '' && seSolapan(mia, rango(m))
+    })
+    if (pisa) return 'Esa persona ya tiene otro movimiento que se pisa con este.'
+  }
+  return null
+}
+
+/** Las filas completas como las pide `cargarManual`; las sin persona no viajan. */
+export function aItems(p: Planilla): ItemManual[] {
+  return p.filas.flatMap((f) => {
+    if (!f.persona) return []
+    const { entrada, salida } = momentosDe(p.fecha, f)
+    const item: ItemManual = {
+      ...('invitationId' in f.persona
+        ? { invitationId: f.persona.invitationId }
+        : { guest: { name: f.persona.nombre, unitId: f.persona.unitId } }),
+      guestDoc: f.dni.trim(),
+      enteredAt: aInstante(entrada),
+      exitedAt: salida ? aInstante(salida) : null,
+    }
+    if (f.nota.trim()) item.note = f.nota.trim()
+    return [item]
+  })
+}
+
+/** El borrador guardado en el navegador; roto o con otra forma → null. */
+export function leerBorrador(texto: string | null): Planilla | null {
+  if (!texto) return null
+  try {
+    const p = JSON.parse(texto)
+    return typeof p?.fecha === 'string' && Array.isArray(p.filas) ? p : null
+  } catch {
+    return null
+  }
 }
