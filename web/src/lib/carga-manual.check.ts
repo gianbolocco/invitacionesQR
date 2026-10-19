@@ -1,8 +1,8 @@
 /** `node src/lib/carga-manual.check.ts`. */
 import assert from 'node:assert/strict'
 import {
-  aInstante, aItems, errorDeFila, leerBorrador, momentosDe, normalizarHora, pisaOtra, resumenCarga, validarCarga,
-  type Carga, type FilaPlanilla,
+  aInstante, aItems, errorDeFila, filaVacia, leerBorrador, momentosDe, normalizarHora, validarCarga,
+  type FilaPlanilla,
 } from './carga-manual.ts'
 
 // Buenos Aires es UTC-3: las 21:10 de allá son las 00:10 UTC del día siguiente.
@@ -22,20 +22,6 @@ assert.match(validarCarga({ entrada: m('2026-10-16', '09:00'), salida: m('2026-1
 assert.match(validarCarga({ entrada: m('2026-10-16', '09:00'), salida: m('2026-10-16', '12:30') }, AHORA)!, /salida todavía/)
 assert.match(validarCarga({ entrada: m('2026-10-16', '09:00'), salida: m('2026-10-16', '') }, AHORA)!, /salida/)
 
-const c = (clave: string, id: string, e: string, s: string | null): Carga => ({
-  clave, invitationId: id, guestName: id, unitLabel: 'Lote 1',
-  entrada: m('2026-10-16', e), salida: s ? m('2026-10-16', s) : null, nota: '',
-})
-const tanda = [c('1', 'a', '08:00', '09:00')]
-assert.equal(pisaOtra(c('2', 'a', '08:30', '09:30'), tanda), true)
-assert.equal(pisaOtra(c('2', 'a', '09:00', '10:00'), tanda), false) // se tocan en el borde
-assert.equal(pisaOtra(c('2', 'b', '08:30', '09:30'), tanda), false) // otra persona
-assert.equal(pisaOtra(c('2', 'a', '08:30', null), tanda), true) // abierta desde adentro del rango
-assert.equal(pisaOtra(c('2', 'a', '07:00', '07:30'), [c('1', 'a', '08:00', null)]), false) // antes de una abierta
-
-assert.equal(resumenCarga(c('1', 'a', '21:10', '22:40'), '2026-10-16'), 'Ingresó 21:10 · Salió 22:40')
-assert.equal(resumenCarga(c('1', 'a', '21:10', null), '2026-10-17'), 'Ingresó 16/10 21:10 · Sigue adentro')
-
 // La planilla: hora tipeada, fila → momentos, errores, items para la API, borrador.
 assert.equal(normalizarHora('2140'), '21:40')
 assert.equal(normalizarHora('9'), '09:00')
@@ -49,6 +35,7 @@ assert.equal(mo.masUnDia, true)
 assert.equal(mo.salida!.fecha, '2026-10-16')
 assert.match(errorDeFila('2026-10-15', f({ dni: '' }), [], AHORA)!, /DNI/)
 assert.match(errorDeFila('2026-10-15', f({ persona: null }), [], AHORA)!, /persona/)
+assert.match(errorDeFila('2026-10-15', f({ persona: { nombre: 'Juan', unitId: '', lote: '' } }), [], AHORA)!, /lote/)
 assert.equal(errorDeFila('2026-10-15', f({}), [], AHORA), null)
 assert.deepEqual(aItems({ fecha: '2026-10-15', filas: [f({ nota: 'corte' })] }, AHORA)[0], {
   guest: { name: 'Juan', unitId: 'u' }, guestDoc: '30123456',
@@ -68,6 +55,7 @@ assert.equal(aItems({ fecha: '2026-10-16', filas: [inv('a', '08:00', '')] }, AHO
 
 // aItems no calla errores; la fila en blanco se saltea.
 const vacia = f({ ingreso: '', persona: null, dni: '', salida: '', nota: '' })
+assert.equal(filaVacia(vacia), true)
 assert.equal(aItems({ fecha: '2026-10-15', filas: [f({}), vacia] }, AHORA).length, 1)
 assert.throws(() => aItems({ fecha: '2026-10-15', filas: [f({ persona: null })] }, AHORA), /fila 1/)
 assert.throws(() => aItems({ fecha: '2026-10-15', filas: [vacia, f({ dni: '' })] }, AHORA), /fila 2/)

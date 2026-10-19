@@ -1,7 +1,8 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 export class ApiError extends Error {
-  constructor(public status: number, public code: string) { super(code) }
+  /** `fila`: el índice del ítem que rechazó la carga manual. */
+  constructor(public status: number, public code: string, public fila?: number) { super(code) }
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -24,7 +25,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = '/'
     }
-    throw new ApiError(res.status, body.error ?? 'unknown')
+    throw new ApiError(res.status, body.error ?? 'unknown', typeof body.fila === 'number' ? body.fila : undefined)
   }
   return res.status === 204 ? (undefined as T) : res.json()
 }

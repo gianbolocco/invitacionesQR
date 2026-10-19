@@ -11,17 +11,8 @@ export const VENTANA_HORAS = 48
 
 export type Momento = { fecha: string; hora: string }
 
-export type Carga = {
-  /** Para quitarla de la tanda: la misma persona puede tener dos cargas. */
-  clave: string
-  invitationId: string
-  guestName: string
-  unitLabel: string
-  entrada: Momento
-  /** null = todavía está adentro. */
-  salida: Momento | null
-  nota: string
-}
+/** Los dos momentos de un movimiento. Salida null = todavía está adentro. */
+type Movimiento = { entrada: Momento; salida: Momento | null }
 
 /** 'YYYY-MM-DD' + 'HH:MM' de Buenos Aires → instante ISO con offset, como lo pide la API. */
 export function aInstante(m: Momento): string {
@@ -32,7 +23,7 @@ const completo = (m: Momento) => /^\d{4}-\d{2}-\d{2}$/.test(m.fecha) && /^\d{2}:
 
 /** Qué corregir en una carga, o null si está bien. Los textos son los que ve el guardia. */
 export function validarCarga(
-  c: Pick<Carga, 'entrada' | 'salida'>,
+  c: Movimiento,
   ahora: Date = new Date(),
 ): string | null {
   if (!completo(c.entrada)) return 'Completá la fecha y la hora de ingreso.'
@@ -51,29 +42,13 @@ export function validarCarga(
 }
 
 /** El rango que ocupa una carga. Abierta (sin salida) ocupa hasta el infinito. */
-function rango(c: Pick<Carga, 'entrada' | 'salida'>): [number, number] {
+function rango(c: Movimiento): [number, number] {
   return [Date.parse(aInstante(c.entrada)), c.salida ? Date.parse(aInstante(c.salida)) : Infinity]
-}
-
-/** Si una carga nueva pisa a otra ya agregada de la misma persona. Se tocan en el borde: no se pisan. */
-export function pisaOtra(nueva: Carga, tanda: Carga[]): boolean {
-  return tanda.some((o) => {
-    if (o.invitationId !== nueva.invitationId) return false
-    return seSolapan(rango(nueva), rango(o))
-  })
 }
 
 /** Dos rangos se pisan si se cruzan; tocarse en el borde no cuenta. */
 function seSolapan([a1, a2]: [number, number], [b1, b2]: [number, number]): boolean {
   return a1 < b2 && b1 < a2
-}
-
-/** Las dos horas de una carga en una línea: "Ingresó 21:10 · Salió 22:40". */
-export function resumenCarga(c: Pick<Carga, 'entrada' | 'salida'>, hoy: string): string {
-  const texto = (m: Momento) => (m.fecha === hoy ? m.hora : `${m.fecha.slice(8)}/${m.fecha.slice(5, 7)} ${m.hora}`)
-  return c.salida
-    ? `Ingresó ${texto(c.entrada)} · Salió ${texto(c.salida)}`
-    : `Ingresó ${texto(c.entrada)} · Sigue adentro`
 }
 
 // ---- La planilla: filas que se tipean con el teclado ----
@@ -134,6 +109,7 @@ export function momentosDe(fecha: string, f: FilaPlanilla): { entrada: Momento; 
 /** Qué corregir en una fila, o null si está bien. `todas` incluye a la propia fila. */
 export function errorDeFila(fecha: string, f: FilaPlanilla, todas: FilaPlanilla[], ahora: Date = new Date()): string | null {
   if (!f.persona) return 'Elegí a la persona.'
+  if (!('invitationId' in f.persona) && !f.persona.unitId) return 'Elegí el lote al que va.'
   if (!f.dni.trim()) return 'Falta el DNI: en la puerta siempre se pide.'
   const { entrada, salida } = momentosDe(fecha, f)
   const error = validarCarga({ entrada, salida }, ahora)
@@ -151,7 +127,8 @@ export function errorDeFila(fecha: string, f: FilaPlanilla, todas: FilaPlanilla[
   return null
 }
 
-const filaVacia = (f: FilaPlanilla) =>
+/** Una fila sin nada tipeado: no cuenta ni como error ni como movimiento. */
+export const filaVacia = (f: FilaPlanilla) =>
   !f.persona && !f.ingreso.trim() && !f.dni.trim() && !f.salida.trim() && !f.nota.trim()
 
 /**
