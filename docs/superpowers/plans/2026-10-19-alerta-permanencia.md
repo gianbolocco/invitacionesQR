@@ -197,8 +197,14 @@ export function primeroExcedidas<T extends { id: string }>(filas: T[], ids: Set<
   "Se pasó {exceso}" en `text-espera font-semibold`, que reemplaza el "hace
   cuánto". El dato no puede ir solo en el color: va también el ícono y el
   texto.
-- [ ] **Paso 3:** lint + tsc, y captura a 1280 px y a 390 px en claro y oscuro.
-  Commit: `feat: los que se pasaron de su tiempo van primero en adentro`.
+- [ ] **Paso 3: chip de estado.** `FiltroEstado` suma `'excedidos'` (en
+  `lib/tablero.ts`). En `agenda-dia`, si `esHoy` y hay excedidos, se agrega el
+  chip "Pasaron su tiempo" con el contador, y `visibles` filtra `columnas.adentro`
+  por el `Set` de ids. Con 0 excedidos, `estado === 'excedidos'` se trata
+  como `'todos'` (se calcula en el render, sin efecto). En el check de
+  `tablero` va un caso nuevo si la lógica sale de `agenda-dia`.
+- [ ] **Paso 4:** lint + tsc, y captura a 1280 px y a 390 px en claro y oscuro.
+  Commit: `feat: los que se pasaron de su tiempo van primero en adentro y tienen su filtro`.
 
 ### Tarea 7: e2e y documentación
 

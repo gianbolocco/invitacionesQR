@@ -59,6 +59,10 @@ una alerta que no se calla termina ignorada.
    - **Columna "Adentro" del tablero y vista lista:** los excedidos van primero,
      con borde y fondo `espera` y el pie "Se pasó 1 h 20". Las vistas compacta y
      por unidad no cambian, porque el aviso del header ya cubre esos casos.
+   - **Chip "Pasaron su tiempo (N)"** en los chips de estado de la agenda
+     (lista, compacta y por unidad), solo mirando hoy y solo si N > 0. Es la
+     vista completa de los excedidos, con DNI, quién invita y agrupación; el
+     panel es el atajo. Si N llega a 0 con el chip elegido, se vuelve a "Todos".
    - **Sonido:** dos pitidos cortos (Web Audio, sin archivo) cada vez que aparece
      una alerta sin ver que antes no estaba. No se repite. En el panel hay un
      interruptor para silenciarlo, que se guarda por dispositivo
