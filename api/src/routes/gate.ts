@@ -161,7 +161,7 @@ const KIND_EXCEL: Record<string, string> = {
 }
 
 const guardia = (nombre: string | null, manual: boolean) =>
-  manual ? `Carga manual · ${nombre ?? ''}` : nombre ?? ''
+  nombre && manual ? `Carga manual · ${nombre}` : nombre ?? ''
 
 const dd = (iso: string) => iso.split('-').reverse().join('/')
 
@@ -286,7 +286,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           dni: e.guestDoc ?? '',
           patente: e.plate ?? '',
           unidad: e.unitLabel,
-          origen: e.manual ? 'Carga manual' : 'Garita',
+          origen: e.manual ? 'Carga manual' : 'Escaneo',
           cargado: e.loadedAt ? fechaExcel(e.loadedAt) : '',
           nota: e.note ?? '',
         })),

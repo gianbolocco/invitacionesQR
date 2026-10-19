@@ -7,6 +7,7 @@ import { db } from '../src/db/index.js'
 import { neighborhoods, units, people, unitMembers, invitations, entryLogs, auditLogs } from '../src/db/schema.js'
 import { hashPassword, randomToken } from '../src/lib/crypto.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
+import { registerEntry } from '../src/services/entries.js'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
 
@@ -273,6 +274,31 @@ describe('carga manual de movimientos', () => {
     expect(celda('Ingresos', 'Nota')).toBe('corte de luz')
     expect(celda('Ingresos', 'Guardia ingreso')).toBe('Carga manual · Rulo')
     expect(celda('Invitaciones', 'Carga manual')).toBe('Sí')
+    // Sin salida cargada no hay guardia de salida: no queda el prefijo colgando.
+    expect(celda('Ingresos', 'Guardia salida')).toBe('')
+  })
+
+  it('el excel marca como escaneo lo que no es carga manual', async () => {
+    const ctx = await base()
+    const i = await inv(ctx)
+    await registerEntry(i.id, ctx.quien.id, { guestName: 'Visita' })
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const celda = (hoja: string, titulo: string) => {
+      const ws = wb.getWorksheet(hoja)!
+      const col = (ws.getRow(1).values as unknown[]).map(String).indexOf(titulo)
+      expect(col, `${hoja}/${titulo}`).toBeGreaterThan(0)
+      return ws.getRow(2).getCell(col).value
+    }
+    expect(celda('Ingresos', 'Origen')).toBe('Escaneo')
+    expect(celda('Ingresos', 'Guardia ingreso')).toBe('Rulo')
+    expect(celda('Invitaciones', 'Carga manual')).toBe('No')
   })
 
   it('una tanda vacía se rechaza', async () => {
