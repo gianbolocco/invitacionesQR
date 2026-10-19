@@ -151,10 +151,20 @@ export function errorDeFila(fecha: string, f: FilaPlanilla, todas: FilaPlanilla[
   return null
 }
 
-/** Las filas completas como las pide `cargarManual`; las sin persona no viajan. */
-export function aItems(p: Planilla): ItemManual[] {
-  return p.filas.flatMap((f) => {
-    if (!f.persona) return []
+const filaVacia = (f: FilaPlanilla) =>
+  !f.persona && !f.ingreso.trim() && !f.dni.trim() && !f.salida.trim() && !f.nota.trim()
+
+/**
+ * Las filas como las pide `cargarManual`. Precondición: todas las filas están
+ * bien (`errorDeFila` null); si alguna no, tira un Error en vez de callarla.
+ * Las filas totalmente en blanco se saltean: una fila vacía al final es normal.
+ */
+export function aItems(p: Planilla, ahora: Date = new Date()): ItemManual[] {
+  return p.filas.flatMap((f, i) => {
+    if (filaVacia(f)) return []
+    if (!f.persona || errorDeFila(p.fecha, f, p.filas, ahora) !== null) {
+      throw new Error(`La fila ${i + 1} todavía tiene errores`)
+    }
     const { entrada, salida } = momentosDe(p.fecha, f)
     const item: ItemManual = {
       ...('invitationId' in f.persona
@@ -169,12 +179,38 @@ export function aItems(p: Planilla): ItemManual[] {
   })
 }
 
-/** El borrador guardado en el navegador; roto o con otra forma → null. */
+const esTexto = (v: unknown): v is string => typeof v === 'string'
+const todosTexto = (o: Record<string, unknown>, ...claves: string[]) => claves.every((k) => esTexto(o[k]))
+
+/** Una fila del borrador con la forma justa, o null si no se puede rescatar. */
+function filaValida(v: unknown): FilaPlanilla | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  if (!esTexto(o.clave)) return null
+  const p = o.persona
+  let persona: FilaPlanilla['persona'] = null
+  if (p != null) {
+    if (typeof p !== 'object') return null
+    const q = p as Record<string, unknown>
+    if ('invitationId' in q) {
+      if (!todosTexto(q, 'invitationId', 'nombre', 'lote') || !(q.dniInvitacion === null || esTexto(q.dniInvitacion))) return null
+      persona = q as FilaPlanilla['persona']
+    } else {
+      if (!todosTexto(q, 'nombre', 'unitId', 'lote')) return null
+      persona = q as FilaPlanilla['persona']
+    }
+  }
+  const t = (k: string) => (esTexto(o[k]) ? (o[k] as string) : '')
+  return { clave: o.clave, ingreso: t('ingreso'), persona, dni: t('dni'), salida: t('salida'), nota: t('nota') }
+}
+
+/** El borrador guardado en el navegador; JSON roto o sin forma de planilla → null, y las filas que no encajan se descartan. */
 export function leerBorrador(texto: string | null): Planilla | null {
   if (!texto) return null
   try {
     const p = JSON.parse(texto)
-    return typeof p?.fecha === 'string' && Array.isArray(p.filas) ? p : null
+    if (typeof p?.fecha !== 'string' || !Array.isArray(p.filas)) return null
+    return { fecha: p.fecha, filas: p.filas.flatMap((f: unknown) => filaValida(f) ?? []) }
   } catch {
     return null
   }

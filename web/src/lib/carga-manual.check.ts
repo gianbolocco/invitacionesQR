@@ -50,7 +50,7 @@ assert.equal(mo.salida!.fecha, '2026-10-16')
 assert.match(errorDeFila('2026-10-15', f({ dni: '' }), [], AHORA)!, /DNI/)
 assert.match(errorDeFila('2026-10-15', f({ persona: null }), [], AHORA)!, /persona/)
 assert.equal(errorDeFila('2026-10-15', f({}), [], AHORA), null)
-assert.deepEqual(aItems({ fecha: '2026-10-15', filas: [f({ nota: 'corte' })] })[0], {
+assert.deepEqual(aItems({ fecha: '2026-10-15', filas: [f({ nota: 'corte' })] }, AHORA)[0], {
   guest: { name: 'Juan', unitId: 'u' }, guestDoc: '30123456',
   enteredAt: '2026-10-15T23:30:00-03:00', exitedAt: '2026-10-16T00:40:00-03:00', note: 'corte',
 })
@@ -63,7 +63,29 @@ const inv = (clave: string, ingreso: string, salida: string): FilaPlanilla =>
 assert.match(errorDeFila('2026-10-16', inv('b', '08:30', '09:30'), [inv('a', '08:00', '09:00'), inv('b', '08:30', '09:30')], AHORA)!, /pisa/)
 assert.equal(errorDeFila('2026-10-16', inv('b', '09:00', '10:00'), [inv('a', '08:00', '09:00'), inv('b', '09:00', '10:00')], AHORA), null)
 assert.equal(errorDeFila('2026-10-16', f({ clave: 'b', ingreso: '08:30', salida: '09:30' }), [f({ clave: 'a', ingreso: '08:00', salida: '09:00' })], AHORA), null)
-assert.equal(aItems({ fecha: '2026-10-16', filas: [inv('a', '08:00', '')] })[0].exitedAt, null)
-assert.equal(aItems({ fecha: '2026-10-16', filas: [inv('a', '08:00', '')] })[0].invitationId, 'i1')
+assert.equal(aItems({ fecha: '2026-10-16', filas: [inv('a', '08:00', '')] }, AHORA)[0].exitedAt, null)
+assert.equal(aItems({ fecha: '2026-10-16', filas: [inv('a', '08:00', '')] }, AHORA)[0].invitationId, 'i1')
+
+// aItems no calla errores; la fila en blanco se saltea.
+const vacia = f({ ingreso: '', persona: null, dni: '', salida: '', nota: '' })
+assert.equal(aItems({ fecha: '2026-10-15', filas: [f({}), vacia] }, AHORA).length, 1)
+assert.throws(() => aItems({ fecha: '2026-10-15', filas: [f({ persona: null })] }, AHORA), /fila 1/)
+assert.throws(() => aItems({ fecha: '2026-10-15', filas: [vacia, f({ dni: '' })] }, AHORA), /fila 2/)
+
+// leerBorrador descarta lo que no encaja y completa lo que falta.
+const crudo = (filas: unknown[]) => JSON.stringify({ fecha: '2026-10-15', filas })
+assert.equal(leerBorrador(crudo([null, f({})]))?.filas.length, 1)
+const sinSalida: Partial<FilaPlanilla> = f({})
+delete sinSalida.salida
+assert.equal(leerBorrador(crudo([sinSalida]))?.filas[0].salida, '')
+assert.equal(leerBorrador(crudo([f({ persona: { nombre: 'J', unitId: 5, lote: 'L' } as never })]))?.filas.length, 0)
+assert.equal(leerBorrador(JSON.stringify({ filas: [] })), null)
+assert.equal(leerBorrador(JSON.stringify({ fecha: 'x', filas: {} })), null)
+
+// Bordes de hora.
+assert.equal(normalizarHora(''), '')
+assert.equal(normalizarHora('123'), '01:23')
+assert.equal(momentosDe('2026-10-15', f({ ingreso: '10:00', salida: '10:00' })).masUnDia, false)
+assert.match(errorDeFila('2026-10-15', f({ salida: 'abc' }), [], AHORA)!, /Completá.*salida/)
 
 console.log('carga-manual: ok')
