@@ -97,7 +97,7 @@ entry_log.overstay_seen_by             uuid null → person
   alerta, y `alertaVista: boolean`, que es true si todos los ingresos abiertos
   están vistos.
 - `POST /gate/invitations/:id/alerta-vista`: marca como vistos los ingresos
-  abiertos de esa invitación. Devuelve 404 si la invitación es de otro barrio o
+  abiertos de esa invitación. Devuelve 403 si la invitación es de otro barrio, 404 si
   no existe, y 409 `no_esta_adentro` si no hay ninguno abierto.
 
 ## Fuera de alcance

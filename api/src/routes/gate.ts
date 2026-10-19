@@ -5,7 +5,7 @@ import { validarUuid } from '../middleware/uuidParam.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
   checkByToken, checkById, registerEntry, registerExit, undoMovement, searchGuests, agendaForDay,
-  insideNow, auditInvitations, auditAll, registerManual, MAX_CARGA_MANUAL,
+  insideNow, marcarAlertaVista, auditInvitations, auditAll, registerManual, MAX_CARGA_MANUAL,
 } from '../services/entries.js'
 import { searchUnits, listUnits } from '../services/units.js'
 import { createExpressInvitation, revokeByGuard } from '../services/invitations.js'
@@ -58,6 +58,12 @@ gateRoutes.post('/invitations', async (req, res) => {
 gateRoutes.post('/invitations/:id/revoke', async (req, res) => {
   const { reason } = z.object({ reason: z.string().max(200).optional() }).parse(req.body)
   await revokeByGuard(req.params.id, req.person!.id, req.person!.neighborhoodId, reason)
+  res.json({ ok: true })
+})
+
+/** "Ya lo vi" de la alerta de permanencia: se calla en todas las garitas. */
+gateRoutes.post('/invitations/:id/alerta-vista', async (req, res) => {
+  await marcarAlertaVista(req.params.id, req.person!.id, req.person!.neighborhoodId)
   res.json({ ok: true })
 })
 

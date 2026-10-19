@@ -289,6 +289,25 @@ async function cargarUna(
  * lo que hace que dos egresos simultáneos no escriban los dos. El que pierde
  * actualiza cero filas y se va con 409.
  */
+/**
+ * El "Ya lo vi" de la alerta de permanencia: marca los ingresos abiertos de la
+ * invitación. Un reingreso es una fila nueva, así que vuelve a alertar.
+ */
+export async function marcarAlertaVista(invitationId: string, guardId: string, neighborhoodId: string) {
+  const [inv] = await db.select({ unitId: invitations.unitId }).from(invitations)
+    .where(eq(invitations.id, invitationId)).limit(1)
+  if (!inv) throw new AppError(404, 'not_found')
+  await assertUnitInNeighborhood(inv.unitId, neighborhoodId)
+
+  const marcadas = await db.update(entryLogs)
+    .set({ overstaySeenAt: new Date(), overstaySeenBy: guardId })
+    .where(and(eq(entryLogs.invitationId, invitationId), isNull(entryLogs.exitedAt)))
+    .returning({ id: entryLogs.id })
+  if (!marcadas.length) throw new AppError(409, 'no_esta_adentro')
+
+  await audit(guardId, neighborhoodId, 'entry.overstay_seen', 'invitation', invitationId)
+}
+
 export async function registerExit(invitationId: string, guardId: string | null) {
   const abierta = await openEntry(invitationId)
   if (!abierta) throw new AppError(409, 'no_esta_adentro')
@@ -438,6 +457,10 @@ export type AgendaRow = {
    * si entró anteayer y nadie registró su salida, sigue adentro hoy.
    */
   adentro: boolean
+  /** Solo en `insideNow`: cuándo vence su tiempo adentro; null = su tipo no alerta. */
+  alertaDesde?: Date | null
+  /** Solo en `insideNow`: un guardia ya marcó "Ya lo vi" en todos sus ingresos abiertos. */
+  alertaVista?: boolean
 }
 
 /**
@@ -522,13 +545,23 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       abiertas.desde                                    as "lastEntryAt",
       (select max(e.exited_at) from entry_log e
         where ${hoy} and e.invitation_id = i.id)       as "lastExitAt",
-      true                                              as "adentro"
+      true                                              as "adentro",
+      -- Un umbral NULL da NULL solo, y 'frecuente' cae fuera del case: no alerta.
+      case i.kind
+        when 'visita'    then abiertas.primero + make_interval(hours => n.overstay_hours_visita)
+        when 'proveedor' then abiertas.primero + make_interval(hours => n.overstay_hours_proveedor)
+      end                                               as "alertaDesde",
+      abiertas.vista                                    as "alertaVista"
     from (
-      select invitation_id, max(entered_at) as desde
+      -- El reloj de la alerta corre desde el ingreso abierto más viejo: con
+      -- cupo 3 puede haber tres adentro, y el que lleva más es el que importa.
+      select invitation_id, max(entered_at) as desde, min(entered_at) as primero,
+             bool_and(overstay_seen_at is not null) as vista
       from entry_log where exited_at is null group by invitation_id
     ) abiertas
     join invitation i on i.id = abiertas.invitation_id
     join unit u on u.id = i.unit_id
+    join neighborhood n on n.id = u.neighborhood_id
     join person p on p.id = i.created_by
     where u.neighborhood_id = ${neighborhoodId}
     order by abiertas.desde desc
