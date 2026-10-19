@@ -28,9 +28,9 @@ choca con `canEnter()` y el cupo. Ese modo queda fuera de alcance.
 Arriba va la **fecha de la planilla**, elegida una sola vez (por defecto, hoy).
 Debajo, una tabla con estas columnas fijas, igual que el papel:
 
-| Ingreso | Persona | Lote | Salida | Nota | |
-|---|---|---|---|---|---|
-| `21:40` | buscador | automático o elegido | `23:10` o vacío | texto | quitar |
+| Ingreso | Persona | DNI | Lote | Salida | Nota | |
+|---|---|---|---|---|---|---|
+| `21:40` | buscador | obligatorio | automático o elegido | `23:10` o vacío | texto | quitar |
 
 - **Teclado primero:** Tab avanza de celda y Enter en la última celda agrega
   una fila nueva y pone el foco en su "Ingreso". La hora se escribe (`2140` →
@@ -42,8 +42,12 @@ Debajo, una tabla con estas columnas fijas, igual que el papel:
   una invitación completa el lote y lo bloquea.
 - **Sin invitación:** si nadie coincide, la opción "Cargar «Juan Pérez» sin
   invitación" deja el nombre escrito y habilita el selector de lote
-  (`/gate/units`). La fila muestra el tag "Sin invitación" y un campo de DNI
-  opcional al expandirla, porque el papel puede no tenerlo.
+  (`/gate/units`). La fila muestra el tag "Sin invitación".
+- **DNI obligatorio en toda fila,** con la misma regla de la puerta: cada fila
+  es un paso por la puerta anotado en papel. Si la invitación ya tiene DNI, se
+  completa solo y se puede corregir. Si no lo tiene, o si es una persona sin
+  invitación, la fila no se puede guardar hasta cargarlo. El DNI solo es
+  opcional al crear el alta exprés, no al pasar por la puerta.
 - **Errores por fila:** se validan al salir de cada fila con la misma lógica
   pura de hoy (`validarCarga`, `pisaOtra`). La fila con error se marca y dice
   qué corregir; "Guardar" queda deshabilitado mientras haya alguna con error.
@@ -59,9 +63,14 @@ En el celular, cada fila se apila como una tarjeta con los mismos campos.
 
 Cada ítem trae **una de dos formas**:
 
-- `{ invitationId, enteredAt, exitedAt?, note? }`, como hoy.
-- `{ guest: { name, unitId, doc? }, enteredAt, exitedAt?, note? }` para una
+- `{ invitationId, guestDoc, enteredAt, exitedAt?, note? }`, como hoy más el
+  DNI.
+- `{ guest: { name, unitId }, guestDoc, enteredAt, exitedAt?, note? }` para una
   persona sin invitación.
+
+`guestDoc` es obligatorio en las dos formas (`trim().min(1)`), igual que en
+`POST /gate/entries`. Se guarda en el movimiento y, si la invitación no tenía
+DNI, se le completa, como hace `registerEntry`.
 
 Para un ítem con `guest`, dentro de la misma transacción de `registerManual`:
 
@@ -107,7 +116,8 @@ Lo usa solo `registerManual`.
 
 - **`api`:** tests de `registerManual` con filas sin invitación (crea la
   invitación con la vigencia del día del ingreso y `createdBy` del guardia,
-  rechaza una unidad de otro barrio, y si falla otra fila no queda ni la
+  rechaza una unidad de otro barrio, rechaza un ítem sin DNI, completa el DNI
+  de una invitación que no lo tenía, y si falla otra fila no queda ni la
   invitación ni el movimiento). También que el error traiga `fila`,
   `loaded_at` en las manuales y `null` en las escaneadas, y las columnas nuevas
   del Excel.
