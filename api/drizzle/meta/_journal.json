@@ -99,6 +99,13 @@
       "when": 1792449820622,
       "tag": "0013_alerta_permanencia",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792453683696,
+      "tag": "0014_frecuente_como",
+      "breakpoints": true
     }
   ]
 }

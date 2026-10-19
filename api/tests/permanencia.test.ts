@@ -29,8 +29,8 @@ async function escenario(umbrales: { visita?: number | null; proveedor?: number 
   const cookie = login.headers['set-cookie'] as unknown as string[]
 
   const hoy = todayInBuenosAires()
-  const inv = async (kind: 'visita' | 'frecuente' | 'proveedor', capacity = 1) => (await db.insert(invitations).values({
-    unitId: u.id, createdBy: guardia.id, kind, guestName: `Juan ${kind}`,
+  const inv = async (kind: 'visita' | 'frecuente' | 'proveedor', capacity = 1, frequentAs?: 'visita' | 'proveedor') => (await db.insert(invitations).values({
+    unitId: u.id, createdBy: guardia.id, kind, frequentAs, guestName: `Juan ${kind}`,
     validFrom: hoy, validTo: hoy, capacity, token: randomToken(16),
   }).returning())[0]
   const entro = (invitationId: string, enteredAt: Date) =>
@@ -66,13 +66,31 @@ describe('alerta de permanencia', () => {
     expect(new Date(fila.alertaDesde!).getTime()).toBe(desde.getTime() + 5 * HORA)
   })
 
-  it('sin umbral o frecuente, alertaDesde es null', async () => {
+  it('sin umbral para su tipo, alertaDesde es null', async () => {
     const { inv, entro, adentro } = await escenario({ visita: 2 })
     await entro((await inv('proveedor')).id, haceH(5))
-    await entro((await inv('frecuente')).id, haceH(5))
+    await entro((await inv('frecuente', 999, 'proveedor')).id, haceH(5))
     const filas = await adentro()
     expect(filas).toHaveLength(2)
     expect(filas.every((f) => f.alertaDesde === null)).toBe(true)
+  })
+
+  it('una frecuente usa el umbral de lo que es; sin subtipo, el de visita', async () => {
+    const { inv, entro, adentro } = await escenario({ visita: 2, proveedor: 5 })
+    const prov = await inv('frecuente', 999, 'proveedor')
+    const sinSubtipo = await inv('frecuente', 999)
+    const desde = haceH(1)
+    await entro(prov.id, desde)
+    await entro(sinSubtipo.id, desde)
+    const filas = await adentro()
+    const de = (id: string) => new Date(filas.find((f) => f.id === id)!.alertaDesde!).getTime()
+    expect(de(prov.id)).toBe(desde.getTime() + 5 * HORA)
+    expect(de(sinSubtipo.id)).toBe(desde.getTime() + 2 * HORA)
+  })
+
+  it('la base rechaza un subtipo en una invitación que no es frecuente', async () => {
+    const { inv } = await escenario()
+    await expect(inv('visita', 1, 'proveedor')).rejects.toThrow()
   })
 
   it('ya lo vi marca los ingresos abiertos y queda en la auditoría', async () => {

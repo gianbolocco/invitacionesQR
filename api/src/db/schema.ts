@@ -80,6 +80,10 @@ export const invitations = pgTable('invitation', {
   unitId: uuid('unit_id').notNull().references(() => units.id),
   createdBy: uuid('created_by').notNull().references(() => people.id),
   kind: text('kind').notNull(),
+  // Solo en las frecuentes: si viene de visita (la empleada, el profesor) o
+  // como proveedor (el jardinero, el pintor de toda la semana). Decide el
+  // umbral de la alerta de permanencia y la marca en la garita.
+  frequentAs: text('frequent_as'),
   guestName: text('guest_name').notNull(),
   guestDoc: text('guest_doc'),
   plate: text('plate'),
@@ -100,6 +104,10 @@ export const invitations = pgTable('invitation', {
   index('invitation_creator_idx').on(t.createdBy, t.createdAt),
   // Sin 'evento': un evento es una invitación por invitado, no un tipo aparte.
   check('invitation_kind_ck', sql`${t.kind} in ('visita','frecuente','proveedor')`),
+  // Solo una frecuente lo lleva. Una frecuente sin él cuenta como visita: la API
+  // siempre lo completa, y así un insert crudo (tests, scripts) no se rompe.
+  check('invitation_frequent_as_ck', sql`${t.frequentAs} is null
+    or (${t.kind} = 'frecuente' and ${t.frequentAs} in ('visita','proveedor'))`),
   check('invitation_window_ck', sql`${t.validTo} >= ${t.validFrom}`),
   check('invitation_capacity_ck', sql`${t.capacity} >= 1`),
 ])

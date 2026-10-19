@@ -443,6 +443,7 @@ export type AgendaRow = {
   guestDoc: string | null
   plate: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
+  frequentAs: 'visita' | 'proveedor' | null
   unitLabel: string
   inviterName: string
   capacity: number
@@ -493,6 +494,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       i.guest_doc         as "guestDoc",
       i.plate,
       i.kind,
+      i.frequent_as       as "frequentAs",
       u.label             as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
@@ -536,6 +538,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       i.guest_doc         as "guestDoc",
       i.plate,
       i.kind,
+      i.frequent_as       as "frequentAs",
       u.label             as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
@@ -546,8 +549,9 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       (select max(e.exited_at) from entry_log e
         where ${hoy} and e.invitation_id = i.id)       as "lastExitAt",
       true                                              as "adentro",
-      -- Un umbral NULL da NULL solo, y 'frecuente' cae fuera del case: no alerta.
-      case i.kind
+      -- Un umbral NULL da NULL solo. Una frecuente usa el umbral de lo que es
+      -- (sin subtipo, visita).
+      case case when i.kind = 'frecuente' then coalesce(i.frequent_as, 'visita') else i.kind end
         when 'visita'    then abiertas.primero + make_interval(hours => n.overstay_hours_visita)
         when 'proveedor' then abiertas.primero + make_interval(hours => n.overstay_hours_proveedor)
       end                                               as "alertaDesde",
@@ -576,6 +580,7 @@ export type AuditRow = {
   guestDoc: string | null
   plate: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
+  frequentAs: 'visita' | 'proveedor' | null
   unitLabel: string
   inviterName: string
   validFrom: string
@@ -760,6 +765,7 @@ async function auditRows(
       i.guest_doc                 as "guestDoc",
       i.plate,
       i.kind,
+      i.frequent_as       as "frequentAs",
       u.label                     as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.valid_from                as "validFrom",

@@ -11,6 +11,8 @@ export type CreateInvitationInput = {
   unitId: string
   createdBy: string
   kind: 'visita' | 'frecuente' | 'proveedor'
+  /** Solo cuenta en las frecuentes; sin él, visita. */
+  frequentAs?: 'visita' | 'proveedor'
   guestName: string
   guestDoc?: string
   plate?: string
@@ -91,6 +93,7 @@ export async function createInvitation(input: CreateInvitationInput) {
     unitId: input.unitId,
     createdBy: input.createdBy,
     kind: input.kind,
+    frequentAs: input.kind === 'frecuente' ? (input.frequentAs ?? 'visita') : null,
     guestName: input.guestName.trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
@@ -123,6 +126,7 @@ const nombreOEtiquetaSql = sql<string>`case when ${people.role} = 'guard' then $
 const columnas = {
   id: invitations.id,
   kind: invitations.kind,
+  frequentAs: invitations.frequentAs,
   guestName: invitations.guestName,
   guestDoc: invitations.guestDoc,
   plate: invitations.plate,
@@ -422,6 +426,7 @@ export type EditInvitationInput = {
   validTo?: string
   weekdays?: number[] | null
   capacity?: number
+  frequentAs?: 'visita' | 'proveedor'
 }
 
 /**
@@ -453,6 +458,7 @@ export async function editInvitation(
   if (validTo < validFrom) throw new AppError(400, 'ventana_invertida')
 
   const capacity = input.capacity ?? inv.capacity
+  if (input.frequentAs !== undefined && inv.kind !== 'frecuente') throw new AppError(400, 'no_es_frecuente')
 
   const [actualizada] = await db.update(invitations).set({
     ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),
@@ -462,6 +468,7 @@ export async function editInvitation(
     validTo,
     ...(input.weekdays !== undefined ? { weekdays: input.weekdays?.length ? input.weekdays : null } : {}),
     capacity,
+    ...(input.frequentAs !== undefined ? { frequentAs: input.frequentAs } : {}),
   }).where(eq(invitations.id, id)).returning()
 
   return actualizada

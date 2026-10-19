@@ -200,6 +200,31 @@ describe('editar una invitación', () => {
     return res.body
   }
 
+  it('una frecuente guarda si es visita o proveedor; sin decirlo, visita', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const prov = await visita(ctx, { kind: 'frecuente', frequentAs: 'proveedor', capacity: 999 })
+    const sinDecir = await visita(ctx, { kind: 'frecuente', capacity: 999 })
+    const comun = await visita(ctx, { frequentAs: 'proveedor' })
+    expect(prov.frequentAs).toBe('proveedor')
+    expect(sinDecir.frequentAs).toBe('visita')
+    // Una invitación que no es frecuente no lleva subtipo aunque lo manden.
+    expect(comun.frequentAs).toBeNull()
+  })
+
+  it('el subtipo de una frecuente se edita; en otra invitación da 400', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const frec = await visita(ctx, { kind: 'frecuente', capacity: 999 })
+    const res = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ frequentAs: 'proveedor' }).expect(200)
+    expect(res.body.frequentAs).toBe('proveedor')
+
+    const comun = await visita(ctx)
+    const mal = await request(app).patch(`/invitations/${comun.id}`).set('Cookie', ctx.cookie)
+      .send({ frequentAs: 'proveedor' })
+    expect(mal.status).toBe(400)
+    expect(mal.body.error).toBe('no_es_frecuente')
+  })
+
   it('cambia nombre, documento y fecha mientras está pendiente', async () => {
     const ctx = await resident('martin@example.com', 'Lote 142')
     const inv = await visita(ctx)
