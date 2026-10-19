@@ -14,13 +14,20 @@ import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-type Alertas = { ahora: Date; excedidas: Excedida[]; pendientes: Excedida[] }
+type Alertas = { ahora: Date; excedidas: Excedida[]; pendientes: Excedida[]; porId: Map<string, Excedida> }
 
 const AlertasContexto = createContext<Alertas | null>(null)
-const SIN_ALERTAS: Alertas = { ahora: new Date(0), excedidas: [], pendientes: [] }
+const SIN_ALERTAS: Alertas = { ahora: new Date(0), excedidas: [], pendientes: [], porId: new Map() }
 
 /** Las alertas de permanencia de la garita. Fuera de `AlertasProvider`, ninguna. */
 export const useAlertas = () => useContext(AlertasContexto) ?? SIN_ALERTAS
+
+/** "1 h 20 min" si esa invitación pasó su tiempo adentro; si no, null. */
+export function useExceso(id: string): string | null {
+  const { porId, ahora } = useAlertas()
+  const e = porId.get(id)
+  return e ? tiempoDesde(e.alertaDesde, ahora) : null
+}
 
 /** Cada cuánto se mira el reloj. La red no participa: el vencimiento ya vino calculado. */
 const TIC = 30_000
@@ -64,7 +71,7 @@ export function AlertasProvider({ children }: { children: React.ReactNode }) {
 
   const valor = useMemo(() => {
     const excedidas = calcular(adentro.data ?? [], ahora)
-    return { ahora, excedidas, pendientes: sinVer(excedidas) }
+    return { ahora, excedidas, pendientes: sinVer(excedidas), porId: new Map(excedidas.map((e) => [e.id, e])) }
   }, [adentro.data, ahora])
 
   // Suena solo cuando aparece una sin ver nueva, no en cada tic ni cuando se va una.

@@ -16,6 +16,8 @@ import {
 } from '@/lib/tablero'
 import { useMedia } from '@/lib/use-media'
 import { usePreferencia } from '@/lib/use-preferencia'
+import { primeroExcedidas } from '@/lib/permanencia'
+import { useAlertas } from './alertas-permanencia'
 import { Tablero } from './vistas/tablero'
 import { Lista } from './vistas/lista'
 import { Compacta } from './vistas/compacta'
@@ -64,7 +66,8 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const esHoy = fecha === hoy
 
   const [tipo, setTipo] = useState<FiltroTipo>('todos')
-  const [estado, setEstado] = useState<FiltroEstado>('todos')
+  const [elegido, setEstado] = useState<FiltroEstado>('todos')
+  const { porId } = useAlertas()
 
   const ancho = useMedia('(min-width: 1280px)')
   const medio = useMedia('(min-width: 768px)')
@@ -77,15 +80,25 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const q = useAgenda(fecha)
   const adentro = useAdentro(esHoy)
 
-  const columnas = useMemo(() => armarColumnas(
-    filtrarPorTipo(q.data ?? [], tipo),
-    esHoy && adentro.data ? filtrarPorTipo(adentro.data, tipo) : null,
-    hoy,
-  ), [q.data, adentro.data, tipo, esHoy, hoy])
+  const columnas = useMemo(() => {
+    const c = armarColumnas(
+      filtrarPorTipo(q.data ?? [], tipo),
+      esHoy && adentro.data ? filtrarPorTipo(adentro.data, tipo) : null,
+      hoy,
+    )
+    // Mirando hoy, los que pasaron su tiempo encabezan "Adentro".
+    const ids = new Set(esHoy ? porId.keys() : [])
+    return { ...c, adentro: primeroExcedidas(c.adentro, ids) }
+  }, [q.data, adentro.data, tipo, esHoy, hoy, porId])
+  const excedidos = esHoy ? columnas.adentro.filter((r) => porId.has(r.id)) : []
+  // Si se resolvieron todos con el chip elegido, se vuelve a "Todos" en vez de dejar una lista vacía.
+  const estado: FiltroEstado = elegido === 'excedidos' && !excedidos.length ? 'todos' : elegido
 
   const total = columnas.porLlegar.length + columnas.adentro.length + columnas.seFueron.length + columnas.vencidas.length
   // El filtro de estado no existe en el tablero: ahí los tres estados ya son las columnas.
-  const visibles: Columnas = vista === 'tablero' || estado === 'todos' ? columnas : { ...VACIAS, [estado]: columnas[estado] }
+  const visibles: Columnas = vista === 'tablero' || estado === 'todos' ? columnas
+    : estado === 'excedidos' ? { ...VACIAS, adentro: excedidos }
+    : { ...VACIAS, [estado]: columnas[estado] }
   const planas = [...visibles.adentro, ...visibles.porLlegar, ...visibles.seFueron, ...visibles.vencidas]
 
   const aplicados: FiltroAplicado[] = tipo === 'todos'
@@ -132,6 +145,9 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
           { valor: 'porLlegar', etiqueta: 'Por llegar', contador: q.data ? columnas.porLlegar.length : undefined },
           { valor: 'adentro', etiqueta: 'Adentro', contador: q.data ? columnas.adentro.length : undefined },
           { valor: 'seFueron', etiqueta: 'Se fueron', contador: q.data ? columnas.seFueron.length : undefined },
+          ...(excedidos.length
+            ? [{ valor: 'excedidos' as const, etiqueta: 'Pasaron su tiempo', contador: excedidos.length }]
+            : []),
         ]} />
       )}
 
