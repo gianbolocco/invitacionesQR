@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 test('sin sesión, la home lleva al login', async ({ page }) => {
   await page.goto('/')

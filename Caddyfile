@@ -23,6 +23,19 @@
 	@comprimible not path /api/gate/eventos
 	encode @comprimible zstd gzip
 
+	# La CSP no va acá: lleva un nonce por request y la pone web/src/proxy.ts.
+	# HSTS sin includeSubDomains ni preload: pazzit.com es la landing y vive aparte.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# La garita lee el QR con la cámara; nada más pide permisos.
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+		-X-Powered-By
+	}
+
 	handle_path /api/* {
 		reverse_proxy api:8080
 	}

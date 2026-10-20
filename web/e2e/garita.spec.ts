@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 test('el guardia busca un invitado, registra el ingreso y lo deshace', async ({ page, browser }) => {
   // Lo crea el vecino, para tener una invitación vigente y fresca.

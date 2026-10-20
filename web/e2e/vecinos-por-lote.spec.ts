@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 test('el admin ve el padrón agrupado por lote y ya no existe la página de unidades', async ({ page }) => {
   await entrar(page, 'admin')

@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 test('el guardia anula una invitación con motivo y el vecino lo ve', async ({ page, browser }) => {
   const nombre = `Anula E2E ${Date.now()}`

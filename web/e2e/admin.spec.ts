@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 test('el admin da de alta un vecino desde el sheet', async ({ page }) => {
   await entrar(page, 'admin')

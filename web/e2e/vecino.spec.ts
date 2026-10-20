@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 /** Crea una invitación de visita desde la UI y devuelve su nombre. */
 async function crearInvitacion(page: import('@playwright/test').Page) {
