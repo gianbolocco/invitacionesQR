@@ -33,14 +33,16 @@ const ETIQUETA: Record<Estado, string> = {
  * `contexto="garita"`: para el guardia, una invitación que espera es alguien
  * "Por llegar"; para el vecino es su "Invitado". Las claves no cambian.
  */
-export function EstadoTag({ estado, detalle, contexto = 'vecino', className }: {
+export function EstadoTag({ estado, etiqueta: propia, detalle, contexto = 'vecino', className }: {
   estado: Estado
+  /** Otra palabra con el mismo aspecto (en últimos movimientos: "Ingreso" con el look de adentro). */
+  etiqueta?: string
   detalle?: string
   contexto?: 'vecino' | 'garita'
   className?: string
 }) {
   const { clase, icono: Icono } = LOOK[estado]
-  const etiqueta = estado === 'esperando' && contexto === 'garita' ? 'Por llegar' : ETIQUETA[estado]
+  const etiqueta = propia ?? (estado === 'esperando' && contexto === 'garita' ? 'Por llegar' : ETIQUETA[estado])
   return (
     <span className={cn(
       'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm px-2.5 py-1',

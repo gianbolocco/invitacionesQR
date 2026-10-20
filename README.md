@@ -33,11 +33,9 @@ una fila abierta. Un egreso nunca se rechaza —el que está adentro tiene que
 poder salir— y no libera cupo, así que un reingreso rebota igual que antes.
 
 Si una visita o un proveedor lleva adentro más horas de las que fijó el admin
-para su tipo, la garita lo **avisa**: un contador en el header con un pitido
-corto, los excedidos primero en "Adentro" y un filtro para verlos juntos. El
-guardia registra la salida o marca "Ya lo vi", que la calla en todas las garitas
-y queda en la auditoría. La cuenta se hace en la garita contra su reloj: no hay
-job en el servidor. Una frecuente usa
+para su tipo, la garita lo **marca**: va primero en "Adentro", con el tiempo que
+lleva en amarillo, y en *Filtros → Advertencia* se ven solo esos. La cuenta se
+hace en la garita contra su reloj: no hay job en el servidor. Una frecuente usa
 las horas de lo que es: visita o proveedor, según eligió el vecino.
 
 **El admin** da de alta vecinos y guardias, corrige lotes, edita los datos del

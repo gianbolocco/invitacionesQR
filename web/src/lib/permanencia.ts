@@ -14,12 +14,6 @@ export function excedidas(filas: AgendaRow[], ahora: Date): Excedida[] {
     .sort((a, b) => new Date(a.alertaDesde).getTime() - new Date(b.alertaDesde).getTime())
 }
 
-/** Las que ningún guardia marcó con "Ya lo vi": las que cuentan y suenan. */
-export const sinVer = (e: Excedida[]) => e.filter((f) => !f.alertaVista)
-
-/** Si hay una sin ver que antes no estaba: es lo único que hace sonar la garita. */
-export const aparecieron = (antes: Set<string>, ahora: Excedida[]) => ahora.some((f) => !antes.has(f.id))
-
 /** Los excedidos primero; dentro de cada grupo, el orden que ya traían. */
 export function primeroExcedidas<T extends { id: string }>(filas: T[], ids: Set<string>): T[] {
   return [...filas.filter((f) => ids.has(f.id)), ...filas.filter((f) => !ids.has(f.id))]

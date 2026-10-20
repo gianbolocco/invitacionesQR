@@ -29,8 +29,6 @@ export type AgendaRow = {
   adentro: boolean
   /** Solo en /gate/adentro: cuándo vence su tiempo adentro; null = su tipo no alerta. */
   alertaDesde?: string | null
-  /** Solo en /gate/adentro: un guardia ya marcó "Ya lo vi". */
-  alertaVista?: boolean
 }
 
 /*
@@ -208,18 +206,6 @@ export function useRegistrarEgreso() {
   return useMutation({
     mutationFn: registrarEgreso,
     onError: () => toast.error('No se pudo registrar. Probá de nuevo.'),
-    onSettled: () => invalidarGarita(qc),
-  })
-}
-
-/** "Ya lo vi" de la alerta de permanencia: la calla en todas las garitas. */
-export function useMarcarVista() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (invitationId: string) => api(`/gate/invitations/${invitationId}/alerta-vista`, { method: 'POST' }),
-    onError: (e) => toast.error(e instanceof ApiError && e.code === 'no_esta_adentro'
-      ? 'Ya salió: la alerta se cierra sola.'
-      : 'No se pudo marcar. Probá de nuevo.'),
     onSettled: () => invalidarGarita(qc),
   })
 }

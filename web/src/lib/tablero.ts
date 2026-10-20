@@ -3,8 +3,7 @@ import type { AgendaRow } from './queries/garita'
 
 export type Tipo = AgendaRow['kind']
 export type FiltroTipo = 'todos' | Tipo
-/** 'excedidos': los de adentro que pasaron su tiempo (alerta de permanencia). */
-export type FiltroEstado = 'todos' | 'porLlegar' | 'adentro' | 'seFueron' | 'excedidos'
+export type FiltroEstado = 'todos' | 'porLlegar' | 'adentro' | 'seFueron'
 
 export type Columnas = {
   porLlegar: AgendaRow[]

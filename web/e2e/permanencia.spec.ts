@@ -3,7 +3,7 @@ import { entrar } from './sesion'
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:8080'
 
-test('la garita avisa quién pasó su tiempo adentro y el guardia lo marca visto', async ({ page, browser }) => {
+test('la garita marca a quien pasó su tiempo adentro y lo deja filtrar', async ({ page, browser }) => {
   // Los dos proyectos corren a la vez: el nombre del proyecto evita que choquen.
   const nombre = `Demorado E2E ${test.info().project.name} ${Date.now()}`
 
@@ -34,19 +34,10 @@ test('la garita avisa quién pasó su tiempo adentro y el guardia lo marca visto
 
     await g.goto('/garita')
     // Puede haber otros excedidos de corridas anteriores: se busca a esta persona, no un número.
-    await g.getByRole('button', { name: /pasaron? su tiempo adentro/ }).click()
-    const panel = g.getByRole('dialog', { name: 'Pasaron su tiempo' })
-    const fila = panel.getByRole('listitem').filter({ hasText: nombre })
-    await expect(fila.getByText(/Hace .+ adentro/)).toBeVisible()
-
-    await fila.getByRole('button', { name: 'Ya lo vi' }).click()
-    // Pasa a "Ya vistas": sigue en la lista, sin el botón.
-    await expect(fila.getByRole('button', { name: 'Ya lo vi' })).toHaveCount(0)
-    await expect(fila.getByRole('link', { name: 'Ver' })).toBeVisible()
+    await g.getByRole('button', { name: /^Filtros/ }).click()
+    await g.getByRole('group', { name: 'Advertencia' }).getByRole('button', { name: /Pasaron su tiempo/ }).click()
     await g.keyboard.press('Escape')
-
-    // En la agenda sigue marcado, y el chip deja ver solo a los excedidos.
-    await g.getByRole('button', { name: /^Pasaron su tiempo/ }).click()
+    await expect(g.getByText('Con advertencia').first()).toBeVisible()
     await expect(g.getByRole('button', { name: new RegExp(nombre) })).toContainText(/Hace .+ adentro/)
   } finally {
     await guardia.close()

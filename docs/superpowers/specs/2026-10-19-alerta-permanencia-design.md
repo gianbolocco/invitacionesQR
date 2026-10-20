@@ -26,6 +26,13 @@ una alerta que no se calla termina ignorada.
 
 ## Decisiones
 
+> **Segunda revisión del dueño (19/10):** se sacaron el aviso del header, el
+> panel lateral, el "Ya lo vi" (endpoint y columnas, migración 0015) y el
+> sonido. Lo que queda: la marca en amarillo en tablero y lista, los excedidos
+> primero en "Adentro" y el filtro **Advertencia** en *Filtros* (funciona en
+> todas las vistas, también el tablero). Los puntos 5, 6 y 7 de abajo y la
+> sección "Celular y revisión del dueño" quedan como historia.
+
 1. **Un umbral por tipo, configurado por el admin**, en *Administración →
    Barrio*: uno para visita y otro para proveedor, en horas enteras de 1 a 72.
    Cada uno puede estar apagado (NULL). Una instalación nueva arranca con los

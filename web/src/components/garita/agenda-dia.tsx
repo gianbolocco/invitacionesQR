@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Building2, CalendarX, ChevronLeft, ChevronRight, Columns3, List, SearchX, Table2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
@@ -11,7 +10,7 @@ import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { Vacio } from '@/components/dominio/vacio'
 import { hoyISO, sumarDias, tituloDia } from '@/lib/fechas'
-import { useAgenda, useAdentro } from '@/lib/queries/garita'
+import { useAgenda, useAdentro, type AgendaRow } from '@/lib/queries/garita'
 import {
   armarColumnas, filtrarPorTipo, type Columnas, type FiltroEstado, type FiltroTipo,
 } from '@/lib/tablero'
@@ -33,6 +32,8 @@ const TIPOS: { valor: FiltroTipo; etiqueta: string }[] = [
   { valor: 'proveedor', etiqueta: 'Proveedores' },
 ]
 
+type FiltroAdvertencia = 'todos' | 'con'
+
 const VACIAS: Columnas = { porLlegar: [], adentro: [], seFueron: [], vencidas: [] }
 
 /**
@@ -49,11 +50,7 @@ const VACIAS: Columnas = { porLlegar: [], adentro: [], seFueron: [], vencidas: [
  * adentro es quién está en el barrio ahora, aunque haya entrado ayer con una
  * invitación de ayer. Por eso es otra consulta, y solo se mezcla mirando hoy.
  */
-export function AgendaDia({ onAbrir, verExcedidos = false }: {
-  onAbrir: (id: string) => void
-  /** Viene del "Ver todos" del panel de alertas (`/garita?ver=excedidos`). */
-  verExcedidos?: boolean
-}) {
+export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   /*
    * null = "hoy", no una fecha fija: la garita queda abierta toda la noche y
    * a las 00:00 tiene que pasar sola al día nuevo. Con la fecha guardada al
@@ -71,24 +68,10 @@ export function AgendaDia({ onAbrir, verExcedidos = false }: {
   const esHoy = fecha === hoy
 
   const [tipo, setTipo] = useState<FiltroTipo>('todos')
-  const [elegido, setEstado] = useState<FiltroEstado>('todos')
+  const [estado, setEstado] = useState<FiltroEstado>('todos')
+  // Los que pasaron el tiempo que fijó el admin para su tipo (alerta de permanencia).
+  const [advertencia, setAdvertencia] = useState<FiltroAdvertencia>('todos')
   const { porId } = useAlertas()
-
-  // "Ver todos" del panel: hoy, con el filtro de excedidos. Se aplica una vez
-  // durante el render (como la precarga de los formularios) y la URL se limpia,
-  // así un segundo "Ver todos" vuelve a funcionar.
-  const router = useRouter()
-  const [pedidoAplicado, setPedidoAplicado] = useState(false)
-  if (verExcedidos !== pedidoAplicado) {
-    setPedidoAplicado(verExcedidos)
-    if (verExcedidos) { setEstado('excedidos'); setElegida(null) }
-  }
-  useEffect(() => {
-    if (!verExcedidos) return
-    // Primero bajar a la agenda y después limpiar la URL: al revés, la navegación cortaba el scroll.
-    document.getElementById('agenda-dia')?.scrollIntoView({ block: 'start' })
-    router.replace('/garita', { scroll: false })
-  }, [verExcedidos, router])
 
   const ancho = useMedia('(min-width: 1280px)')
   const medio = useMedia('(min-width: 768px)')
@@ -96,37 +79,34 @@ export function AgendaDia({ onAbrir, verExcedidos = false }: {
   const disponible: Record<Vista, boolean> = { tablero: ancho, lista: true, compacta: medio, unidad: true }
   const preferida: Vista = guardada ?? 'lista'
   // Una vista guardada que esta pantalla no puede mostrar (el tablero en un celular) cae a la lista.
-  const vistaElegida: Vista = disponible[preferida] ? preferida : 'lista'
+  const vista: Vista = disponible[preferida] ? preferida : 'lista'
 
   const q = useAgenda(fecha)
   const adentro = useAdentro(esHoy)
 
   const columnas = useMemo(() => {
-    const c = armarColumnas(
-      filtrarPorTipo(q.data ?? [], tipo),
-      esHoy && adentro.data ? filtrarPorTipo(adentro.data, tipo) : null,
-      hoy,
-    )
+    const filtrar = (filas: AgendaRow[] | undefined) => {
+      const deTipo = filtrarPorTipo(filas ?? [], tipo)
+      // La advertencia es de quien está adentro ahora: otro día no hay a quién marcar.
+      return advertencia === 'con' ? deTipo.filter((r) => esHoy && porId.has(r.id)) : deTipo
+    }
+    const c = armarColumnas(filtrar(q.data), esHoy && adentro.data ? filtrar(adentro.data) : null, hoy)
     // Mirando hoy, los que pasaron su tiempo encabezan "Adentro".
     const ids = new Set(esHoy ? porId.keys() : [])
     return { ...c, adentro: primeroExcedidas(c.adentro, ids) }
-  }, [q.data, adentro.data, tipo, esHoy, hoy, porId])
-  const excedidos = esHoy ? columnas.adentro.filter((r) => porId.has(r.id)) : []
-  // Si se resolvieron todos con el chip elegido, se vuelve a "Todos" en vez de dejar una lista vacía.
-  const estado: FiltroEstado = elegido === 'excedidos' && !excedidos.length ? 'todos' : elegido
-  // El tablero no tiene chips de estado: para ver solo a los excedidos se pasa a la lista, sin guardarlo.
-  const vista: Vista = estado === 'excedidos' && vistaElegida === 'tablero' ? 'lista' : vistaElegida
+  }, [q.data, adentro.data, tipo, advertencia, esHoy, hoy, porId])
+  const cuantosConAdvertencia = esHoy ? filtrarPorTipo(adentro.data ?? [], tipo).filter((r) => porId.has(r.id)).length : 0
 
   const total = columnas.porLlegar.length + columnas.adentro.length + columnas.seFueron.length + columnas.vencidas.length
   // El filtro de estado no existe en el tablero: ahí los tres estados ya son las columnas.
-  const visibles: Columnas = vista === 'tablero' || estado === 'todos' ? columnas
-    : estado === 'excedidos' ? { ...VACIAS, adentro: excedidos }
-    : { ...VACIAS, [estado]: columnas[estado] }
+  const visibles: Columnas = vista === 'tablero' || estado === 'todos' ? columnas : { ...VACIAS, [estado]: columnas[estado] }
   const planas = [...visibles.adentro, ...visibles.porLlegar, ...visibles.seFueron, ...visibles.vencidas]
 
-  const aplicados: FiltroAplicado[] = tipo === 'todos'
-    ? []
-    : [{ clave: 'tipo', etiqueta: TIPOS.find((t) => t.valor === tipo)!.etiqueta, quitar: () => setTipo('todos') }]
+  const aplicados: FiltroAplicado[] = [
+    ...(tipo === 'todos' ? [] : [{ clave: 'tipo', etiqueta: TIPOS.find((t) => t.valor === tipo)!.etiqueta, quitar: () => setTipo('todos') }]),
+    ...(advertencia === 'todos' ? [] : [{ clave: 'advertencia', etiqueta: 'Con advertencia', quitar: () => setAdvertencia('todos') }]),
+  ]
+  const limpiar = () => { setTipo('todos'); setAdvertencia('todos') }
 
   const opciones: OpcionVista<Vista>[] = [
     { valor: 'tablero', etiqueta: 'Tablero', icono: Columns3, disponible: ancho },
@@ -148,28 +128,30 @@ export function AgendaDia({ onAbrir, verExcedidos = false }: {
           <ChevronRight aria-hidden />
         </Button>
         <CampoFecha id="agenda-fecha" valor={fecha} onCambio={setFecha} className="w-44" />
-        <HojaFiltros aplicados={aplicados} resultados={q.data ? planas.length : undefined} onLimpiar={() => setTipo('todos')}>
+        <HojaFiltros aplicados={aplicados} resultados={q.data ? planas.length : undefined} onLimpiar={limpiar}>
           <SeccionFiltro titulo="Tipo de invitación">
             <Chips etiqueta="Tipo de invitación" valor={tipo} onCambio={setTipo} opciones={TIPOS} />
+          </SeccionFiltro>
+          <SeccionFiltro titulo="Advertencia">
+            <Chips etiqueta="Advertencia" valor={advertencia} onCambio={setAdvertencia} opciones={[
+              { valor: 'todos', etiqueta: 'Todos' },
+              { valor: 'con', etiqueta: 'Pasaron su tiempo', contador: cuantosConAdvertencia },
+            ]} />
           </SeccionFiltro>
         </HojaFiltros>
         <div className="ml-auto">
           <SelectorVista etiqueta="Vista de la agenda" opciones={opciones} valor={vista}
-            onCambio={(v) => { guardar(v); if (v === 'tablero') setEstado('todos') }} />
+            onCambio={guardar} />
         </div>
       </div>
 
-      <h2 id="agenda-dia" className="scroll-mt-20 font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha, hoy)}</h2>
+      <h2 className="font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha, hoy)}</h2>
 
-      {aplicados.length > 0 && <FiltrosAplicados aplicados={aplicados} onLimpiar={() => setTipo('todos')} />}
+      {aplicados.length > 0 && <FiltrosAplicados aplicados={aplicados} onLimpiar={limpiar} />}
 
       {vista !== 'tablero' && (
         <Chips etiqueta="Estado" desplaza valor={estado} onCambio={setEstado} opciones={[
           { valor: 'todos', etiqueta: 'Todos', contador: q.data ? total : undefined },
-          // Segundo y no al final: en el celular los chips se desplazan, y elegido desde "Ver todos" tiene que verse.
-          ...(excedidos.length
-            ? [{ valor: 'excedidos' as const, etiqueta: 'Pasaron su tiempo', contador: excedidos.length }]
-            : []),
           { valor: 'porLlegar', etiqueta: 'Por llegar', contador: q.data ? columnas.porLlegar.length : undefined },
           { valor: 'adentro', etiqueta: 'Adentro', contador: q.data ? columnas.adentro.length : undefined },
           { valor: 'seFueron', etiqueta: 'Se fueron', contador: q.data ? columnas.seFueron.length : undefined },
@@ -181,10 +163,10 @@ export function AgendaDia({ onAbrir, verExcedidos = false }: {
       ) : q.isError ? (
         <ErrorConReintento onReintentar={() => q.refetch()} reintentando={q.isFetching} />
       ) : total === 0 ? (
-        tipo === 'todos'
+        aplicados.length === 0
           ? <Vacio icono={CalendarX} titulo="Nadie tiene autorización para este día" />
-          : <Vacio icono={SearchX} titulo="Ninguna invitación de ese tipo"
-              accion={<Button variant="outline" onClick={() => setTipo('todos')}>Ver todos</Button>} />
+          : <Vacio icono={SearchX} titulo={advertencia === 'con' ? 'Nadie pasó su tiempo adentro' : 'Ninguna invitación de ese tipo'}
+              accion={<Button variant="outline" onClick={limpiar}>Ver todos</Button>} />
       ) : vista !== 'tablero' && planas.length === 0 ? (
         <Vacio icono={SearchX} titulo="Nadie en ese estado"
           accion={<Button variant="outline" onClick={() => setEstado('todos')}>Ver todos</Button>} />
