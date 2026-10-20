@@ -14,7 +14,7 @@ test('el guardia anula una invitación con motivo y el vecino lo ve', async ({ p
   const g = await guardia.newPage()
   await entrar(g, 'guardia')
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).first().click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
 
   await g.getByRole('button', { name: /Anular esta invitación/ }).click()
@@ -28,7 +28,7 @@ test('el guardia anula una invitación con motivo y el vecino lo ve', async ({ p
   // La garita ya no la deja pasar, y el vecino lee por qué.
   await g.goto('/garita')
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).first().click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
   await expect(g.getByText('La anularon')).toBeVisible()
 

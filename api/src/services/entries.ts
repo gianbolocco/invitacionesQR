@@ -380,8 +380,10 @@ export async function searchGuests(neighborhoodId: string, query: string) {
     plate: invitations.plate,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
+    frequentAs: invitations.frequentAs,
     unitLabel: units.label,
     // Para que el guardia sepa qué va a pasar antes de tocar el resultado.
+    anulada: sql<boolean>`${invitations.revokedAt} is not null`,
     adentro: sql<boolean>`exists (
       select 1 from entry_log e
       where e.invitation_id = ${invitations.id} and e.exited_at is null

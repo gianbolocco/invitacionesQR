@@ -39,7 +39,7 @@ test('no se puede anular una invitación con el invitado adentro', async ({ page
   const g = await guardia.newPage()
   await entrar(g, 'guardia')
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await g.getByLabel('Documento').fill('30111222')
   await g.getByRole('button', { name: 'Registrar ingreso' }).click()
   await guardia.close()

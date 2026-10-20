@@ -44,6 +44,9 @@ export type Hit = {
   guestDoc: string | null
   unitLabel: string
   plate: string | null
+  kind: 'visita' | 'frecuente' | 'proveedor'
+  frequentAs: 'visita' | 'proveedor' | null
+  anulada: boolean
   adentro: boolean
 }
 

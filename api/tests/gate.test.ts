@@ -155,6 +155,16 @@ describe('garita', () => {
     expect(res.body[0].guestName).toBe('Juan Pérez')
   })
 
+  it('cada resultado dice si está anulada y, si es frecuente, qué es', async () => {
+    const { cookie, inv } = await scenario()
+    const antes = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie)
+    expect(antes.body[0]).toMatchObject({ anulada: false, kind: 'visita', frequentAs: null })
+
+    await db.update(invitations).set({ revokedAt: new Date() }).where(eq(invitations.id, inv.id))
+    const despues = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie)
+    expect(despues.body[0].anulada).toBe(true)
+  })
+
   it('la búsqueda y el QR caen en el mismo resultado', async () => {
     const { cookie, inv } = await scenario()
     const hit = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie)
