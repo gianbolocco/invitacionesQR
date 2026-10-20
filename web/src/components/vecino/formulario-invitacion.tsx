@@ -9,7 +9,8 @@ import { Chips, ChipsMultiples } from '@/components/dominio/chips'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
 import { Nota } from '@/components/dominio/nota'
 import { DIAS, KIND_LABEL, type Invitation } from '@/lib/invitations'
-import { hoyISO, sumarDias } from '@/lib/fechas'
+import { fechaCorta, hoyISO, unMesDespues } from '@/lib/fechas'
+import { ApiError } from '@/lib/api'
 import { useCrearInvitacion, useEditarInvitacion, type DatosInvitacion } from '@/lib/queries/invitaciones'
 
 type Kind = Invitation['kind']
@@ -18,11 +19,6 @@ const AYUDA_TIPO: Record<Kind, string> = {
   visita: 'Una persona, un día.',
   frecuente: 'Entra muchas veces en un período: la empleada, el profesor, la niñera.',
   proveedor: 'Un servicio, un día: el técnico, el delivery, el flete.',
-}
-
-/** Un año para las frecuentes: no es "para siempre", obliga a revisar la lista. */
-function enUnAnio(desde: string): string {
-  return sumarDias(desde, 365)
 }
 
 export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
@@ -38,24 +34,30 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   const mutacion = editando ? editar : crear
 
   const [kind, setKind] = useState<Kind>(invitacion?.kind ?? inicial?.kind ?? 'visita')
+  const [frecuenteComo, setFrecuenteComo] = useState<'visita' | 'proveedor'>(invitacion?.frequentAs ?? 'visita')
   const [unitId, setUnitId] = useState(invitacion?.unitId ?? units[0]?.id ?? '')
   const [guestName, setGuestName] = useState(invitacion?.guestName ?? inicial?.guestName ?? '')
   const [guestDoc, setGuestDoc] = useState(invitacion?.guestDoc ?? inicial?.guestDoc ?? '')
   const [plate, setPlate] = useState(invitacion?.plate ?? inicial?.plate ?? '')
   const [validFrom, setValidFrom] = useState(invitacion?.validFrom ?? hoy)
-  const [validTo, setValidTo] = useState(invitacion?.validTo ?? enUnAnio(hoy))
+  // Un mes: el tope de una visita frecuente, que es la que se elige por defecto.
+  const [validTo, setValidTo] = useState(invitacion?.validTo ?? unMesDespues(hoy))
   const [dias, setDias] = useState<string[]>((invitacion?.weekdays ?? []).map(String))
   const [tocado, setTocado] = useState<Record<string, boolean>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
 
   const frecuente = kind === 'frecuente'
+  // Una visita frecuente dura hasta un mes (la API lo exige igual); la de proveedor no tiene tope.
+  const tope = frecuente && frecuenteComo === 'visita' ? unMesDespues(validFrom) : undefined
 
   // Las reglas, en un solo lugar: lo que se muestra al salir de un campo y lo
   // que frena el envío son lo mismo.
   const errores = {
     guestName: guestName.trim() ? null : 'Escribí el nombre de quien viene.',
     validFrom: !editando && validFrom < hoy ? 'No se puede invitar para un día que ya pasó.' : null,
-    validTo: frecuente && validTo < validFrom ? 'La fecha de fin tiene que ser igual o posterior al inicio.' : null,
+    validTo: frecuente && validTo < validFrom ? 'La fecha de fin tiene que ser igual o posterior al inicio.'
+      : tope && validTo > tope ? `Una visita frecuente dura hasta un mes: elegí hasta el ${fechaCorta(tope)}.`
+      : null,
   }
   const mostrar = (campo: keyof typeof errores) => (tocado[campo] ? errores[campo] : null)
   const tocar = (campo: string) => setTocado((t) => ({ ...t, [campo]: true }))
@@ -68,6 +70,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
 
     const datos: DatosInvitacion = {
       kind,
+      ...(frecuente ? { frequentAs: frecuenteComo } : {}),
       guestName: guestName.trim(),
       guestDoc: guestDoc.trim() || null,
       plate: plate.trim().toUpperCase() || null,
@@ -83,7 +86,11 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
         ? await editar.mutateAsync(datos)
         : await crear.mutateAsync({ ...datos, unitId })
       onListo(inv)
-    } catch {
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'frecuente_mas_de_un_mes') {
+        setErrorGeneral('Una visita frecuente dura hasta un mes. Acortá las fechas o elegí Proveedor.')
+        return
+      }
       setErrorGeneral(editando
         ? 'No se pudo guardar. Una invitación que ya se usó o venció no se puede editar.'
         : 'No se pudo crear la invitación. Revisá los datos y probá de nuevo.')
@@ -119,13 +126,21 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
 
         {frecuente ? (
           <>
+            <Campo id="frecuente-como" etiqueta="¿Viene de visita o a trabajar?"
+              ayuda={frecuenteComo === 'visita'
+                ? 'La empleada, la niñera, el profesor.'
+                : 'El jardinero, el pintor, el de la pileta: en la garita se marca como proveedor.'}>
+              <Chips etiqueta="Viene de visita o a trabajar" valor={frecuenteComo}
+                onCambio={(v) => { setFrecuenteComo(v); tocar('validTo') }}
+                opciones={[{ valor: 'visita', etiqueta: 'Visita' }, { valor: 'proveedor', etiqueta: 'Proveedor' }]} />
+            </Campo>
             <div className="grid gap-4 sm:grid-cols-2">
               <Campo id="desde" etiqueta="Desde" error={mostrar('validFrom')}>
                 <CampoFecha id="desde" valor={validFrom} min={editando ? undefined : hoy}
-                  onCambio={(v) => { setValidFrom(v); tocar('validFrom') }} />
+                  onCambio={(v) => { setValidFrom(v); tocar('validFrom'); tocar('validTo') }} />
               </Campo>
               <Campo id="hasta" etiqueta="Hasta" error={mostrar('validTo')}>
-                <CampoFecha id="hasta" valor={validTo} min={validFrom}
+                <CampoFecha id="hasta" valor={validTo} min={validFrom} max={tope}
                   onCambio={(v) => { setValidTo(v); tocar('validTo') }} />
               </Campo>
             </div>

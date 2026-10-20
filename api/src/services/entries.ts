@@ -150,6 +150,8 @@ export type CargaManual = {
   invitationId?: string
   guest?: { name: string; unitId: string }
   guestDoc: string
+  /** La anotada en la planilla. Sin ella, la de la invitación. */
+  plate?: string
   enteredAt: Date
   /** null = todavía está adentro. */
   exitedAt: Date | null
@@ -215,6 +217,7 @@ async function cargarUna(
   if (!it.invitationId && !it.guest) throw new AppError(400, 'tanda_invalida')
 
   const guestDoc = it.guestDoc.trim()
+  const plate = it.plate?.trim().toUpperCase() || null
   let invitationId: string
   let target: { unitId: string; guestName: string; guestDoc: string | null; plate: string | null }
 
@@ -222,7 +225,7 @@ async function cargarUna(
     await assertUnitInNeighborhood(it.guest.unitId, neighborhoodId, tx)
     // Recién creada y sin otros movimientos: no hay con qué superponerse.
     const [inv] = await tx.insert(invitations).values(valoresDePorteria({
-      unitId: it.guest.unitId, guestName: it.guest.name, guestDoc,
+      unitId: it.guest.unitId, guestName: it.guest.name, guestDoc, plate: plate ?? undefined,
       createdBy: loaderId, neighborhoodId,
     }, todayInBuenosAires(it.enteredAt))).returning()
     invitationId = inv.id
@@ -266,7 +269,7 @@ async function cargarUna(
     exitGuardId: it.exitedAt ? loaderId : null,
     guestName: target.guestName,
     guestDoc,
-    plate: target.plate,
+    plate: plate ?? target.plate,
     note: it.note?.trim() || null,
     source: 'manual',
     loadedBy: loaderId,
@@ -377,8 +380,10 @@ export async function searchGuests(neighborhoodId: string, query: string) {
     plate: invitations.plate,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
+    frequentAs: invitations.frequentAs,
     unitLabel: units.label,
     // Para que el guardia sepa qué va a pasar antes de tocar el resultado.
+    anulada: sql<boolean>`${invitations.revokedAt} is not null`,
     adentro: sql<boolean>`exists (
       select 1 from entry_log e
       where e.invitation_id = ${invitations.id} and e.exited_at is null
@@ -421,6 +426,7 @@ export type AgendaRow = {
   guestDoc: string | null
   plate: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
+  frequentAs: 'visita' | 'proveedor' | null
   unitLabel: string
   inviterName: string
   capacity: number
@@ -435,6 +441,8 @@ export type AgendaRow = {
    * si entró anteayer y nadie registró su salida, sigue adentro hoy.
    */
   adentro: boolean
+  /** Solo en `insideNow`: cuándo vence su tiempo adentro; null = su tipo no alerta. */
+  alertaDesde?: Date | null
 }
 
 /**
@@ -467,6 +475,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       i.guest_doc         as "guestDoc",
       i.plate,
       i.kind,
+      i.frequent_as       as "frequentAs",
       u.label             as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
@@ -510,6 +519,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       i.guest_doc         as "guestDoc",
       i.plate,
       i.kind,
+      i.frequent_as       as "frequentAs",
       u.label             as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
@@ -519,13 +529,22 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       abiertas.desde                                    as "lastEntryAt",
       (select max(e.exited_at) from entry_log e
         where ${hoy} and e.invitation_id = i.id)       as "lastExitAt",
-      true                                              as "adentro"
+      true                                              as "adentro",
+      -- Un umbral NULL da NULL solo. Una frecuente usa el umbral de lo que es
+      -- (sin subtipo, visita).
+      case case when i.kind = 'frecuente' then coalesce(i.frequent_as, 'visita') else i.kind end
+        when 'visita'    then abiertas.primero + make_interval(hours => n.overstay_hours_visita)
+        when 'proveedor' then abiertas.primero + make_interval(hours => n.overstay_hours_proveedor)
+      end                                               as "alertaDesde"
     from (
-      select invitation_id, max(entered_at) as desde
+      -- El reloj de la alerta corre desde el ingreso abierto más viejo: con
+      -- cupo 3 puede haber tres adentro, y el que lleva más es el que importa.
+      select invitation_id, max(entered_at) as desde, min(entered_at) as primero
       from entry_log where exited_at is null group by invitation_id
     ) abiertas
     join invitation i on i.id = abiertas.invitation_id
     join unit u on u.id = i.unit_id
+    join neighborhood n on n.id = u.neighborhood_id
     join person p on p.id = i.created_by
     where u.neighborhood_id = ${neighborhoodId}
     order by abiertas.desde desc
@@ -540,6 +559,7 @@ export type AuditRow = {
   guestDoc: string | null
   plate: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
+  frequentAs: 'visita' | 'proveedor' | null
   unitLabel: string
   inviterName: string
   validFrom: string
@@ -724,6 +744,7 @@ async function auditRows(
       i.guest_doc                 as "guestDoc",
       i.plate,
       i.kind,
+      i.frequent_as       as "frequentAs",
       u.label                     as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.valid_from                as "validFrom",

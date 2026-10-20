@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { Upload, X } from 'lucide-react'
-import { useBarrio, useGuardarBarrio, useSubirLogo, useQuitarLogo } from '@/lib/queries/admin'
+import { useBarrio, useGuardarBarrio, useSubirLogo, useQuitarLogo, type HorasPermanencia } from '@/lib/queries/admin'
 import { logoUrl, useMarca } from '@/lib/marca-cliente'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { VistaPreviaMarca } from '@/components/admin/vista-previa-marca'
@@ -9,6 +9,21 @@ import { Campo } from '@/components/dominio/campo'
 import { Nota } from '@/components/dominio/nota'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+
+type TipoAlerta = keyof HorasPermanencia
+// Lo que se propone al prender la alerta: una visita rara vez pasa de la tarde;
+// un proveedor trabaja una jornada.
+const ALERTAS: { tipo: TipoAlerta; etiqueta: string; sugerida: string }[] = [
+  { tipo: 'visita', etiqueta: 'Visitas', sugerida: '6' },
+  { tipo: 'proveedor', etiqueta: 'Proveedores', sugerida: '8' },
+]
+
+/** '6' → 6; lo que no es un entero de 1 a 72 → undefined. */
+function horasValidas(v: string): number | undefined {
+  const n = Number(v)
+  return /^\d+$/.test(v.trim()) && n >= 1 && n <= 72 ? n : undefined
+}
 
 export default function BarrioPage() {
   const barrio = useBarrio()
@@ -22,6 +37,8 @@ export default function BarrioPage() {
   const [color, setColor] = useState<string | null>(null)
   const [arrastrando, setArrastrando] = useState(false)
   const [errorLogo, setErrorLogo] = useState<string | null>(null)
+  // null = ese tipo no alerta; un string = lo que está tipeado en las horas.
+  const [alertas, setAlertas] = useState<Record<TipoAlerta, string | null>>({ visita: null, proveedor: null })
   const [cargado, setCargado] = useState(false)
   const inputArchivo = useRef<HTMLInputElement>(null)
 
@@ -34,13 +51,22 @@ export default function BarrioPage() {
     setAddress(barrio.data.address ?? '')
     setMapUrl(barrio.data.mapUrl ?? '')
     setColor(barrio.data.brandColor)
+    const h = barrio.data.overstayHours
+    setAlertas({ visita: h.visita?.toString() ?? null, proveedor: h.proveedor?.toString() ?? null })
   }
+
+  const horasInvalidas = ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
 
   const marcaPreview = { ...marcaReal, nombre: barrio.data?.name ?? marcaReal.nombre, color: color ?? marcaReal.color }
 
   async function guardarForm(e: React.FormEvent) {
     e.preventDefault()
-    await guardar.mutateAsync({ address, mapUrl, ...(color ? { brandColor: color } : {}) })
+    if (horasInvalidas) return
+    const horas = (t: TipoAlerta) => (alertas[t] === null ? null : horasValidas(alertas[t]!)!)
+    await guardar.mutateAsync({
+      address, mapUrl, ...(color ? { brandColor: color } : {}),
+      overstayHours: { visita: horas('visita'), proveedor: horas('proveedor') },
+    })
   }
 
   async function subir(file: File) {
@@ -89,9 +115,45 @@ export default function BarrioPage() {
             </p>
           </fieldset>
 
-          {guardar.isError && <Nota tono="error">El link de mapas tiene que empezar con http. Copialo desde Google Maps con &quot;Compartir&quot;.</Nota>}
+          <fieldset className="flex flex-col gap-3 border-t border-line pt-4">
+            <legend className="mb-1 text-[13px] font-semibold text-ink-soft">Alertas de permanencia</legend>
+            {ALERTAS.map(({ tipo, etiqueta, sugerida }) => {
+              const valor = alertas[tipo]
+              const error = valor !== null && horasValidas(valor) === undefined ? 'Poné entre 1 y 72 horas.' : null
+              return (
+                <div key={tipo} className="flex flex-col gap-1.5">
+                  <div className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-2">
+                    <label className="flex min-w-36 items-center gap-3 text-sm font-semibold">
+                      <Switch checked={valor !== null} aria-label={`Alertar por ${etiqueta.toLowerCase()}`}
+                        onCheckedChange={(on) => setAlertas((a) => ({ ...a, [tipo]: on ? sugerida : null }))} />
+                      {etiqueta}
+                    </label>
+                    {valor !== null ? (
+                      <span className="flex items-center gap-2 text-sm text-ink-soft">
+                        después de
+                        <Input id={`horas-${tipo}`} type="number" inputMode="numeric" min={1} max={72} step={1}
+                          aria-label={`Horas para ${etiqueta.toLowerCase()}`} aria-invalid={!!error}
+                          aria-describedby={error ? `horas-${tipo}-nota` : undefined}
+                          className="w-20 tabular" value={valor}
+                          onChange={(e) => setAlertas((a) => ({ ...a, [tipo]: e.target.value }))} />
+                        horas adentro
+                      </span>
+                    ) : (
+                      <span className="text-sm text-ink-soft">No alerta</span>
+                    )}
+                  </div>
+                  {error && <p id={`horas-${tipo}-nota`} role="alert" className="text-sm text-alto">{error}</p>}
+                </div>
+              )
+            })}
+            <p className="text-sm text-ink-soft">
+              La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Una frecuente usa las horas de lo que es: visita o proveedor.
+            </p>
+          </fieldset>
+
+          {guardar.isError && <Nota tono="error">No se pudo guardar. Revisá el link de mapas (tiene que empezar con http) y las horas.</Nota>}
           {guardar.isSuccess && <Nota tono="exito">Guardado.</Nota>}
-          <Button type="submit" className="self-start" disabled={guardar.isPending}>
+          <Button type="submit" className="self-start" disabled={guardar.isPending || horasInvalidas}>
             {guardar.isPending ? 'Guardando…' : 'Guardar'}
           </Button>
         </form>

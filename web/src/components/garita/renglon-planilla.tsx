@@ -94,7 +94,7 @@ function CampoHoraTexto({ valor, onValor, ...resto }: {
   )
 }
 
-type Invitacion = { id: string; guestName: string; guestDoc: string | null; unitLabel: string }
+type Invitacion = { id: string; guestName: string; guestDoc: string | null; plate: string | null; unitLabel: string }
 
 /**
  * Un renglón de la planilla de papel: una `<tr>` en escritorio y una tarjeta en
@@ -132,9 +132,10 @@ export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, bloque
   function elegirInvitacion(x: Invitacion) {
     setTexto(x.guestName)
     onCambio({
-      persona: { invitationId: x.id, nombre: x.guestName, lote: x.unitLabel, dniInvitacion: x.guestDoc },
-      // El DNI de la invitación se completa solo; si no tiene, queda lo que se tipeó.
+      persona: { invitationId: x.id, nombre: x.guestName, lote: x.unitLabel, dniInvitacion: x.guestDoc, patenteInvitacion: x.plate },
+      // El DNI y la patente de la invitación se completan solos; si no tiene, queda lo que se tipeó.
       dni: x.guestDoc ?? fila.dni,
+      patente: x.plate ?? fila.patente,
     })
   }
 
@@ -142,7 +143,11 @@ export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, bloque
     setTexto(v)
     if (conInvitacion) {
       // Cambiar el nombre es buscar a otra persona: el DNI que trajo la invitación se va con ella.
-      onCambio({ persona: null, dni: fila.dni === conInvitacion.dniInvitacion ? '' : fila.dni })
+      onCambio({
+        persona: null,
+        dni: fila.dni === conInvitacion.dniInvitacion ? '' : fila.dni,
+        patente: fila.patente === conInvitacion.patenteInvitacion ? '' : fila.patente,
+      })
     } else if (sinInvitacion) {
       onCambio({ persona: v.trim() ? { ...sinInvitacion, nombre: v } : null })
     }
@@ -219,9 +224,10 @@ export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, bloque
     <CampoHoraTexto id={id('salida')} readOnly={bloqueada} aria-label={etiqueta('Salida')} placeholder={escritorio ? '—' : 'Adentro'}
       className={cn(celda, escritorio && 'w-[4.75rem] shrink-0')} valor={fila.salida} onValor={(salida) => onCambio({ salida })} />
   )
-  const nota = (
-    <Input id={id('nota')} readOnly={bloqueada} aria-label={etiqueta('Nota')} placeholder="Opcional" maxLength={200} autoComplete="off" className={celda}
-      value={fila.nota} onChange={(e) => onCambio({ nota: e.target.value })}
+  const patente = (
+    <Input id={id('patente')} readOnly={bloqueada} aria-label={etiqueta('Patente')} placeholder="Opcional" maxLength={10} autoComplete="off"
+      className={cn(celda, 'uppercase tabular')}
+      value={fila.patente} onChange={(e) => onCambio({ patente: e.target.value.toUpperCase() })}
       onKeyDown={(e) => { if (e.key === 'Enter' && !bloqueada) { e.preventDefault(); onEnterFinal() } }} />
   )
   const quitar = (
@@ -247,7 +253,7 @@ export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, bloque
           <td className="px-0.5 py-1.5">{dni}</td>
           <td className="px-0.5 py-1.5">{lote}</td>
           <td className="px-0.5 py-1.5"><div className="flex items-center gap-1.5">{salida}{masUno}</div></td>
-          <td className="px-0.5 py-1.5">{nota}</td>
+          <td className="px-0.5 py-1.5">{patente}</td>
           <td className="py-1.5 pr-2 text-right">{quitar}</td>
         </tr>
         {aviso && (
@@ -285,7 +291,7 @@ export function RenglonPlanilla({ fila, numero, fecha, error, escritorio, bloque
         {campo('DNI', dni)}
         {campo('Lote', lote)}
         {campo('Salida', salida, masUno)}
-        {campo('Nota', nota)}
+        {campo('Patente', patente)}
       </div>
       {aviso}
     </section>

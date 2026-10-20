@@ -92,6 +92,27 @@
       "when": 1792379704761,
       "tag": "0012_carga_cargada_el",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792449820622,
+      "tag": "0013_alerta_permanencia",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792453683696,
+      "tag": "0014_frecuente_como",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792454678970,
+      "tag": "0015_sin_ya_lo_vi",
+      "breakpoints": true
     }
   ]
 }

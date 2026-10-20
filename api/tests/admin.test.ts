@@ -139,6 +139,32 @@ describe('datos del barrio', () => {
     expect(res.status).toBe(400)
   })
 
+  it('el barrio arranca sin alertas de permanencia', async () => {
+    const { cookie } = await loginAs('admin')
+    const res = await request(app).get('/admin/neighborhood').set('Cookie', cookie).expect(200)
+    expect(res.body.overstayHours).toEqual({ visita: null, proveedor: null })
+  })
+
+  it('guarda y apaga los umbrales de permanencia', async () => {
+    const { cookie } = await loginAs('admin')
+    const res = await request(app).patch('/admin/neighborhood').set('Cookie', cookie)
+      .send({ overstayHours: { visita: 6, proveedor: 8 } }).expect(200)
+    expect(res.body.overstayHours).toEqual({ visita: 6, proveedor: 8 })
+
+    // Una clave que no viene no se toca.
+    const apagado = await request(app).patch('/admin/neighborhood').set('Cookie', cookie)
+      .send({ overstayHours: { visita: null } }).expect(200)
+    expect(apagado.body.overstayHours).toEqual({ visita: null, proveedor: 8 })
+  })
+
+  it('rechaza umbrales fuera de 1..72 o no enteros', async () => {
+    const { cookie } = await loginAs('admin')
+    for (const visita of [0, 73, 2.5]) {
+      await request(app).patch('/admin/neighborhood').set('Cookie', cookie)
+        .send({ overstayHours: { visita } }).expect(400)
+    }
+  })
+
   it('un vecino no puede editar el barrio', async () => {
     const { cookie } = await loginAs('resident')
     const res = await request(app).patch('/admin/neighborhood').set('Cookie', cookie)

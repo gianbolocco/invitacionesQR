@@ -26,7 +26,7 @@ const MAX_FILAS = 50
 /** Las claves de las filas con algo tipeado. */
 const conClaves = (filas: FilaPlanilla[]) => new Set(filas.filter((f) => !filaVacia(f)).map((f) => f.clave))
 
-const filaNueva = (): FilaPlanilla => ({ clave: crypto.randomUUID(), ingreso: '', persona: null, dni: '', salida: '', nota: '' })
+const filaNueva = (): FilaPlanilla => ({ clave: crypto.randomUUID(), ingreso: '', persona: null, dni: '', salida: '', patente: '' })
 
 /**
  * Para pasar lo que se anotó en papel durante un corte: la planilla entera, en
@@ -96,7 +96,7 @@ export default function CargarMovimientosPage() {
     setPlanilla((p) => p && { ...p, filas: [...p.filas, nueva] })
   }
 
-  // Enter en la nota: a la fila siguiente, o una nueva si era la última.
+  // Enter en la patente: a la fila siguiente, o una nueva si era la última.
   function siguiente(i: number) {
     if (i < filas.length - 1) enfocar(filas[i + 1].clave)
     else agregar()
@@ -177,7 +177,7 @@ export default function CargarMovimientosPage() {
             </Campo>
           </div>
           <p className="max-w-xl pb-1 text-sm text-ink-soft">
-            Tab pasa de celda y Enter en la nota agrega una fila. La hora va sin dos puntos (2140); una salida más
+            Tab pasa de celda y Enter en la patente agrega una fila. La hora va sin dos puntos (2140); una salida más
             temprana que el ingreso es del día siguiente.
           </p>
         </div>
@@ -192,7 +192,7 @@ export default function CargarMovimientosPage() {
               <thead>
                 <tr className="border-b border-line text-left text-[13px] text-ink-soft">
                   <th scope="col" className="py-2.5 pl-3 font-semibold">#</th>
-                  {['Ingreso', 'Persona', 'DNI', 'Lote', 'Salida', 'Nota'].map((t) => (
+                  {['Ingreso', 'Persona', 'DNI', 'Lote', 'Salida', 'Patente'].map((t) => (
                     <th key={t} scope="col" className="px-3 py-2.5 font-semibold">{t}</th>
                   ))}
                   <th scope="col"><span className="sr-only">Quitar</span></th>

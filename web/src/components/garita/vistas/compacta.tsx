@@ -36,7 +36,7 @@ export function Compacta({ filas, hoy, onAbrir }: {
                 <span className="flex items-center gap-2">
                   <button type="button" onClick={(e) => { e.stopPropagation(); onAbrir(r.id) }}
                     className="min-w-0 truncate text-left font-semibold">{r.guestName}</button>
-                  <TagTipo kind={r.kind} />
+                  <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
                 </span>
               </td>
               <td className="px-3 py-2.5">

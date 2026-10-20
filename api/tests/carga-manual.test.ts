@@ -195,6 +195,33 @@ describe('carga manual de movimientos', () => {
     expect(f.invitationId).toBe(i.id)
   })
 
+  it('guarda la patente cargada, en mayúsculas, en el movimiento y en la invitación de portería', async () => {
+    const ctx = await base()
+    await cargar(ctx, [{ guest: { name: 'Juan Pérez', unitId: ctx.u.id }, plate: ' ab 123 cd ', enteredAt: haceH(2) }])
+    const [i] = await db.select().from(invitations)
+    const [f] = await db.select().from(entryLogs)
+    expect(i.plate).toBe('AB 123 CD')
+    expect(f.plate).toBe('AB 123 CD')
+  })
+
+  it('sin patente cargada, el movimiento usa la de la invitación', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { plate: 'AA111BB' })
+    await cargar(ctx, [{ invitationId: i.id, enteredAt: haceH(2) }])
+    const [f] = await db.select().from(entryLogs)
+    expect(f.plate).toBe('AA111BB')
+  })
+
+  it('la patente cargada pisa la de la invitación solo en el movimiento', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { plate: 'AA111BB' })
+    await cargar(ctx, [{ invitationId: i.id, plate: 'cc222dd', enteredAt: haceH(2) }])
+    const [f] = await db.select().from(entryLogs)
+    const [ii] = await db.select().from(invitations)
+    expect(f.plate).toBe('CC222DD')
+    expect(ii.plate).toBe('AA111BB')
+  })
+
   it('rechaza una unidad de otro barrio para alguien sin invitación', async () => {
     const ctx = await base()
     const [otro] = await db.insert(neighborhoods).values({ name: 'Otro' }).returning()

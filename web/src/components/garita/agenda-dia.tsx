@@ -10,12 +10,14 @@ import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { Vacio } from '@/components/dominio/vacio'
 import { hoyISO, sumarDias, tituloDia } from '@/lib/fechas'
-import { useAgenda, useAdentro } from '@/lib/queries/garita'
+import { useAgenda, useAdentro, type AgendaRow } from '@/lib/queries/garita'
 import {
   armarColumnas, filtrarPorTipo, type Columnas, type FiltroEstado, type FiltroTipo,
 } from '@/lib/tablero'
 import { useMedia } from '@/lib/use-media'
 import { usePreferencia } from '@/lib/use-preferencia'
+import { primeroExcedidas } from '@/lib/permanencia'
+import { useAlertas } from './alertas-permanencia'
 import { Tablero } from './vistas/tablero'
 import { Lista } from './vistas/lista'
 import { Compacta } from './vistas/compacta'
@@ -29,6 +31,8 @@ const TIPOS: { valor: FiltroTipo; etiqueta: string }[] = [
   { valor: 'frecuente', etiqueta: 'Frecuentes' },
   { valor: 'proveedor', etiqueta: 'Proveedores' },
 ]
+
+type FiltroAdvertencia = 'todos' | 'con'
 
 const VACIAS: Columnas = { porLlegar: [], adentro: [], seFueron: [], vencidas: [] }
 
@@ -65,6 +69,9 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
 
   const [tipo, setTipo] = useState<FiltroTipo>('todos')
   const [estado, setEstado] = useState<FiltroEstado>('todos')
+  // Los que pasaron el tiempo que fijó el admin para su tipo (alerta de permanencia).
+  const [advertencia, setAdvertencia] = useState<FiltroAdvertencia>('todos')
+  const { porId } = useAlertas()
 
   const ancho = useMedia('(min-width: 1280px)')
   const medio = useMedia('(min-width: 768px)')
@@ -77,20 +84,29 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
   const q = useAgenda(fecha)
   const adentro = useAdentro(esHoy)
 
-  const columnas = useMemo(() => armarColumnas(
-    filtrarPorTipo(q.data ?? [], tipo),
-    esHoy && adentro.data ? filtrarPorTipo(adentro.data, tipo) : null,
-    hoy,
-  ), [q.data, adentro.data, tipo, esHoy, hoy])
+  const columnas = useMemo(() => {
+    const filtrar = (filas: AgendaRow[] | undefined) => {
+      const deTipo = filtrarPorTipo(filas ?? [], tipo)
+      // La advertencia es de quien está adentro ahora: otro día no hay a quién marcar.
+      return advertencia === 'con' ? deTipo.filter((r) => esHoy && porId.has(r.id)) : deTipo
+    }
+    const c = armarColumnas(filtrar(q.data), esHoy && adentro.data ? filtrar(adentro.data) : null, hoy)
+    // Mirando hoy, los que pasaron su tiempo encabezan "Adentro".
+    const ids = new Set(esHoy ? porId.keys() : [])
+    return { ...c, adentro: primeroExcedidas(c.adentro, ids) }
+  }, [q.data, adentro.data, tipo, advertencia, esHoy, hoy, porId])
+  const cuantosConAdvertencia = esHoy ? filtrarPorTipo(adentro.data ?? [], tipo).filter((r) => porId.has(r.id)).length : 0
 
   const total = columnas.porLlegar.length + columnas.adentro.length + columnas.seFueron.length + columnas.vencidas.length
   // El filtro de estado no existe en el tablero: ahí los tres estados ya son las columnas.
   const visibles: Columnas = vista === 'tablero' || estado === 'todos' ? columnas : { ...VACIAS, [estado]: columnas[estado] }
   const planas = [...visibles.adentro, ...visibles.porLlegar, ...visibles.seFueron, ...visibles.vencidas]
 
-  const aplicados: FiltroAplicado[] = tipo === 'todos'
-    ? []
-    : [{ clave: 'tipo', etiqueta: TIPOS.find((t) => t.valor === tipo)!.etiqueta, quitar: () => setTipo('todos') }]
+  const aplicados: FiltroAplicado[] = [
+    ...(tipo === 'todos' ? [] : [{ clave: 'tipo', etiqueta: TIPOS.find((t) => t.valor === tipo)!.etiqueta, quitar: () => setTipo('todos') }]),
+    ...(advertencia === 'todos' ? [] : [{ clave: 'advertencia', etiqueta: 'Tiempo excedido', quitar: () => setAdvertencia('todos') }]),
+  ]
+  const limpiar = () => { setTipo('todos'); setAdvertencia('todos') }
 
   const opciones: OpcionVista<Vista>[] = [
     { valor: 'tablero', etiqueta: 'Tablero', icono: Columns3, disponible: ancho },
@@ -112,19 +128,26 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
           <ChevronRight aria-hidden />
         </Button>
         <CampoFecha id="agenda-fecha" valor={fecha} onCambio={setFecha} className="w-44" />
-        <HojaFiltros aplicados={aplicados} resultados={q.data ? planas.length : undefined} onLimpiar={() => setTipo('todos')}>
+        <HojaFiltros aplicados={aplicados} resultados={q.data ? planas.length : undefined} onLimpiar={limpiar}>
           <SeccionFiltro titulo="Tipo de invitación">
             <Chips etiqueta="Tipo de invitación" valor={tipo} onCambio={setTipo} opciones={TIPOS} />
           </SeccionFiltro>
+          <SeccionFiltro titulo="Advertencia">
+            <Chips etiqueta="Advertencia" valor={advertencia} onCambio={setAdvertencia} opciones={[
+              { valor: 'todos', etiqueta: 'Todos' },
+              { valor: 'con', etiqueta: 'Tiempo excedido', contador: cuantosConAdvertencia },
+            ]} />
+          </SeccionFiltro>
         </HojaFiltros>
         <div className="ml-auto">
-          <SelectorVista etiqueta="Vista de la agenda" opciones={opciones} valor={vista} onCambio={guardar} />
+          <SelectorVista etiqueta="Vista de la agenda" opciones={opciones} valor={vista}
+            onCambio={guardar} />
         </div>
       </div>
 
       <h2 className="font-display text-2xl font-extrabold capitalize tracking-[-0.02em]">{tituloDia(fecha, hoy)}</h2>
 
-      {aplicados.length > 0 && <FiltrosAplicados aplicados={aplicados} onLimpiar={() => setTipo('todos')} />}
+      {aplicados.length > 0 && <FiltrosAplicados aplicados={aplicados} onLimpiar={limpiar} />}
 
       {vista !== 'tablero' && (
         <Chips etiqueta="Estado" desplaza valor={estado} onCambio={setEstado} opciones={[
@@ -140,10 +163,10 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
       ) : q.isError ? (
         <ErrorConReintento onReintentar={() => q.refetch()} reintentando={q.isFetching} />
       ) : total === 0 ? (
-        tipo === 'todos'
+        aplicados.length === 0
           ? <Vacio icono={CalendarX} titulo="Nadie tiene autorización para este día" />
-          : <Vacio icono={SearchX} titulo="Ninguna invitación de ese tipo"
-              accion={<Button variant="outline" onClick={() => setTipo('todos')}>Ver todos</Button>} />
+          : <Vacio icono={SearchX} titulo={advertencia === 'con' ? 'Nadie con tiempo excedido' : 'Ninguna invitación de ese tipo'}
+              accion={<Button variant="outline" onClick={limpiar}>Ver todos</Button>} />
       ) : vista !== 'tablero' && planas.length === 0 ? (
         <Vacio icono={SearchX} titulo="Nadie en ese estado"
           accion={<Button variant="outline" onClick={() => setEstado('todos')}>Ver todos</Button>} />

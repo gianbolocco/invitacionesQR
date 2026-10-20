@@ -5,6 +5,8 @@ export { hoyISO, fechaCorta } from './fechas'
 export type Invitation = {
   id: string
   kind: 'visita' | 'frecuente' | 'proveedor'
+  /** Solo en las frecuentes: si viene de visita o como proveedor. */
+  frequentAs?: 'visita' | 'proveedor' | null
   guestName: string
   guestDoc: string | null
   plate: string | null

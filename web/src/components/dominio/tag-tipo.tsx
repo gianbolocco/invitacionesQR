@@ -7,19 +7,30 @@ const BASE = 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounde
 /**
  * El tipo de invitación, a la vista. La visita común no lleva tag: es lo
  * normal, y marcarla sería ruido. Frecuente y proveedor sí, porque cambian lo
- * que el guardia espera (alguien que viene seguido, alguien que trabaja).
+ * que el guardia espera (alguien que viene seguido, alguien que trabaja). Una
+ * frecuente que viene como proveedor lleva las dos: todo proveedor se marca.
  * El ícono acompaña la palabra: no depende del color para leerse.
  */
-export function TagTipo({ kind, className }: { kind: Invitation['kind']; className?: string }) {
-  if (kind === 'visita') return null
-  const Icono = kind === 'frecuente' ? Repeat : Truck
+export function TagTipo({ kind, frequentAs, className }: {
+  kind: Invitation['kind']
+  frequentAs?: Invitation['frequentAs']
+  className?: string
+}) {
+  const frecuente = kind === 'frecuente'
+  const proveedor = kind === 'proveedor' || (frecuente && frequentAs === 'proveedor')
+  if (!frecuente && !proveedor) return null
   return (
-    <span className={cn(BASE,
-      kind === 'frecuente' ? 'bg-azul-tint text-ink [&_svg]:text-azul-text' : 'border border-line bg-card text-ink',
-      className,
-    )}>
-      <Icono className="size-3.5" aria-hidden />
-      {KIND_LABEL[kind]}
+    <span className={cn('inline-flex shrink-0 flex-wrap justify-end gap-1', className)}>
+      {frecuente && (
+        <span className={cn(BASE, 'bg-azul-tint text-ink [&_svg]:text-azul-text')}>
+          <Repeat className="size-3.5" aria-hidden />{KIND_LABEL.frecuente}
+        </span>
+      )}
+      {proveedor && (
+        <span className={cn(BASE, 'border border-line bg-card text-ink')}>
+          <Truck className="size-3.5" aria-hidden />{KIND_LABEL.proveedor}
+        </span>
+      )}
     </span>
   )
 }

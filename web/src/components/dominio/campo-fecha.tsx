@@ -21,11 +21,12 @@ export function textoFecha(iso: string): string {
  * Reemplaza a `<input type=date>`, que se ve distinto en cada navegador y en
  * algunos celulares no se puede usar con una mano.
  */
-export function CampoFecha({ id, valor, onCambio, min, className }: {
+export function CampoFecha({ id, valor, onCambio, min, max, className }: {
   id?: string
   valor: string
   onCambio: (iso: string) => void
   min?: string
+  max?: string
   className?: string
 }) {
   const [abierto, setAbierto] = useState(false)
@@ -44,7 +45,7 @@ export function CampoFecha({ id, valor, onCambio, min, className }: {
         <Calendar mode="single" locale={es} weekStartsOn={1}
           selected={valor ? aFecha(valor) : undefined}
           defaultMonth={valor ? aFecha(valor) : undefined}
-          disabled={min ? { before: aFecha(min) } : undefined}
+          disabled={[...(min ? [{ before: aFecha(min) }] : []), ...(max ? [{ after: aFecha(max) }] : [])]}
           onSelect={(d) => { if (d) { onCambio(aISO(d)); setAbierto(false) } }} />
       </PopoverContent>
     </Popover>

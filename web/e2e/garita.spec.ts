@@ -16,10 +16,8 @@ test('el guardia busca un invitado, registra el ingreso y lo deshace', async ({ 
   await entrar(g, 'guardia')
 
   await g.getByLabel('Buscar invitado').fill(nombre)
-  // .first(): la agenda, que ya no esconde a los frecuentes, también lo nombra;
-  // el resultado del buscador es el primero en el DOM.
-  await expect(g.getByText(nombre).first()).toBeVisible()
-  await g.getByText(nombre).first().click()
+  // Por rol: la agenda también lo nombra, y en el celular queda tapada por la búsqueda.
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await expect(g).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
   await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
 
@@ -68,7 +66,7 @@ test('una invitación anulada no pasa', async ({ page, browser }) => {
   const g = await guardia.newPage()
   await entrar(g, 'guardia')
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
   await expect(g.getByText('La anularon')).toBeVisible()
   await guardia.close()
@@ -90,7 +88,7 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
 
   // Ingreso.
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
   await g.getByLabel('Documento').fill('30111222')
   await g.getByRole('button', { name: 'Registrar ingreso' }).click()
@@ -112,7 +110,7 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await expect(g.getByText(nombre).first()).toBeVisible()
 
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).first().click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await expect(g.getByRole('heading', { name: 'EGRESO', exact: true })).toBeVisible()
   await g.getByRole('button', { name: 'Registrar egreso' }).click()
   await expect(g.getByRole('heading', { name: 'EGRESO', exact: true })).toBeVisible()
@@ -184,14 +182,27 @@ test('una invitación nueva aparece en la garita sin recargar', async ({ page, b
 
 /** Una lectora: ráfaga de 5 ms por tecla y Enter, sin campo enfocado. */
 async function leerConLectora(page: import('@playwright/test').Page, texto: string) {
+  // Que la garita haya terminado de cargar: con una agenda larga, las teclas que
+  // llegan antes de que la lectora escuche se pierden (en la garita real nadie
+  // escanea en el primer segundo).
+  // Con un sheet abierto lo de atrás queda oculto para la accesibilidad: ahí ya cargó.
+  if (new URL(page.url()).pathname === '/garita' && await page.getByRole('dialog').count() === 0) {
+    await expect(page.getByRole('heading', { level: 3 }).first()).toBeVisible()
+  }
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await page.keyboard.type(texto, { delay: 5 })
   await page.keyboard.press('Enter')
 }
+/**
+ * Un DNI de prueba que no choca: celular y escritorio corren a la vez, y con
+ * solo el reloj los dos podían sacar el mismo número en el mismo milisegundo
+ * (dos coincidencias → lista, no veredicto).
+ */
+const docUnico = () => `${test.info().project.name === 'celular' ? 1 : 2}${String(Date.now()).slice(-7)}`
 const dni = (doc: string, apellido: string) => `00700000001@${apellido}@JUAN@M@${doc}@A@01/01/1990@01/01/2020@123`
 
 test('leer el DNI con la lectora abre la invitación con el documento cargado', async ({ page, browser }) => {
-  const doc = String(Date.now()).slice(-8)
+  const doc = docUnico()
   const nombre = `Lectora E2E ${doc}`
   await entrar(page, 'vecino')
   await page.goto('/invitaciones/nueva')
@@ -212,7 +223,7 @@ test('leer el DNI con la lectora abre la invitación con el documento cargado', 
 })
 
 test('un DNI sin invitación abre el alta exprés con nombre y documento', async ({ page }) => {
-  const doc = String(Date.now()).slice(-8)
+  const doc = docUnico()
   await entrar(page, 'guardia')
   await page.goto('/garita')
   await leerConLectora(page, dni(doc, `ZZSINVIT${doc}`))
@@ -222,7 +233,7 @@ test('un DNI sin invitación abre el alta exprés con nombre y documento', async
 })
 
 test('el Enter de la lectora nunca registra: ni doble (CR+LF) ni tardío', async ({ page, browser }) => {
-  const doc = String(Date.now()).slice(-8)
+  const doc = docUnico()
   await entrar(page, 'vecino')
   await page.goto('/invitaciones/nueva')
   await page.getByLabel('Nombre del invitado').fill(`Enter E2E ${doc}`)
@@ -284,17 +295,17 @@ async function abrirNoPasaPorCupo(page: import('@playwright/test').Page, browser
   await entrar(g, 'guardia')
   // Ingreso y egreso: la visita agota su cupo de 1.
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).first().click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await g.getByLabel('Documento').fill('30111222')
   await g.getByRole('button', { name: 'Registrar ingreso' }).click()
   await g.getByRole('button', { name: /^Siguiente/ }).click()
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).first().click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await g.getByRole('button', { name: 'Registrar egreso' }).click()
   await g.getByRole('button', { name: /^Siguiente/ }).click()
 
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).first().click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
   await expect(g.getByText('Cupo agotado')).toBeVisible()
   return { g, nombre }
@@ -325,7 +336,7 @@ test('una invitación anulada no se puede autorizar igual', async ({ page, brows
   const g = await (await browser.newContext()).newPage()
   await entrar(g, 'guardia')
   await g.getByLabel('Buscar invitado').fill(nombre)
-  await g.getByText(nombre).click()
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
   await expect(g.getByRole('button', { name: 'Autorizar igual' })).toHaveCount(0)
 })
@@ -347,7 +358,7 @@ test('un DNI leído con el sheet precargado abierto reemplaza el nombre de la in
   await g.getByRole('button', { name: 'Autorizar igual' }).click()
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
   await g.getByRole('button', { name: 'Cambiar' }).focus()
-  const doc = String(Date.now()).slice(-8)
+  const doc = docUnico()
   await leerConLectora(g, dni(doc, 'MEZCLA'))
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue('Juan Mezcla')
   await expect(g.getByLabel('Documento', { exact: true })).toHaveValue(doc)
