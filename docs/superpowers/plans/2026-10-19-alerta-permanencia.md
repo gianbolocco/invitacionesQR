@@ -1,5 +1,12 @@
 # Alerta de permanencia: plan de implementación
 
+> **Ejecutado y superado (19/10).** Las 7 tareas se hicieron, pero después de
+> verlas el dueño sacó el aviso del header, el panel, el "Ya lo vi" y el
+> sonido (tareas 2, 5 y parte de la 6), y se sumaron el subtipo de las
+> frecuentes, el tope de un mes y el filtro *Tiempo excedido*. Lo que existe
+> está en el [spec](../specs/2026-10-19-alerta-permanencia-design.md); este plan
+> queda como registro de cómo se empezó.
+
 > **Para agentes:** usar superpowers:subagent-driven-development o
 > superpowers:executing-plans, tarea por tarea. Los pasos usan `- [ ]`.
 

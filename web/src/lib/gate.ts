@@ -80,7 +80,7 @@ export function detalleRechazo(
 
 export const porToken = (token: string) => api<Resultado>(`/gate/check/${token}`)
 export const buscar = (q: string, signal?: AbortSignal) =>
-  api<Hit[]>(`/gate/search?q=${encodeURIComponent(q)}`, { signal })
+  api<Hit[]>('/gate/search', { method: 'POST', body: JSON.stringify({ q }), signal })
 
 export function mensajeDeError(error: unknown): string {
   if (error instanceof ApiError) {

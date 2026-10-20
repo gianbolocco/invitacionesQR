@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:8080'
 

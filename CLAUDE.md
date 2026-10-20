@@ -1,4 +1,4 @@
-# VisitPass
+# Pazzit
 
 Invitaciones con QR y control de acceso para barrios cerrados. El qué y el porqué
 están en el [README](README.md): leerlo antes de tocar algo que no sea trivial.
@@ -10,6 +10,8 @@ cd api && npm test                  # vitest contra la base invitaciones_test (s
 cd api && npx tsc --noEmit
 cd web && npm run check && npm run lint && npx tsc --noEmit
 cd web && npm run e2e               # Playwright; necesita el stack levantado (docker compose up -d --build)
+                                    # escribe en la base de desarrollo y no limpia: si se pone lento o
+                                    # intermitente, --workers=1 (la lectora pierde teclas con la página trabada)
 ```
 
 No hay tests de componentes en el front: la lógica pura va en `web/src/lib/*.ts`

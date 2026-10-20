@@ -49,6 +49,15 @@ async function abrirAvisos(cookie: string) {
       }
       return leido
     },
+    /** Lo que llegó en `ms`: para probar que un aviso NO salió. */
+    async leerPor(ms: number) {
+      const plazo = new Promise<void>((r) => setTimeout(r, ms))
+      for (;;) {
+        const r = await Promise.race([lector.read(), plazo])
+        if (!r || r.done) return leido
+        leido += texto.decode(r.value)
+      }
+    },
     cerrar() { corte.abort(); server.close() },
   }
 }
@@ -69,6 +78,18 @@ describe('avisos en vivo a la garita', () => {
       }).expect(201)
 
       expect(await avisos.esperar('data: cambio')).toContain('data: cambio')
+    } finally {
+      avisos.cerrar()
+    }
+  })
+
+  it('buscar en la garita no les avisa a las demás aunque vaya por POST', async () => {
+    const { guardia } = await escenario()
+    const avisos = await abrirAvisos(guardia.cookie)
+    try {
+      await avisos.esperar('retry:')
+      await request(app).post('/gate/search').set('Cookie', guardia.cookie).send({ q: '30111222' }).expect(200)
+      expect(await avisos.leerPor(300)).not.toContain('data: cambio')
     } finally {
       avisos.cerrar()
     }

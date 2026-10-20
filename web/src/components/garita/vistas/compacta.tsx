@@ -1,4 +1,5 @@
 'use client'
+import { memo } from 'react'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { TagTipo } from '@/components/dominio/tag-tipo'
 import { quienInvita } from '@/lib/invitations'
@@ -29,30 +30,35 @@ export function Compacta({ filas, hoy, onAbrir }: {
           </tr>
         </thead>
         <tbody>
-          {filas.map((r) => (
-            <tr key={r.id} onClick={() => onAbrir(r.id)}
-              className="cursor-pointer border-b border-line last:border-b-0 transition-colors duration-150 hover:bg-surface-sunk/70">
-              <td className="px-4 py-2.5">
-                <span className="flex items-center gap-2">
-                  <button type="button" onClick={(e) => { e.stopPropagation(); onAbrir(r.id) }}
-                    className="min-w-0 truncate text-left font-semibold">{r.guestName}</button>
-                  <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
-                </span>
-              </td>
-              <td className="px-3 py-2.5">
-                <span className="block tabular">{r.unitLabel}</span>
-                <span className="block truncate text-xs text-ink-soft">{quienInvita(r.inviterName)}</span>
-              </td>
-              <td className="px-3 py-2.5 tabular text-ink-soft">
-                {[r.guestDoc, r.plate].filter(Boolean).join(' · ') || '—'}
-              </td>
-              <td className="px-4 py-2.5 text-right">
-                <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />
-              </td>
-            </tr>
-          ))}
+          {filas.map((r) => <FilaCompacta key={r.id} r={r} hoy={hoy} onAbrir={onAbrir} />)}
         </tbody>
       </table>
     </div>
   )
 }
+
+// Con memo, como las filas de la lista: un aviso no redibuja las que no cambiaron.
+const FilaCompacta = memo(function FilaCompacta({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onAbrir: (id: string) => void }) {
+  return (
+    <tr onClick={() => onAbrir(r.id)}
+      className="cursor-pointer border-b border-line last:border-b-0 transition-colors duration-150 hover:bg-surface-sunk/70">
+      <td className="px-4 py-2.5">
+        <span className="flex items-center gap-2">
+          <button type="button" onClick={(e) => { e.stopPropagation(); onAbrir(r.id) }}
+            className="min-w-0 truncate text-left font-semibold">{r.guestName}</button>
+          <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
+        </span>
+      </td>
+      <td className="px-3 py-2.5">
+        <span className="block tabular">{r.unitLabel}</span>
+        <span className="block truncate text-xs text-ink-soft">{quienInvita(r.inviterName)}</span>
+      </td>
+      <td className="px-3 py-2.5 tabular text-ink-soft">
+        {[r.guestDoc, r.plate].filter(Boolean).join(' · ') || '—'}
+      </td>
+      <td className="px-4 py-2.5 text-right">
+        <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />
+      </td>
+    </tr>
+  )
+})

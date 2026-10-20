@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 test('el guardia busca un invitado, registra el ingreso y lo deshace', async ({ page, browser }) => {
   // Lo crea el vecino, para tener una invitación vigente y fresca.
@@ -124,7 +123,10 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await expect(g).toHaveURL(/\/garita$/)
   await g.waitForTimeout(1500)
   await expect(g).toHaveURL(/\/garita$/)
-  await expect(g.getByRole('heading', { name: /^Se fueron/ })).toBeVisible()
+  // "Se fueron" arranca plegado: se abre para encontrarlo.
+  // expanded: el chip del filtro de estado también se llama "Se fueron".
+  await g.getByRole('button', { name: /^Se fueron/, expanded: false }).click()
+  await expect(g.getByRole('button', { name: /^Se fueron/, expanded: true })).toBeVisible()
   await expect(g.getByText(nombre).first()).toBeVisible()
 
   await guardia.close()
