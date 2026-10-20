@@ -35,5 +35,6 @@ export function pieDe(r: AgendaRow, hoy: string): string {
   if (estado === 'salio') return r.lastExitAt ? `Salió ${hora(r.lastExitAt)}` : 'Salió'
   if (estado === 'vencida') return 'Venció'
   if (r.kind !== 'frecuente' && r.capacity > 1) return `Cupo ${r.capacity}`
-  return r.guestDoc ? `DNI ${r.guestDoc}` : ''
+  // El DNI no va acá: la tarjeta ya lo muestra a la izquierda, junto a la patente.
+  return ''
 }
