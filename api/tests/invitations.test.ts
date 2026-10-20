@@ -200,6 +200,55 @@ describe('editar una invitación', () => {
     return res.body
   }
 
+  it('una frecuente guarda si es visita o proveedor; sin decirlo, visita', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const prov = await visita(ctx, { kind: 'frecuente', frequentAs: 'proveedor', capacity: 999 })
+    const sinDecir = await visita(ctx, { kind: 'frecuente', capacity: 999 })
+    const comun = await visita(ctx, { frequentAs: 'proveedor' })
+    expect(prov.frequentAs).toBe('proveedor')
+    expect(sinDecir.frequentAs).toBe('visita')
+    // Una invitación que no es frecuente no lleva subtipo aunque lo manden.
+    expect(comun.frequentAs).toBeNull()
+  })
+
+  it('una visita frecuente dura hasta un mes; la de proveedor no tiene tope', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const MES = '2027-01-15', MES_Y_UNO = '2027-01-16'
+    const base = { kind: 'frecuente', capacity: 999, validFrom: '2026-12-15' }
+    expect((await visita(ctx, { ...base, validTo: MES })).id).toBeDefined()
+    const larga = await request(app).post('/invitations').set('Cookie', ctx.cookie)
+      .send({ unitId: ctx.unitId, guestName: 'Mucama', ...base, validTo: MES_Y_UNO })
+    expect(larga.status).toBe(400)
+    expect(larga.body.error).toBe('frecuente_mas_de_un_mes')
+    expect((await visita(ctx, { ...base, frequentAs: 'proveedor', validTo: '2027-12-15' })).id).toBeDefined()
+  })
+
+  it('editar una visita frecuente no la estira más de un mes', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const frec = await visita(ctx, { kind: 'frecuente', capacity: 999, validTo: MANIANA })
+    const res = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ validTo: '2099-01-01' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('frecuente_mas_de_un_mes')
+    // Pasarla a proveedor sí la deja larga.
+    await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ frequentAs: 'proveedor', validTo: '2099-01-01' }).expect(200)
+  })
+
+  it('el subtipo de una frecuente se edita; en otra invitación da 400', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const frec = await visita(ctx, { kind: 'frecuente', capacity: 999 })
+    const res = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ frequentAs: 'proveedor' }).expect(200)
+    expect(res.body.frequentAs).toBe('proveedor')
+
+    const comun = await visita(ctx)
+    const mal = await request(app).patch(`/invitations/${comun.id}`).set('Cookie', ctx.cookie)
+      .send({ frequentAs: 'proveedor' })
+    expect(mal.status).toBe(400)
+    expect(mal.body.error).toBe('no_es_frecuente')
+  })
+
   it('cambia nombre, documento y fecha mientras está pendiente', async () => {
     const ctx = await resident('martin@example.com', 'Lote 142')
     const inv = await visita(ctx)
@@ -458,8 +507,9 @@ describe('la home del vecino pide solo lo vigente', () => {
 
   it('una frecuente de todo el año sigue vigente aunque haya entrado muchas veces', async () => {
     const { cookie, unitId } = await resident('ana@example.com', 'Lote 7')
+    // De proveedor: la de visita no puede durar más de un mes.
     await request(app).post('/invitations').set('Cookie', cookie).send({
-      unitId, kind: 'frecuente', guestName: 'Mucama',
+      unitId, kind: 'frecuente', frequentAs: 'proveedor', guestName: 'Mucama',
       validFrom: dias(-30), validTo: dias(300), capacity: 999,
     }).expect(201)
 

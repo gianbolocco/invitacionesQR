@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api, apiBase, ApiError } from '@/lib/api'
 import { hoyISO } from '@/lib/fechas'
@@ -17,6 +17,8 @@ export type AgendaRow = {
   guestDoc: string | null
   plate: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
+  /** Solo en las frecuentes: si viene de visita o como proveedor. */
+  frequentAs?: 'visita' | 'proveedor' | null
   unitLabel: string
   inviterName: string
   capacity: number
@@ -25,6 +27,8 @@ export type AgendaRow = {
   lastEntryAt: string | null
   lastExitAt: string | null
   adentro: boolean
+  /** Solo en /gate/adentro: cuándo vence su tiempo adentro; null = su tipo no alerta. */
+  alertaDesde?: string | null
 }
 
 /*
@@ -88,6 +92,8 @@ export function useBusqueda(q: string) {
     queryKey: claves.busqueda(q),
     queryFn: ({ signal }) => buscar(q, signal),
     enabled: q.length > 0,
+    // Mientras llega lo de la letra nueva, queda la lista anterior: no parpadea al tipear.
+    placeholderData: keepPreviousData,
   })
 }
 

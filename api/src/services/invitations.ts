@@ -3,7 +3,7 @@ import { db } from '../db/index.js'
 import { invitations, entryLogs, people, units, unitMembers, neighborhoods } from '../db/schema.js'
 import { randomToken } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
-import { todayInBuenosAires } from '../lib/dates.js'
+import { todayInBuenosAires, unMesDespues } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { PORTERIA } from '../lib/porteria.js'
 
@@ -11,6 +11,8 @@ export type CreateInvitationInput = {
   unitId: string
   createdBy: string
   kind: 'visita' | 'frecuente' | 'proveedor'
+  /** Solo cuenta en las frecuentes; sin él, visita. */
+  frequentAs?: 'visita' | 'proveedor'
   guestName: string
   guestDoc?: string
   plate?: string
@@ -84,13 +86,26 @@ export function valoresDePorteria(input: CreateExpressInvitationInput, dia: stri
   }
 }
 
+/**
+ * Una visita frecuente dura hasta un mes: la empleada o el profesor se renuevan
+ * cada mes, así la lista no junta gente que ya no viene. La frecuente que viene
+ * a trabajar (proveedor) no tiene este tope.
+ */
+function assertRangoDeFrecuente(kind: string, frequentAs: string | null | undefined, validFrom: string, validTo: string) {
+  if (kind === 'frecuente' && (frequentAs ?? 'visita') === 'visita' && validTo > unMesDespues(validFrom)) {
+    throw new AppError(400, 'frecuente_mas_de_un_mes')
+  }
+}
+
 export async function createInvitation(input: CreateInvitationInput) {
   await assertMemberOfUnit(input.createdBy, input.unitId)
+  assertRangoDeFrecuente(input.kind, input.frequentAs, input.validFrom, input.validTo)
 
   const [inv] = await db.insert(invitations).values({
     unitId: input.unitId,
     createdBy: input.createdBy,
     kind: input.kind,
+    frequentAs: input.kind === 'frecuente' ? (input.frequentAs ?? 'visita') : null,
     guestName: input.guestName.trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
@@ -123,6 +138,7 @@ const nombreOEtiquetaSql = sql<string>`case when ${people.role} = 'guard' then $
 const columnas = {
   id: invitations.id,
   kind: invitations.kind,
+  frequentAs: invitations.frequentAs,
   guestName: invitations.guestName,
   guestDoc: invitations.guestDoc,
   plate: invitations.plate,
@@ -422,6 +438,7 @@ export type EditInvitationInput = {
   validTo?: string
   weekdays?: number[] | null
   capacity?: number
+  frequentAs?: 'visita' | 'proveedor'
 }
 
 /**
@@ -453,6 +470,12 @@ export async function editInvitation(
   if (validTo < validFrom) throw new AppError(400, 'ventana_invertida')
 
   const capacity = input.capacity ?? inv.capacity
+  if (input.frequentAs !== undefined && inv.kind !== 'frecuente') throw new AppError(400, 'no_es_frecuente')
+  // Solo si cambia algo que lo afecta: una frecuente vieja de un año se sigue
+  // pudiendo corregir (el nombre, el DNI) sin obligar a acortarla.
+  const cambiaRango = validFrom !== inv.validFrom || validTo !== inv.validTo
+    || (input.frequentAs !== undefined && input.frequentAs !== inv.frequentAs)
+  if (cambiaRango) assertRangoDeFrecuente(inv.kind, input.frequentAs ?? inv.frequentAs, validFrom, validTo)
 
   const [actualizada] = await db.update(invitations).set({
     ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),
@@ -462,6 +485,7 @@ export async function editInvitation(
     validTo,
     ...(input.weekdays !== undefined ? { weekdays: input.weekdays?.length ? input.weekdays : null } : {}),
     capacity,
+    ...(input.frequentAs !== undefined ? { frequentAs: input.frequentAs } : {}),
   }).where(eq(invitations.id, id)).returning()
 
   return actualizada

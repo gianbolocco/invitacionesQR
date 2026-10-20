@@ -28,9 +28,14 @@ choca con `canEnter()` y el cupo. Ese modo queda fuera de alcance.
 Arriba va la **fecha de la planilla**, elegida una sola vez (por defecto, hoy).
 Debajo, una tabla con estas columnas fijas, igual que el papel:
 
-| Ingreso | Persona | DNI | Lote | Salida | Nota | |
+| Ingreso | Persona | DNI | Lote | Salida | Patente | |
 |---|---|---|---|---|---|---|
-| `21:40` | buscador | obligatorio | automático o elegido | `23:10` o vacío | texto | quitar |
+| `21:40` | buscador | obligatorio | automático o elegido | `23:10` o vacío | opcional, la de la invitación o tipeada | quitar |
+
+La patente reemplaza a la nota (cambio del 19/10): se guarda en mayúsculas en el
+movimiento y, en una persona sin invitación, también en la invitación de
+portería. Sin patente tipeada, el movimiento usa la de la invitación. La API
+sigue aceptando `note` para no perder las notas ya cargadas.
 
 - **Teclado primero:** Tab avanza de celda y Enter en la última celda agrega
   una fila nueva y pone el foco en su "Ingreso". La hora se escribe (`2140` →

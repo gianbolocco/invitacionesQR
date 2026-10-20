@@ -133,7 +133,8 @@ export default function GaritaHoy() {
     <ChromeGarita>
       <div className="grid grid-cols-1 gap-8 md:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
-          <BuscarInvitado q={q} onQ={(v) => { setQ(v); setDniLista(null) }} onAbrir={abrirDeLista} onLectura={leer} />
+          <BuscarInvitado q={q} onQ={(v) => { setQ(v); setDniLista(null) }} onAbrir={abrirDeLista} onLectura={leer}
+            onAutorizar={() => setAltaAbierta(true)} />
           <div className="flex flex-col gap-1">
             <Button type="button" variant="outline"
               onClick={(e) => { setDisparador(e.currentTarget); setAltaAbierta(true) }}>

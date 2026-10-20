@@ -6,16 +6,18 @@ import { TagTipo } from '@/components/dominio/tag-tipo'
 import type { AgendaRow } from '@/lib/queries/garita'
 import type { Columnas } from '@/lib/tablero'
 import { detalleDe, estadoDe, metaDe } from '@/components/garita/datos-agenda'
+import { TextoExcedido, useTiempoExcedido } from '@/components/garita/alertas-permanencia'
 
 export function FilaAgenda({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onAbrir: (id: string) => void }) {
+  const excedido = useTiempoExcedido(r)
   return (
     <Fila densa titulo={
       <span className="flex items-center gap-2">
         <span className="min-w-0 truncate">{r.guestName}</span>
-        <TagTipo kind={r.kind} />
+        <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
       </span>
     } meta={metaDe(r)} onClick={() => onAbrir(r.id)}
-      extremo={<EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />} />
+      extremo={excedido ? <TextoExcedido texto={excedido} className="text-[13px]" /> : <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />} />
   )
 }
 

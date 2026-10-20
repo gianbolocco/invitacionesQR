@@ -48,6 +48,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-M
 const createSchema = z.object({
   unitId: z.string().uuid(),
   kind: z.enum(['visita', 'frecuente', 'proveedor']),
+  frequentAs: z.enum(['visita', 'proveedor']).optional(),
   guestName: z.string().min(1),
   guestDoc: z.string().optional(),
   plate: z.string().optional(),
@@ -106,6 +107,7 @@ const editSchema = z.object({
   validTo: isoDate.optional(),
   weekdays: z.array(z.number().int().min(0).max(6)).nullable().optional(),
   capacity: z.number().int().min(1).optional(),
+  frequentAs: z.enum(['visita', 'proveedor']).optional(),
 })
 
 invitationRoutes.patch('/:id', async (req, res) => {

@@ -26,8 +26,15 @@ export const neighborhoods = pgTable('neighborhood', {
   // Cuándo se cambió el logo por última vez. Viaja como versión en la URL del
   // logo: la respuesta se cachea una hora y sin esto se vería el anterior.
   logoUpdatedAt: timestamp('logo_updated_at', { withTimezone: true }),
+  // Horas adentro antes de que la garita avise, por tipo. NULL = ese tipo no
+  // alerta. Una frecuente usa la de su subtipo (`invitation.frequent_as`).
+  overstayHoursVisita: smallint('overstay_hours_visita'),
+  overstayHoursProveedor: smallint('overstay_hours_proveedor'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [
+  check('neighborhood_overstay_visita_ck', sql`${t.overstayHoursVisita} between 1 and 72`),
+  check('neighborhood_overstay_proveedor_ck', sql`${t.overstayHoursProveedor} between 1 and 72`),
+])
 
 export const units = pgTable('unit', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -73,6 +80,10 @@ export const invitations = pgTable('invitation', {
   unitId: uuid('unit_id').notNull().references(() => units.id),
   createdBy: uuid('created_by').notNull().references(() => people.id),
   kind: text('kind').notNull(),
+  // Solo en las frecuentes: si viene de visita (la empleada, el profesor) o
+  // como proveedor (el jardinero, el pintor de toda la semana). Decide el
+  // umbral de la alerta de permanencia y la marca en la garita.
+  frequentAs: text('frequent_as'),
   guestName: text('guest_name').notNull(),
   guestDoc: text('guest_doc'),
   plate: text('plate'),
@@ -93,6 +104,10 @@ export const invitations = pgTable('invitation', {
   index('invitation_creator_idx').on(t.createdBy, t.createdAt),
   // Sin 'evento': un evento es una invitación por invitado, no un tipo aparte.
   check('invitation_kind_ck', sql`${t.kind} in ('visita','frecuente','proveedor')`),
+  // Solo una frecuente lo lleva. Una frecuente sin él cuenta como visita: la API
+  // siempre lo completa, y así un insert crudo (tests, scripts) no se rompe.
+  check('invitation_frequent_as_ck', sql`${t.frequentAs} is null
+    or (${t.kind} = 'frecuente' and ${t.frequentAs} in ('visita','proveedor'))`),
   check('invitation_window_ck', sql`${t.validTo} >= ${t.validFrom}`),
   check('invitation_capacity_ck', sql`${t.capacity} >= 1`),
 ])

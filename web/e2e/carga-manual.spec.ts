@@ -30,7 +30,7 @@ test('el guardia pasa la planilla del corte y la auditoría la muestra completa'
     await campo('Persona', 1).fill(nombre)
     await g.getByRole('option', { name: /Invitado ese día/ }).click()
     await campo('DNI', 1).fill('30111222')
-    await campo('Nota', 1).fill('corte de luz')
+    await campo('Patente', 1).fill('ab123cd')
 
     await g.getByRole('button', { name: 'Agregar fila' }).click()
     await campo('Ingreso', 2).fill('0000')
@@ -59,7 +59,7 @@ test('el guardia pasa la planilla del corte y la auditoría la muestra completa'
     await expect(g.getByText(nombre)).toBeVisible()
     await expect(g.getByText('Carga manual').first()).toBeVisible()
     await desplegar.first().click()
-    await expect(g.getByText('corte de luz')).toBeVisible()
+    await expect(g.getByText(/AB123CD/)).toBeVisible()
     await expect(g.getByText(/Cargado a mano por/)).toBeVisible()
 
     await buscar.fill(sinInvitacion)

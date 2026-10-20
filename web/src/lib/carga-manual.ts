@@ -58,13 +58,14 @@ export type FilaPlanilla = {
   /** 'HH:MM' o lo que se tipeó. */
   ingreso: string
   persona:
-    | { invitationId: string; nombre: string; lote: string; dniInvitacion: string | null }
+    | { invitationId: string; nombre: string; lote: string; dniInvitacion: string | null; patenteInvitacion?: string | null }
     | { nombre: string; unitId: string; lote: string }
     | null
   dni: string
   /** '' = sigue adentro. */
   salida: string
-  nota: string
+  /** La anotada en el papel; con invitación arranca con la suya. */
+  patente: string
 }
 export type Planilla = { fecha: string; filas: FilaPlanilla[] }
 
@@ -73,9 +74,9 @@ export type ItemManual = {
   invitationId?: string
   guest?: { name: string; unitId: string }
   guestDoc: string
+  plate?: string
   enteredAt: string
   exitedAt: string | null
-  note?: string
 }
 
 /** '2140' → '21:40', '9' → '09:00', '21:4' → '21:04'; lo que no es una hora → ''. */
@@ -131,7 +132,7 @@ export function errorDeFila(fecha: string, f: FilaPlanilla, todas: FilaPlanilla[
 
 /** Una fila sin nada tipeado: no cuenta ni como error ni como movimiento. */
 export const filaVacia = (f: FilaPlanilla) =>
-  !f.persona && !f.ingreso.trim() && !f.dni.trim() && !f.salida.trim() && !f.nota.trim()
+  !f.persona && !f.ingreso.trim() && !f.dni.trim() && !f.salida.trim() && !f.patente.trim()
 
 /**
  * Las filas como las pide `cargarManual`. Precondición: todas las filas están
@@ -153,7 +154,7 @@ export function aItems(p: Planilla, ahora: Date = new Date()): ItemManual[] {
       enteredAt: aInstante(entrada),
       exitedAt: salida ? aInstante(salida) : null,
     }
-    if (f.nota.trim()) item.note = f.nota.trim()
+    if (f.patente.trim()) item.plate = f.patente.trim().toUpperCase()
     return [item]
   })
 }
@@ -180,7 +181,7 @@ function filaValida(v: unknown): FilaPlanilla | null {
     }
   }
   const t = (k: string) => (esTexto(o[k]) ? (o[k] as string) : '')
-  return { clave: o.clave, ingreso: t('ingreso'), persona, dni: t('dni'), salida: t('salida'), nota: t('nota') }
+  return { clave: o.clave, ingreso: t('ingreso'), persona, dni: t('dni'), salida: t('salida'), patente: t('patente') }
 }
 
 /** El borrador guardado en el navegador; JSON roto o sin forma de planilla → null, y las filas que no encajan se descartan. */

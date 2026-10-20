@@ -176,8 +176,12 @@ export type Barrio = {
   address: string | null
   mapUrl: string | null
   brandColor: string | null
+  /** Horas adentro antes de alertar a la garita; null = ese tipo no alerta. */
+  overstayHours: HorasPermanencia
   paleta: string[]
 }
+
+export type HorasPermanencia = { visita: number | null; proveedor: number | null }
 
 export function useBarrio() {
   return useQuery({ queryKey: claves.barrio, queryFn: ({ signal }) => api<Barrio>('/admin/neighborhood', { signal }) })
@@ -186,13 +190,13 @@ export function useBarrio() {
 export function useGuardarBarrio() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (datos: { address: string; mapUrl: string; brandColor?: string }) =>
+    mutationFn: (datos: { address: string; mapUrl: string; brandColor?: string; overstayHours?: HorasPermanencia }) =>
       api<Barrio>('/admin/neighborhood', { method: 'PATCH', body: JSON.stringify(datos) }),
     onSuccess: (b) => {
       qc.setQueryData(claves.barrio, b)
       qc.invalidateQueries({ queryKey: claveMarca })
     },
-    onError: () => toast.error('El link de mapas tiene que empezar con http. Copialo desde Google Maps con "Compartir".'),
+    onError: () => toast.error('No se pudo guardar. Revisá el link de mapas (tiene que empezar con http) y las horas (de 1 a 72).'),
   })
 }
 
