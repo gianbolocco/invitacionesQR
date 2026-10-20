@@ -36,6 +36,20 @@
 		-X-Powered-By
 	}
 
+	# Un ambiente de prueba (qa) va detrás de usuario y contraseña: se activa
+	# cargando QA_PASS_HASH; vacía, como en producción, no pide nada. Sin pasar
+	# por acá el healthcheck, que es del propio contenedor y no tiene credenciales.
+	@protegido {
+		expression "{$QA_PASS_HASH}" != ""
+		not path /api/health
+	}
+	# El hash por defecto nunca se usa (sin QA_PASS_HASH el matcher no aplica),
+	# pero Caddy lo valida al arrancar: es de un valor al azar que no se guardó.
+	basic_auth @protegido {
+		{$QA_USUARIO:qa} {$QA_PASS_HASH:$2a$14$5Vjj48EVRNcT5qbrlsVNLurS75Z9RdZ8giXLWjTi65P0y0.23JrZe}
+	}
+	header @protegido X-Robots-Tag "noindex, nofollow"
+
 	handle_path /api/* {
 		reverse_proxy api:8080
 	}
