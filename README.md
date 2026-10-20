@@ -1,4 +1,4 @@
-# VisitPass
+# Pazzit
 
 Invitaciones y control de acceso para barrios cerrados. Reemplaza el "avisá a la
 guardia por WhatsApp": el vecino genera una invitación, el invitado carga sus
@@ -13,7 +13,9 @@ el stack con otras cuatro variables de entorno.
 **El vecino** crea una invitación a nivel unidad (UF), no a nivel persona: los
 que viven en la misma casa ven y gestionan las invitaciones de esa casa. Hay
 tres tipos —visita, frecuente y proveedor— y son todos la misma tabla, con
-distinta ventana de validez y distinto cupo.
+distinta ventana de validez y distinto cupo. Una frecuente dice si viene de
+visita (la empleada, el profesor) o a trabajar (el jardinero): la de visita dura
+hasta un mes, y en la garita la otra se marca también como proveedor.
 
 **El invitado** recibe un link. Ahí ve quién lo invita, a qué unidad y cómo
 llegar, carga su documento y su patente si quiere, y se queda con su QR.
@@ -25,7 +27,9 @@ la trazabilidad de quién entró y quién no.
 
 **El guardia** tiene su propia cuenta —cada movimiento queda a nombre de quien
 estaba logueado, que es lo que hace auditable el "¿quién lo dejó pasar?"—, la
-lista del día, el escáner y la auditoría exportable a Excel.
+lista del día, el escáner y la auditoría exportable a Excel. El buscador de la
+garita muestra los resultados flotando sobre la pantalla (en el celular, a
+pantalla completa) y se maneja con el teclado: flechas, Enter y Esc.
 
 Escanear el QR de nuevo, o buscar por documento, registra la **salida**: el
 sistema resuelve solo si el movimiento es un ingreso o un egreso según haya o no
@@ -191,3 +195,8 @@ se lean en escala de grises y con daltonismo.
   Además, el número de DNI viaja como parámetro de consulta a `/gate/search` y puede
   quedar en los logs de acceso.
 - **Aviso al vecino** cuando su invitado llega a la barrera.
+- **Agenda larga.** La garita dibuja todas las filas del día. Con varios cientos
+  la página se traba y la lectora puede tomar la ráfaga del escáner por tipeo
+  humano y descartarla: virtualizar la lista o plegar "Se fueron".
+- **Base propia para el e2e.** Hoy escribe en la de desarrollo y no limpia; con
+  el tiempo la suite se vuelve lenta e intermitente.
