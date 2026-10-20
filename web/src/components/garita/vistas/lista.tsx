@@ -1,5 +1,6 @@
 'use client'
-import { memo } from 'react'
+import { memo, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Fila } from '@/components/dominio/fila'
 import { EstadoTag } from '@/components/dominio/estado-tag'
@@ -67,11 +68,11 @@ const ItemTramo = memo(function ItemTramo({ r, hoy, onAbrir }: { r: AgendaRow; h
   )
 })
 
-const TRAMOS: { clave: keyof Columnas; titulo: string; apagado?: boolean }[] = [
+const TRAMOS: { clave: keyof Columnas; titulo: string; plegado?: boolean }[] = [
   { clave: 'adentro', titulo: 'Adentro' },
   { clave: 'porLlegar', titulo: 'Por llegar' },
-  { clave: 'seFueron', titulo: 'Se fueron', apagado: true },
-  { clave: 'vencidas', titulo: 'Vencidas', apagado: true },
+  { clave: 'seFueron', titulo: 'Se fueron', plegado: true },
+  { clave: 'vencidas', titulo: 'Vencidas', plegado: true },
 ]
 
 /**
@@ -84,16 +85,46 @@ export function Lista({ columnas, hoy, onAbrir }: {
   hoy: string
   onAbrir: (id: string) => void
 }) {
+  const conFilas = TRAMOS.filter((t) => columnas[t.clave].length > 0)
   return (
     <div className="flex flex-col gap-6">
-      {TRAMOS.filter((t) => columnas[t.clave].length > 0).map((t) => (
-        <section key={t.clave} className="flex flex-col gap-2">
-          <h3 className="text-[13px] font-semibold text-ink-soft">
-            {t.titulo} ({columnas[t.clave].length})
-          </h3>
-          <Tramo filas={columnas[t.clave]} hoy={hoy} onAbrir={onAbrir} className={t.apagado ? 'opacity-70' : undefined} />
-        </section>
-      ))}
+      {conFilas.map((t) => t.plegado && conFilas.length > 1
+        ? <TramoPlegado key={t.clave} titulo={t.titulo} filas={columnas[t.clave]} hoy={hoy} onAbrir={onAbrir} />
+        : (
+          <section key={t.clave} className="flex flex-col gap-2">
+            <h3 className="text-[13px] font-semibold text-ink-soft">
+              {t.titulo} ({columnas[t.clave].length})
+            </h3>
+            <Tramo filas={columnas[t.clave]} hoy={hoy} onAbrir={onAbrir} className={t.plegado ? 'opacity-70' : undefined} />
+          </section>
+        ))}
     </div>
+  )
+}
+
+/*
+ * Lo que ya pasó arranca cerrado. A la noche "Se fueron" es la mayoría de la
+ * agenda, y cerrado no se monta: cada aviso de la garita redibujaba esas filas
+ * y en una PC lenta la página trabada le cortaba lecturas a la lectora. Si el
+ * filtro deja solo este tramo, va abierto (ver Lista).
+ */
+function TramoPlegado({ titulo, filas, hoy, onAbrir }: {
+  titulo: string
+  filas: AgendaRow[]
+  hoy: string
+  onAbrir: (id: string) => void
+}) {
+  const [abierto, setAbierto] = useState(false)
+  return (
+    <section className="flex flex-col gap-2">
+      <h3>
+        <button type="button" aria-expanded={abierto} onClick={() => setAbierto(!abierto)}
+          className="-mx-2 flex min-h-11 items-center gap-1.5 rounded-md px-2 text-[13px] font-semibold text-ink-soft transition-colors duration-150 hover:bg-surface-sunk/70">
+          <ChevronRight aria-hidden className={`size-4 transition-transform duration-200 ${abierto ? 'rotate-90' : ''}`} />
+          {titulo} ({filas.length})
+        </button>
+      </h3>
+      {abierto && <Tramo filas={filas} hoy={hoy} onAbrir={onAbrir} className="opacity-70" />}
+    </section>
   )
 }
