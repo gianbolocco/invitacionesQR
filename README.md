@@ -34,7 +34,7 @@ poder salir— y no libera cupo, así que un reingreso rebota igual que antes.
 
 Si una visita o un proveedor lleva adentro más horas de las que fijó el admin
 para su tipo, la garita lo **marca**: va primero en "Adentro", con el tiempo que
-lleva en amarillo, y en *Filtros → Advertencia* se ven solo esos. La cuenta se
+lleva en amarillo, y en *Filtros → Tiempo excedido* se ven solo esos. La cuenta se
 hace en la garita contra su reloj: no hay job en el servidor. Una frecuente usa
 las horas de lo que es: visita o proveedor, según eligió el vecino.
 

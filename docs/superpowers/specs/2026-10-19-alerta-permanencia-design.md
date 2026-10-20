@@ -29,7 +29,7 @@ una alerta que no se calla termina ignorada.
 > **Segunda revisión del dueño (19/10):** se sacaron el aviso del header, el
 > panel lateral, el "Ya lo vi" (endpoint y columnas, migración 0015) y el
 > sonido. Lo que queda: la marca en amarillo en tablero y lista, los excedidos
-> primero en "Adentro" y el filtro **Advertencia** en *Filtros* (funciona en
+> primero en "Adentro" y el filtro **Advertencia → Tiempo excedido** en *Filtros* (funciona en
 > todas las vistas, también el tablero). Los puntos 5, 6 y 7 de abajo y la
 > sección "Celular y revisión del dueño" quedan como historia.
 
@@ -43,7 +43,10 @@ una alerta que no se calla termina ignorada.
    mientras no se usó. Usa el umbral de ese subtipo. Las que ya existían
    quedaron como visita; una frecuente sin subtipo (un insert crudo) cuenta como
    visita. En la garita, una frecuente proveedor lleva las dos marcas:
-   "Frecuente" y "Proveedor".
+   "Frecuente" y "Proveedor". Una **visita frecuente dura hasta un mes** (mismo
+   día del mes siguiente; `frecuente_mas_de_un_mes` si no): se valida en el
+   formulario y en la API, al crear y al editar si cambian las fechas o el
+   subtipo. La de proveedor no tiene tope.
 3. **El reloj corre desde el ingreso más viejo que sigue abierto** de esa
    invitación (una invitación con cupo 3 puede tener a tres personas adentro).
 4. **La cuenta es en vivo y no se guarda.** La API devuelve en `/gate/adentro`

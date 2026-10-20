@@ -35,9 +35,9 @@ test('la garita marca a quien pasó su tiempo adentro y lo deja filtrar', async 
     await g.goto('/garita')
     // Puede haber otros excedidos de corridas anteriores: se busca a esta persona, no un número.
     await g.getByRole('button', { name: /^Filtros/ }).click()
-    await g.getByRole('group', { name: 'Advertencia' }).getByRole('button', { name: /Pasaron su tiempo/ }).click()
+    await g.getByRole('group', { name: 'Advertencia' }).getByRole('button', { name: /Tiempo excedido/ }).click()
     await g.keyboard.press('Escape')
-    await expect(g.getByText('Con advertencia').first()).toBeVisible()
+    await expect(g.getByText('Tiempo excedido').first()).toBeVisible()
     await expect(g.getByRole('button', { name: new RegExp(nombre) })).toContainText(/Hace .+ adentro/)
   } finally {
     await guardia.close()

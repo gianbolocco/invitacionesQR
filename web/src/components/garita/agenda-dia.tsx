@@ -104,7 +104,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
 
   const aplicados: FiltroAplicado[] = [
     ...(tipo === 'todos' ? [] : [{ clave: 'tipo', etiqueta: TIPOS.find((t) => t.valor === tipo)!.etiqueta, quitar: () => setTipo('todos') }]),
-    ...(advertencia === 'todos' ? [] : [{ clave: 'advertencia', etiqueta: 'Con advertencia', quitar: () => setAdvertencia('todos') }]),
+    ...(advertencia === 'todos' ? [] : [{ clave: 'advertencia', etiqueta: 'Tiempo excedido', quitar: () => setAdvertencia('todos') }]),
   ]
   const limpiar = () => { setTipo('todos'); setAdvertencia('todos') }
 
@@ -135,7 +135,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
           <SeccionFiltro titulo="Advertencia">
             <Chips etiqueta="Advertencia" valor={advertencia} onCambio={setAdvertencia} opciones={[
               { valor: 'todos', etiqueta: 'Todos' },
-              { valor: 'con', etiqueta: 'Pasaron su tiempo', contador: cuantosConAdvertencia },
+              { valor: 'con', etiqueta: 'Tiempo excedido', contador: cuantosConAdvertencia },
             ]} />
           </SeccionFiltro>
         </HojaFiltros>
@@ -165,7 +165,7 @@ export function AgendaDia({ onAbrir }: { onAbrir: (id: string) => void }) {
       ) : total === 0 ? (
         aplicados.length === 0
           ? <Vacio icono={CalendarX} titulo="Nadie tiene autorización para este día" />
-          : <Vacio icono={SearchX} titulo={advertencia === 'con' ? 'Nadie pasó su tiempo adentro' : 'Ninguna invitación de ese tipo'}
+          : <Vacio icono={SearchX} titulo={advertencia === 'con' ? 'Nadie con tiempo excedido' : 'Ninguna invitación de ese tipo'}
               accion={<Button variant="outline" onClick={limpiar}>Ver todos</Button>} />
       ) : vista !== 'tablero' && planas.length === 0 ? (
         <Vacio icono={SearchX} titulo="Nadie en ese estado"
