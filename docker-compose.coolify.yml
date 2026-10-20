@@ -119,11 +119,6 @@ services:
     expose: ['80']
     environment:
       SITIO: ':80'
-      # Solo en qa: usuario y contraseña antes de entrar. El hash sale de
-      #   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'la-clave'
-      # y en Coolify va marcado "Is Literal?": lleva $ que, si no, se interpolan.
-      QA_USUARIO: ${QA_USUARIO:-qa}
-      QA_PASS_HASH: ${QA_PASS_HASH:-}
     depends_on: [web, api]
     # Es el servicio que Coolify expone, así que es el que reporta el estado del
     # recurso. Pega a /api/health A TRAVÉS de Caddy: un solo chequeo cubre el
