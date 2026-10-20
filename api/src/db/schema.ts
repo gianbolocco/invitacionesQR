@@ -135,10 +135,6 @@ export const entryLogs = pgTable('entry_log', {
   loadedBy: uuid('loaded_by').references(() => people.id),
   // Cuándo se cargó a mano. La hora del movimiento es la declarada; esta es la real.
   loadedAt: timestamp('loaded_at', { withTimezone: true }),
-  // El "Ya lo vi" de la alerta de permanencia. Va en el ingreso y no en la
-  // invitación: si sale y vuelve a entrar, es otra fila y vuelve a alertar.
-  overstaySeenAt: timestamp('overstay_seen_at', { withTimezone: true }),
-  overstaySeenBy: uuid('overstay_seen_by').references(() => people.id),
 }, (t) => [
   index('entry_unit_idx').on(t.unitId, t.enteredAt),
   index('entry_invitation_idx').on(t.invitationId),

@@ -289,25 +289,6 @@ async function cargarUna(
  * lo que hace que dos egresos simultáneos no escriban los dos. El que pierde
  * actualiza cero filas y se va con 409.
  */
-/**
- * El "Ya lo vi" de la alerta de permanencia: marca los ingresos abiertos de la
- * invitación. Un reingreso es una fila nueva, así que vuelve a alertar.
- */
-export async function marcarAlertaVista(invitationId: string, guardId: string, neighborhoodId: string) {
-  const [inv] = await db.select({ unitId: invitations.unitId }).from(invitations)
-    .where(eq(invitations.id, invitationId)).limit(1)
-  if (!inv) throw new AppError(404, 'not_found')
-  await assertUnitInNeighborhood(inv.unitId, neighborhoodId)
-
-  const marcadas = await db.update(entryLogs)
-    .set({ overstaySeenAt: new Date(), overstaySeenBy: guardId })
-    .where(and(eq(entryLogs.invitationId, invitationId), isNull(entryLogs.exitedAt)))
-    .returning({ id: entryLogs.id })
-  if (!marcadas.length) throw new AppError(409, 'no_esta_adentro')
-
-  await audit(guardId, neighborhoodId, 'entry.overstay_seen', 'invitation', invitationId)
-}
-
 export async function registerExit(invitationId: string, guardId: string | null) {
   const abierta = await openEntry(invitationId)
   if (!abierta) throw new AppError(409, 'no_esta_adentro')
@@ -460,8 +441,6 @@ export type AgendaRow = {
   adentro: boolean
   /** Solo en `insideNow`: cuándo vence su tiempo adentro; null = su tipo no alerta. */
   alertaDesde?: Date | null
-  /** Solo en `insideNow`: un guardia ya marcó "Ya lo vi" en todos sus ingresos abiertos. */
-  alertaVista?: boolean
 }
 
 /**
@@ -554,13 +533,11 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       case case when i.kind = 'frecuente' then coalesce(i.frequent_as, 'visita') else i.kind end
         when 'visita'    then abiertas.primero + make_interval(hours => n.overstay_hours_visita)
         when 'proveedor' then abiertas.primero + make_interval(hours => n.overstay_hours_proveedor)
-      end                                               as "alertaDesde",
-      abiertas.vista                                    as "alertaVista"
+      end                                               as "alertaDesde"
     from (
       -- El reloj de la alerta corre desde el ingreso abierto más viejo: con
       -- cupo 3 puede haber tres adentro, y el que lleva más es el que importa.
-      select invitation_id, max(entered_at) as desde, min(entered_at) as primero,
-             bool_and(overstay_seen_at is not null) as vista
+      select invitation_id, max(entered_at) as desde, min(entered_at) as primero
       from entry_log where exited_at is null group by invitation_id
     ) abiertas
     join invitation i on i.id = abiertas.invitation_id
