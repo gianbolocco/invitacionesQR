@@ -301,7 +301,7 @@ describe('quién está adentro', () => {
     expect(adentro.body.map((r: { id: string }) => r.id)).toEqual([inv.id])
     expect(adentro.body[0].lastEntryAt).not.toBeNull()
 
-    const porDni = await request(app).get('/gate/search?q=30111222').set('Cookie', cookie).expect(200)
+    const porDni = await request(app).post('/gate/search').send({ q: '30111222' }).set('Cookie', cookie).expect(200)
     expect(porDni.body.map((r: { id: string; adentro: boolean }) => [r.id, r.adentro])).toEqual([[inv.id, true]])
   })
 
@@ -314,7 +314,7 @@ describe('quién está adentro', () => {
 
     const adentro = await request(app).get('/gate/adentro').set('Cookie', cookie).expect(200)
     expect(adentro.body).toEqual([])
-    const porDni = await request(app).get('/gate/search?q=30111222').set('Cookie', cookie).expect(200)
+    const porDni = await request(app).post('/gate/search').send({ q: '30111222' }).set('Cookie', cookie).expect(200)
     expect(porDni.body).toEqual([])
   })
 
