@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -44,7 +44,8 @@ export default function GaritaHoy() {
   const [disparador, setDisparador] = useState<HTMLButtonElement | null>(null)
   useAvisosGarita()
 
-  const abrir = (id: string) => router.push(`/garita/invitacion/${id}`)
+  // Estable: lo reciben las filas de la agenda, que van con memo.
+  const abrir = useCallback((id: string) => router.push(`/garita/invitacion/${id}`), [router])
   // Solo los resultados de la lista armada por un DNI llevan el documento leído.
   function abrirDeLista(id: string) {
     if (dniLista) documentoLeido.dejar(id, dniLista.documento)

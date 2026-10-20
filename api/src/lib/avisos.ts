@@ -43,10 +43,14 @@ export function avisarGaritas(): void {
  * los routers que tocan invitaciones o movimientos, y no llamado desde cada
  * servicio: así una escritura nueva no se puede olvidar de avisar. Avisa de
  * más (un cambio de logo también) y eso solo cuesta una consulta.
+ *
+ * Un POST que solo lee (la búsqueda, que va por POST para que el DNI no quede
+ * en la URL) marca `res.locals.soloLectura`: si no, cada tecla del guardia haría
+ * recargar la agenda en todas las garitas.
  */
 export const avisarAlEscribir: RequestHandler = (req, res, next) => {
   if (req.method !== 'GET') {
-    res.on('finish', () => { if (res.statusCode < 400) avisarGaritas() })
+    res.on('finish', () => { if (res.statusCode < 400 && !res.locals.soloLectura) avisarGaritas() })
   }
   next()
 }

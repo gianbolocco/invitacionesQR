@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { headers } from 'next/headers'
 import { Onest } from 'next/font/google'
 import { SCRIPT_ANTI_PARPADEO } from '@/lib/theme'
 import { leerMarca } from '@/lib/marca'
@@ -49,13 +50,15 @@ export async function generateViewport(): Promise<Viewport> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const marca = await leerMarca()
+  // Lo pone proxy.ts: sin él, la CSP bloquea este script inline.
+  const nonce = (await headers()).get('x-nonce') ?? undefined
 
   return (
     <html lang="es-AR" className={onest.variable}
       suppressHydrationWarning>
       <head>
         {/* Antes de pintar: si no, la pantalla arranca clara y salta a oscura. */}
-        <script dangerouslySetInnerHTML={{ __html: SCRIPT_ANTI_PARPADEO }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: SCRIPT_ANTI_PARPADEO }} />
         {/* El color del barrio, en el HTML y no en un fetch del cliente: así el
             punto del barrio en el pase no parpadea con el verde por defecto. */}
         <style dangerouslySetInnerHTML={{ __html: `:root{--marca-base:${marca.color}}` }} />

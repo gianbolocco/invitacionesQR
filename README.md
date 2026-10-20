@@ -192,11 +192,6 @@ se lean en escala de grises y con daltonismo.
 
 - **Ley 25.326.** Falta decidir cuánto se guardan los ingresos con documento y
   patente, y el job de anonimización.
-  Además, el número de DNI viaja como parámetro de consulta a `/gate/search` y puede
-  quedar en los logs de acceso.
 - **Aviso al vecino** cuando su invitado llega a la barrera.
-- **Agenda larga.** La garita dibuja todas las filas del día. Con varios cientos
-  la página se traba y la lectora puede tomar la ráfaga del escáner por tipeo
-  humano y descartarla: virtualizar la lista o plegar "Se fueron".
 - **Base propia para el e2e.** Hoy escribe en la de desarrollo y no limpia; con
   el tiempo la suite se vuelve lenta e intermitente.

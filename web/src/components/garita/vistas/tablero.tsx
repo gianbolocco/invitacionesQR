@@ -1,4 +1,5 @@
 'use client'
+import { memo } from 'react'
 import { LayoutGroup, MotionConfig, motion } from 'motion/react'
 import { CheckCheck, DoorOpen, Hourglass } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -67,13 +68,7 @@ export function Tablero({ columnas, hoy, onAbrir }: {
                       <CheckCheck className="size-4" aria-hidden />{c.vacio}
                     </p>
                   )}
-                  {filas.map((r) => (
-                    <motion.div key={r.id} layout="position" layoutId={r.id}
-                      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}>
-                      <TarjetaInvitado fila={r} hoy={hoy} onAbrir={onAbrir} />
-                    </motion.div>
-                  ))}
+                  {filas.map((r) => <ItemColumna key={r.id} r={r} hoy={hoy} onAbrir={onAbrir} />)}
                 </div>
               </section>
             )
@@ -85,6 +80,17 @@ export function Tablero({ columnas, hoy, onAbrir }: {
     </MotionConfig>
   )
 }
+
+// Con memo, como las filas de la lista: un aviso no redibuja las tarjetas que no cambiaron.
+const ItemColumna = memo(function ItemColumna({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onAbrir: (id: string) => void }) {
+  return (
+    <motion.div layout="position" layoutId={r.id}
+      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}>
+      <TarjetaInvitado fila={r} hoy={hoy} onAbrir={onAbrir} />
+    </motion.div>
+  )
+})
 
 function Vencidas({ filas, onAbrir }: { filas: AgendaRow[]; onAbrir: (id: string) => void }) {
   return (

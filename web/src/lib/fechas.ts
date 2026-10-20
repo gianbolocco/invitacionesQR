@@ -6,11 +6,20 @@
  */
 export const TZ = 'America/Argentina/Buenos_Aires'
 
+/*
+ * Los formateadores se crean una vez: construir un Intl.DateTimeFormat cuesta
+ * mucho más que usarlo. Creados en cada llamada, la agenda de la garita armaba
+ * miles por refresco y trababa la página un segundo en una PC lenta.
+ */
+const ISO = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
+const HORA = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+const CORTA = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' })
+const LARGA = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+const CON_ANIO = new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric' })
+
 /** 'YYYY-MM-DD' de hoy en Buenos Aires. `en-CA` ya produce ese formato. */
 export function hoyISO(ahora: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(ahora)
+  return ISO.format(ahora)
 }
 
 /** Corre una fecha `n` días. Se calcula al mediodía UTC: ningún huso la cambia de día. */
@@ -50,8 +59,7 @@ export function aISO(d: Date): string {
 
 /** "14 sept": corto, para filas y tarjetas. */
 export function fechaCorta(iso: string): string {
-  return new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' })
-    .format(local(iso)).replace('.', '')
+  return CORTA.format(local(iso)).replace('.', '')
 }
 
 /** "04/09": para tablas, donde las columnas no tienen que bailar. Se arma a
@@ -64,9 +72,7 @@ export function fechaNumerica(iso: string): string {
 /** "09:05" de un instante, en Buenos Aires. en-GB con h23 siempre rellena y
  *  nunca escribe "24:05" a la medianoche. */
 export function hora(instante: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).format(new Date(instante))
+  return HORA.format(new Date(instante))
 }
 
 /** "04/10, 14:02". */
@@ -97,8 +103,7 @@ export function tituloDia(iso: string, hoy: string = hoyISO()): string {
   if (iso === hoy) return 'Hoy'
   if (iso === sumarDias(hoy, 1)) return 'Mañana'
   if (iso === sumarDias(hoy, -1)) return 'Ayer'
-  return new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
-    .format(local(iso))
+  return LARGA.format(local(iso))
 }
 
 /**
@@ -118,7 +123,5 @@ export function cupoTexto(inv: { kind: string; capacity: number; usedCount: numb
 
 /** "11/10/2026": con año, para accesos que pueden ser de hace mucho. */
 export function fechaConAnio(iso: string): string {
-  return new Intl.DateTimeFormat('es-AR', {
-    timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric',
-  }).format(new Date(iso))
+  return CON_ANIO.format(new Date(iso))
 }

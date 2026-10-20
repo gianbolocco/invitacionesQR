@@ -29,8 +29,10 @@ gateRoutes.get('/invitation/:id', async (req, res) => {
   res.json(await checkById(req.params.id))
 })
 
-gateRoutes.get('/search', async (req, res) => {
-  const { q } = z.object({ q: z.string().min(1) }).parse(req.query)
+// POST y no GET: el DNI en la query queda en los logs de acceso de cada proxy.
+gateRoutes.post('/search', async (req, res) => {
+  res.locals.soloLectura = true
+  const { q } = z.object({ q: z.string().min(1) }).parse(req.body)
   res.json(await searchGuests(req.person!.neighborhoodId, q))
 })
 
