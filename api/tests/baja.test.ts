@@ -22,7 +22,7 @@ describe('dar de baja a un vecino', () => {
 
   it('sus invitaciones vigentes dejan de abrir la barrera', async () => {
     const { personId, unitId, neighborhoodId } = await seedBasics()
-    const frecuente = await invitar(unitId, personId, hoy, dentroDe(90))
+    const frecuente = await invitar(unitId, personId, hoy, dentroDe(20))
 
     await disablePerson(personId, personId, neighborhoodId)
 
