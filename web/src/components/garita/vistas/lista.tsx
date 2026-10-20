@@ -1,4 +1,5 @@
 'use client'
+import { memo } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Fila } from '@/components/dominio/fila'
 import { EstadoTag } from '@/components/dominio/estado-tag'
@@ -8,7 +9,13 @@ import type { Columnas } from '@/lib/tablero'
 import { detalleDe, estadoDe, metaDe } from '@/components/garita/datos-agenda'
 import { TextoExcedido, useTiempoExcedido } from '@/components/garita/alertas-permanencia'
 
-export function FilaAgenda({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onAbrir: (id: string) => void }) {
+/*
+ * Las filas van con memo: la agenda se vuelve a pedir con cada aviso de la
+ * garita, y React Query conserva el objeto de cada fila que no cambió. Sin
+ * memo se redibujaban cientos de filas por aviso, y la página trabada le
+ * hacía perder lecturas a la lectora.
+ */
+export const FilaAgenda = memo(function FilaAgenda({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onAbrir: (id: string) => void }) {
   const excedido = useTiempoExcedido(r)
   return (
     <Fila densa titulo={
@@ -19,7 +26,7 @@ export function FilaAgenda({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onA
     } meta={metaDe(r)} onClick={() => onAbrir(r.id)}
       extremo={excedido ? <TextoExcedido texto={excedido} className="text-[13px]" /> : <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />} />
   )
-}
+})
 
 /**
  * Un tramo de la lista. La fila que llega con el refresco entra abriéndose y
@@ -35,26 +42,30 @@ function Tramo({ filas, hoy, onAbrir, className }: {
   return (
     <div className={className}>
       <AnimatePresence initial={false}>
-        {filas.map((r) => (
-          // Variantes y no initial/animate sueltos: así el initial={false} de
-          // AnimatePresence también apaga el destello en la carga inicial.
-          // -mx-2 px-2: la fila se sale 8 px para su fondo al pasar el mouse, y el
-          // overflow-hidden de la animación se lo recortaba.
-          <motion.div key={r.id} layout className="relative -mx-2 overflow-hidden px-2"
-            initial="nueva" animate="lista" exit="sale" variants={{
-              nueva: { opacity: 0, height: 0 },
-              lista: { opacity: 1, height: 'auto', transition: { duration: 0.3 } },
-              sale: { opacity: 0, height: 0, transition: { duration: 0.2 } },
-            }}>
-            <motion.span aria-hidden className="pointer-events-none absolute inset-0 rounded-md bg-azul-tint"
-              variants={{ nueva: { opacity: 1 }, lista: { opacity: 0, transition: { duration: 1.6, delay: 0.3 } } }} />
-            <div className="relative"><FilaAgenda r={r} hoy={hoy} onAbrir={onAbrir} /></div>
-          </motion.div>
-        ))}
+        {filas.map((r) => <ItemTramo key={r.id} r={r} hoy={hoy} onAbrir={onAbrir} />)}
       </AnimatePresence>
     </div>
   )
 }
+
+// Variantes y no initial/animate sueltos: así el initial={false} de
+// AnimatePresence también apaga el destello en la carga inicial.
+// -mx-2 px-2: la fila se sale 8 px para su fondo al pasar el mouse, y el
+// overflow-hidden de la animación se lo recortaba.
+const ItemTramo = memo(function ItemTramo({ r, hoy, onAbrir }: { r: AgendaRow; hoy: string; onAbrir: (id: string) => void }) {
+  return (
+    <motion.div layout className="relative -mx-2 overflow-hidden px-2"
+      initial="nueva" animate="lista" exit="sale" variants={{
+        nueva: { opacity: 0, height: 0 },
+        lista: { opacity: 1, height: 'auto', transition: { duration: 0.3 } },
+        sale: { opacity: 0, height: 0, transition: { duration: 0.2 } },
+      }}>
+      <motion.span aria-hidden className="pointer-events-none absolute inset-0 rounded-md bg-azul-tint"
+        variants={{ nueva: { opacity: 1 }, lista: { opacity: 0, transition: { duration: 1.6, delay: 0.3 } } }} />
+      <div className="relative"><FilaAgenda r={r} hoy={hoy} onAbrir={onAbrir} /></div>
+    </motion.div>
+  )
+})
 
 const TRAMOS: { clave: keyof Columnas; titulo: string; apagado?: boolean }[] = [
   { clave: 'adentro', titulo: 'Adentro' },
