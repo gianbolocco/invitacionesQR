@@ -38,7 +38,7 @@ export function textoDias(days: number[]): string {
 }
 
 /** '08:00' → '8', '08:30' → '8:30', '24:00' → '24'. */
-function horaCorta(h: string): string {
+export function horaCorta(h: string): string {
   const [hh, mm] = h.split(':')
   return mm === '00' ? String(Number(hh)) : `${Number(hh)}:${mm}`
 }

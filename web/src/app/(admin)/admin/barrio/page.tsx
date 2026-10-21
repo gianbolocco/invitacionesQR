@@ -1,10 +1,12 @@
 'use client'
 import { useRef, useState } from 'react'
 import { Upload, X } from 'lucide-react'
-import { useBarrio, useGuardarBarrio, useSubirLogo, useQuitarLogo, type HorasPermanencia } from '@/lib/queries/admin'
+import { useBarrio, useRubros, useGuardarBarrio, useSubirLogo, useQuitarLogo, type HorasPermanencia } from '@/lib/queries/admin'
 import { logoUrl, useMarca } from '@/lib/marca-cliente'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { VistaPreviaMarca } from '@/components/admin/vista-previa-marca'
+import { Rubros } from '@/components/admin/rubros'
+import { HorariosProveedores, HoyProveedores } from '@/components/admin/horarios-proveedores'
 import { Campo } from '@/components/dominio/campo'
 import { Nota } from '@/components/dominio/nota'
 import { Button } from '@/components/ui/button'
@@ -29,6 +31,7 @@ export default function BarrioPage() {
   const barrio = useBarrio()
   const marcaReal = useMarca()
   const guardar = useGuardarBarrio()
+  const rubros = useRubros()
   const subirLogo = useSubirLogo()
   const quitarLogo = useQuitarLogo()
 
@@ -209,6 +212,19 @@ export default function BarrioPage() {
             Probar el link de mapas
           </a>
         )}
+
+        <section aria-labelledby="proveedores" className="flex flex-col gap-3">
+          <h2 id="proveedores" className="text-[13px] font-semibold text-ink-soft">Proveedores</h2>
+          {barrio.data && (
+            <div className="grid items-start gap-4 xl:grid-cols-[1fr_17rem]">
+              <div className="flex flex-col gap-4">
+                <HorariosProveedores inicial={barrio.data.providerWindows} rubros={rubros.data ?? []} />
+                <Rubros />
+              </div>
+              <HoyProveedores franjas={barrio.data.providerWindows} rubros={rubros.data ?? []} />
+            </div>
+          )}
+        </section>
       </div>
 
       <aside className="lg:sticky lg:top-20 lg:self-start">
