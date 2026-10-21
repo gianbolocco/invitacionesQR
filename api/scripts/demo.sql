@@ -6,6 +6,8 @@
 -- El admin se crea aparte con crear-admin-cli. Las cuentas de demo entran con "pass123" (vecinos por
 -- mail, guardias por usuario: ramon, julio).
 --
+-- Carga también los rubros de proveedores y las franjas horarias de Alamo Alto.
+--
 -- Correrlo a la mañana de la demo: los horarios de "adentro" salen de now().
 
 begin;
@@ -14,6 +16,7 @@ begin;
 delete from audit_log;
 delete from entry_log;
 delete from invitation;
+delete from trade;
 delete from unit_member;
 delete from session;
 delete from auth_token;
@@ -31,7 +34,7 @@ declare
   laura uuid; martin uuid; sofia uuid; diego uuid; carolina uuid; pablo uuid;
   ramon uuid; julio uuid;
   inv uuid; d int; i int; n int; dia date; entra timestamptz; g uuid;
-  u uuid; autor uuid; tipo text;
+  u uuid; autor uuid; tipo text; idx int;
 
   nombres text[] := array['Agustina López','Bruno Castro','Carla Molina','Damián Rojas','Elena Vega',
     'Facundo Silva','Gabriela Ortiz','Hernán Suárez','Inés Morales','Javier Romero','Karina Navarro',
@@ -39,9 +42,24 @@ declare
     'Ulises Correa','Victoria Luna','Walter Domínguez'];
   proveedores text[] := array['Técnico de internet','Flete mudanza','Pileta — mantenimiento',
     'Electricista','Fumigación','Delivery supermercado'];
+  rubros text[] := array[null,'Flete','Piletero','Electricista',null,null]; -- uno por cada proveedor de arriba
   lotes uuid[]; autores uuid[];
 begin
   perform setseed(0.42);
+
+  -- Rubros y franjas de proveedores (L-V todo el año, sábado solo Piletero y Agua)
+  insert into trade (neighborhood_id, name)
+  select nid, t from unnest(array['Jardinero','Piletero','Electricista','Plomero','Carpintero','Albañil',
+    'Corralón','Gasista','Techista','Agua','Flete']) t;
+  update neighborhood set provider_windows = jsonb_build_array(
+    jsonb_build_object('days', jsonb_build_array(1,2,3,4,5), 'from', '08:00', 'to', '17:00',
+      'season', jsonb_build_object('from', '04-01', 'to', '10-31'), 'trades', null),
+    jsonb_build_object('days', jsonb_build_array(1,2,3,4,5), 'from', '08:00', 'to', '18:00',
+      'season', jsonb_build_object('from', '11-01', 'to', '03-31'), 'trades', null),
+    jsonb_build_object('days', jsonb_build_array(6), 'from', '08:00', 'to', '13:00', 'season', null,
+      'trades', jsonb_build_array((select id from trade where name = 'Piletero'),
+                                  (select id from trade where name = 'Agua'))))
+  where id = nid;
 
   -- Lotes
   insert into unit (neighborhood_id, label) values (nid, 'Lote 12') returning id into l12;
@@ -87,19 +105,21 @@ begin
       u := lotes[1 + floor(random() * 5)::int];
       autor := (select person_id from unit_member where unit_id = u limit 1);
       tipo := case when random() < 0.25 then 'proveedor' else 'visita' end;
+      idx := 1 + floor(random() * 6)::int;
       entra := (dia + time '09:00' + (floor(random() * 11 * 60)::int || ' minutes')::interval) at time zone tz;
       g := case when extract(hour from entra at time zone tz) < 15 then ramon else julio end;
 
       insert into invitation (unit_id, created_by, kind, guest_name, guest_doc, plate,
-        valid_from, valid_to, capacity, token, created_at)
+        valid_from, valid_to, capacity, token, created_at, trade_id)
       values (u, autor, tipo,
-        case when tipo = 'proveedor' then proveedores[1 + floor(random() * 6)::int]
+        case when tipo = 'proveedor' then proveedores[idx]
              else nombres[1 + floor(random() * 20)::int] end,
         to_char(20000000 + floor(random() * 25000000)::int, 'FM99G999G999'),
         case when random() < 0.5 then 'A' || chr(65 + floor(random() * 26)::int) || ' '
           || lpad(floor(random() * 1000)::int::text, 3, '0') || ' ' || chr(65 + floor(random() * 26)::int)
           || chr(65 + floor(random() * 26)::int) end,
-        dia, dia, 1, md5(random()::text), entra - interval '1 day')
+        dia, dia, 1, md5(random()::text), entra - interval '1 day',
+        case when tipo = 'proveedor' then (select id from trade where name = rubros[idx]) end)
       returning id into inv;
 
       insert into entry_log (invitation_id, unit_id, guard_id, entered_at, exited_at, exit_guard_id,
@@ -130,13 +150,21 @@ begin
 
   -- El plomero de los Méndez: proveedor de hoy, con nota, adentro hace una hora.
   insert into invitation (unit_id, created_by, kind, guest_name, guest_doc, plate,
-    valid_from, valid_to, capacity, token, note, created_at)
+    valid_from, valid_to, capacity, token, note, created_at, trade_id)
   values (l48, carolina, 'proveedor', 'Hugo Ríos', '25.987.654', 'AE 482 KL',
     hoy, hoy, 1, md5(random()::text), 'Es el plomero, va directo al lote 48. Pérdida en la cocina.',
-    ahora - interval '1 day')
+    ahora - interval '1 day', (select id from trade where name = 'Plomero'))
   returning id into inv;
   insert into entry_log (invitation_id, unit_id, guard_id, entered_at, guest_name, guest_doc, plate)
   values (inv, l48, ramon, ahora - interval '1 hour', 'Hugo Ríos', '25.987.654', 'AE 482 KL');
+
+  -- El jardinero de los Fernández: frecuente de proveedor lun/mié/sáb. El sábado
+  -- choca con su horario (los sábados solo entran Piletero y Agua).
+  insert into invitation (unit_id, created_by, kind, frequent_as, guest_name, guest_doc,
+    valid_from, valid_to, weekdays, capacity, token, created_at, trade_id)
+  values (l12, laura, 'frecuente', 'proveedor', 'Ariel Gómez', '30.555.666',
+    hoy - 10, hoy + 60, '{1,3,6}', 999, md5(random()::text), ahora - interval '10 days',
+    (select id from trade where name = 'Jardinero'));
 
   -- Visita de ayer que nunca registró la salida: la garita la marca en amarillo.
   insert into invitation (unit_id, created_by, kind, guest_name, guest_doc, plate,
