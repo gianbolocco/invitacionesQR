@@ -120,7 +120,8 @@ async function assertRubro(neighborhoodId: string, kind: string, frequentAs: str
 }
 
 /** Las franjas que le tocan a un rubro: las de todos los rubros y las que lo nombran. */
-export function franjasDelRubro(franjas: Franja[], tradeId: string | null): Franja[] {
+export function franjasDelRubro(franjas: Franja[], kind: string, frequentAs: string | null, tradeId: string | null): Franja[] {
+  if (!aplicaFranjas(kind, frequentAs)) return []
   return franjas.filter((f) => f.trades === null || (tradeId !== null && f.trades.includes(tradeId)))
 }
 
@@ -381,6 +382,7 @@ export async function findPublicByToken(token: string) {
     guestDoc: invitations.guestDoc,
     plate: invitations.plate,
     kind: invitations.kind,
+    frequentAs: invitations.frequentAs,
     tradeId: invitations.tradeId,
     tradeName: trades.name,
     providerWindows: neighborhoods.providerWindows,
@@ -407,7 +409,7 @@ export async function findPublicByToken(token: string) {
     guestName: row.guestName,
     kind: row.kind,
     tradeName: row.tradeName,
-    franjas: franjasDelRubro(row.providerWindows, row.tradeId),
+    franjas: franjasDelRubro(row.providerWindows, row.kind, row.frequentAs, row.tradeId),
     validFrom: row.validFrom,
     validTo: row.validTo,
     revokedAt: row.revokedAt,

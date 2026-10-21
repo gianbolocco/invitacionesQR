@@ -163,4 +163,32 @@ describe('rubro en la invitación y horario en la barrera', () => {
     const s = await request(app).post('/gate/search').set('Cookie', garita).send({ q: 'Pedro' }).expect(200)
     expect(JSON.stringify(s.body)).toContain('Plomero')
   })
+
+  it('las visitas no reciben franjas de proveedor', async () => {
+    const { invitar, franjas, garita } = await barrera()
+    const vis = (await invitar({ kind: 'visita' }).expect(201)).body
+    const fre = (await invitar({ kind: 'frecuente', frequentAs: 'visita' }).expect(201)).body
+    await franjas([cerrada])
+    const c = await request(app).get(`/gate/check/${vis.token}`).set('Cookie', garita).expect(200)
+    expect(c.body.franjas).toEqual([])
+    const p = await request(app).get(`/invitations/public/${fre.token}`).expect(200)
+    expect(p.body.franjas).toEqual([])
+  })
+
+  it('editar el rubro', async () => {
+    const { invitar, rubro, vecino } = await barrera()
+    const t = await rubro('Plomero')
+    const editar = (id: string, body: object) =>
+      request(app).patch(`/invitations/${id}`).set('Cookie', vecino).send(body)
+
+    const fre = (await invitar({ kind: 'frecuente', frequentAs: 'proveedor', tradeId: t }).expect(201)).body
+    const r = await editar(fre.id, { frequentAs: 'visita' }).expect(200)
+    expect(r.body.tradeId).toBeNull()
+
+    const prov = (await invitar({ tradeId: t }).expect(201)).body
+    expect((await editar(prov.id, { tradeId: null }).expect(400)).body.error).toBe('rubro_requerido')
+
+    const vis = (await invitar({ kind: 'visita' }).expect(201)).body
+    expect((await editar(vis.id, { tradeId: t }).expect(400)).body.error).toBe('rubro_invalido')
+  })
 })

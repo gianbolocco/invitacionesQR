@@ -58,7 +58,7 @@ async function buildCheck(invitation: LoadedInvitation) {
   return {
     invitation: inv,
     // Solo las franjas de su rubro, nunca la lista entera del barrio.
-    franjas: franjasDelRubro(providerWindows, invitation.tradeId),
+    franjas: franjasDelRubro(providerWindows, invitation.kind, invitation.frequentAs, invitation.tradeId),
     check,
     usedCount,
     lastEntryAt,
