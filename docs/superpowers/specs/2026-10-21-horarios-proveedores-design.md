@@ -1,6 +1,6 @@
 # Horarios de ingreso de proveedores: diseño
 
-Estado: en revisión (21/10). Rama `horarios-proveedores`.
+Estado: implementado en la rama `horarios-proveedores` (21/10).
 
 ## Problema
 
@@ -80,7 +80,7 @@ Este es el primero de tres:
 
 ## Vecino e invitado
 
-- **Formulario.** Con tipo Proveedor, o Frecuente → "A trabajar", aparece el
+- **Formulario.** Con tipo Proveedor, o Frecuente → Proveedor (los chips siguen siendo "Visita" / "Proveedor"), aparece el
   **Rubro**. Es obligatorio si el barrio tiene rubros cargados. Debajo, la caja
   "Puede entrar" con las franjas de ese rubro: primero la de la temporada
   vigente y después las otras ("Desde el 1/11 · 8 a 18").

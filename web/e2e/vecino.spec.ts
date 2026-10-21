@@ -95,6 +95,6 @@ test('la nota del vecino llega al veredicto de la garita', async ({ page, browse
   await entrar(g, 'guardia')
   await g.getByLabel('Buscar invitado').fill(nombre)
   await g.getByRole('option', { name: new RegExp(nombre) }).click()
-  await expect(g.getByText('Viene en un Gol rojo')).toBeVisible()
+  await expect(g.getByText('Viene en un Gol rojo', { exact: true })).toBeVisible()
   await guardia.close()
 })
