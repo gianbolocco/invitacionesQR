@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { canEnter, type InvitationLike } from '../src/authz.js'
+import type { Franja } from '../src/lib/franjas.js'
 
 const base: InvitationLike = {
   validFrom: '2026-09-14', validTo: '2026-09-14',
   weekdays: null, capacity: 1, revokedAt: null,
+  kind: 'visita', frequentAs: null, tradeId: null,
 }
 
 // 2026-09-14 es lunes. 15:00 en Buenos Aires = 18:00 UTC.
 const lunes15h = new Date('2026-09-14T18:00:00Z')
+const solo8a12: Franja[] = [{ days: [1], from: '08:00', to: '12:00', season: null, trades: null }]
+const prov = { ...base, kind: 'proveedor' }
 
 describe('canEnter', () => {
   it('autoriza dentro de la ventana con cupo disponible', () => {
@@ -71,4 +75,14 @@ describe('canEnter', () => {
     const vencida = { ...base, validFrom: '2026-01-01', validTo: '2026-01-02' }
     expect(canEnter(vencida, lunes15h, 99)).toEqual({ ok: false, reason: 'expired' })
   })
+
+  it('rechaza a un proveedor fuera de franja (lunes 15 h)', () =>
+    expect(canEnter(prov, lunes15h, 0, solo8a12)).toEqual({ ok: false, reason: 'outside_hours' }))
+  it('una visita no mira las franjas', () =>
+    expect(canEnter(base, lunes15h, 0, solo8a12)).toEqual({ ok: true }))
+  it('el día gana sobre el horario', () =>
+    expect(canEnter({ ...prov, validTo: '2026-12-31', weekdays: [2] }, lunes15h, 0, solo8a12))
+      .toEqual({ ok: false, reason: 'wrong_weekday' }))
+  it('el horario gana sobre el cupo', () =>
+    expect(canEnter(prov, lunes15h, 1, solo8a12)).toEqual({ ok: false, reason: 'outside_hours' }))
 })

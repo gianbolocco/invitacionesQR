@@ -1,4 +1,5 @@
 import { todayInBuenosAires, weekdayInBuenosAires } from './lib/dates.js'
+import { aplicaFranjas, dentroDeFranja, type Franja } from './lib/franjas.js'
 
 export type InvitationLike = {
   validFrom: string   // 'YYYY-MM-DD'
@@ -6,9 +7,12 @@ export type InvitationLike = {
   weekdays: number[] | null
   capacity: number
   revokedAt: Date | null
+  kind: string
+  frequentAs: string | null
+  tradeId: string | null
 }
 
-export type EntryReason = 'revoked' | 'not_yet' | 'expired' | 'wrong_weekday' | 'no_capacity'
+export type EntryReason = 'revoked' | 'not_yet' | 'expired' | 'wrong_weekday' | 'outside_hours' | 'no_capacity'
 
 export type EntryCheck =
   | { ok: true }
@@ -17,9 +21,9 @@ export type EntryCheck =
 /**
  * Única pieza no trivial del sistema. Función pura: sin base, sin reloj interno.
  * El orden de los rechazos importa y está testeado: revocada gana sobre todo,
- * después la ventana, después el día, y recién al final el cupo.
+ * después la ventana, después el día, después el horario del proveedor, y recién al final el cupo.
  */
-export function canEnter(inv: InvitationLike, now: Date, usedCount: number): EntryCheck {
+export function canEnter(inv: InvitationLike, now: Date, usedCount: number, franjas: Franja[] = []): EntryCheck {
   if (inv.revokedAt) return { ok: false, reason: 'revoked' }
 
   // Comparar 'YYYY-MM-DD' como string es correcto: el formato ISO ordena
@@ -30,6 +34,10 @@ export function canEnter(inv: InvitationLike, now: Date, usedCount: number): Ent
 
   if (inv.weekdays?.length && !inv.weekdays.includes(weekdayInBuenosAires(now))) {
     return { ok: false, reason: 'wrong_weekday' }
+  }
+
+  if (aplicaFranjas(inv.kind, inv.frequentAs) && !dentroDeFranja(franjas, inv.tradeId, now)) {
+    return { ok: false, reason: 'outside_hours' }
   }
 
   if (usedCount >= inv.capacity) return { ok: false, reason: 'no_capacity' }
