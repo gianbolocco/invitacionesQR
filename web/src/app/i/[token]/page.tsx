@@ -6,6 +6,8 @@ import { Loader2, MapPin, SearchX, Sun } from 'lucide-react'
 import { api } from '@/lib/api'
 import { KIND_LABEL, PORTERIA, vigencia, type Invitation } from '@/lib/invitations'
 import { hoyISO } from '@/lib/fechas'
+import { pluralRubro, type Franja } from '@/lib/franjas'
+import { HorarioRubro } from '@/components/dominio/horario-rubro'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,6 +30,8 @@ type Publica = {
   hasDoc: boolean
   hasPlate: boolean
   frozen: boolean
+  tradeName: string | null
+  franjas: Franja[]
 }
 
 /** Pide SOLO lo que falta. Los datos se piden una vez. */
@@ -150,6 +154,13 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
         <p className="flex items-center justify-center gap-2 text-center text-sm text-ink-soft">
           <Sun className="size-4" aria-hidden />Mostrá esta pantalla en la garita con el brillo alto.
         </p>
+      )}
+
+      {!sello && inv.tradeName && inv.franjas.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <HorarioRubro titulo={`Horario de ingreso para ${pluralRubro(inv.tradeName)}`} franjas={inv.franjas} />
+          <p className="text-sm text-ink-soft">Fuera de ese horario la guardia no te deja pasar.</p>
+        </section>
       )}
 
       {!sello && !inv.frozen && (!inv.hasDoc || !inv.hasPlate) && (

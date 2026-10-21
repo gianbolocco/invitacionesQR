@@ -29,6 +29,8 @@ export type Invitation = {
   adentro: boolean
   /** ISO del último ingreso, o null si nunca entró. */
   ultimoIngreso: string | null
+  tradeId: string | null
+  tradeName: string | null
 }
 
 export const KIND_LABEL: Record<Invitation['kind'], string> = {

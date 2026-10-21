@@ -61,11 +61,13 @@ export function Chips<T extends string>({ opciones, valor, onCambio, etiqueta, d
 }
 
 /** La misma pastilla para elegir varias: días de la semana, por ejemplo. */
-export function ChipsMultiples<T extends string>({ opciones, valores, onCambio, etiqueta }: {
+export function ChipsMultiples<T extends string>({ opciones, valores, onCambio, etiqueta, choque = [] }: {
   opciones: Opcion<T>[]
   valores: T[]
   onCambio: (v: T[]) => void
   etiqueta: string
+  /** Valores marcados en amarillo (un aviso, no un error). */
+  choque?: T[]
 }) {
   return (
     <div role="group" aria-label={etiqueta} className="flex flex-wrap gap-1.5">
@@ -77,6 +79,7 @@ export function ChipsMultiples<T extends string>({ opciones, valores, onCambio, 
             className={cn(
               'inline-flex h-11 min-w-11 items-center justify-center rounded-sm border-2 px-3 text-[15px] font-semibold',
               activa ? 'border-ink bg-ink text-card' : 'border-control bg-card text-ink',
+              choque.includes(o.valor) && 'bg-espera-tint text-espera ring-2 ring-espera',
             )}>
             {o.etiqueta}
           </button>

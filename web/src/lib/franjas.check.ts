@@ -1,6 +1,6 @@
 /** `node src/lib/franjas.check.ts`. */
 import assert from 'node:assert/strict'
-import { textoDias, textoHorario, franjasDelRubro, diasSinFranja, vigentesHoy, detalleFueraDeHorario, type Franja } from './franjas.ts'
+import { pluralRubro, diaDe, textoDias, textoHorario, franjasDelRubro, diasSinFranja, vigentesHoy, detalleFueraDeHorario, type Franja } from './franjas.ts'
 
 const P = 'pileta'
 const alamo: Franja[] = [
@@ -29,4 +29,8 @@ assert.equal(detalleFueraDeHorario(franjasDelRubro(alamo, 'plomero'), 'Plomero',
 const sabado = new Date('2026-10-24T10:00:00-03:00')
 assert.equal(detalleFueraDeHorario(franjasDelRubro(alamo, 'plomero'), 'Plomero', sabado),
   'Su rubro no entra los sábados')
+assert.equal(pluralRubro('Plomero'), 'plomeros')
+assert.equal(pluralRubro('Albañil'), 'albañiles')
+assert.equal(pluralRubro('Gas'), 'gas')
+assert.equal(diaDe('2026-10-24'), 6)
 console.log('franjas: ok')

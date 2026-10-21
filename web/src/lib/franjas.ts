@@ -72,3 +72,15 @@ export function detalleFueraDeHorario(franjas: Franja[], tradeName: string, ahor
   if (!f) return `Su rubro no entra los ${nombreDiaPlural(dia).toLowerCase()}`
   return `${tradeName}: ${textoDias(f.days).toLowerCase()} de ${horaCorta(f.from)} a ${horaCorta(f.to)} · Son las ${HORA.format(ahora)}`
 }
+
+/** 'Plomero' → 'plomeros', 'Albañil' → 'albañiles', 'Gas' → 'gas'. */
+export function pluralRubro(nombre: string): string {
+  const n = nombre.trim().toLowerCase()
+  if (n.endsWith('s')) return n
+  return /[aeiouáéíóú]$/.test(n) ? `${n}s` : `${n}es`
+}
+
+/** Día de la semana (0 = domingo) de una fecha ISO; al mediodía UTC, no depende del huso. */
+export function diaDe(iso: string): number {
+  return new Date(`${iso}T12:00:00Z`).getUTCDay()
+}
