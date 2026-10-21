@@ -26,7 +26,7 @@ export function TarjetaInvitado({ fila, hoy, onAbrir }: {
       <span className="flex items-start justify-between gap-2">
         <span className="flex min-w-0 items-start gap-1.5">
           <span className="min-w-0 text-[15px] font-semibold leading-snug">{fila.guestName}</span>
-          <span className="mt-1 shrink-0"><IconoNota nota={fila.note} /></span>
+          <span className="mt-px shrink-0"><IconoNota nota={fila.note} /></span>
         </span>
         <TagTipo kind={fila.kind} frequentAs={fila.frequentAs} />
       </span>
