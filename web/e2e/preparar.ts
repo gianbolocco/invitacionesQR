@@ -25,7 +25,11 @@ insert into person (neighborhood_id, email, name, role, status, password_hash)
     set status = 'active', password_hash = excluded.password_hash, role = excluded.role;
 
 -- La alerta de permanencia arranca apagada: la prende permanencia.spec.ts.
-update neighborhood set overstay_hours_visita = null, overstay_hours_proveedor = null;
+-- Los horarios de proveedores arrancan apagados: los prende horarios-proveedores.spec.ts.
+-- Rubros sueltos de corridas anteriores: con alguno activo, las invitaciones
+-- de otros specs fallan con rubro_requerido.
+update trade set archived_at = now() where archived_at is null;
+update neighborhood set overstay_hours_visita = null, overstay_hours_proveedor = null, provider_windows = '[]';
 
 insert into unit_member (unit_id, person_id)
   select u.id, p.id from unit u, person p

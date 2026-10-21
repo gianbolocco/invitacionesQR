@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '../db/index.js'
-import { neighborhoods } from '../db/schema.js'
+import { neighborhoods, trades, type Franja } from '../db/schema.js'
 import { audit } from '../lib/audit.js'
 import { AppError } from '../lib/errors.js'
 import { PALETA, esColorDeLaPaleta } from '../lib/marca.js'
@@ -14,6 +14,7 @@ export async function getNeighborhood(id: string) {
     brandColor: neighborhoods.brandColor,
     visita: neighborhoods.overstayHoursVisita,
     proveedor: neighborhoods.overstayHoursProveedor,
+    providerWindows: neighborhoods.providerWindows,
   }).from(neighborhoods).where(eq(neighborhoods.id, id)).limit(1)
   if (!row) throw new AppError(404, 'not_found')
   const { visita, proveedor, ...barrio } = row
@@ -28,10 +29,20 @@ export async function updateNeighborhood(
   data: {
     name?: string; address?: string; mapUrl?: string; brandColor?: string
     overstayHours?: { visita?: number | null; proveedor?: number | null }
+    providerWindows?: Franja[]
   },
 ) {
   if (data.brandColor !== undefined && !esColorDeLaPaleta(data.brandColor)) {
     throw new AppError(400, 'color_invalido')
+  }
+
+  if (data.providerWindows) {
+    const ids = [...new Set(data.providerWindows.flatMap((f) => f.trades ?? []))]
+    if (ids.length) {
+      const propios = await db.select({ id: trades.id }).from(trades)
+        .where(and(eq(trades.neighborhoodId, id), inArray(trades.id, ids)))
+      if (propios.length !== ids.length) throw new AppError(400, 'franja_invalida')
+    }
   }
 
   // Los strings vacíos se guardan como NULL: así el front sabe que no hay dato
@@ -44,6 +55,7 @@ export async function updateNeighborhood(
     // Una clave que no viene no se toca; null la apaga.
     ...(data.overstayHours?.visita !== undefined ? { overstayHoursVisita: data.overstayHours.visita } : {}),
     ...(data.overstayHours?.proveedor !== undefined ? { overstayHoursProveedor: data.overstayHours.proveedor } : {}),
+    ...(data.providerWindows !== undefined ? { providerWindows: data.providerWindows } : {}),
   }).where(eq(neighborhoods.id, id))
 
   await audit(actorId, id, 'neighborhood.updated', 'neighborhood', id, data)

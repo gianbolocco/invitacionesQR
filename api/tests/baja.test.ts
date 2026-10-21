@@ -14,15 +14,15 @@ const dentroDe = (dias: number) => new Date(Date.now() + dias * 86_400_000).toIS
 describe('dar de baja a un vecino', () => {
   beforeEach(resetDb)
 
-  async function invitar(unitId: string, createdBy: string, validFrom: string, validTo: string) {
+  async function invitar(neighborhoodId: string, unitId: string, createdBy: string, validFrom: string, validTo: string) {
     return createInvitation({
-      unitId, createdBy, kind: 'frecuente', guestName: 'Rosa', validFrom, validTo, capacity: 99,
+      neighborhoodId, unitId, createdBy, kind: 'frecuente', guestName: 'Rosa', validFrom, validTo, capacity: 99,
     })
   }
 
   it('sus invitaciones vigentes dejan de abrir la barrera', async () => {
     const { personId, unitId, neighborhoodId } = await seedBasics()
-    const frecuente = await invitar(unitId, personId, hoy, dentroDe(20))
+    const frecuente = await invitar(neighborhoodId, unitId, personId, hoy, dentroDe(20))
 
     await disablePerson(personId, personId, neighborhoodId)
 
@@ -37,8 +37,8 @@ describe('dar de baja a un vecino', () => {
     }).returning()
     await db.insert(unitMembers).values({ unitId, personId: otra.id })
 
-    const vencida = await invitar(unitId, personId, dentroDe(-30), dentroDe(-20))
-    const deLaura = await invitar(unitId, otra.id, hoy, dentroDe(30))
+    const vencida = await invitar(neighborhoodId, unitId, personId, dentroDe(-30), dentroDe(-20))
+    const deLaura = await invitar(neighborhoodId, unitId, otra.id, hoy, dentroDe(30))
 
     await disablePerson(personId, personId, neighborhoodId)
 

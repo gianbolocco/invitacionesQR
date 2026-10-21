@@ -241,7 +241,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   }
 
   const motivo = !ok ? MOTIVO[(check as { reason: string }).reason] ?? 'Rechazado' : ''
-  const detalle = !ok ? detalleRechazo((check as { reason: string }).reason, inv) : null
+  const detalle = !ok ? detalleRechazo((check as { reason: string }).reason, inv, { franjas: resultado.franjas, tradeName: inv.tradeName }) : null
   const sinCupo = !ok && (check as { reason: string }).reason === 'no_capacity'
   const palabra = esEgreso ? 'EGRESO' : ok ? 'INGRESO' : 'NO PASA'
   const registrando = ingresar.isPending || egresar.isPending
@@ -323,7 +323,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 <Dato etiqueta="Patente">{plate || inv.plate || '—'}</Dato>
               </>
             )}
-            <Dato etiqueta="Tipo">{KIND_LABEL[inv.kind]}</Dato>
+            <Dato etiqueta="Tipo">{KIND_LABEL[inv.kind]}{inv.tradeName && ` · ${inv.kind === 'frecuente' ? `${KIND_LABEL.proveedor} · ` : ''}${inv.tradeName}`}</Dato>
             <Dato etiqueta="Lote">{inv.unitLabel}</Dato>
             <Dato etiqueta="Invita">{inv.inviterName}</Dato>
             {!esEgreso && <Dato etiqueta="Vigencia">{vigencia(inv)}</Dato>}
@@ -382,17 +382,17 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 </motion.div>
               ) : (
                 <motion.div key="rechazo" className="flex flex-col gap-3">
+                  <button ref={accionRef} onClick={salir}
+                    className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
+                    Volver (Esc)
+                  </button>
                   {/* El vecino ya dijo que sí por teléfono. Una anulada no: ahí dijo que no. */}
                   {(check as { reason: string }).reason !== 'revoked' && (
                     <button onClick={(e) => { setDisparadorAlta(e.currentTarget); setAltaAbierta(true) }}
-                      className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
-                      Autorizar igual
+                      className="min-h-11 text-base font-semibold underline underline-offset-4 opacity-80">
+                      Autorizar igual…
                     </button>
                   )}
-                  <button ref={accionRef} onClick={salir}
-                    className="min-h-16 w-full rounded border-2 border-current/40 text-xl font-bold">
-                    Volver (Esc)
-                  </button>
                   {(check as { reason: string }).reason !== 'revoked' && !esEgreso && (
                     <button onClick={() => setAnulando(true)} className="min-h-11 text-sm underline underline-offset-4 opacity-70">
                       Anular esta invitación…

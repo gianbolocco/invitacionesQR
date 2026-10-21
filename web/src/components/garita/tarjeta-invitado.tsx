@@ -28,7 +28,7 @@ export function TarjetaInvitado({ fila, hoy, onAbrir }: {
           <span className="min-w-0 text-[15px] font-semibold leading-snug">{fila.guestName}</span>
           <span className="mt-px shrink-0"><IconoNota nota={fila.note} /></span>
         </span>
-        <TagTipo kind={fila.kind} frequentAs={fila.frequentAs} />
+        <TagTipo kind={fila.kind} frequentAs={fila.frequentAs} tradeName={fila.tradeName} />
       </span>
       <span className="truncate text-[13px] text-ink-soft">
         {fila.unitLabel} · {quienInvita(fila.inviterName)}

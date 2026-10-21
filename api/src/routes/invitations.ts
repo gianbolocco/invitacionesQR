@@ -5,6 +5,8 @@ import {
   createInvitation, listForUnits, revokeInvitation, findPublicByToken,
   fillGuestDetails, editInvitation, restoreInvitation, searchInvitations, getInvitation,
 } from '../services/invitations.js'
+import { listTrades } from '../services/trades.js'
+import { getNeighborhood } from '../services/neighborhoods.js'
 import { unitsOfPerson } from '../services/units.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { AppError } from '../lib/errors.js'
@@ -57,11 +59,12 @@ const createSchema = z.object({
   validTo: isoDate,
   weekdays: z.array(z.number().int().min(0).max(6)).optional(),
   capacity: z.number().int().min(1),
+  tradeId: z.string().uuid().nullable().optional(),
 }).refine((v) => v.validTo >= v.validFrom, { message: 'La ventana está invertida', path: ['validTo'] })
 
 invitationRoutes.post('/', async (req, res) => {
   const body = createSchema.parse(req.body)
-  res.status(201).json(await createInvitation({ ...body, createdBy: req.person!.id }))
+  res.status(201).json(await createInvitation({ ...body, createdBy: req.person!.id, neighborhoodId: req.person!.neighborhoodId }))
 })
 
 invitationRoutes.get('/', async (req, res) => {
@@ -90,6 +93,13 @@ invitationRoutes.get('/historial', async (req, res) => {
   }))
 })
 
+/** Rubros activos y franjas del barrio, para el formulario de proveedor. Antes de /:id. */
+invitationRoutes.get('/trades', async (req, res) => {
+  const nid = req.person!.neighborhoodId
+  const [rubros, barrio] = await Promise.all([listTrades(nid), getNeighborhood(nid)])
+  res.json({ trades: rubros.map(({ id, name }) => ({ id, name })), providerWindows: barrio.providerWindows })
+})
+
 /** El detalle de una invitación, para la pantalla del pase. */
 invitationRoutes.get('/:id', async (req, res) => {
   res.json(await getInvitation(req.params.id, req.person!.id))
@@ -110,10 +120,11 @@ const editSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).nullable().optional(),
   capacity: z.number().int().min(1).optional(),
   frequentAs: z.enum(['visita', 'proveedor']).optional(),
+  tradeId: z.string().uuid().nullable().optional(),
 })
 
 invitationRoutes.patch('/:id', async (req, res) => {
-  res.json(await editInvitation(req.params.id, req.person!.id, editSchema.parse(req.body)))
+  res.json(await editInvitation(req.params.id, req.person!.id, editSchema.parse(req.body), req.person!.neighborhoodId))
 })
 
 /** Deshacer una anulación. */

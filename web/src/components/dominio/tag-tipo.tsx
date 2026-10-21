@@ -11,9 +11,10 @@ const BASE = 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounde
  * frecuente que viene como proveedor lleva las dos: todo proveedor se marca.
  * El ícono acompaña la palabra: no depende del color para leerse.
  */
-export function TagTipo({ kind, frequentAs, className }: {
+export function TagTipo({ kind, frequentAs, tradeName, className }: {
   kind: Invitation['kind']
   frequentAs?: Invitation['frequentAs']
+  tradeName?: string | null
   className?: string
 }) {
   const frecuente = kind === 'frecuente'
@@ -28,7 +29,7 @@ export function TagTipo({ kind, frequentAs, className }: {
       )}
       {proveedor && (
         <span className={cn(BASE, 'border border-line bg-card text-ink')}>
-          <Truck className="size-3.5" aria-hidden />{KIND_LABEL.proveedor}
+          <Truck className="size-3.5" aria-hidden />{KIND_LABEL.proveedor}{tradeName && ` · ${tradeName}`}
         </span>
       )}
     </span>

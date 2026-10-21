@@ -5,6 +5,7 @@ import {
 import { toast } from 'sonner'
 import { api, ApiError } from '@/lib/api'
 import type { Invitation } from '@/lib/invitations'
+import type { Franja } from '@/lib/franjas'
 
 export type FiltrosHistorial = {
   q: string
@@ -25,6 +26,8 @@ export type DatosInvitacion = {
   validTo: string
   weekdays: number[] | null
   capacity: number
+  /** Solo proveedores; null = sin rubro. Si no se manda, no cambia. */
+  tradeId?: string | null
 }
 
 type PaginaHistorial = { rows: Invitation[]; total: number; page: number; pageSize: number }
@@ -147,5 +150,14 @@ export function useAnularInvitacion() {
       })
     },
     onSettled: () => qc.invalidateQueries({ queryKey: claves.todas }),
+  })
+}
+
+/** Rubros activos del barrio y las franjas de ingreso de proveedores. Vacío = función apagada. */
+export function useRubrosDelBarrio() {
+  return useQuery({
+    queryKey: ['invitaciones', 'rubros'] as const,
+    queryFn: ({ signal }) => api<{ trades: { id: string; name: string }[]; providerWindows: Franja[] }>('/invitations/trades', { signal }),
+    staleTime: 5 * 60_000,
   })
 }

@@ -102,7 +102,7 @@ function Vencidas({ filas, onAbrir }: { filas: AgendaRow[]; onAbrir: (id: string
       <div className="pb-1">
         {filas.map((r) => (
           <Fila densa key={r.id}
-            titulo={<span className="flex items-center gap-2"><span className="min-w-0 truncate">{r.guestName}</span><IconoNota nota={r.note} /><TagTipo kind={r.kind} frequentAs={r.frequentAs} /></span>}
+            titulo={<span className="flex items-center gap-2"><span className="min-w-0 truncate">{r.guestName}</span><IconoNota nota={r.note} /><TagTipo kind={r.kind} frequentAs={r.frequentAs} tradeName={r.tradeName} /></span>}
             meta={metaDe(r)} onClick={() => onAbrir(r.id)} extremo={<EstadoTag estado="vencida" />} />
         ))}
       </div>

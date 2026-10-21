@@ -315,7 +315,7 @@ async function abrirNoPasaPorCupo(page: import('@playwright/test').Page, browser
 
 test('un NO PASA por cupo se puede autorizar igual, con todo precargado', async ({ page, browser }) => {
   const { g, nombre } = await abrirNoPasaPorCupo(page, browser, 'Autorizar E2E')
-  await g.getByRole('button', { name: 'Autorizar igual' }).click()
+  await g.getByRole('button', { name: 'Autorizar igual…' }).click()
 
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
   await expect(g.getByLabel('Documento', { exact: true })).toHaveValue('30111222')
@@ -340,13 +340,13 @@ test('una invitación anulada no se puede autorizar igual', async ({ page, brows
   await g.getByLabel('Buscar invitado').fill(nombre)
   await g.getByRole('option', { name: new RegExp(nombre) }).click()
   await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
-  await expect(g.getByRole('button', { name: 'Autorizar igual' })).toHaveCount(0)
+  await expect(g.getByRole('button', { name: 'Autorizar igual…' })).toHaveCount(0)
 })
 
 test('el Esc que cierra el sheet de Autorizar igual no saca del veredicto', async ({ page, browser }) => {
   const { g } = await abrirNoPasaPorCupo(page, browser, 'Esc E2E')
   const url = g.url()
-  await g.getByRole('button', { name: 'Autorizar igual' }).click()
+  await g.getByRole('button', { name: 'Autorizar igual…' }).click()
   await expect(g.getByRole('dialog')).toBeVisible()
   await g.keyboard.press('Escape')
   await expect(g.getByRole('dialog')).toBeHidden()
@@ -357,7 +357,7 @@ test('el Esc que cierra el sheet de Autorizar igual no saca del veredicto', asyn
 
 test('un DNI leído con el sheet precargado abierto reemplaza el nombre de la invitación', async ({ page, browser }) => {
   const { g, nombre } = await abrirNoPasaPorCupo(page, browser, 'Mezcla E2E')
-  await g.getByRole('button', { name: 'Autorizar igual' }).click()
+  await g.getByRole('button', { name: 'Autorizar igual…' }).click()
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
   await g.getByRole('button', { name: 'Cambiar' }).focus()
   const doc = docUnico()

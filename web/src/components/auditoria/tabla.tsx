@@ -59,7 +59,7 @@ export function Tabla({ filas }: { filas: AuditRow[] }) {
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-2">
                       <span className="min-w-0 truncate font-semibold">{r.guestName}</span>
-                      <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
+                      <TagTipo kind={r.kind} frequentAs={r.frequentAs} tradeName={r.tradeName} />
                       {r.manual && <TagManual />}
                     </span>
                     <Secundaria>{[r.guestDoc && `DNI ${r.guestDoc}`, r.plate].filter(Boolean).join(' · ')}</Secundaria>

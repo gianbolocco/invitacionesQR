@@ -8,10 +8,12 @@ import { Campo } from '@/components/dominio/campo'
 import { Chips, ChipsMultiples } from '@/components/dominio/chips'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
 import { Nota } from '@/components/dominio/nota'
+import { HorarioRubro } from '@/components/dominio/horario-rubro'
 import { DIAS, KIND_LABEL, type Invitation } from '@/lib/invitations'
 import { fechaCorta, hoyISO, unMesDespues } from '@/lib/fechas'
 import { ApiError } from '@/lib/api'
-import { useCrearInvitacion, useEditarInvitacion, type DatosInvitacion } from '@/lib/queries/invitaciones'
+import { useCrearInvitacion, useEditarInvitacion, useRubrosDelBarrio, type DatosInvitacion } from '@/lib/queries/invitaciones'
+import { diaDe, diasSinFranja, franjasDelRubro, nombreDiaPlural } from '@/lib/franjas'
 
 type Kind = Invitation['kind']
 
@@ -44,10 +46,22 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   // Un mes: el tope de una visita frecuente, que es la que se elige por defecto.
   const [validTo, setValidTo] = useState(invitacion?.validTo ?? unMesDespues(hoy))
   const [dias, setDias] = useState<string[]>((invitacion?.weekdays ?? []).map(String))
+  const [rubro, setRubro] = useState(invitacion?.tradeId ?? '')
   const [tocado, setTocado] = useState<Record<string, boolean>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
 
   const frecuente = kind === 'frecuente'
+  const { data: rubros } = useRubrosDelBarrio()
+  const comoProveedor = kind === 'proveedor' || (frecuente && frecuenteComo === 'proveedor')
+  const listaRubros = rubros?.trades ?? []
+  // Sin rubros activos en el barrio la función está apagada: no hay campo.
+  const pideRubro = comoProveedor && listaRubros.length > 0
+  const archivado = Boolean(invitacion?.tradeId) && !listaRubros.some((t) => t.id === invitacion?.tradeId)
+  const franjasRubro = pideRubro && rubro ? franjasDelRubro(rubros?.providerWindows ?? [], rubro) : []
+  // Días que el rubro no cubre: un aviso, nunca frena el envío.
+  const diasRevisar = frecuente ? (dias.length ? dias.map(Number) : [0, 1, 2, 3, 4, 5, 6]) : [diaDe(validFrom)]
+  const choques = pideRubro && rubro ? diasSinFranja(rubros?.providerWindows ?? [], rubro, diasRevisar) : []
+  const nombreRubro = listaRubros.find((t) => t.id === rubro)?.name ?? invitacion?.tradeName ?? ''
   // Una visita frecuente dura hasta un mes (la API lo exige igual); la de proveedor no tiene tope.
   const tope = frecuente && frecuenteComo === 'visita' ? unMesDespues(validFrom) : undefined
 
@@ -55,6 +69,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   // que frena el envío son lo mismo.
   const errores = {
     guestName: guestName.trim() ? null : 'Escribí el nombre de quien viene.',
+    rubro: pideRubro && !rubro ? 'Elegí el rubro.' : null,
     validFrom: !editando && validFrom < hoy ? 'No se puede invitar para un día que ya pasó.' : null,
     validTo: frecuente && validTo < validFrom ? 'La fecha de fin tiene que ser igual o posterior al inicio.'
       : tope && validTo > tope ? `Una visita frecuente dura hasta un mes: elegí hasta el ${fechaCorta(tope)}.`
@@ -65,7 +80,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    setTocado({ guestName: true, validFrom: true, validTo: true })
+    setTocado({ guestName: true, rubro: true, validFrom: true, validTo: true })
     if (Object.values(errores).some(Boolean)) return
     setErrorGeneral(null)
 
@@ -81,6 +96,9 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       weekdays: frecuente && dias.length ? dias.map(Number).sort((a, b) => a - b) : null,
       // Una frecuente entra muchas veces dentro de su ventana; el resto, una.
       capacity: frecuente ? 999 : 1,
+      // Si el rubro no cambió no se manda (puede estar archivado); si ya no es proveedor, se limpia.
+      ...(pideRubro ? (rubro !== (invitacion?.tradeId ?? '') ? { tradeId: rubro } : {})
+        : listaRubros.length ? { tradeId: null } : {}),
     }
 
     try {
@@ -93,11 +111,44 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
         setErrorGeneral('Una visita frecuente dura hasta un mes. Acortá las fechas o elegí Proveedor.')
         return
       }
+      if (e instanceof ApiError && e.code === 'rubro_requerido') {
+        setErrorGeneral('Elegí el rubro.')
+        return
+      }
+      if (e instanceof ApiError && e.code === 'rubro_invalido') {
+        setErrorGeneral('Ese rubro ya no está disponible. Elegí otro.')
+        return
+      }
       setErrorGeneral(editando
         ? 'No se pudo guardar. Una invitación que ya se usó o venció no se puede editar.'
         : 'No se pudo crear la invitación. Revisá los datos y probá de nuevo.')
     }
   }
+
+  const campoRubro = pideRubro && (
+    <>
+      <Campo id="rubro" etiqueta="Rubro" error={mostrar('rubro')}>
+        <Select value={rubro} onValueChange={(v) => { setRubro(v); tocar('rubro') }}>
+          <SelectTrigger id="rubro" className="h-11! w-full" aria-invalid={Boolean(mostrar('rubro')) || undefined}>
+            <SelectValue placeholder="Elegí el rubro" />
+          </SelectTrigger>
+          <SelectContent>
+            {archivado && invitacion?.tradeId && (
+              <SelectItem value={invitacion.tradeId}>{invitacion.tradeName} (archivado)</SelectItem>
+            )}
+            {listaRubros.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </Campo>
+      <HorarioRubro titulo="Puede entrar" franjas={franjasRubro} />
+      {choques.length > 0 && (
+        <p role="status" className="rounded-md bg-espera-tint p-3 text-sm font-semibold text-espera">
+          Los {new Intl.ListFormat('es', { type: 'conjunction' }).format(choques.map((d) => nombreDiaPlural(d).toLowerCase()))} no entra el rubro {nombreRubro}:
+          {choques.length > 1 ? ' esos días' : ' ese día'} la guardia lo va a rechazar.
+        </p>
+      )}
+    </>
+  )
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-8">
@@ -126,6 +177,8 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
             onChange={(e) => setGuestName(e.target.value)} onBlur={() => tocar('guestName')} />
         </Campo>
 
+        {!frecuente && campoRubro}
+
         {frecuente ? (
           <>
             <Campo id="frecuente-como" etiqueta="¿Viene de visita o a trabajar?"
@@ -136,6 +189,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
                 onCambio={(v) => { setFrecuenteComo(v); tocar('validTo') }}
                 opciones={[{ valor: 'visita', etiqueta: 'Visita' }, { valor: 'proveedor', etiqueta: 'Proveedor' }]} />
             </Campo>
+            {campoRubro}
             <div className="grid gap-4 sm:grid-cols-2">
               <Campo id="desde" etiqueta="Desde" error={mostrar('validFrom')}>
                 <CampoFecha id="desde" valor={validFrom} min={editando ? undefined : hoy}
@@ -147,7 +201,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
               </Campo>
             </div>
             <Campo id="dias" etiqueta="Días habilitados" ayuda="Sin días marcados, puede entrar todos los días.">
-              <ChipsMultiples etiqueta="Días habilitados" valores={dias} onCambio={setDias}
+              <ChipsMultiples etiqueta="Días habilitados" valores={dias} onCambio={setDias} choque={choques.map(String)}
                 opciones={DIAS.map((d, i) => ({ valor: String(i), etiqueta: d }))} />
             </Campo>
           </>

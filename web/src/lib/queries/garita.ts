@@ -19,6 +19,7 @@ export type AgendaRow = {
   kind: 'visita' | 'frecuente' | 'proveedor'
   /** Solo en las frecuentes: si viene de visita o como proveedor. */
   frequentAs?: 'visita' | 'proveedor' | null
+  tradeName?: string | null
   unitLabel: string
   inviterName: string
   capacity: number

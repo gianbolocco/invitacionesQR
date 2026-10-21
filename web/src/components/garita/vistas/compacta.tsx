@@ -48,7 +48,7 @@ const FilaCompacta = memo(function FilaCompacta({ r, hoy, onAbrir }: { r: Agenda
           <button type="button" onClick={(e) => { e.stopPropagation(); onAbrir(r.id) }}
             className="min-w-0 truncate text-left font-semibold">{r.guestName}</button>
           <IconoNota nota={r.note} />
-          <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
+          <TagTipo kind={r.kind} frequentAs={r.frequentAs} tradeName={r.tradeName} />
         </span>
       </td>
       <td className="px-3 py-2.5">

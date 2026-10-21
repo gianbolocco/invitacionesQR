@@ -163,7 +163,7 @@ export function BuscarInvitado({ q, onQ, onAbrir, onLectura, onAutorizar }: {
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                     {h.anulada ? <EstadoTag estado="anulada" /> : h.adentro ? <EstadoTag estado="adentro" /> : null}
-                    <TagTipo kind={h.kind} frequentAs={h.frequentAs} />
+                    <TagTipo kind={h.kind} frequentAs={h.frequentAs} tradeName={h.tradeName} />
                   </div>
                 </li>
               ))}

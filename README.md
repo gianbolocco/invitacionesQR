@@ -42,8 +42,16 @@ lleva en amarillo, y en *Filtros → Tiempo excedido* se ven solo esos. La cuent
 hace en la garita contra su reloj: no hay job en el servidor. Una frecuente usa
 las horas de lo que es: visita o proveedor, según eligió el vecino.
 
+**Horarios de proveedores.** El admin carga en *Administración → Barrio* los
+rubros (plomero, jardinero…) y las franjas: días, horario, temporada opcional y
+a qué rubros aplica. Sin franjas no hay restricción. Cuando las hay, el vecino
+elige el rubro al invitar a un proveedor y ve cuándo puede entrar. Fuera de la
+franja, la garita muestra NO PASA · Fuera de horario, y el guardia puede
+**Autorizar igual**: queda en la auditoría.
+
 **El admin** da de alta vecinos y guardias, corrige lotes, edita los datos del
-barrio (las horas de la alerta de permanencia incluidas) y ve el tablero.
+barrio (las horas de la alerta de permanencia, los rubros y los horarios de
+proveedores incluidos) y ve el tablero.
 
 ## Correr en desarrollo
 
@@ -151,6 +159,19 @@ la cubren y rehacer la app nunca toca los datos. Ver el encabezado de
 Para probar cambios antes de producción, usá una segunda aplicación Coolify con
 la rama `qa` y una base de datos de pruebas separada. El webhook despliega solo
 la rama configurada en cada aplicación; `main` queda como la versión estable.
+
+### Datos de demo
+
+[`api/scripts/demo.sql`](api/scripts/demo.sql) deja qa lista para mostrar:
+vecinos y guardias con contraseña `pass123`, dos semanas de historia y un día
+armado (gente adentro, uno con el tiempo excedido, visitas con nota, una
+anulada). Borra todo menos el barrio, admins incluidos: después va
+`crear-admin-cli`. Los horarios salen de `now()`, así que se corre la mañana de
+la demo. **Nunca en producción.**
+
+```bash
+psql "$DATABASE_URL_QA" -v ON_ERROR_STOP=1 -f api/scripts/demo.sql
+```
 
 ### Backup
 
