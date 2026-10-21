@@ -8,9 +8,11 @@ import { cn } from '@/lib/utils'
  * link; si tiene acción, un botón; si no, un div. `densa` es la de garita y
  * admin (56px); la del vecino es más alta (64px), pensada para el pulgar.
  */
-export function Fila({ titulo, meta, extremo, href, onClick, densa, className }: {
+export function Fila({ titulo, meta, aviso, extremo, href, onClick, densa, className }: {
   titulo: ReactNode
   meta?: ReactNode
+  /** Una línea aparte bajo la meta, que puede partirse en dos en vez de cortarse. */
+  aviso?: ReactNode
   extremo?: ReactNode
   href?: string
   onClick?: () => void
@@ -29,6 +31,7 @@ export function Fila({ titulo, meta, extremo, href, onClick, densa, className }:
       <span className="min-w-0 flex-1">
         <span className="block truncate text-base font-semibold">{titulo}</span>
         {meta && <span className="mt-0.5 block truncate text-sm text-ink-soft tabular">{meta}</span>}
+        {aviso && <span className="mt-0.5 block text-xs font-semibold text-espera">{aviso}</span>}
       </span>
       {extremo && <span className="shrink-0">{extremo}</span>}
     </>

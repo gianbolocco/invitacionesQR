@@ -16,6 +16,7 @@ export function FilaInvitacion({ inv, mostrarUnidad = false, mostrarCreador = fa
   const estado = estadoInvitacion(inv, hoyISO())
   const { data: rubros } = useRubrosDelBarrio()
   const sinFranja = inv.kind === 'frecuente' && inv.frequentAs === 'proveedor' && inv.tradeId
+    && (estado === 'esperando' || estado === 'adentro')
     ? diasSinFranja(rubros?.providerWindows ?? [], inv.tradeId, inv.weekdays?.length ? inv.weekdays : [0, 1, 2, 3, 4, 5, 6])
     : []
   const textoMeta = [
@@ -26,17 +27,12 @@ export function FilaInvitacion({ inv, mostrarUnidad = false, mostrarCreador = fa
     mostrarUnidad ? inv.unitLabel : null,
     mostrarCreador ? quienInvita(inv.creatorName, 'por') : null,
   ].filter(Boolean).join(' · ')
-  const meta = sinFranja.length === 0 ? textoMeta : (
-    <>
-      {textoMeta}
-      <span className="block text-xs font-semibold text-espera">
-        Los {sinFranja.map((d) => nombreDiaPlural(d).toLowerCase()).join(' y ')} no puede entrar
-      </span>
-    </>
-  )
+  const aviso = sinFranja.length
+    ? `Los ${sinFranja.map((d) => nombreDiaPlural(d).toLowerCase()).join(' y ')} no puede entrar`
+    : undefined
 
   return (
-    <Fila href={`/invitaciones/${inv.id}`} titulo={inv.guestName} meta={meta}
+    <Fila href={`/invitaciones/${inv.id}`} titulo={inv.guestName} meta={textoMeta} aviso={aviso}
       extremo={<EstadoTag estado={estado}
         detalle={estado === 'adentro' && inv.ultimoIngreso ? hora(inv.ultimoIngreso) : undefined} />} />
   )
