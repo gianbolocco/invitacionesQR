@@ -1,10 +1,14 @@
 node_modules/
 .env
 .env.local
+# Notas locales: datos de conexión, cosas de una sola compu
+*.local.md
 dist/
 .next/
 out/
 .superpowers/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
 # Capturas del rediseño: no se versionan, las regenera docs/rediseno/capturas.cjs
 docs/rediseno/antes/
 docs/rediseno/despues/
