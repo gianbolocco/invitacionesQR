@@ -2,7 +2,7 @@
 @import 'tw-animate-css';
 
 /*
-  Sistema de Pazzit (PLAN-REDISENO.md §1).
+  Sistema de Pazzit (docs/rediseno/plan.md §1).
   Forma, letra, estados, sol y neutros cálidos son de Pazzit. El acento
   (header, botones, links) es el color del barrio (--marca-base, lo inyecta el
   servidor); por defecto, el azul de Pazzit.

@@ -1,15 +1,24 @@
+# Dependencias y builds
 node_modules/
-.env
-.env.local
-# Notas locales: datos de conexión, cosas de una sola compu
-*.local.md
 dist/
 .next/
 out/
+
+# Entorno y notas de una sola compu (datos de conexión, credenciales)
+.env
+.env.local
+*.local.md
+
+# Herramientas locales del editor y de los agentes
+.claude/agents/
+.claude/skills/
+skills-lock.json
 .superpowers/
-# Playwright CLI output (may contain credentials)
+.impeccable/
+# La salida de Playwright CLI puede llevar credenciales
 .playwright-cli/
-# Capturas del rediseño: no se versionan, las regenera docs/rediseno/capturas.cjs
+
+# Capturas del rediseño: pesan y las regenera docs/rediseno/capturas.cjs
 docs/rediseno/antes/
 docs/rediseno/despues/
 docs/rediseno/*.png

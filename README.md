@@ -192,6 +192,13 @@ El diseño sale del cartel de entrada del barrio: la itálica del nombre, el dob
 filete, y los veredictos distinguidos por **luminancia y no por tono**, para que
 se lean en escala de grises y con daltonismo.
 
+## Documentación
+
+| Dónde | Qué hay |
+|---|---|
+| [`docs/superpowers/`](docs/superpowers/) | Specs de diseño y planes de cada feature, con fecha. |
+| [`docs/rediseno/`](docs/rediseno/) | Plan y progreso del rediseño con la identidad Pazzit, y el prototipo visual. |
+
 ## Pendiente
 
 - **Ley 25.326.** Falta decidir cuánto se guardan los ingresos con documento y
