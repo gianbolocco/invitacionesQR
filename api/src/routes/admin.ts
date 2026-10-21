@@ -9,6 +9,7 @@ import {
 } from '../services/people.js'
 import { importPeopleRows, previewPeopleCsv } from '../services/people-import.js'
 import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
+import { listTrades, createTrade, updateTrade } from '../services/trades.js'
 import { guardarLogo, borrarLogo } from '../services/branding.js'
 import { AppError } from '../lib/errors.js'
 import { contrasena } from '../lib/contrasena.js'
@@ -115,7 +116,37 @@ adminRoutes.get('/neighborhood', async (req, res) => {
   res.json(await getNeighborhood(req.person!.neighborhoodId))
 })
 
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/)
+const mmdd = z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/)
+const franja = z.object({
+  days: z.array(z.number().int().min(0).max(6)).min(1),
+  from: hhmm, to: hhmm,
+  season: z.object({ from: mmdd, to: mmdd }).nullable(),
+  trades: z.array(z.string().uuid()).min(1).nullable(),
+}).refine((f) => f.from < f.to)
+const franjas = z.array(franja).max(30)
+
+adminRoutes.get('/trades', async (req, res) => {
+  res.json(await listTrades(req.person!.neighborhoodId, { incluirArchivados: true }))
+})
+
+adminRoutes.post('/trades', async (req, res) => {
+  const { name } = z.object({ name: z.string().trim().min(1).max(40) }).parse(req.body)
+  res.status(201).json(await createTrade(req.person!.neighborhoodId, req.person!.id, name))
+})
+
+adminRoutes.patch('/trades/:id', async (req, res) => {
+  const body = z.object({
+    name: z.string().trim().min(1).max(40).optional(),
+    archived: z.boolean().optional(),
+  }).parse(req.body)
+  res.json(await updateTrade(req.person!.neighborhoodId, req.person!.id, req.params.id, body))
+})
+
 adminRoutes.patch('/neighborhood', async (req, res) => {
+  // Antes del resto: el front traduce 'franja_invalida', no el shape genérico de zod.
+  const ventanas = franjas.optional().safeParse(req.body?.providerWindows)
+  if (!ventanas.success) throw new AppError(400, 'franja_invalida')
   const body = z.object({
     name: z.string().trim().min(1).max(80).optional(),
     address: z.string().max(200).optional(),
@@ -127,9 +158,10 @@ adminRoutes.patch('/neighborhood', async (req, res) => {
       visita: z.number().int().min(1).max(72).nullable().optional(),
       proveedor: z.number().int().min(1).max(72).nullable().optional(),
     }).optional(),
-  }).parse(req.body)
+  }).parse({ ...req.body, providerWindows: undefined })
 
-  res.json(await updateNeighborhood(req.person!.neighborhoodId, req.person!.id, body))
+  res.json(await updateNeighborhood(req.person!.neighborhoodId, req.person!.id,
+    { ...body, providerWindows: ventanas.data }))
 })
 
 adminRoutes.post('/people/:id/enable', async (req, res) => {

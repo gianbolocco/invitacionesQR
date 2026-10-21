@@ -5,6 +5,8 @@ import {
   createInvitation, listForUnits, revokeInvitation, findPublicByToken,
   fillGuestDetails, editInvitation, restoreInvitation, searchInvitations, getInvitation,
 } from '../services/invitations.js'
+import { listTrades } from '../services/trades.js'
+import { getNeighborhood } from '../services/neighborhoods.js'
 import { unitsOfPerson } from '../services/units.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { AppError } from '../lib/errors.js'
@@ -88,6 +90,13 @@ invitationRoutes.get('/historial', async (req, res) => {
     ...f,
     createdBy: soloMias ? req.person!.id : undefined,
   }))
+})
+
+/** Rubros activos y franjas del barrio, para el formulario de proveedor. Antes de /:id. */
+invitationRoutes.get('/trades', async (req, res) => {
+  const nid = req.person!.neighborhoodId
+  const [rubros, barrio] = await Promise.all([listTrades(nid), getNeighborhood(nid)])
+  res.json({ trades: rubros.map(({ id, name }) => ({ id, name })), providerWindows: barrio.providerWindows })
 })
 
 /** El detalle de una invitación, para la pantalla del pase. */
