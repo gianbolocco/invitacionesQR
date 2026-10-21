@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { ChevronDown, Plus, X } from 'lucide-react'
 import { useGuardarFranjas, type Rubro } from '@/lib/queries/admin'
-import { horaCorta, nombreDiaPlural, temporadaRige, vigentesHoy, type Franja } from '@/lib/franjas'
+import { horaCorta, nombreDiaPlural, textoHorario, temporadaRige, vigentesHoy, type Franja } from '@/lib/franjas'
 import { hoyISO, sumarDias } from '@/lib/fechas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -86,7 +86,9 @@ function SelectorRubros({ franja, rubros, onChange }: { franja: Franja; rubros: 
 
 export function HorariosProveedores({ inicial, rubros }: { inicial: Franja[]; rubros: Rubro[] }) {
   const guardar = useGuardarFranjas()
-  const [franjas, setFranjas] = useState<Franja[]>(inicial)
+  const [franjas, setFranjasCrudo] = useState<Franja[]>(inicial)
+  // Todo cambio borra el "Guardado." anterior: ya no describe lo que hay en pantalla.
+  const setFranjas: typeof setFranjasCrudo = (fn) => { guardar.reset(); setFranjasCrudo(fn) }
   const hoy = new Date()
   const diaHoy = diaDe(hoyISO(hoy))
   const rigenHoy = vigentesHoy(franjas, hoy)
@@ -181,6 +183,7 @@ export function HorariosProveedores({ inicial, rubros }: { inicial: Franja[]; ru
       </div>
 
       {guardar.isSuccess && !guardar.isPending && <Nota tono="exito">Guardado.</Nota>}
+      {sinRubros && <p className="text-sm text-alto">Hay una franja sin rubros elegidos.</p>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button type="button" variant="outline" onClick={() => setFranjas((fs) => [...fs, NUEVA])}>
           <Plus aria-hidden />Agregar franja
@@ -233,7 +236,11 @@ export function HoyProveedores({ franjas, rubros }: { franjas: Franja[]; rubros:
           )
         })}
       </ul>
-      {desde && <p className="mt-3 text-sm text-ink-soft">Desde el {Number(desde.mmdd.slice(3))}/{Number(desde.mmdd.slice(0, 2))} rige {horaCorta(desde.f.from)} a {horaCorta(desde.f.to)}.</p>}
+      {desde && (
+        <p className="mt-3 text-sm text-ink-soft">
+          Desde el {Number(desde.mmdd.slice(3))}/{Number(desde.mmdd.slice(0, 2))}: {textoHorario(desde.f)} · {desde.f.trades === null ? 'Todos los rubros' : desde.f.trades.map((id) => rubros.find((r) => r.id === id)?.name ?? 'Rubro').join(', ')}
+        </p>
+      )}
     </aside>
   )
 }
