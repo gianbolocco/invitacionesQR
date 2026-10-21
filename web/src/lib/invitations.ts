@@ -10,6 +10,7 @@ export type Invitation = {
   guestName: string
   guestDoc: string | null
   plate: string | null
+  note: string | null
   validFrom: string
   validTo: string
   weekdays: number[] | null

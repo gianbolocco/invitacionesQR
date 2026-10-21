@@ -20,6 +20,7 @@ export type DatosInvitacion = {
   guestName: string
   guestDoc: string | null
   plate: string | null
+  note: string | null
   validFrom: string
   validTo: string
   weekdays: number[] | null
@@ -91,6 +92,7 @@ export function useCrearInvitacion() {
           ...d,
           guestDoc: d.guestDoc ?? undefined,
           plate: d.plate ?? undefined,
+          note: d.note ?? undefined,
           weekdays: d.weekdays ?? undefined,
         }),
       }),
