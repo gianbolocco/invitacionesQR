@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { ChevronDown, Plus, X } from 'lucide-react'
 import { useGuardarFranjas, type Rubro } from '@/lib/queries/admin'
-import { horaCorta, nombreDiaPlural, textoHorario, temporadaRige, vigentesHoy, type Franja } from '@/lib/franjas'
+import { diaDe, horaCorta, nombreDiaPlural, textoHorario, temporadaRige, vigentesHoy, type Franja } from '@/lib/franjas'
 import { hoyISO, sumarDias } from '@/lib/fechas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +22,6 @@ const mm = (mmdd: string) => Number(mmdd.slice(0, 2))
 const aMMDD = (m: number, d: number) => `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 
 /** Día de la semana (0 = domingo) de una fecha ISO; no depende del huso. */
-const diaDe = (iso: string) => new Date(`${iso}T12:00:00Z`).getUTCDay()
 const diaMes = (iso: string) => `${Number(iso.slice(8))}/${Number(iso.slice(5, 7))}`
 
 function SelectorFecha({ valor, etiqueta, onChange }: { valor: string; etiqueta: string; onChange: (v: string) => void }) {
@@ -115,7 +114,7 @@ export function HorariosProveedores({ inicial, rubros }: { inicial: Franja[]; ru
           </thead>
           <tbody>
             {franjas.length === 0 && (
-              <tr><td colSpan={5} className="px-2 py-4 text-ink-soft">Sin franjas: ningún proveedor puede entrar. Agregá una.</td></tr>
+              <tr><td colSpan={5} className="px-2 py-4 text-ink-soft">Sin franjas: los proveedores entran a cualquier hora. Agregá una para restringir.</td></tr>
             )}
             {franjas.map((f, i) => {
               const rige = rigenHoy.includes(f) && f.days.includes(diaHoy)

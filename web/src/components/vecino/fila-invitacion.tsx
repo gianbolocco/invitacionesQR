@@ -28,7 +28,7 @@ export function FilaInvitacion({ inv, mostrarUnidad = false, mostrarCreador = fa
     mostrarCreador ? quienInvita(inv.creatorName, 'por') : null,
   ].filter(Boolean).join(' · ')
   const aviso = sinFranja.length
-    ? `Los ${sinFranja.map((d) => nombreDiaPlural(d).toLowerCase()).join(' y ')} no puede entrar`
+    ? `Los ${new Intl.ListFormat('es', { type: 'conjunction' }).format(sinFranja.map((d) => nombreDiaPlural(d).toLowerCase()))} no puede entrar`
     : undefined
 
   return (

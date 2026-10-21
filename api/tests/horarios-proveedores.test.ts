@@ -175,6 +175,16 @@ describe('rubro en la invitación y horario en la barrera', () => {
     expect(p.body.franjas).toEqual([])
   })
 
+  it('editar una frecuente con el rubro archivado no lo revalida si no cambia', async () => {
+    const { invitar, rubro, vecino, admin } = await barrera()
+    const t = await rubro('Plomero')
+    const fre = (await invitar({ kind: 'frecuente', frequentAs: 'proveedor', tradeId: t }).expect(201)).body
+    await request(app).patch(`/admin/trades/${t}`).set('Cookie', admin).send({ archived: true }).expect(200)
+    const r = await request(app).patch(`/invitations/${fre.id}`).set('Cookie', vecino)
+      .send({ guestName: 'otro', frequentAs: 'proveedor' }).expect(200)
+    expect(r.body.tradeId).toBe(t)
+  })
+
   it('editar el rubro', async () => {
     const { invitar, rubro, vecino } = await barrera()
     const t = await rubro('Plomero')

@@ -6,7 +6,7 @@ import { Loader2, MapPin, SearchX, Sun } from 'lucide-react'
 import { api } from '@/lib/api'
 import { KIND_LABEL, PORTERIA, vigencia, type Invitation } from '@/lib/invitations'
 import { hoyISO } from '@/lib/fechas'
-import { pluralRubro, type Franja } from '@/lib/franjas'
+import { type Franja } from '@/lib/franjas'
 import { HorarioRubro } from '@/components/dominio/horario-rubro'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -158,7 +158,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
 
       {!sello && inv.tradeName && inv.franjas.length > 0 && (
         <section className="flex flex-col gap-2">
-          <HorarioRubro titulo={`Horario de ingreso para ${pluralRubro(inv.tradeName)}`} franjas={inv.franjas} />
+          <HorarioRubro titulo={`Horario de ingreso · ${inv.tradeName}`} franjas={inv.franjas} />
           <p className="text-sm text-ink-soft">Fuera de ese horario la guardia no te deja pasar.</p>
         </section>
       )}

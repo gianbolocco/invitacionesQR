@@ -80,7 +80,7 @@ export function detalleRechazo(
   extra?: { franjas: Franja[]; tradeName: string | null },
 ): string | null {
   if (reason === 'outside_hours') {
-    if (!extra?.franjas.length) return null
+    if (!extra) return null
     return detalleFueraDeHorario(extra.franjas, extra.tradeName ?? 'Proveedor', new Date())
   }
   if (reason === 'expired') return `Era válida hasta el ${fechaNumerica(inv.validTo)}`

@@ -523,11 +523,14 @@ export async function editInvitation(
     || (input.frequentAs !== undefined && input.frequentAs !== inv.frequentAs)
   if (cambiaRango) assertRangoDeFrecuente(inv.kind, input.frequentAs ?? inv.frequentAs, validFrom, validTo)
 
-  // El rubro se revalida solo si cambia algo que lo afecta. Pasar a visita lo limpia.
+  // El rubro se revalida solo si cambia algo que lo afecta (un rubro archivado no traba editar el nombre). Pasar a visita lo limpia.
   const frequentAs = input.frequentAs ?? inv.frequentAs
   let tradeId: string | null | undefined = input.tradeId
   if (input.frequentAs === 'visita') tradeId = null
-  else if (input.tradeId !== undefined || input.frequentAs !== undefined) {
+  else if (
+    (input.tradeId !== undefined && input.tradeId !== inv.tradeId)
+    || (input.frequentAs !== undefined && input.frequentAs !== inv.frequentAs)
+  ) {
     await assertRubro(neighborhoodId, inv.kind, frequentAs, input.tradeId === undefined ? inv.tradeId : input.tradeId)
   }
 

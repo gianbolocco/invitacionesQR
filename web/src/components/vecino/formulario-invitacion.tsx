@@ -13,7 +13,7 @@ import { DIAS, KIND_LABEL, type Invitation } from '@/lib/invitations'
 import { fechaCorta, hoyISO, unMesDespues } from '@/lib/fechas'
 import { ApiError } from '@/lib/api'
 import { useCrearInvitacion, useEditarInvitacion, useRubrosDelBarrio, type DatosInvitacion } from '@/lib/queries/invitaciones'
-import { diaDe, diasSinFranja, franjasDelRubro, nombreDiaPlural, pluralRubro } from '@/lib/franjas'
+import { diaDe, diasSinFranja, franjasDelRubro, nombreDiaPlural } from '@/lib/franjas'
 
 type Kind = Invitation['kind']
 
@@ -143,7 +143,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       <HorarioRubro titulo="Puede entrar" franjas={franjasRubro} />
       {choques.length > 0 && (
         <p role="status" className="rounded-md bg-espera-tint p-3 text-sm font-semibold text-espera">
-          Los {choques.map((d) => nombreDiaPlural(d).toLowerCase()).join(' y ')} no entran {pluralRubro(nombreRubro)}:
+          Los {new Intl.ListFormat('es', { type: 'conjunction' }).format(choques.map((d) => nombreDiaPlural(d).toLowerCase()))} no entra el rubro {nombreRubro}:
           {choques.length > 1 ? ' esos días' : ' ese día'} la guardia lo va a rechazar.
         </p>
       )}
