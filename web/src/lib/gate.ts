@@ -3,6 +3,7 @@ import { api, ApiError } from './api'
 import { fechaNumerica } from './fechas'
 import { DIAS } from './invitations'
 import type { ItemManual } from './carga-manual'
+import { detalleFueraDeHorario, type Franja } from './franjas'
 
 export type Check = { ok: true } | { ok: false; reason: string }
 
@@ -24,7 +25,10 @@ export type Resultado = {
     /** El vecino que invita, o PORTERIA si fue un alta exprés. */
     inviterName: string
     note: string | null
+    tradeName: string | null
   }
+  /** Las franjas del rubro de un proveedor; [] para el resto. */
+  franjas: Franja[]
   check: Check
   usedCount: number
   lastEntryAt: string | null
@@ -47,6 +51,7 @@ export type Hit = {
   plate: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
   frequentAs: 'visita' | 'proveedor' | null
+  tradeName: string | null
   anulada: boolean
   adentro: boolean
   note: string | null
@@ -60,6 +65,7 @@ export const MOTIVO: Record<string, string> = {
   expired: 'Venció',
   wrong_weekday: 'Hoy no está habilitado',
   no_capacity: 'Cupo agotado',
+  outside_hours: 'Fuera de horario',
   no_esta_adentro: 'No figura adentro',
   fuera_de_plazo: 'Pasó el tiempo para deshacer',
 }
@@ -71,7 +77,12 @@ export const MOTIVO: Record<string, string> = {
 export function detalleRechazo(
   reason: string,
   inv: { validFrom: string; validTo: string; weekdays: number[] | null },
+  extra?: { franjas: Franja[]; tradeName: string | null },
 ): string | null {
+  if (reason === 'outside_hours') {
+    if (!extra?.franjas.length) return null
+    return detalleFueraDeHorario(extra.franjas, extra.tradeName ?? 'Proveedor', new Date())
+  }
   if (reason === 'expired') return `Era válida hasta el ${fechaNumerica(inv.validTo)}`
   if (reason === 'not_yet') return `Es válida desde el ${fechaNumerica(inv.validFrom)}`
   if (reason === 'wrong_weekday' && inv.weekdays?.length) {

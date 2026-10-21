@@ -24,7 +24,7 @@ export const FilaAgenda = memo(function FilaAgenda({ r, hoy, onAbrir }: { r: Age
       <span className="flex items-center gap-2">
         <span className="min-w-0 truncate">{r.guestName}</span>
         <IconoNota nota={r.note} />
-        <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
+        <TagTipo kind={r.kind} frequentAs={r.frequentAs} tradeName={r.tradeName} />
       </span>
     } meta={metaDe(r)} onClick={() => onAbrir(r.id)}
       extremo={excedido ? <TextoExcedido texto={excedido} className="text-[13px]" /> : <EstadoTag estado={estadoDe(r, hoy)} detalle={detalleDe(r, hoy)} contexto="garita" />} />
