@@ -1,6 +1,6 @@
 # Nota de la invitación: diseño
 
-Estado: diseño aprobado (20/10), rama `nota-invitacion`.
+Estado: implementado en la rama `nota-invitacion` (20/10).
 
 ## Problema
 
@@ -69,9 +69,9 @@ En el detalle de la invitación del vecino, la nota va como un dato más, si hay
   pongas datos sensibles"). Como los demás campos del alta, lleva
   `useCampoLectora`: un QR o un DNI que llega con el foco en la nota se
   interpreta como lectura y no queda escrito en ella.
-- **Veredicto / detalle** (`garita/invitacion/[id]`): la nota completa, en un
-  bloque propio debajo de los datos del invitado, con el texto en `text-ink`
-  sobre una superficie de los tokens. Es lo que el guardia mira al escanear.
+- **Veredicto / detalle** (`garita/invitacion/[id]`): la nota completa, como la
+  primera fila de los datos ("Nota"), con el color del veredicto igual que el
+  resto. Es lo que el guardia mira al escanear.
 - **Lista del día (las cuatro vistas) y resultados del buscador**: solo un ícono
   de nota (lucide `StickyNote`) al lado del nombre, con la nota en el `title` y
   en un `sr-only` para lectores de pantalla. No se agrega texto a las filas.
