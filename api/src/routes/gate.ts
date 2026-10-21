@@ -49,6 +49,7 @@ gateRoutes.post('/invitations', async (req, res) => {
     guestName: z.string().min(1),
     guestDoc: z.string().optional(),
     plate: z.string().optional(),
+    note: z.string().trim().max(140).optional(),
   }).parse(req.body)
 
   res.status(201).json(await createExpressInvitation({
