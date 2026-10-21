@@ -1,11 +1,12 @@
 import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
-import { invitations, entryLogs, people, units, unitMembers, neighborhoods } from '../db/schema.js'
+import { invitations, entryLogs, people, units, unitMembers, neighborhoods, trades } from '../db/schema.js'
 import { randomToken } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
 import { todayInBuenosAires, unMesDespues } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { PORTERIA } from '../lib/porteria.js'
+import { aplicaFranjas, type Franja } from '../lib/franjas.js'
 
 export type CreateInvitationInput = {
   unitId: string
@@ -21,6 +22,8 @@ export type CreateInvitationInput = {
   validTo: string
   weekdays?: number[]
   capacity: number
+  tradeId?: string | null
+  neighborhoodId: string
 }
 
 export async function assertMemberOfUnit(personId: string, unitId: string): Promise<void> {
@@ -100,15 +103,39 @@ function assertRangoDeFrecuente(kind: string, frequentAs: string | null | undefi
   }
 }
 
+async function assertRubro(neighborhoodId: string, kind: string, frequentAs: string | null, tradeId: string | null | undefined) {
+  if (!aplicaFranjas(kind, frequentAs)) {
+    if (tradeId) throw new AppError(400, 'rubro_invalido')
+    return
+  }
+  if (tradeId) {
+    const [t] = await db.select().from(trades).where(and(eq(trades.id, tradeId),
+      eq(trades.neighborhoodId, neighborhoodId), isNull(trades.archivedAt))).limit(1)
+    if (!t) throw new AppError(400, 'rubro_invalido')
+    return
+  }
+  const [hay] = await db.select({ id: trades.id }).from(trades)
+    .where(and(eq(trades.neighborhoodId, neighborhoodId), isNull(trades.archivedAt))).limit(1)
+  if (hay) throw new AppError(400, 'rubro_requerido')
+}
+
+/** Las franjas que le tocan a un rubro: las de todos los rubros y las que lo nombran. */
+export function franjasDelRubro(franjas: Franja[], tradeId: string | null): Franja[] {
+  return franjas.filter((f) => f.trades === null || (tradeId !== null && f.trades.includes(tradeId)))
+}
+
 export async function createInvitation(input: CreateInvitationInput) {
   await assertMemberOfUnit(input.createdBy, input.unitId)
   assertRangoDeFrecuente(input.kind, input.frequentAs, input.validFrom, input.validTo)
+  const frequentAs = input.kind === 'frecuente' ? (input.frequentAs ?? 'visita') : null
+  await assertRubro(input.neighborhoodId, input.kind, frequentAs, input.tradeId)
 
   const [inv] = await db.insert(invitations).values({
     unitId: input.unitId,
     createdBy: input.createdBy,
     kind: input.kind,
-    frequentAs: input.kind === 'frecuente' ? (input.frequentAs ?? 'visita') : null,
+    frequentAs,
+    tradeId: input.tradeId ?? null,
     guestName: input.guestName.trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
@@ -156,6 +183,8 @@ const columnas = {
   revokedReason: invitations.revokedReason,
   createdAt: invitations.createdAt,
   createdBy: invitations.createdBy,
+  tradeId: invitations.tradeId,
+  tradeName: trades.name,
   creatorName: nombreOEtiquetaSql,
   unitId: invitations.unitId,
   unitLabel: units.label,
@@ -170,6 +199,7 @@ function consultaInvitaciones() {
     .from(invitations)
     .innerJoin(people, eq(people.id, invitations.createdBy))
     .innerJoin(units, eq(units.id, invitations.unitId))
+    .leftJoin(trades, eq(trades.id, invitations.tradeId))
     .leftJoin(entryLogs, eq(entryLogs.invitationId, invitations.id))
     .$dynamic()
 }
@@ -195,7 +225,7 @@ export async function listForUnits(unitIds: string[]) {
       isNull(invitations.revokedAt),
       gte(invitations.validTo, hoy),
     ))
-    .groupBy(invitations.id, people.name, people.role, units.label)
+    .groupBy(invitations.id, people.name, people.role, units.label, trades.name)
     // El cupo se mide sobre el count de ingresos, así que va en HAVING. Quien
     // está adentro sigue en la home aunque haya agotado el cupo: es justo lo
     // que el vecino quiere ver ("ya llegó").
@@ -260,7 +290,7 @@ export async function searchInvitations(
   const [rows, [conteo]] = await Promise.all([
     consultaInvitaciones()
       .where(donde)
-      .groupBy(invitations.id, people.name, people.role, units.label)
+      .groupBy(invitations.id, people.name, people.role, units.label, trades.name)
       .orderBy(desc(invitations.createdAt))
       .limit(pageSize)
       .offset((page - 1) * pageSize),
@@ -280,7 +310,7 @@ export async function searchInvitations(
 export async function getInvitation(id: string, personId: string) {
   const [row] = await consultaInvitaciones()
     .where(eq(invitations.id, id))
-    .groupBy(invitations.id, people.name, people.role, units.label)
+    .groupBy(invitations.id, people.name, people.role, units.label, trades.name)
     .limit(1)
   if (!row) throw new AppError(404, 'not_found')
   await assertMemberOfUnit(personId, row.unitId)
@@ -351,6 +381,9 @@ export async function findPublicByToken(token: string) {
     guestDoc: invitations.guestDoc,
     plate: invitations.plate,
     kind: invitations.kind,
+    tradeId: invitations.tradeId,
+    tradeName: trades.name,
+    providerWindows: neighborhoods.providerWindows,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
     revokedAt: invitations.revokedAt,
@@ -364,6 +397,7 @@ export async function findPublicByToken(token: string) {
     .innerJoin(units, eq(units.id, invitations.unitId))
     .innerJoin(people, eq(people.id, invitations.createdBy))
     .innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
+    .leftJoin(trades, eq(trades.id, invitations.tradeId))
     .where(eq(invitations.token, token))
     .limit(1)
 
@@ -372,6 +406,8 @@ export async function findPublicByToken(token: string) {
   return {
     guestName: row.guestName,
     kind: row.kind,
+    tradeName: row.tradeName,
+    franjas: franjasDelRubro(row.providerWindows, row.tradeId),
     validFrom: row.validFrom,
     validTo: row.validTo,
     revokedAt: row.revokedAt,
@@ -445,6 +481,7 @@ export type EditInvitationInput = {
   weekdays?: number[] | null
   capacity?: number
   frequentAs?: 'visita' | 'proveedor'
+  tradeId?: string | null
 }
 
 /**
@@ -462,6 +499,7 @@ export async function editInvitation(
   id: string,
   personId: string,
   input: EditInvitationInput,
+  neighborhoodId: string,
 ) {
   const [inv] = await db.select().from(invitations).where(eq(invitations.id, id)).limit(1)
   if (!inv) throw new AppError(404, 'not_found')
@@ -483,7 +521,16 @@ export async function editInvitation(
     || (input.frequentAs !== undefined && input.frequentAs !== inv.frequentAs)
   if (cambiaRango) assertRangoDeFrecuente(inv.kind, input.frequentAs ?? inv.frequentAs, validFrom, validTo)
 
+  // El rubro se revalida solo si cambia algo que lo afecta. Pasar a visita lo limpia.
+  const frequentAs = input.frequentAs ?? inv.frequentAs
+  let tradeId: string | null | undefined = input.tradeId
+  if (input.frequentAs === 'visita') tradeId = null
+  else if (input.tradeId !== undefined || input.frequentAs !== undefined) {
+    await assertRubro(neighborhoodId, inv.kind, frequentAs, input.tradeId === undefined ? inv.tradeId : input.tradeId)
+  }
+
   const [actualizada] = await db.update(invitations).set({
+    ...(tradeId !== undefined ? { tradeId } : {}),
     ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),
     ...(input.guestDoc !== undefined ? { guestDoc: input.guestDoc?.trim() || null } : {}),
     ...(input.plate !== undefined ? { plate: input.plate?.trim().toUpperCase() || null } : {}),

@@ -59,11 +59,12 @@ const createSchema = z.object({
   validTo: isoDate,
   weekdays: z.array(z.number().int().min(0).max(6)).optional(),
   capacity: z.number().int().min(1),
+  tradeId: z.string().uuid().nullable().optional(),
 }).refine((v) => v.validTo >= v.validFrom, { message: 'La ventana está invertida', path: ['validTo'] })
 
 invitationRoutes.post('/', async (req, res) => {
   const body = createSchema.parse(req.body)
-  res.status(201).json(await createInvitation({ ...body, createdBy: req.person!.id }))
+  res.status(201).json(await createInvitation({ ...body, createdBy: req.person!.id, neighborhoodId: req.person!.neighborhoodId }))
 })
 
 invitationRoutes.get('/', async (req, res) => {
@@ -119,10 +120,11 @@ const editSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).nullable().optional(),
   capacity: z.number().int().min(1).optional(),
   frequentAs: z.enum(['visita', 'proveedor']).optional(),
+  tradeId: z.string().uuid().nullable().optional(),
 })
 
 invitationRoutes.patch('/:id', async (req, res) => {
-  res.json(await editInvitation(req.params.id, req.person!.id, editSchema.parse(req.body)))
+  res.json(await editInvitation(req.params.id, req.person!.id, editSchema.parse(req.body), req.person!.neighborhoodId))
 })
 
 /** Deshacer una anulación. */

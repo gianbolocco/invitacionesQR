@@ -1,12 +1,12 @@
 import { and, desc, eq, gt, gte, ilike, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
 import { db } from '../db/index.js'
-import { invitations, entryLogs, units, people } from '../db/schema.js'
+import { invitations, entryLogs, units, people, trades, neighborhoods } from '../db/schema.js'
 import { canEnter, type EntryCheck } from '../authz.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { audit } from '../lib/audit.js'
 import { PORTERIA } from '../lib/porteria.js'
-import { assertUnitInNeighborhood, valoresDePorteria } from './invitations.js'
+import { assertUnitInNeighborhood, valoresDePorteria, franjasDelRubro } from './invitations.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -20,6 +20,10 @@ async function loadForCheck(where: SQL) {
   const [row] = await db.select({
     id: invitations.id,
     kind: invitations.kind,
+    frequentAs: invitations.frequentAs,
+    tradeId: invitations.tradeId,
+    tradeName: trades.name,
+    providerWindows: neighborhoods.providerWindows,
     guestName: invitations.guestName,
     guestDoc: invitations.guestDoc,
     plate: invitations.plate,
@@ -36,7 +40,9 @@ async function loadForCheck(where: SQL) {
     inviterName: sql<string>`case when ${people.role} = 'guard' then ${PORTERIA} else ${people.name} end`,
   }).from(invitations)
     .innerJoin(units, eq(units.id, invitations.unitId))
+    .innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
     .innerJoin(people, eq(people.id, invitations.createdBy))
+    .leftJoin(trades, eq(trades.id, invitations.tradeId))
     .where(where).limit(1)
   return row ?? null
 }
@@ -45,11 +51,14 @@ type LoadedInvitation = NonNullable<Awaited<ReturnType<typeof loadForCheck>>>
 
 async function buildCheck(invitation: LoadedInvitation) {
   const { usedCount, lastEntryAt } = await usage(invitation.id)
-  const check: EntryCheck = canEnter(invitation, new Date(), usedCount)
+  const { providerWindows, ...inv } = invitation
+  const check: EntryCheck = canEnter(inv, new Date(), usedCount, providerWindows)
   const abierta = await openEntry(invitation.id)
 
   return {
-    invitation,
+    invitation: inv,
+    // Solo las franjas de su rubro, nunca la lista entera del barrio.
+    franjas: franjasDelRubro(providerWindows, invitation.tradeId),
     check,
     usedCount,
     lastEntryAt,
@@ -117,7 +126,11 @@ export async function registerEntry(
 
     const { usedCount } = await usage(invitationId, tx)
 
-    const check = canEnter(target, new Date(), usedCount)
+    // Después del FOR UPDATE de arriba, que sigue siendo lo que serializa el cupo.
+    const [{ providerWindows }] = await tx.select({ providerWindows: neighborhoods.providerWindows })
+      .from(units).innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
+      .where(eq(units.id, target.unitId)).limit(1)
+    const check = canEnter(target, new Date(), usedCount, providerWindows)
     if (!check.ok) throw new AppError(409, check.reason)
 
     const [entry] = await tx.insert(entryLogs).values({
@@ -383,6 +396,7 @@ export async function searchGuests(neighborhoodId: string, query: string) {
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
     frequentAs: invitations.frequentAs,
+    tradeName: trades.name,
     unitLabel: units.label,
     // Para que el guardia sepa qué va a pasar antes de tocar el resultado.
     anulada: sql<boolean>`${invitations.revokedAt} is not null`,
@@ -393,6 +407,7 @@ export async function searchGuests(neighborhoodId: string, query: string) {
   })
     .from(invitations)
     .innerJoin(units, eq(units.id, invitations.unitId))
+    .leftJoin(trades, eq(trades.id, invitations.tradeId))
     .where(and(
       eq(units.neighborhoodId, neighborhoodId),
       // O sigue adentro: el que entró ayer con una invitación de ayer tiene que
@@ -430,6 +445,7 @@ export type AgendaRow = {
   note: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
   frequentAs: 'visita' | 'proveedor' | null
+  tradeName: string | null
   unitLabel: string
   inviterName: string
   capacity: number
@@ -480,6 +496,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       i.note,
       i.kind,
       i.frequent_as       as "frequentAs",
+      t.name              as "tradeName",
       u.label             as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
@@ -495,6 +512,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
+    left join trade t on t.id = i.trade_id
     where u.neighborhood_id = ${neighborhoodId}
       and i.revoked_at is null
       and ${day}::date between i.valid_from and i.valid_to
@@ -525,6 +543,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       i.note,
       i.kind,
       i.frequent_as       as "frequentAs",
+      t.name              as "tradeName",
       u.label             as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
@@ -551,6 +570,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
     join unit u on u.id = i.unit_id
     join neighborhood n on n.id = u.neighborhood_id
     join person p on p.id = i.created_by
+    left join trade t on t.id = i.trade_id
     where u.neighborhood_id = ${neighborhoodId}
     order by abiertas.desde desc
   `)
@@ -565,6 +585,7 @@ export type AuditRow = {
   plate: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
   frequentAs: 'visita' | 'proveedor' | null
+  tradeName: string | null
   unitLabel: string
   inviterName: string
   validFrom: string
@@ -750,6 +771,7 @@ async function auditRows(
       i.plate,
       i.kind,
       i.frequent_as       as "frequentAs",
+      t.name                      as "tradeName",
       u.label                     as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.valid_from                as "validFrom",
@@ -772,6 +794,7 @@ async function auditRows(
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
+    left join trade t on t.id = i.trade_id
     left join uso on uso.invitation_id = i.id
     left join ultimo on ultimo.invitation_id = i.id
     where ${filtrosAuditoria(neighborhoodId, f)}

@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
-import { neighborhoods, people } from '../src/db/schema.js'
+import { eq } from 'drizzle-orm'
+import { neighborhoods, people, units, unitMembers } from '../src/db/schema.js'
+import { todayInBuenosAires } from '../src/lib/dates.js'
 import { hashPassword } from '../src/lib/crypto.js'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
@@ -67,5 +69,98 @@ describe('rubros y franjas de proveedores', () => {
     const r = await request(app).patch('/admin/neighborhood').set('Cookie', admin)
       .send({ providerWindows: [{ ...franjaOk, ...cambio }] }).expect(400)
     expect(r.body.error).toBe('franja_invalida')
+  })
+})
+
+describe('rubro en la invitación y horario en la barrera', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  // Siempre cerrada salvo el minuto de medianoche (BA): el test solo se rompería a las 00:00.
+  const cerrada = { days: [0, 1, 2, 3, 4, 5, 6], from: '00:00', to: '00:01', season: null, trades: null }
+  const hoy = todayInBuenosAires()
+
+  async function barrera() {
+    const base = await escenario()
+    const [u] = await db.insert(units).values({ neighborhoodId: base.n.id, label: 'Lote 1' }).returning()
+    const [v] = await db.select().from(people).where(eq(people.email, 'vecino@example.com'))
+    await db.insert(unitMembers).values({ unitId: u.id, personId: v.id })
+    await db.insert(people).values({
+      neighborhoodId: base.n.id, email: 'garita@example.com', name: 'Garita', role: 'guard',
+      status: 'active', passwordHash: await hashPassword(PASS),
+    })
+    const l = await request(app).post('/auth/login').send({ email: 'garita@example.com', password: PASS })
+    const garita = l.headers['set-cookie'] as unknown as string[]
+    const invitar = (extra: object) => request(app).post('/invitations').set('Cookie', base.vecino).send({
+      unitId: u.id, kind: 'proveedor', guestName: 'Pedro', validFrom: hoy, validTo: hoy, capacity: 1, ...extra,
+    })
+    const rubro = async (name: string) =>
+      (await request(app).post('/admin/trades').set('Cookie', base.admin).send({ name }).expect(201)).body.id as string
+    const franjas = (providerWindows: object[]) =>
+      request(app).patch('/admin/neighborhood').set('Cookie', base.admin).send({ providerWindows }).expect(200)
+    return { ...base, u, garita, invitar, rubro, franjas }
+  }
+
+  it('con rubros cargados el proveedor exige rubro; sin rubros no', async () => {
+    const { invitar, rubro } = await barrera()
+    await invitar({}).expect(201)
+    await rubro('Plomero')
+    const r = await invitar({}).expect(400)
+    expect(r.body.error).toBe('rubro_requerido')
+  })
+
+  it('rubro_invalido en visita, frecuente de visita y rubro archivado', async () => {
+    const { invitar, rubro, admin } = await barrera()
+    const t = await rubro('Plomero')
+    for (const extra of [{ kind: 'visita' }, { kind: 'frecuente', frequentAs: 'visita' }]) {
+      const r = await invitar({ ...extra, tradeId: t }).expect(400)
+      expect(r.body.error).toBe('rubro_invalido')
+    }
+    await request(app).patch(`/admin/trades/${t}`).set('Cookie', admin).send({ archived: true }).expect(200)
+    const r = await invitar({ tradeId: t }).expect(400)
+    expect(r.body.error).toBe('rubro_invalido')
+  })
+
+  it('una frecuente como proveedor acepta rubro', async () => {
+    const { invitar, rubro } = await barrera()
+    const t = await rubro('Jardinero')
+    const r = await invitar({ kind: 'frecuente', frequentAs: 'proveedor', tradeId: t }).expect(201)
+    expect(r.body.tradeId).toBe(t)
+  })
+
+  it('fuera de franja: check y alta de ingreso rechazan; con [] pasa; la visita pasa', async () => {
+    const { invitar, rubro, franjas, garita } = await barrera()
+    const t = await rubro('Plomero')
+    const prov = (await invitar({ tradeId: t }).expect(201)).body
+    const vis = (await invitar({ kind: 'visita' }).expect(201)).body
+    await franjas([cerrada])
+
+    const c = await request(app).get(`/gate/check/${prov.token}`).set('Cookie', garita).expect(200)
+    expect(c.body.check).toEqual({ ok: false, reason: 'outside_hours' })
+    expect(c.body.invitation.tradeName).toBe('Plomero')
+    expect(c.body.franjas).toEqual([cerrada])
+    expect(c.body.invitation.providerWindows).toBeUndefined()
+    const ingreso = (id: string) => request(app).post('/gate/entries').set('Cookie', garita)
+      .send({ invitationId: id, guestName: 'Pedro', guestDoc: '123' })
+    const e = await ingreso(prov.id).expect(409)
+    expect(e.body.error).toBe('outside_hours')
+
+    const cv = await request(app).get(`/gate/check/${vis.token}`).set('Cookie', garita).expect(200)
+    expect(cv.body.check).toEqual({ ok: true })
+    await ingreso(vis.id).expect(201)
+
+    await franjas([])
+    await ingreso(prov.id).expect(201)
+  })
+
+  it('la página pública y la búsqueda traen el rubro', async () => {
+    const { invitar, rubro, franjas, garita } = await barrera()
+    const t = await rubro('Plomero')
+    const prov = (await invitar({ tradeId: t }).expect(201)).body
+    await franjas([cerrada])
+    const p = await request(app).get(`/invitations/public/${prov.token}`).expect(200)
+    expect(p.body.tradeName).toBe('Plomero')
+    expect(p.body.franjas).toEqual([cerrada])
+    const s = await request(app).post('/gate/search').set('Cookie', garita).send({ q: 'Pedro' }).expect(200)
+    expect(JSON.stringify(s.body)).toContain('Plomero')
   })
 })
