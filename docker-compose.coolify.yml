@@ -72,9 +72,6 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       # El barrio de esta instalación. Se siembra al primer arranque; si la
       # base ya tiene uno, no se hace nada.
-      BARRIO_NOMBRE: ${BARRIO_NOMBRE:?falta BARRIO_NOMBRE}
-      BARRIO_DIRECCION: ${BARRIO_DIRECCION:-}
-      BARRIO_MAPA: ${BARRIO_MAPA:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?falta ADMIN_EMAIL}
       ADMIN_NOMBRE: ${ADMIN_NOMBRE:-}
     # /health chequea app y base. node -e con fetch porque node:24-slim no
@@ -119,6 +116,8 @@ services:
     expose: ['80']
     environment:
       SITIO: ':80'
+      # Solo en qa: NOINDEX=1 para que los buscadores no la indexen.
+      NOINDEX: ${NOINDEX:-}
     depends_on: [web, api]
     # Es el servicio que Coolify expone, así que es el que reporta el estado del
     # recurso. Pega a /api/health A TRAVÉS de Caddy: un solo chequeo cubre el
