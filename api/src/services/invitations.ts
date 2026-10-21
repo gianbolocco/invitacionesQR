@@ -16,6 +16,7 @@ export type CreateInvitationInput = {
   guestName: string
   guestDoc?: string
   plate?: string
+  note?: string
   validFrom: string
   validTo: string
   weekdays?: number[]
@@ -45,6 +46,7 @@ export type CreateExpressInvitationInput = {
   guestName: string
   guestDoc?: string
   plate?: string
+  note?: string
   createdBy: string
   neighborhoodId: string
 }
@@ -79,6 +81,7 @@ export function valoresDePorteria(input: CreateExpressInvitationInput, dia: stri
     guestName: input.guestName.trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
+    note: input.note?.trim() || null,
     validFrom: dia,
     validTo: dia,
     capacity: 1,
@@ -109,6 +112,7 @@ export async function createInvitation(input: CreateInvitationInput) {
     guestName: input.guestName.trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
+    note: input.note?.trim() || null,
     validFrom: input.validFrom,
     validTo: input.validTo,
     weekdays: input.weekdays?.length ? input.weekdays : null,
@@ -142,6 +146,7 @@ const columnas = {
   guestName: invitations.guestName,
   guestDoc: invitations.guestDoc,
   plate: invitations.plate,
+  note: invitations.note,
   validFrom: invitations.validFrom,
   validTo: invitations.validTo,
   weekdays: invitations.weekdays,
@@ -434,6 +439,7 @@ export type EditInvitationInput = {
   guestName?: string
   guestDoc?: string | null
   plate?: string | null
+  note?: string | null
   validFrom?: string
   validTo?: string
   weekdays?: number[] | null
@@ -481,6 +487,7 @@ export async function editInvitation(
     ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),
     ...(input.guestDoc !== undefined ? { guestDoc: input.guestDoc?.trim() || null } : {}),
     ...(input.plate !== undefined ? { plate: input.plate?.trim().toUpperCase() || null } : {}),
+    ...(input.note !== undefined ? { note: input.note?.trim() || null } : {}),
     validFrom,
     validTo,
     ...(input.weekdays !== undefined ? { weekdays: input.weekdays?.length ? input.weekdays : null } : {}),

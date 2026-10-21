@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Fila } from '@/components/dominio/fila'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { TagTipo } from '@/components/dominio/tag-tipo'
+import { IconoNota } from '@/components/garita/icono-nota'
 import type { AgendaRow } from '@/lib/queries/garita'
 import type { Columnas } from '@/lib/tablero'
 import { detalleDe, estadoDe, metaDe } from '@/components/garita/datos-agenda'
@@ -22,6 +23,7 @@ export const FilaAgenda = memo(function FilaAgenda({ r, hoy, onAbrir }: { r: Age
     <Fila densa titulo={
       <span className="flex items-center gap-2">
         <span className="min-w-0 truncate">{r.guestName}</span>
+        <IconoNota nota={r.note} />
         <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
       </span>
     } meta={metaDe(r)} onClick={() => onAbrir(r.id)}

@@ -23,6 +23,7 @@ async function loadForCheck(where: SQL) {
     guestName: invitations.guestName,
     guestDoc: invitations.guestDoc,
     plate: invitations.plate,
+    note: invitations.note,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
     weekdays: invitations.weekdays,
@@ -378,6 +379,7 @@ export async function searchGuests(neighborhoodId: string, query: string) {
     guestDoc: invitations.guestDoc,
     kind: invitations.kind,
     plate: invitations.plate,
+    note: invitations.note,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
     frequentAs: invitations.frequentAs,
@@ -425,6 +427,7 @@ export type AgendaRow = {
   guestName: string
   guestDoc: string | null
   plate: string | null
+  note: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
   frequentAs: 'visita' | 'proveedor' | null
   unitLabel: string
@@ -474,6 +477,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       i.guest_name        as "guestName",
       i.guest_doc         as "guestDoc",
       i.plate,
+      i.note,
       i.kind,
       i.frequent_as       as "frequentAs",
       u.label             as "unitLabel",
@@ -518,6 +522,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       i.guest_name        as "guestName",
       i.guest_doc         as "guestDoc",
       i.plate,
+      i.note,
       i.kind,
       i.frequent_as       as "frequentAs",
       u.label             as "unitLabel",

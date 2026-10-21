@@ -39,6 +39,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   const [guestName, setGuestName] = useState(invitacion?.guestName ?? inicial?.guestName ?? '')
   const [guestDoc, setGuestDoc] = useState(invitacion?.guestDoc ?? inicial?.guestDoc ?? '')
   const [plate, setPlate] = useState(invitacion?.plate ?? inicial?.plate ?? '')
+  const [nota, setNota] = useState(invitacion?.note ?? '')
   const [validFrom, setValidFrom] = useState(invitacion?.validFrom ?? hoy)
   // Un mes: el tope de una visita frecuente, que es la que se elige por defecto.
   const [validTo, setValidTo] = useState(invitacion?.validTo ?? unMesDespues(hoy))
@@ -74,6 +75,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       guestName: guestName.trim(),
       guestDoc: guestDoc.trim() || null,
       plate: plate.trim().toUpperCase() || null,
+      note: nota.trim() || null,
       validFrom,
       validTo: frecuente ? validTo : validFrom,
       weekdays: frecuente && dias.length ? dias.map(Number).sort((a, b) => a - b) : null,
@@ -173,6 +175,14 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
           </Campo>
         </div>
       </section>
+
+      <Campo id="nota" etiqueta="Nota para la guardia (opcional)"
+        accesorio={<span className="text-xs tabular text-ink-soft">{nota.length}/140</span>}
+        ayuda="La lee la guardia. No pongas datos de salud ni otros datos sensibles.">
+        <textarea id="nota" rows={2} maxLength={140} value={nota} aria-describedby="nota-nota" onChange={(e) => setNota(e.target.value)}
+          placeholder="Viene en un Gol rojo"
+          className="w-full resize-none rounded-sm border-2 border-control bg-card px-3.5 py-2.5 text-base text-ink outline-none placeholder:text-ink-soft focus-visible:border-azul-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus" />
+      </Campo>
 
       {errorGeneral && <Nota tono="error">{errorGeneral}</Nota>}
 

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { TagTipo } from '@/components/dominio/tag-tipo'
+import { IconoNota } from '@/components/garita/icono-nota'
 import { useDemora } from '@/lib/use-demora'
 import { useMedia } from '@/lib/use-media'
 import { useBusqueda } from '@/lib/queries/garita'
@@ -152,8 +153,9 @@ export function BuscarInvitado({ q, onQ, onAbrir, onLectura, onAutorizar }: {
                   className={cn('flex min-h-14 cursor-pointer gap-x-3 gap-y-1.5 px-4 py-2.5 max-md:flex-col md:items-center',
                     i === marcado && 'bg-surface-sunk')}>
                   <div className="min-w-0 flex-1">
-                    <p className={cn('truncate text-[15px] font-semibold', h.anulada && 'text-ink-soft line-through decoration-1')}>
-                      {h.guestName}
+                    <p className="flex items-center gap-1.5 text-[15px] font-semibold">
+                      <span className={cn('truncate', h.anulada && 'text-ink-soft line-through decoration-1')}>{h.guestName}</span>
+                      <IconoNota nota={h.note} />
                     </p>
                     <p className="truncate text-[13px] text-ink-soft tabular">
                       {[h.unitLabel, h.guestDoc && `DNI ${formatearDni(h.guestDoc)}`, h.plate].filter(Boolean).join(' · ')}

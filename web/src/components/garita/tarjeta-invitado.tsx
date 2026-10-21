@@ -1,4 +1,5 @@
 import { TagTipo } from '@/components/dominio/tag-tipo'
+import { IconoNota } from './icono-nota'
 import { quienInvita } from '@/lib/invitations'
 import type { AgendaRow } from '@/lib/queries/garita'
 import { pieDe } from './datos-agenda'
@@ -23,7 +24,10 @@ export function TarjetaInvitado({ fila, hoy, onAbrir }: {
     <button type="button" onClick={() => onAbrir(fila.id)}
       className="flex w-full flex-col gap-1.5 rounded-md border border-line bg-card p-3 text-left">
       <span className="flex items-start justify-between gap-2">
-        <span className="min-w-0 text-[15px] font-semibold leading-snug">{fila.guestName}</span>
+        <span className="flex min-w-0 items-start gap-1.5">
+          <span className="min-w-0 text-[15px] font-semibold leading-snug">{fila.guestName}</span>
+          <span className="mt-px shrink-0"><IconoNota nota={fila.note} /></span>
+        </span>
         <TagTipo kind={fila.kind} frequentAs={fila.frequentAs} />
       </span>
       <span className="truncate text-[13px] text-ink-soft">

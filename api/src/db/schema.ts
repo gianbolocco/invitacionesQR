@@ -87,6 +87,9 @@ export const invitations = pgTable('invitation', {
   guestName: text('guest_name').notNull(),
   guestDoc: text('guest_doc'),
   plate: text('plate'),
+  // Lo que el vecino le deja dicho a la guardia ("viene en un Gol rojo"). No
+  // confundir con entry_log.note, que es la observación del guardia en una carga manual.
+  note: text('note'),
   validFrom: date('valid_from').notNull(),
   validTo: date('valid_to').notNull(),
   weekdays: smallint('weekdays').array(),
@@ -110,6 +113,7 @@ export const invitations = pgTable('invitation', {
     or (${t.kind} = 'frecuente' and ${t.frequentAs} in ('visita','proveedor'))`),
   check('invitation_window_ck', sql`${t.validTo} >= ${t.validFrom}`),
   check('invitation_capacity_ck', sql`${t.capacity} >= 1`),
+  check('invitation_note_ck', sql`char_length(${t.note}) <= 140`),
 ])
 
 export const entryLogs = pgTable('entry_log', {

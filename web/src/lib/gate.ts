@@ -23,6 +23,7 @@ export type Resultado = {
     unitLabel: string
     /** El vecino que invita, o PORTERIA si fue un alta exprés. */
     inviterName: string
+    note: string | null
   }
   check: Check
   usedCount: number
@@ -48,6 +49,7 @@ export type Hit = {
   frequentAs: 'visita' | 'proveedor' | null
   anulada: boolean
   adentro: boolean
+  note: string | null
 }
 
 export type UnidadHit = { unitId: string; unitLabel: string; residentName: string }
@@ -105,7 +107,7 @@ export const registrarEgreso = (invitationId: string) =>
 
 export const buscarUnidades = (q: string) => api<UnidadHit[]>(`/gate/units?q=${encodeURIComponent(q)}`)
 
-export const altaExpres = (datos: { unitId: string; guestName: string; guestDoc?: string; plate?: string }) =>
+export const altaExpres = (datos: { unitId: string; guestName: string; guestDoc?: string; plate?: string; note?: string }) =>
   api<{ id: string }>('/gate/invitations', { method: 'POST', body: JSON.stringify(datos) })
 
 export const deshacer = (entryId: string) =>

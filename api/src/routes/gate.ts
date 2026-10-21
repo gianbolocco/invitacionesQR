@@ -49,6 +49,7 @@ gateRoutes.post('/invitations', async (req, res) => {
     guestName: z.string().min(1),
     guestDoc: z.string().optional(),
     plate: z.string().optional(),
+    note: z.string().trim().max(140).optional(),
   }).parse(req.body)
 
   res.status(201).json(await createExpressInvitation({
@@ -279,6 +280,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Unidad', key: 'unidad' },
           { header: 'Origen', key: 'origen' },
           { header: 'Cargado el', key: 'cargado', width: 18, formato: 'fechaHora' },
+          { header: 'Nota del vecino', key: 'notaVecino', width: 30 },
           { header: 'Nota', key: 'nota', width: 30 },
         ],
         filas: ingresos.map((e) => ({
@@ -292,6 +294,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           unidad: e.unitLabel,
           origen: e.manual ? 'Carga manual' : 'Escaneo',
           cargado: e.loadedAt ? fechaExcel(e.loadedAt) : '',
+          notaVecino: e.invitationNote ?? '',
           nota: e.note ?? '',
         })),
       },

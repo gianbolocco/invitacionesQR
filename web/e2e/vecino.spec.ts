@@ -80,3 +80,21 @@ test('/nueva redirige al formulario nuevo conservando los datos', async ({ page 
   await expect(page).toHaveURL(/\/invitaciones\/nueva\?kind=proveedor&guestName=Flete$/)
   await expect(page.getByLabel('Nombre del invitado')).toHaveValue('Flete')
 })
+
+test('la nota del vecino llega al veredicto de la garita', async ({ page, browser }) => {
+  await entrar(page, 'vecino')
+  const nombre = `Con nota ${Date.now()}`
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByLabel('Nota para la guardia (opcional)').fill('Viene en un Gol rojo')
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await expect(page.getByText('Viene en un Gol rojo')).toBeVisible()
+
+  const guardia = await browser.newContext()
+  const g = await guardia.newPage()
+  await entrar(g, 'guardia')
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
+  await expect(g.getByText('Viene en un Gol rojo')).toBeVisible()
+  await guardia.close()
+})
