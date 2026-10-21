@@ -152,6 +152,19 @@ Para probar cambios antes de producción, usá una segunda aplicación Coolify c
 la rama `qa` y una base de datos de pruebas separada. El webhook despliega solo
 la rama configurada en cada aplicación; `main` queda como la versión estable.
 
+### Datos de demo
+
+[`api/scripts/demo.sql`](api/scripts/demo.sql) deja qa lista para mostrar:
+vecinos y guardias con contraseña `pass123`, dos semanas de historia y un día
+armado (gente adentro, uno con el tiempo excedido, visitas con nota, una
+anulada). Borra todo menos el barrio, admins incluidos: después va
+`crear-admin-cli`. Los horarios salen de `now()`, así que se corre la mañana de
+la demo. **Nunca en producción.**
+
+```bash
+psql "$DATABASE_URL_QA" -v ON_ERROR_STOP=1 -f api/scripts/demo.sql
+```
+
 ### Backup
 
 Todo el estado vive en la base, el logo incluido. En Coolify lo cubre el
