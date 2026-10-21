@@ -179,7 +179,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       <Campo id="nota" etiqueta="Nota para la guardia (opcional)"
         accesorio={<span className="text-xs tabular text-ink-soft">{nota.length}/140</span>}
         ayuda="La lee la guardia. No pongas datos de salud ni otros datos sensibles.">
-        <textarea id="nota" rows={2} maxLength={140} value={nota} onChange={(e) => setNota(e.target.value)}
+        <textarea id="nota" rows={2} maxLength={140} value={nota} aria-describedby="nota-nota" onChange={(e) => setNota(e.target.value)}
           placeholder="Viene en un Gol rojo"
           className="w-full resize-none rounded-sm border-2 border-control bg-card px-3.5 py-2.5 text-base text-ink outline-none placeholder:text-ink-soft focus-visible:border-azul-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus" />
       </Campo>

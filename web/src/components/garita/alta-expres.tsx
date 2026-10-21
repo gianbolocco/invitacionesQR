@@ -151,7 +151,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
           </Campo>
 
           <Campo id="nota-expres" etiqueta="Nota (opcional)" ayuda="No pongas datos sensibles.">
-            <Input id="nota-expres" onKeyDown={teclaNota} value={nota} maxLength={140}
+            <Input id="nota-expres" onKeyDown={teclaNota} value={nota} maxLength={140} aria-describedby="nota-expres-nota"
               onChange={(e) => setNota(e.target.value)} />
           </Campo>
 

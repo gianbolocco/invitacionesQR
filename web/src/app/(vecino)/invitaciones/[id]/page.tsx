@@ -92,7 +92,7 @@ export default function DetalleInvitacion({ params, searchParams }: {
       <p className="max-w-sm text-center text-sm text-ink-soft">
         {cupo ? `${cupo}. ` : ''}Quien lo reciba tiene que subir el brillo para que el lector lo tome.
       </p>
-      {inv.note && <p className="max-w-sm text-center text-sm"><span className="text-ink-soft">Nota para la guardia: </span>{inv.note}</p>}
+      {inv.note && <p className="max-w-sm break-words text-center text-sm"><span className="text-ink-soft">Nota para la guardia: </span>{inv.note}</p>}
 
       <AccionesPase inv={inv} url={url}
         onAnular={() => setConfirmando(true)}

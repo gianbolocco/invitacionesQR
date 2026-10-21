@@ -24,9 +24,9 @@ export function TarjetaInvitado({ fila, hoy, onAbrir }: {
     <button type="button" onClick={() => onAbrir(fila.id)}
       className="flex w-full flex-col gap-1.5 rounded-md border border-line bg-card p-3 text-left">
       <span className="flex items-start justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5">
+        <span className="flex min-w-0 items-start gap-1.5">
           <span className="min-w-0 text-[15px] font-semibold leading-snug">{fila.guestName}</span>
-          <IconoNota nota={fila.note} />
+          <span className="mt-1 shrink-0"><IconoNota nota={fila.note} /></span>
         </span>
         <TagTipo kind={fila.kind} frequentAs={fila.frequentAs} />
       </span>
