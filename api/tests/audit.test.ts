@@ -328,6 +328,24 @@ describe('la auditoría muestra la salida', () => {
     expect(ing.columna('Salida')).toBeGreaterThan(0)
     expect(String(ing.w.getRow(2).getCell(ing.columna('Salida')).value)).not.toBe('')
   })
+
+  it('el excel de ingresos trae la nota del vecino aparte de la de carga manual', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'Martín Pérez', note: 'Viene en un Gol rojo' })
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Martín Pérez' })
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      }).expect(200)
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const w = wb.getWorksheet('Ingresos')!
+    const encabezados = (w.getRow(1).values as unknown[]).map(String)
+    expect(w.getRow(2).getCell(encabezados.indexOf('Nota del vecino')).value).toBe('Viene en un Gol rojo')
+    expect(encabezados).toContain('Nota')
+  })
 })
 
 describe('el estado distingue al que sigue adentro del que ya se fue', () => {
