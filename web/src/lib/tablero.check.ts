@@ -6,7 +6,7 @@ const HOY = '2026-10-16'
 const fila = (id: string, o: Record<string, unknown> = {}) => ({
   id, guestName: id, guestDoc: null, plate: null, kind: 'visita' as const, unitLabel: 'Lote 142',
   inviterName: 'Lucía', capacity: 1, validTo: HOY, enteredCount: 0, lastEntryAt: null,
-  lastExitAt: null, adentro: false, ...o,
+  lastExitAt: null, adentro: false, note: null, ...o,
 })
 
 const agenda = [

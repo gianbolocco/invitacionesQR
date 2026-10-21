@@ -7,6 +7,7 @@ import { TarjetaInvitado } from '@/components/garita/tarjeta-invitado'
 import { Fila } from '@/components/dominio/fila'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { TagTipo } from '@/components/dominio/tag-tipo'
+import { IconoNota } from '@/components/garita/icono-nota'
 import type { AgendaRow } from '@/lib/queries/garita'
 import type { Columnas } from '@/lib/tablero'
 import { cn } from '@/lib/utils'
@@ -101,7 +102,7 @@ function Vencidas({ filas, onAbrir }: { filas: AgendaRow[]; onAbrir: (id: string
       <div className="pb-1">
         {filas.map((r) => (
           <Fila densa key={r.id}
-            titulo={<span className="flex items-center gap-2"><span className="min-w-0 truncate">{r.guestName}</span><TagTipo kind={r.kind} frequentAs={r.frequentAs} /></span>}
+            titulo={<span className="flex items-center gap-2"><span className="min-w-0 truncate">{r.guestName}</span><IconoNota nota={r.note} /><TagTipo kind={r.kind} frequentAs={r.frequentAs} /></span>}
             meta={metaDe(r)} onClick={() => onAbrir(r.id)} extremo={<EstadoTag estado="vencida" />} />
         ))}
       </div>

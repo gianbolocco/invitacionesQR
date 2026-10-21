@@ -2,6 +2,7 @@
 import { memo } from 'react'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { TagTipo } from '@/components/dominio/tag-tipo'
+import { IconoNota } from '@/components/garita/icono-nota'
 import { quienInvita } from '@/lib/invitations'
 import type { AgendaRow } from '@/lib/queries/garita'
 import { detalleDe, estadoDe } from '@/components/garita/datos-agenda'
@@ -46,6 +47,7 @@ const FilaCompacta = memo(function FilaCompacta({ r, hoy, onAbrir }: { r: Agenda
         <span className="flex items-center gap-2">
           <button type="button" onClick={(e) => { e.stopPropagation(); onAbrir(r.id) }}
             className="min-w-0 truncate text-left font-semibold">{r.guestName}</button>
+          <IconoNota nota={r.note} />
           <TagTipo kind={r.kind} frequentAs={r.frequentAs} />
         </span>
       </td>

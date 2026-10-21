@@ -35,6 +35,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const [qUnidad, setQUnidad] = useState('')
   const [guestDoc, setGuestDoc] = useState('')
   const [plate, setPlate] = useState('')
+  const [nota, setNota] = useState('')
   const qDemorada = useDemora(qUnidad)
   const unidades = useBuscarUnidades(unidad ? '' : qDemorada.trim())
   const alta = useAltaExpres()
@@ -69,7 +70,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const [abiertoVisto, setAbiertoVisto] = useState(abierto)
   if (abierto !== abiertoVisto) {
     setAbiertoVisto(abierto)
-    if (!abierto) { setNombreEscaneado(''); setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate('') }
+    if (!abierto) { setNombreEscaneado(''); setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate(''); setNota('') }
     // "Autorizar igual": todo lo que ya se sabe de la invitación rechazada, lote incluido.
     else if (inicial) {
       setGuestName(inicial.guestName); setUnidad(inicial.unidad)
@@ -82,6 +83,9 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const teclaPatente = useCampoLectora(plate, (l) =>
     l.tipo === 'dni' ? (setPlate(''), aplicarDni(l, false)) : (setPlate(''), onQr(l.token)))
 
+  const teclaNota = useCampoLectora(nota, (l) =>
+    l.tipo === 'dni' ? (setNota(''), aplicarDni(l, false)) : (setNota(''), onQr(l.token)))
+
   function cerrar(v: boolean) {
     onAbiertoChange(v)
   }
@@ -91,6 +95,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
     if (!unidad) return
     const inv = await alta.mutateAsync({
       unitId: unidad.unitId, guestName, guestDoc: guestDoc || undefined, plate: plate || undefined,
+      note: nota.trim() || undefined,
     })
     cerrar(false)
     onCreada(inv.id)
@@ -143,6 +148,11 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
           <Campo id="patente-expres" etiqueta="Patente (opcional)">
             <Input id="patente-expres" onKeyDown={teclaPatente} value={plate} className="uppercase"
               onChange={(e) => setPlate(e.target.value.toUpperCase())} />
+          </Campo>
+
+          <Campo id="nota-expres" etiqueta="Nota (opcional)" ayuda="No pongas datos sensibles.">
+            <Input id="nota-expres" onKeyDown={teclaNota} value={nota} maxLength={140}
+              onChange={(e) => setNota(e.target.value)} />
           </Campo>
 
           <Button type="submit" disabled={!unidad || !guestName.trim() || alta.isPending}>

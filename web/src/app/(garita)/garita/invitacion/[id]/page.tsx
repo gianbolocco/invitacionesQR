@@ -290,6 +290,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           {/* Lo que el guardia compara con lo que tiene adelante: el documento y
               el auto. Y el tipo, porque un proveedor no se trata como una visita. */}
           <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-2.5 text-lg sm:text-xl">
+            {inv.note && <Dato etiqueta="Nota">{inv.note}</Dato>}
             {editable ? (
               <>
                 <dt className="self-start pt-2.5 opacity-70"><label htmlFor="doc-veredicto">Documento</label></dt>

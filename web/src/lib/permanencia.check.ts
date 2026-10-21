@@ -6,7 +6,7 @@ const AHORA = new Date('2026-10-19T20:00:00-03:00')
 const fila = (id: string, alertaDesde: string | null) => ({
   id, guestName: id, guestDoc: null, plate: null, kind: 'visita' as const, unitLabel: 'Lote 142',
   inviterName: 'Lucía', capacity: 1, validTo: '2026-10-19', enteredCount: 1, lastEntryAt: null,
-  lastExitAt: null, adentro: true, alertaDesde,
+  lastExitAt: null, adentro: true, note: null, alertaDesde,
 })
 
 const filas = [
