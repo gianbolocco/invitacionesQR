@@ -120,6 +120,13 @@
       "when": 1792549816700,
       "tag": "0016_nota_invitacion",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792614421652,
+      "tag": "0017_horarios_proveedores",
+      "breakpoints": true
     }
   ]
 }
