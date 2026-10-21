@@ -24,11 +24,11 @@ export function FiltrosHistorialPanel({ valor, onCambio }: { valor: Filtros; onC
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Tipo</p>
+        <p className="text-[13px] font-semibold text-ink-soft">Tipo</p>
         <Chips etiqueta="Tipo" valor={valor.kind} opciones={TIPOS} onCambio={(kind) => onCambio({ ...valor, kind })} />
       </div>
       <div className="flex flex-col gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Estado</p>
+        <p className="text-[13px] font-semibold text-ink-soft">Estado</p>
         <Chips etiqueta="Estado" valor={valor.estado} opciones={ESTADOS} onCambio={(estado) => onCambio({ ...valor, estado })} />
       </div>
       <div className="flex min-h-11 items-center gap-3">

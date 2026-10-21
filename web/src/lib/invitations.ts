@@ -5,15 +5,20 @@ export { hoyISO, fechaCorta } from './fechas'
 export type Invitation = {
   id: string
   kind: 'visita' | 'frecuente' | 'proveedor'
+  /** Solo en las frecuentes: si viene de visita o como proveedor. */
+  frequentAs?: 'visita' | 'proveedor' | null
   guestName: string
   guestDoc: string | null
   plate: string | null
+  note: string | null
   validFrom: string
   validTo: string
   weekdays: number[] | null
   capacity: number
   token: string
   revokedAt: string | null
+  /** null = no la anuló la portería. '' = la anuló sin dejar motivo. */
+  revokedReason: string | null
   createdAt: string
   createdBy: string
   creatorName: string
@@ -24,6 +29,8 @@ export type Invitation = {
   adentro: boolean
   /** ISO del último ingreso, o null si nunca entró. */
   ultimoIngreso: string | null
+  tradeId: string | null
+  tradeName: string | null
 }
 
 export const KIND_LABEL: Record<Invitation['kind'], string> = {
@@ -33,6 +40,17 @@ export const KIND_LABEL: Record<Invitation['kind'], string> = {
 }
 
 export const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
+/**
+ * Lo que la API pone en lugar del nombre cuando la invitación la creó la
+ * portería (alta exprés). Mismo literal que api/src/lib/porteria.ts.
+ */
+export const PORTERIA = 'Autorizado por portería'
+
+/** "invita Martín", o "Autorizado por portería" solo: con prefijo no se lee. */
+export function quienInvita(nombre: string, prefijo = 'invita'): string {
+  return nombre === PORTERIA ? PORTERIA : `${prefijo} ${nombre}`
+}
 
 /** "Hoy", "14 sept" o "11 oct a 9 ene · Lun Mié Vie". Sirve para la lista y para el invitado. */
 export function vigencia(v: { validFrom: string; validTo: string; weekdays: number[] | null }): string {

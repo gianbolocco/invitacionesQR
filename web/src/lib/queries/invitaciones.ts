@@ -3,8 +3,9 @@ import {
   keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient,
 } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import type { Invitation } from '@/lib/invitations'
+import type { Franja } from '@/lib/franjas'
 
 export type FiltrosHistorial = {
   q: string
@@ -15,13 +16,18 @@ export type FiltrosHistorial = {
 
 export type DatosInvitacion = {
   kind: Invitation['kind']
+  /** Solo se manda en las frecuentes. */
+  frequentAs?: 'visita' | 'proveedor'
   guestName: string
   guestDoc: string | null
   plate: string | null
+  note: string | null
   validFrom: string
   validTo: string
   weekdays: number[] | null
   capacity: number
+  /** Solo proveedores; null = sin rubro. Si no se manda, no cambia. */
+  tradeId?: string | null
 }
 
 type PaginaHistorial = { rows: Invitation[]; total: number; page: number; pageSize: number }
@@ -89,6 +95,7 @@ export function useCrearInvitacion() {
           ...d,
           guestDoc: d.guestDoc ?? undefined,
           plate: d.plate ?? undefined,
+          note: d.note ?? undefined,
           weekdays: d.weekdays ?? undefined,
         }),
       }),
@@ -131,9 +138,11 @@ export function useAnularInvitacion() {
       qc.setQueryData<Invitation[]>(claves.vigentes, (l) => l?.filter((i) => i.id !== inv.id))
       return { antes }
     },
-    onError: (_e, _inv, ctx) => {
+    onError: (e, _inv, ctx) => {
       if (ctx?.antes) qc.setQueryData(claves.vigentes, ctx.antes)
-      toast.error('No se pudo anular. Probá de nuevo.')
+      toast.error(e instanceof ApiError && e.code === 'guest_inside'
+        ? 'No se puede anular mientras el invitado está adentro.'
+        : 'No se pudo anular. Probá de nuevo.')
     },
     onSuccess: (_r, inv) => {
       toast.success(`Anulaste la invitación de ${inv.guestName}`, {
@@ -141,5 +150,14 @@ export function useAnularInvitacion() {
       })
     },
     onSettled: () => qc.invalidateQueries({ queryKey: claves.todas }),
+  })
+}
+
+/** Rubros activos del barrio y las franjas de ingreso de proveedores. Vacío = función apagada. */
+export function useRubrosDelBarrio() {
+  return useQuery({
+    queryKey: ['invitaciones', 'rubros'] as const,
+    queryFn: ({ signal }) => api<{ trades: { id: string; name: string }[]; providerWindows: Franja[] }>('/invitations/trades', { signal }),
+    staleTime: 5 * 60_000,
   })
 }

@@ -18,7 +18,29 @@
 }
 
 {$SITIO} {
-	encode zstd gzip
+	# Todo comprimido salvo los avisos en vivo de la garita: comprimir un stream
+	# de Server-Sent Events lo retiene en el buffer y los avisos llegan tarde.
+	@comprimible not path /api/gate/eventos
+	encode @comprimible zstd gzip
+
+	# La CSP no va acá: lleva un nonce por request y la pone web/src/proxy.ts.
+	# HSTS sin includeSubDomains ni preload: pazzit.com es la landing y vive aparte.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# La garita lee el QR con la cámara; nada más pide permisos.
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+		-X-Powered-By
+	}
+
+	# Un ambiente de prueba (qa) es público pero no tiene que salir en los
+	# buscadores: se activa cargando NOINDEX con cualquier valor. En producción
+	# queda vacía y no se agrega nada.
+	@sin_indexar expression "{$NOINDEX}" != ""
+	header @sin_indexar X-Robots-Tag "noindex, nofollow"
 
 	handle_path /api/* {
 		reverse_proxy api:8080

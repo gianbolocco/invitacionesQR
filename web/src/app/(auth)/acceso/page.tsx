@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Campo } from '@/components/dominio/campo'
 import { Nota } from '@/components/dominio/nota'
 import { Vacio } from '@/components/dominio/vacio'
-import { CampoContrasena } from '@/components/campo-contrasena'
+import { CampoContrasena, MIN_CONTRASENA } from '@/components/campo-contrasena'
 
 function Acceso() {
   const router = useRouter()
@@ -44,7 +44,7 @@ function Acceso() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (password.length < 10) { setError('La contraseña necesita al menos 10 caracteres.'); return }
+    if (password.length < MIN_CONTRASENA) { setError(`La contraseña necesita al menos ${MIN_CONTRASENA} caracteres.`); return }
     if (password !== confirmPassword) { setError('Las contraseñas no coinciden.'); return }
     if (needsLot && !lot.trim()) { setError('Escribí el número de tu lote.'); return }
     setBusy(true)

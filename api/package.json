@@ -11,8 +11,7 @@
     "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
     "build": "tsc",
     "migrate": "drizzle-kit migrate",
-    "seed": "node dist/seed-cli.js",
-    "resend-admin-invite": "node dist/resend-admin-invite-cli.js"
+    "crear-admin": "node dist/crear-admin-cli.js"
   },
   "keywords": [],
   "author": "",
@@ -42,5 +41,8 @@
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

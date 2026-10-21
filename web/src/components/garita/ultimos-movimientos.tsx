@@ -14,13 +14,15 @@ export function UltimosMovimientos() {
 
   return (
     <section className="flex flex-col gap-2">
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
+      <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-soft">
         <History className="size-3.5" aria-hidden />Últimos movimientos
       </p>
       <ul className="flex flex-col gap-1.5">
         {eventos.map((e) => (
           <li key={`${e.invitationId}-${e.tipo}-${e.cuando}`} className="flex items-center gap-2 text-sm">
-            <EstadoTag estado={e.tipo === 'ingreso' ? 'adentro' : 'salio'} />
+            {e.tipo === 'ingreso'
+              ? <EstadoTag estado="adentro" etiqueta="Ingreso" />
+              : <EstadoTag estado="salio" etiqueta="Egreso" />}
             <span className="min-w-0 flex-1 truncate font-medium">{e.guestName}</span>
             <span className="shrink-0 text-ink-soft tabular">{hora(e.cuando)}</span>
           </li>

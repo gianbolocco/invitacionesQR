@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 /** Crea una invitación de visita desde la UI y devuelve su nombre. */
 async function crearInvitacion(page: import('@playwright/test').Page) {
@@ -28,6 +27,25 @@ test('el vecino crea una invitación, copia el link y la anula con deshacer', as
 
   await page.getByRole('button', { name: 'Deshacer' }).click()
   await expect(page.getByRole('link', { name: new RegExp(nombre) })).toBeVisible()
+})
+
+test('no se puede anular una invitación con el invitado adentro', async ({ page, browser }) => {
+  await entrar(page, 'vecino')
+  const nombre = await crearInvitacion(page)
+  const url = page.url()
+
+  const guardia = await browser.newContext()
+  const g = await guardia.newPage()
+  await entrar(g, 'guardia')
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
+  await g.getByLabel('Documento').fill('30111222')
+  await g.getByRole('button', { name: 'Registrar ingreso' }).click()
+  await guardia.close()
+
+  await page.goto(url)
+  await expect(page.getByText('No se puede anular mientras está adentro.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Anular invitación' })).toHaveCount(0)
 })
 
 test('el formulario no deja crear sin nombre', async ({ page }) => {
@@ -61,4 +79,22 @@ test('/nueva redirige al formulario nuevo conservando los datos', async ({ page 
   await page.goto('/nueva?kind=proveedor&guestName=Flete')
   await expect(page).toHaveURL(/\/invitaciones\/nueva\?kind=proveedor&guestName=Flete$/)
   await expect(page.getByLabel('Nombre del invitado')).toHaveValue('Flete')
+})
+
+test('la nota del vecino llega al veredicto de la garita', async ({ page, browser }) => {
+  await entrar(page, 'vecino')
+  const nombre = `Con nota ${Date.now()}`
+  await page.goto('/invitaciones/nueva')
+  await page.getByLabel('Nombre del invitado').fill(nombre)
+  await page.getByLabel('Nota para la guardia (opcional)').fill('Viene en un Gol rojo')
+  await page.getByRole('button', { name: 'Crear invitación' }).click()
+  await expect(page.getByText('Viene en un Gol rojo')).toBeVisible()
+
+  const guardia = await browser.newContext()
+  const g = await guardia.newPage()
+  await entrar(g, 'guardia')
+  await g.getByLabel('Buscar invitado').fill(nombre)
+  await g.getByRole('option', { name: new RegExp(nombre) }).click()
+  await expect(g.getByText('Viene en un Gol rojo', { exact: true })).toBeVisible()
+  await guardia.close()
 })

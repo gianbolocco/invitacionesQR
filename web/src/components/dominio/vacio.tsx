@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 /**
  * "No hay nada" como invitación a hacer algo. Se usa SOLO cuando la consulta
  * salió bien y vino vacía: un error tiene su propio componente.
+ * Centrado en el celular; alineado a la izquierda en pantallas anchas, donde
+ * acompaña a la lista que reemplaza.
  */
 export function Vacio({ icono: Icono, titulo, detalle, accion }: {
   icono: LucideIcon
@@ -12,13 +14,13 @@ export function Vacio({ icono: Icono, titulo, detalle, accion }: {
   accion?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
-      <span className="grid size-14 place-items-center rounded-full bg-surface-sunk text-ink-soft">
+    <div className="flex flex-col items-center gap-4 px-6 py-12 text-center animate-in fade-in duration-200 md:items-start md:px-0 md:text-left">
+      <span className="grid size-14 place-items-center rounded-md bg-azul-tint text-azul-text">
         <Icono className="size-6" aria-hidden />
       </span>
       <div>
-        <p className="font-display text-[19px] font-bold tracking-[-0.01em]">{titulo}</p>
-        {detalle && <p className="mx-auto mt-1 max-w-sm text-ink-soft">{detalle}</p>}
+        <p className="t-heading">{titulo}</p>
+        {detalle && <p className="mx-auto mt-1 max-w-[40ch] text-ink-soft md:mx-0">{detalle}</p>}
       </div>
       {accion}
     </div>

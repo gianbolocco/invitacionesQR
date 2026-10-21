@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 test('sin sesión, la home lleva al login', async ({ page }) => {
   await page.goto('/')
@@ -38,5 +37,6 @@ test('el manifest lleva el nombre del barrio', async ({ request }) => {
   expect(res.ok()).toBe(true)
   const m = await res.json()
   expect(m.name).toBeTruthy()
-  expect(m.name).not.toBe('VisitPass')
+  // 'Pazzit' es el nombre por defecto: si sale ese, no leyó el barrio.
+  expect(m.name).not.toBe('Pazzit')
 })

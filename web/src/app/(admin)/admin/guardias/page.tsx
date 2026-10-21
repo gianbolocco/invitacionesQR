@@ -17,6 +17,7 @@ import { Campo } from '@/components/dominio/campo'
 import { Nota } from '@/components/dominio/nota'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MIN_CONTRASENA } from '@/components/campo-contrasena'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -38,7 +39,7 @@ function AltaGuardia({ abierto, onAbiertoChange }: { abierto: boolean; onAbierto
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    if (password.length < 10) { setError('La contraseña necesita al menos 10 caracteres.'); return }
+    if (password.length < MIN_CONTRASENA) { setError(`La contraseña necesita al menos ${MIN_CONTRASENA} caracteres.`); return }
     const usuarioNormalizado = username.trim().toLowerCase()
     if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(usuarioNormalizado)) {
       setError('El usuario debe tener 3 a 32 caracteres: letras, números, punto, guion o guion bajo.')
@@ -68,7 +69,7 @@ function AltaGuardia({ abierto, onAbiertoChange }: { abierto: boolean; onAbierto
             required placeholder="cruiz" value={username}
             onChange={(e) => setUsername(e.target.value)} />
         </Campo>
-        <Campo id="pass-g" etiqueta="Contraseña" ayuda="Mínimo 10 caracteres. Se la das vos en mano.">
+        <Campo id="pass-g" etiqueta="Contraseña" ayuda={`Mínimo ${MIN_CONTRASENA} caracteres. Se la das vos en mano.`}>
           <Input id="pass-g" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </Campo>
         {error && <Nota tono="error">{error}</Nota>}
@@ -78,13 +79,15 @@ function AltaGuardia({ abierto, onAbiertoChange }: { abierto: boolean; onAbierto
   )
 }
 
-function DialogContrasena({ persona, onCerrar }: { persona: Person | null; onCerrar: () => void }) {
+function DialogContrasena({ persona, disparador, onCerrar }: {
+  persona: Person | null; disparador: HTMLButtonElement | null; onCerrar: () => void
+}) {
   const cambiar = useCambiarContrasenaGuardia()
   const [password, setPassword] = useState('')
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
-    if (!persona || password.length < 10) return
+    if (!persona || password.length < MIN_CONTRASENA) return
     await cambiar.mutateAsync({ personId: persona.id, password })
     setPassword('')
     onCerrar()
@@ -92,7 +95,9 @@ function DialogContrasena({ persona, onCerrar }: { persona: Person | null; onCer
 
   return (
     <Dialog open={persona !== null} onOpenChange={(v) => { if (!v) { setPassword(''); onCerrar() } }}>
-      <DialogContent>
+      {/* Lo abre el menú ⋯ de la fila, no un DialogTrigger: sin esto, Radix
+          no sabe a quién devolverle el foco al cerrar y lo manda al body. */}
+      <DialogContent onCloseAutoFocus={(e) => { e.preventDefault(); disparador?.focus() }}>
         <DialogHeader>
           <DialogTitle>Cambiar la contraseña de {persona?.name}</DialogTitle>
           <DialogDescription>
@@ -107,7 +112,7 @@ function DialogContrasena({ persona, onCerrar }: { persona: Person | null; onCer
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={onCerrar}>Cancelar</Button>
-          <Button type="submit" form="form-contrasena" disabled={cambiar.isPending || password.length < 10}>
+          <Button type="submit" form="form-contrasena" disabled={cambiar.isPending || password.length < MIN_CONTRASENA}>
             Guardar
           </Button>
         </DialogFooter>
@@ -116,11 +121,13 @@ function DialogContrasena({ persona, onCerrar }: { persona: Person | null; onCer
   )
 }
 
-function DialogBaja({ persona, onCerrar }: { persona: Person | null; onCerrar: () => void }) {
+function DialogBaja({ persona, disparador, onCerrar }: {
+  persona: Person | null; disparador: HTMLButtonElement | null; onCerrar: () => void
+}) {
   const deshabilitar = useDeshabilitarPersona()
   return (
     <Dialog open={persona !== null} onOpenChange={(v) => { if (!v) onCerrar() }}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={(e) => { e.preventDefault(); disparador?.focus() }}>
         <DialogHeader>
           <DialogTitle>¿Dar de baja a {persona?.name}?</DialogTitle>
           <DialogDescription>No va a poder entrar a la garita. Los ingresos que ya registró quedan igual.</DialogDescription>
@@ -143,13 +150,19 @@ export default function GuardiasPage() {
   const [altaAbierta, setAltaAbierta] = useState(false)
   const [reseteando, setReseteando] = useState<Person | null>(null)
   const [porDarDeBaja, setPorDarDeBaja] = useState<Person | null>(null)
+  const [disparador, setDisparador] = useState<HTMLButtonElement | null>(null)
 
   const guardias = (personas.data ?? []).filter((p) => p.role === 'guard')
 
   function accionesDe(g: Person): AccionFila[] {
-    const acciones: AccionFila[] = [{ etiqueta: 'Cambiar contraseña', onClick: () => setReseteando(g) }]
+    const acciones: AccionFila[] = [
+      { etiqueta: 'Cambiar contraseña', onClick: (btn) => { setDisparador(btn); setReseteando(g) } },
+    ]
     if (g.status === 'disabled') acciones.push({ etiqueta: 'Reactivar', onClick: () => reactivar.mutate(g) })
-    else acciones.push({ etiqueta: 'Dar de baja', destructiva: true, onClick: () => setPorDarDeBaja(g) })
+    else acciones.push({
+      etiqueta: 'Dar de baja', destructiva: true,
+      onClick: (btn) => { setDisparador(btn); setPorDarDeBaja(g) },
+    })
     return acciones
   }
 
@@ -170,7 +183,7 @@ export default function GuardiasPage() {
         ) : (
           <div>
             {guardias.map((g) => (
-              <Fila key={g.id} titulo={g.name}
+              <Fila densa key={g.id} titulo={g.name}
                 meta={[
                   g.username ? `usuario ${g.username}` : g.email ?? 'sin usuario',
                   ESTADO[g.status],
@@ -183,8 +196,8 @@ export default function GuardiasPage() {
         )}
       </div>
 
-      <DialogContrasena persona={reseteando} onCerrar={() => setReseteando(null)} />
-      <DialogBaja persona={porDarDeBaja} onCerrar={() => setPorDarDeBaja(null)} />
+      <DialogContrasena persona={reseteando} disparador={disparador} onCerrar={() => setReseteando(null)} />
+      <DialogBaja persona={porDarDeBaja} disparador={disparador} onCerrar={() => setPorDarDeBaja(null)} />
     </>
   )
 }

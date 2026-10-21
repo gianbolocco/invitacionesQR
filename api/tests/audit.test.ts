@@ -87,7 +87,7 @@ describe('auditoría de invitaciones', () => {
   })
 
 
-  it('exporta un .xlsx de verdad, con las hojas Invitaciones e Ingresos', async () => {
+  it('exporta un .xlsx de verdad, con portada y las hojas Invitaciones e Ingresos', async () => {
     const ctx = await base()
     const i = await inv(ctx, { guestName: 'Martín Pérez' })
     await registerEntry(i.id, ctx.guardiaId, { guestName: 'Martín Pérez' })
@@ -108,7 +108,7 @@ describe('auditoría de invitaciones', () => {
 
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buf)
-    expect(wb.worksheets.map((w) => w.name)).toEqual(['Invitaciones', 'Ingresos'])
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Resumen', 'Invitaciones', 'Ingresos'])
 
     const inv1 = wb.getWorksheet('Invitaciones')!
     const encabezados = (inv1.getRow(1).values as unknown[]).map(String)
@@ -125,7 +125,35 @@ describe('auditoría de invitaciones', () => {
     const cabecerasIng = (ing.getRow(1).values as unknown[]).map(String)
     const colIng = (t: string) => cabecerasIng.indexOf(t)
     expect(ing.getRow(2).getCell(colIng('Invitado')).value).toBe('Martín Pérez')
-    expect(ing.getRow(2).getCell(colIng('Guardia')).value).toBe('Rulo')
+    expect(ing.getRow(2).getCell(colIng('Guardia ingreso')).value).toBe('Rulo')
+    // Fecha de verdad, en hora de Buenos Aires: Excel la ordena y filtra.
+    expect(ing.getRow(2).getCell(colIng('Ingreso')).value).toBeInstanceOf(Date)
+    // Sin "Último ingreso" ni la columna de cantidad de ingresos.
+    expect(encabezados).not.toContain('Último ingreso')
+    expect(encabezados).not.toContain('Ingresos')
+    expect(encabezados).toContain('Guardia ingreso')
+  })
+
+  it('la portada dice con qué filtros se sacó y quién lo generó', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Martín Pérez' })
+    const res = await request(app).get(`/gate/audit.xlsx?from=2026-10-06&to=2026-10-13&status=vencida`)
+      .set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      })
+      .expect(200)
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const valores: Record<string, unknown> = {}
+    wb.getWorksheet('Resumen')!.eachRow((fila) => { valores[String(fila.getCell(1).value)] = fila.getCell(2).value })
+    expect(valores['Período']).toBe('06/10/2026 al 13/10/2026')
+    expect(valores['Estado']).toBe('Vencida')
+    expect(valores['Unidad']).toBe('Todas')
+    expect(valores['Por']).toBe('Rulo')
   })
 
   it('el Excel se llama como el barrio, no como el de la demo', async () => {
@@ -236,6 +264,26 @@ describe('la auditoría muestra la salida', () => {
     expect(fila.exitGuardName).toBe('Rulo')
   })
 
+  it('con varios ingresos, la fila muestra los guardias del ÚLTIMO, no los máximos', async () => {
+    const ctx = await base()
+    const [ana] = await db.insert(people).values({
+      neighborhoodId: (await db.select().from(neighborhoods))[0].id, email: 'ana@example.com', name: 'Ana',
+      role: 'guard', status: 'active',
+    }).returning()
+    const i = await inv(ctx, { guestName: 'Frecuente', kind: 'frecuente', capacity: 10 })
+    // Primero Rulo entra y saca; después Ana entra y sigue adentro.
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Frecuente' })
+    await registerExit(i.id, ctx.guardiaId)
+    await registerEntry(i.id, ana.id, { guestName: 'Frecuente' })
+
+    const res = await request(app).get('/gate/audit').set('Cookie', ctx.cookie).expect(200)
+    const fila = res.body.rows.find((r: { id: string }) => r.id === i.id)
+    // Antes: max(nombre) daba "Rulo" y max(salida) la salida del primer ingreso.
+    expect(fila.guardName).toBe('Ana')
+    expect(fila.exitedAt).toBeNull()
+    expect(fila.exitGuardName).toBeNull()
+  })
+
   it('sin salida registrada, los dos campos vienen en null', async () => {
     const ctx = await base()
     const i = await inv(ctx, { guestName: 'Sigue adentro' })
@@ -279,6 +327,24 @@ describe('la auditoría muestra la salida', () => {
     const ing = hoja('Ingresos')
     expect(ing.columna('Salida')).toBeGreaterThan(0)
     expect(String(ing.w.getRow(2).getCell(ing.columna('Salida')).value)).not.toBe('')
+  })
+
+  it('el excel de ingresos trae la nota del vecino aparte de la de carga manual', async () => {
+    const ctx = await base()
+    const i = await inv(ctx, { guestName: 'Martín Pérez', note: 'Viene en un Gol rojo' })
+    await registerEntry(i.id, ctx.guardiaId, { guestName: 'Martín Pérez' })
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', ctx.cookie)
+      .buffer(true).parse((r, cb) => {
+        const trozos: Buffer[] = []
+        r.on('data', (d: Buffer) => trozos.push(d))
+        r.on('end', () => cb(null, Buffer.concat(trozos)))
+      }).expect(200)
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const w = wb.getWorksheet('Ingresos')!
+    const encabezados = (w.getRow(1).values as unknown[]).map(String)
+    expect(w.getRow(2).getCell(encabezados.indexOf('Nota del vecino')).value).toBe('Viene en un Gol rojo')
+    expect(encabezados).toContain('Nota')
   })
 })
 
@@ -371,5 +437,67 @@ describe('el estado distingue al que sigue adentro del que ya se fue', () => {
     const w = wb.getWorksheet('Invitaciones')!
     const cabeceras = (w.getRow(1).values as unknown[]).map(String)
     expect(w.getRow(2).getCell(cabeceras.indexOf('Estado')).value).toBe('Concluida')
+  })
+})
+
+describe('auditoría: búsqueda y tipo', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  const nombres = (res: { body: { rows: { guestName: string }[] } }) =>
+    res.body.rows.map((r) => r.guestName).sort()
+
+  it('busca por nombre, sin importar mayúsculas', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Martín Gómez' })
+    await inv(ctx, { guestName: 'Laura Pérez' })
+    const res = await request(app).get('/gate/audit?q=GÓMEZ').set('Cookie', ctx.cookie)
+    expect(nombres(res)).toEqual(['Martín Gómez'])
+  })
+
+  it('busca el documento por dígitos aunque se guardó con puntos', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Con puntos', guestDoc: '30.123.456' })
+    await inv(ctx, { guestName: 'Otro', guestDoc: '28765432' })
+    const res = await request(app).get('/gate/audit?q=30123456').set('Cookie', ctx.cookie)
+    expect(nombres(res)).toEqual(['Con puntos'])
+  })
+
+  it('busca por patente, por unidad y por quién invita', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Con patente', plate: 'AB123CD' })
+    await inv(ctx, { guestName: 'Sin patente' })
+    expect(nombres(await request(app).get('/gate/audit?q=ab123').set('Cookie', ctx.cookie))).toEqual(['Con patente'])
+    expect(nombres(await request(app).get('/gate/audit?q=142').set('Cookie', ctx.cookie))).toHaveLength(2)
+    expect(nombres(await request(app).get('/gate/audit?q=Martín').set('Cookie', ctx.cookie))).toHaveLength(2)
+  })
+
+  it('el % y el _ no son comodines', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Cien por ciento' })
+    const res = await request(app).get('/gate/audit?q=%25').set('Cookie', ctx.cookie)
+    expect(res.body.rows).toHaveLength(0)
+  })
+
+  it('filtra por tipo y los contadores acompañan la búsqueda', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Visita A' })
+    await inv(ctx, { guestName: 'Frecuente A', kind: 'frecuente', capacity: 999 })
+    const res = await request(app).get('/gate/audit?kind=frecuente').set('Cookie', ctx.cookie)
+    expect(nombres(res)).toEqual(['Frecuente A'])
+    expect(res.body.counts.esperando).toBe(1)
+    expect(res.body.total).toBe(1)
+  })
+
+  it('el export respeta la búsqueda', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Martín Gómez' })
+    await inv(ctx, { guestName: 'Laura Pérez' })
+    const res = await request(app).get('/gate/audit.xlsx?q=laura').set('Cookie', ctx.cookie)
+      .buffer().parse((r, cb) => { const c: Buffer[] = []; r.on('data', (d) => c.push(d)); r.on('end', () => cb(null, Buffer.concat(c))) })
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body)
+    const texto = JSON.stringify(wb.worksheets.map((w) => w.getSheetValues()))
+    expect(texto).toContain('Laura Pérez')
+    expect(texto).not.toContain('Martín Gómez')
   })
 })

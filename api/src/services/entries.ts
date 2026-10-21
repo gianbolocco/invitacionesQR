@@ -1,10 +1,12 @@
-import { and, desc, eq, gte, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, ilike, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
 import { db } from '../db/index.js'
-import { invitations, entryLogs, units, people } from '../db/schema.js'
+import { invitations, entryLogs, units, people, trades, neighborhoods } from '../db/schema.js'
 import { canEnter, type EntryCheck } from '../authz.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { audit } from '../lib/audit.js'
+import { PORTERIA } from '../lib/porteria.js'
+import { assertUnitInNeighborhood, valoresDePorteria, franjasDelRubro } from './invitations.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -18,9 +20,14 @@ async function loadForCheck(where: SQL) {
   const [row] = await db.select({
     id: invitations.id,
     kind: invitations.kind,
+    frequentAs: invitations.frequentAs,
+    tradeId: invitations.tradeId,
+    tradeName: trades.name,
+    providerWindows: neighborhoods.providerWindows,
     guestName: invitations.guestName,
     guestDoc: invitations.guestDoc,
     plate: invitations.plate,
+    note: invitations.note,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
     weekdays: invitations.weekdays,
@@ -28,7 +35,15 @@ async function loadForCheck(where: SQL) {
     revokedAt: invitations.revokedAt,
     unitId: invitations.unitId,
     unitLabel: units.label,
-  }).from(invitations).innerJoin(units, eq(units.id, invitations.unitId)).where(where).limit(1)
+    // Para el veredicto: a quién llamar si hay dudas. Si la creó un guardia
+    // (alta exprés), no se muestra su nombre, igual que en la agenda.
+    inviterName: sql<string>`case when ${people.role} = 'guard' then ${PORTERIA} else ${people.name} end`,
+  }).from(invitations)
+    .innerJoin(units, eq(units.id, invitations.unitId))
+    .innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
+    .innerJoin(people, eq(people.id, invitations.createdBy))
+    .leftJoin(trades, eq(trades.id, invitations.tradeId))
+    .where(where).limit(1)
   return row ?? null
 }
 
@@ -36,11 +51,14 @@ type LoadedInvitation = NonNullable<Awaited<ReturnType<typeof loadForCheck>>>
 
 async function buildCheck(invitation: LoadedInvitation) {
   const { usedCount, lastEntryAt } = await usage(invitation.id)
-  const check: EntryCheck = canEnter(invitation, new Date(), usedCount)
+  const { providerWindows, ...inv } = invitation
+  const check: EntryCheck = canEnter(inv, new Date(), usedCount, providerWindows)
   const abierta = await openEntry(invitation.id)
 
   return {
-    invitation,
+    invitation: inv,
+    // Solo las franjas de su rubro, nunca la lista entera del barrio.
+    franjas: franjasDelRubro(providerWindows, invitation.kind, invitation.frequentAs, invitation.tradeId),
     check,
     usedCount,
     lastEntryAt,
@@ -108,7 +126,11 @@ export async function registerEntry(
 
     const { usedCount } = await usage(invitationId, tx)
 
-    const check = canEnter(target, new Date(), usedCount)
+    // Después del FOR UPDATE de arriba, que sigue siendo lo que serializa el cupo.
+    const [{ providerWindows }] = await tx.select({ providerWindows: neighborhoods.providerWindows })
+      .from(units).innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
+      .where(eq(units.id, target.unitId)).limit(1)
+    const check = canEnter(target, new Date(), usedCount, providerWindows)
     if (!check.ok) throw new AppError(409, check.reason)
 
     const [entry] = await tx.insert(entryLogs).values({
@@ -121,8 +143,153 @@ export async function registerEntry(
       note: data.note?.trim() || null,
     }).returning()
 
+    // Si la invitación no tenía documento, el que se tipeó en la puerta
+    // queda ahí: la próxima vez (frecuente, proveedor) ya viene precargado.
+    // La fila de la invitación ya está bloqueada por el FOR UPDATE de arriba.
+    if (!target.guestDoc && data.guestDoc?.trim()) {
+      await tx.update(invitations).set({ guestDoc: data.guestDoc.trim() })
+        .where(eq(invitations.id, invitationId))
+    }
+
     return entry
   })
+}
+
+/** Hasta cuántas horas atrás se puede cargar un movimiento a mano. */
+const VENTANA_MANUAL_H = 48
+export const MAX_CARGA_MANUAL = 50
+
+export type CargaManual = {
+  /** Una invitación existente, o `guest` para alguien que entró sin ninguna. */
+  invitationId?: string
+  guest?: { name: string; unitId: string }
+  guestDoc: string
+  /** La anotada en la planilla. Sin ella, la de la invitación. */
+  plate?: string
+  enteredAt: Date
+  /** null = todavía está adentro. */
+  exitedAt: Date | null
+  note?: string
+}
+
+/**
+ * Carga a mano ingresos y egresos que ya pasaron (un corte de luz, una
+ * planilla de papel), con la hora en que ocurrieron.
+ *
+ * Es un registro, no una decisión de acceso: igual que registerExit, NO
+ * valida cupo, fecha ni anulación. Lo que sí valida es que el relato cierre:
+ * nada en el futuro, nada de hace más de 48 h (es lo que separa cargar un
+ * corte de reescribir la historia) y nada que se superponga con otro
+ * movimiento de la misma invitación. Todo o nada: una tanda con un error no
+ * guarda ninguna, y el error dice qué fila (`fila`, desde 0) lo causó.
+ *
+ * Quien no tenía invitación (`guest`) recibe una de portería del día en que
+ * entró. Quien carga queda como guardia de ingreso y de salida, y en
+ * `loaded_by`/`loaded_at`: la fila no se hace pasar por un escaneo.
+ */
+export async function registerManual(
+  neighborhoodId: string,
+  loaderId: string,
+  items: CargaManual[],
+) {
+  if (items.length === 0 || items.length > MAX_CARGA_MANUAL) throw new AppError(400, 'tanda_invalida')
+  const ahora = new Date()
+  const desde = new Date(ahora.getTime() - VENTANA_MANUAL_H * 3_600_000)
+
+  const filas = await db.transaction(async (tx) => {
+    const creadas = []
+    for (const [n, it] of items.entries()) {
+      try {
+        creadas.push(await cargarUna(tx, neighborhoodId, loaderId, it, ahora, desde))
+      } catch (e) {
+        if (e instanceof AppError) throw new AppError(e.status, e.code, e.message, n)
+        throw e
+      }
+    }
+    return creadas
+  })
+
+  for (const f of filas) {
+    await audit(loaderId, neighborhoodId, 'entry.manual', 'entry_log', f.id, {
+      invitationId: f.invitationId, enteredAt: f.enteredAt, exitedAt: f.exitedAt, note: f.note,
+    })
+  }
+  return filas
+}
+
+async function cargarUna(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  neighborhoodId: string,
+  loaderId: string,
+  it: CargaManual,
+  ahora: Date,
+  desde: Date,
+) {
+  if (it.enteredAt > ahora || (it.exitedAt && it.exitedAt > ahora)) throw new AppError(400, 'fecha_futura')
+  if (it.enteredAt < desde) throw new AppError(400, 'fuera_de_ventana')
+  if (it.exitedAt && it.exitedAt < it.enteredAt) throw new AppError(400, 'salida_anterior')
+  if (!it.invitationId && !it.guest) throw new AppError(400, 'tanda_invalida')
+
+  const guestDoc = it.guestDoc.trim()
+  const plate = it.plate?.trim().toUpperCase() || null
+  let invitationId: string
+  let target: { unitId: string; guestName: string; guestDoc: string | null; plate: string | null }
+
+  if (it.guest) {
+    await assertUnitInNeighborhood(it.guest.unitId, neighborhoodId, tx)
+    // Recién creada y sin otros movimientos: no hay con qué superponerse.
+    const [inv] = await tx.insert(invitations).values(valoresDePorteria({
+      unitId: it.guest.unitId, guestName: it.guest.name, guestDoc, plate: plate ?? undefined,
+      createdBy: loaderId, neighborhoodId,
+    }, todayInBuenosAires(it.enteredAt))).returning()
+    invitationId = inv.id
+    target = inv
+  } else {
+    invitationId = it.invitationId!
+    const [encontrada] = await tx.select({
+      unitId: invitations.unitId, guestName: invitations.guestName,
+      guestDoc: invitations.guestDoc, plate: invitations.plate,
+    }).from(invitations)
+      .innerJoin(units, eq(units.id, invitations.unitId))
+      .where(and(eq(invitations.id, invitationId), eq(units.neighborhoodId, neighborhoodId)))
+      // Serializa dos tandas simultáneas sobre la misma invitación: sin esto las
+      // dos pasan el chequeo de superposición y se pisan.
+      .for('update', { of: invitations })
+      .limit(1)
+    if (!encontrada) throw new AppError(404, 'not_found')
+    target = encontrada
+
+    // Un movimiento ocupa [ingreso, salida) y una fila abierta ocupa hasta hoy.
+    // Se superponen si cada uno empieza antes de que el otro termine.
+    const [choque] = await tx.select({ id: entryLogs.id }).from(entryLogs).where(and(
+      eq(entryLogs.invitationId, invitationId),
+      or(isNull(entryLogs.exitedAt), gt(entryLogs.exitedAt, it.enteredAt)),
+      it.exitedAt ? lt(entryLogs.enteredAt, it.exitedAt) : undefined,
+    )).limit(1)
+    if (choque) throw new AppError(409, 'se_superpone')
+
+    // Igual que registerEntry: el DNI cargado queda en la invitación.
+    if (!target.guestDoc) {
+      await tx.update(invitations).set({ guestDoc }).where(eq(invitations.id, invitationId))
+    }
+  }
+
+  const [fila] = await tx.insert(entryLogs).values({
+    invitationId,
+    unitId: target.unitId,
+    guardId: loaderId,
+    enteredAt: it.enteredAt,
+    exitedAt: it.exitedAt,
+    exitGuardId: it.exitedAt ? loaderId : null,
+    guestName: target.guestName,
+    guestDoc,
+    plate: plate ?? target.plate,
+    note: it.note?.trim() || null,
+    source: 'manual',
+    loadedBy: loaderId,
+    loadedAt: ahora,
+  }).returning()
+  return fila
 }
 
 /**
@@ -217,6 +384,7 @@ export async function undoMovement(
 export async function searchGuests(neighborhoodId: string, query: string) {
   const q = `%${query.trim()}%`
   const hoy = todayInBuenosAires()
+  const digitos = query.replace(/\D/g, '')
 
   return db.select({
     id: invitations.id,
@@ -224,10 +392,14 @@ export async function searchGuests(neighborhoodId: string, query: string) {
     guestDoc: invitations.guestDoc,
     kind: invitations.kind,
     plate: invitations.plate,
+    note: invitations.note,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
+    frequentAs: invitations.frequentAs,
+    tradeName: trades.name,
     unitLabel: units.label,
     // Para que el guardia sepa qué va a pasar antes de tocar el resultado.
+    anulada: sql<boolean>`${invitations.revokedAt} is not null`,
     adentro: sql<boolean>`exists (
       select 1 from entry_log e
       where e.invitation_id = ${invitations.id} and e.exited_at is null
@@ -235,9 +407,15 @@ export async function searchGuests(neighborhoodId: string, query: string) {
   })
     .from(invitations)
     .innerJoin(units, eq(units.id, invitations.unitId))
+    .leftJoin(trades, eq(trades.id, invitations.tradeId))
     .where(and(
       eq(units.neighborhoodId, neighborhoodId),
-      gte(invitations.validTo, hoy),
+      // O sigue adentro: el que entró ayer con una invitación de ayer tiene que
+      // aparecer hoy por DNI, para registrarle la salida sin el QR.
+      or(
+        gte(invitations.validTo, hoy),
+        sql`exists (select 1 from entry_log e where e.invitation_id = ${invitations.id} and e.exited_at is null)`,
+      ),
       or(
         sql`unaccent(${invitations.guestName}) ilike unaccent(${q})`,
         sql`unaccent(${units.label}) ilike unaccent(${q})`,
@@ -245,6 +423,13 @@ export async function searchGuests(neighborhoodId: string, query: string) {
         // Sin unaccent: un documento no lleva tildes, y pasarlo por unaccent
         // sería gasto sin efecto.
         ilike(invitations.guestDoc, q),
+        // Por dígitos: el vecino cargó "30.123.456" y la lectora del DNI manda
+        // 30123456. Desde 3 dígitos, para que "Lote 1" no matchee todo con un 1.
+        // Solo si la búsqueda no tiene letras: "Lote 142" es una unidad, no un
+        // documento, y sin este corte matchearía cualquier DNI con 142 adentro.
+        digitos.length >= 3 && !/\p{L}/u.test(query)
+          ? sql`regexp_replace(${invitations.guestDoc}, '\\D', '', 'g') like ${`%${digitos}%`}`
+          : undefined,
       ),
     ))
     .orderBy(desc(invitations.createdAt))
@@ -257,10 +442,15 @@ export type AgendaRow = {
   guestName: string
   guestDoc: string | null
   plate: string | null
+  note: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
+  frequentAs: 'visita' | 'proveedor' | null
+  tradeName: string | null
   unitLabel: string
   inviterName: string
   capacity: number
+  /** Para que la garita distinga "no vino todavía" de "ya venció". */
+  validTo: string
   enteredCount: number
   lastEntryAt: Date | null
   /** Última salida registrada ESE día. */
@@ -270,6 +460,8 @@ export type AgendaRow = {
    * si entró anteayer y nadie registró su salida, sigue adentro hoy.
    */
   adentro: boolean
+  /** Solo en `insideNow`: cuándo vence su tiempo adentro; null = su tipo no alerta. */
+  alertaDesde?: Date | null
 }
 
 /**
@@ -301,10 +493,14 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       i.guest_name        as "guestName",
       i.guest_doc         as "guestDoc",
       i.plate,
+      i.note,
       i.kind,
+      i.frequent_as       as "frequentAs",
+      t.name              as "tradeName",
       u.label             as "unitLabel",
-      p.name              as "inviterName",
+      case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
+      i.valid_to          as "validTo",
       (select count(*) from entry_log e
         where ${eseDia} and e.invitation_id = i.id)::int as "enteredCount",
       (select max(e.entered_at) from entry_log e
@@ -316,11 +512,67 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
+    left join trade t on t.id = i.trade_id
     where u.neighborhood_id = ${neighborhoodId}
       and i.revoked_at is null
       and ${day}::date between i.valid_from and i.valid_to
       and (i.weekdays is null or ${dow} = any(i.weekdays))
     order by lower(i.guest_name)
+  `)
+
+  return res.rows as unknown as AgendaRow[]
+}
+
+/**
+ * Quiénes están en el barrio ahora: toda invitación con un ingreso sin egreso.
+ *
+ * No mira fechas ni anulación, igual que el egreso: el que entró ayer con una
+ * invitación de ayer, o al que le anularon la invitación estando adentro,
+ * sigue adentro. Mismas columnas que la agenda, salvo `lastEntryAt`, que acá
+ * es el último ingreso abierto de cualquier día.
+ */
+export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
+  const hoy = sql`(e.entered_at at time zone ${TZ})::date = ${todayInBuenosAires()}::date`
+
+  const res = await db.execute(sql`
+    select
+      i.id,
+      i.guest_name        as "guestName",
+      i.guest_doc         as "guestDoc",
+      i.plate,
+      i.note,
+      i.kind,
+      i.frequent_as       as "frequentAs",
+      t.name              as "tradeName",
+      u.label             as "unitLabel",
+      case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
+      i.capacity,
+      i.valid_to          as "validTo",
+      (select count(*) from entry_log e
+        where ${hoy} and e.invitation_id = i.id)::int  as "enteredCount",
+      abiertas.desde                                    as "lastEntryAt",
+      (select max(e.exited_at) from entry_log e
+        where ${hoy} and e.invitation_id = i.id)       as "lastExitAt",
+      true                                              as "adentro",
+      -- Un umbral NULL da NULL solo. Una frecuente usa el umbral de lo que es
+      -- (sin subtipo, visita).
+      case case when i.kind = 'frecuente' then coalesce(i.frequent_as, 'visita') else i.kind end
+        when 'visita'    then abiertas.primero + make_interval(hours => n.overstay_hours_visita)
+        when 'proveedor' then abiertas.primero + make_interval(hours => n.overstay_hours_proveedor)
+      end                                               as "alertaDesde"
+    from (
+      -- El reloj de la alerta corre desde el ingreso abierto más viejo: con
+      -- cupo 3 puede haber tres adentro, y el que lleva más es el que importa.
+      select invitation_id, max(entered_at) as desde, min(entered_at) as primero
+      from entry_log where exited_at is null group by invitation_id
+    ) abiertas
+    join invitation i on i.id = abiertas.invitation_id
+    join unit u on u.id = i.unit_id
+    join neighborhood n on n.id = u.neighborhood_id
+    join person p on p.id = i.created_by
+    left join trade t on t.id = i.trade_id
+    where u.neighborhood_id = ${neighborhoodId}
+    order by abiertas.desde desc
   `)
 
   return res.rows as unknown as AgendaRow[]
@@ -332,6 +584,8 @@ export type AuditRow = {
   guestDoc: string | null
   plate: string | null
   kind: 'visita' | 'frecuente' | 'proveedor'
+  frequentAs: 'visita' | 'proveedor' | null
+  tradeName: string | null
   unitLabel: string
   inviterName: string
   validFrom: string
@@ -348,6 +602,10 @@ export type AuditRow = {
   guardName: string | null
   exitedAt: Date | null
   exitGuardName: string | null
+  /** Algún movimiento de esta invitación se cargó a mano. */
+  manual: boolean
+  /** null = no la anuló la portería. '' = la anuló sin dejar motivo. */
+  revokedReason: string | null
 }
 
 export type AuditStatus = AuditRow['status']
@@ -357,6 +615,9 @@ export type AuditFilters = {
   to?: string
   unitId?: string
   status?: AuditStatus
+  kind?: 'visita' | 'frecuente' | 'proveedor'
+  /** Texto libre: nombre, documento, patente, unidad o quién invita. */
+  q?: string
   page?: number
   pageSize?: number
 }
@@ -406,6 +667,35 @@ export function auditAll(neighborhoodId: string, f: AuditFilters): Promise<Audit
   return auditRows(neighborhoodId, f, 5000, 0)
 }
 
+
+/**
+ * Los filtros que comparten las filas y los contadores: con paginación, un
+ * contador que no mira la búsqueda mostraría números de otra lista.
+ * El estado NO entra acá: los contadores cuentan todos los estados a la vez.
+ */
+function filtrosAuditoria(neighborhoodId: string, f: AuditFilters) {
+  const q = f.q?.trim() ?? ''
+  // % y _ son comodines de LIKE: se escapan para que "Lote_1" busque ese texto.
+  const patron = q ? `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null
+  // El documento se guarda como lo escribió quien invitó ("30.123.456"): se
+  // compara solo por dígitos, y solo si lo buscado tiene alguno.
+  const digitos = q.replace(/\D/g, '')
+  const patronDoc = digitos ? `%${digitos}%` : null
+  return sql`
+    u.neighborhood_id = ${neighborhoodId}
+    and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
+    and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
+    and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+    and (${f.kind ?? null}::text is null or i.kind = ${f.kind ?? null}::text)
+    and (${patron}::text is null
+      or i.guest_name ilike ${patron}::text
+      or i.plate ilike ${patron}::text
+      or u.label ilike ${patron}::text
+      or p.name ilike ${patron}::text
+      or regexp_replace(coalesce(i.guest_doc, ''), '\\D', '', 'g') like ${patronDoc}::text)
+  `
+}
+
 async function auditCounts(
   neighborhoodId: string,
   f: AuditFilters,
@@ -428,11 +718,9 @@ async function auditCounts(
       end as status
       from invitation i
       join unit u on u.id = i.unit_id
+      join person p on p.id = i.created_by
       left join uso on uso.invitation_id = i.id
-      where u.neighborhood_id = ${neighborhoodId}
-        and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
-        and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
-        and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+      where ${filtrosAuditoria(neighborhoodId, f)}
     )
     select
       count(*) filter (where status = 'adentro')::int    as adentro,
@@ -457,15 +745,24 @@ async function auditRows(
     with uso as (
       select e.invitation_id,
              count(*)::int as veces,
-             max(e.entered_at) as ultima,
-             max(g.name) as guardia,
              count(*) filter (where e.exited_at is null)::int as abiertas,
-             max(e.exited_at) as ultima_salida,
-             max(gs.name) as guardia_salida
+             bool_or(e.source = 'manual') as manual
+      from entry_log e
+      group by e.invitation_id
+    ),
+    /*
+     * El último ingreso ENTERO, con su salida y sus dos guardias. Antes eran
+     * max() por columna: max(nombre) daba el guardia alfabéticamente último, y
+     * max(salida) podía ser la de un ingreso anterior al que sigue abierto.
+     */
+    ultimo as (
+      select distinct on (e.invitation_id)
+             e.invitation_id, e.entered_at, e.exited_at,
+             g.name as guardia, gs.name as guardia_salida
       from entry_log e
       left join person g on g.id = e.guard_id
       left join person gs on gs.id = e.exit_guard_id
-      group by e.invitation_id
+      order by e.invitation_id, e.entered_at desc
     )
     select
       i.id,
@@ -473,8 +770,10 @@ async function auditRows(
       i.guest_doc                 as "guestDoc",
       i.plate,
       i.kind,
+      i.frequent_as       as "frequentAs",
+      t.name                      as "tradeName",
       u.label                     as "unitLabel",
-      p.name                      as "inviterName",
+      case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.valid_from                as "validFrom",
       i.valid_to                  as "validTo",
       i.created_at                as "createdAt",
@@ -485,19 +784,20 @@ async function auditRows(
         when i.valid_to < ${hoy}::date then 'vencida'
         else 'esperando'
       end                         as status,
-      uso.ultima                  as "enteredAt",
+      ultimo.entered_at           as "enteredAt",
       coalesce(uso.veces, 0)      as "enteredCount",
-      uso.guardia                 as "guardName",
-      uso.ultima_salida           as "exitedAt",
-      uso.guardia_salida          as "exitGuardName"
+      ultimo.guardia              as "guardName",
+      ultimo.exited_at            as "exitedAt",
+      ultimo.guardia_salida       as "exitGuardName",
+      coalesce(uso.manual, false) as manual,
+      i.revoked_reason            as "revokedReason"
     from invitation i
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
+    left join trade t on t.id = i.trade_id
     left join uso on uso.invitation_id = i.id
-    where u.neighborhood_id = ${neighborhoodId}
-      and (${f.from ?? null}::date is null or i.valid_to >= ${f.from ?? null}::date)
-      and (${f.to ?? null}::date is null or i.valid_from <= ${f.to ?? null}::date)
-      and (${f.unitId ?? null}::uuid is null or i.unit_id = ${f.unitId ?? null}::uuid)
+    left join ultimo on ultimo.invitation_id = i.id
+    where ${filtrosAuditoria(neighborhoodId, f)}
       and (${f.status ?? null}::text is null or ${f.status ?? null}::text = case
         when i.revoked_at is not null then 'anulada'
         when coalesce(uso.abiertas, 0) > 0 then 'adentro'

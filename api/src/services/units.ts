@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, ilike, or, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { units, unitMembers, people } from '../db/schema.js'
 import { audit } from '../lib/audit.js'
@@ -101,4 +101,36 @@ export async function lotInfoForPerson(personId: string): Promise<{
   if (!unit) return { needsLot: true, lot: null }
 
   return { needsLot: false, lot: unit.label.replace(/^Lote\s+/i, '') }
+}
+
+/**
+ * Unidades de un barrio que matchean por lote o por apellido de algún
+ * residente. A diferencia de `unitsOfPerson` (las unidades de UN vecino,
+ * para que elija entre las suyas), esta busca entre TODAS las del barrio:
+ * la usa el guardia para encontrar la unidad de alguien que llamó por
+ * teléfono, sin ser miembro de ella.
+ *
+ * Una fila por combinación unidad+residente: si dos personas viven en el
+ * mismo lote, aparecen las dos, apuntando al mismo `unitId`.
+ */
+export async function searchUnits(neighborhoodId: string, query: string) {
+  const q = `%${query.trim()}%`
+  return db.select({
+    unitId: units.id,
+    unitLabel: units.label,
+    residentName: people.name,
+  })
+    .from(unitMembers)
+    .innerJoin(units, eq(units.id, unitMembers.unitId))
+    .innerJoin(people, eq(people.id, unitMembers.personId))
+    .where(and(
+      eq(units.neighborhoodId, neighborhoodId),
+      or(
+        sql`unaccent(${people.name}) ilike unaccent(${q})`,
+        // Sin unaccent: un lote no lleva tildes.
+        ilike(units.label, q),
+      ),
+    ))
+    .orderBy(units.label)
+    .limit(20)
 }

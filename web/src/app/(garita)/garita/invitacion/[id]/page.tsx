@@ -1,64 +1,81 @@
 'use client'
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'motion/react'
-import { Loader2 } from 'lucide-react'
-import { MOTIVO, hora, type Movimiento } from '@/lib/gate'
+import { toast } from 'sonner'
+import { AnimatePresence, motion } from 'motion/react'
+import { Check, Loader2 } from 'lucide-react'
+import { MOTIVO, detalleRechazo, hora, mensajeDeError, type Movimiento } from '@/lib/gate'
+import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
+import { useCampoLectora, useLectora } from '@/lib/use-lectora'
+import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
+import { KIND_LABEL, vigencia } from '@/lib/invitations'
 import {
-  useDeshacerMovimiento, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
+  useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
 } from '@/lib/queries/garita'
 import { Input } from '@/components/ui/input'
+import { AltaExpres } from '@/components/garita/alta-expres'
+import { AnularInvitacion } from '@/components/garita/anular-invitacion'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 
-/** Segundos que la confirmación espera antes de volver sola al escáner. */
+/** Segundos que la confirmación espera antes de volver sola a la pantalla anterior. */
 const SEGUNDOS_CONFIRMACION = 8
 
+const SALIDA = [0.2, 0.8, 0.2, 1] as const
+
+/** Una fila de la ficha. dt + dd sueltos: los acomoda la grilla de la <dl>. */
+function Dato({ etiqueta, children }: { etiqueta: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <>
+      <dt className="opacity-70">{etiqueta}</dt>
+      <dd className="min-w-0 break-words font-semibold tabular">{children}</dd>
+    </>
+  )
+}
+
 /**
- * Lo que se registró, con un Deshacer al alcance. Vuelve sola al escáner
- * para que el camino común no sume ni un toque; "Siguiente" la saltea para
- * el que está despachando una fila.
+ * Lo que queda en la zona de acción una vez registrado: Deshacer a mano y
+ * un Siguiente que vuelve solo al escáner, para que el camino común no sume
+ * ni un toque.
  */
-function Confirmacion({ movimiento, esEgreso, guestName, onListo, onDeshacer, deshaciendo }: {
-  movimiento: Movimiento
-  esEgreso: boolean
-  guestName: string
+function AccionesRegistrado({ onListo, onDeshacer, deshaciendo }: {
   onListo: () => void
   onDeshacer: () => void
   deshaciendo: boolean
 }) {
   const [restan, setRestan] = useState(SEGUNDOS_CONFIRMACION)
+  const siguienteRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    const t = setInterval(() => setRestan((n) => n - 1), 1000)
+    siguienteRef.current?.focus()
+    const t = setInterval(() => setRestan((n) => Math.max(0, n - 1)), 1000)
     return () => clearInterval(t)
   }, [])
   useEffect(() => { if (restan <= 0) onListo() }, [restan, onListo])
 
-  const cuando = esEgreso ? movimiento.exitedAt : movimiento.enteredAt
-
   return (
-    <main aria-live="polite" className="flex min-h-dvh flex-col justify-between gap-6 overflow-x-hidden bg-pass-field p-6 text-pass-ink sm:p-8">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] opacity-70">Registrado</p>
-        <motion.h1 initial={{ opacity: 0, scale: 1.12 }} animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.26, ease: [0.2, 0.9, 0.3, 1] }}
-          className="font-display mt-1 text-4xl font-extrabold tracking-[-0.02em] sm:text-6xl">
-          {esEgreso ? 'EGRESO' : 'INGRESO'}
-        </motion.h1>
-        <p className="mt-6 break-words text-3xl font-semibold sm:text-4xl">{guestName}</p>
-        {cuando && <p className="mt-1 text-xl tabular opacity-80 sm:text-2xl">a las {hora(cuando)}</p>}
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <button onClick={onDeshacer} disabled={deshaciendo}
-          className="min-h-16 rounded border-2 border-pass-ink/40 text-xl font-bold disabled:opacity-60">
-          {deshaciendo ? 'Deshaciendo…' : 'Deshacer'}
-        </button>
-        <button onClick={onListo} className="min-h-16 rounded bg-pass-ink text-xl font-bold text-pass-field">
-          Siguiente ({Math.max(0, restan)})
-        </button>
-      </div>
-    </main>
+    <div className="flex flex-col gap-3">
+      <p role="status" className="flex items-center gap-2 text-lg font-semibold">
+        <motion.span initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 520, damping: 26, delay: 0.08 }}
+          className="grid size-7 place-items-center rounded-full bg-ink text-card">
+          <Check className="size-4" strokeWidth={3} aria-hidden />
+        </motion.span>
+        Registrado
+      </p>
+      <button ref={siguienteRef} onClick={onListo}
+        className="relative min-h-16 overflow-hidden rounded bg-ink text-xl font-bold text-card">
+        {/* La barra que se vacía dice lo mismo que el número, sin tener que leerlo. */}
+        <motion.span aria-hidden initial={{ scaleX: 1 }} animate={{ scaleX: 0 }}
+          transition={{ duration: SEGUNDOS_CONFIRMACION, ease: 'linear' }}
+          className="absolute inset-x-0 bottom-0 h-1 origin-left bg-card/45" />
+        <span className="tabular">Siguiente ({Math.max(0, restan)})</span>
+      </button>
+      <button onClick={onDeshacer} disabled={deshaciendo}
+        className="min-h-14 rounded border-2 border-ink/30 text-lg font-bold disabled:opacity-60">
+        {deshaciendo ? 'Deshaciendo…' : 'Deshacer'}
+      </button>
+      <p className="hidden text-center text-sm opacity-70 lg:block">o escaneá el siguiente</p>
+    </div>
   )
 }
 
@@ -68,8 +85,10 @@ function Confirmacion({ movimiento, esEgreso, guestName, onListo, onDeshacer, de
  *
  * Tres canales, ninguno de los cuales es el color: la palabra, el "sello" de
  * entrada y la luminancia del campo. INGRESO y EGRESO comparten el campo
- * claro porque los dos significan "abrí"; se distinguen por palabra, que es
- * una lectura de segundo orden y alcanza.
+ * claro porque los dos significan "abrí"; se distinguen por palabra.
+ *
+ * Es UNA pantalla: al registrar, la palabra, el nombre y el fondo se quedan
+ * quietos y solo muda la zona de acción de abajo.
  */
 export default function VeredictoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -78,22 +97,45 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const ingresar = useRegistrarIngreso()
   const egresar = useRegistrarEgreso()
   const deshacerMov = useDeshacerMovimiento()
+  const abrirQr = useAbrirQr()
+  const anotar = useAnotarLectura()
+  const dniPendiente = useDniPendiente()
+  const documentoLeido = useDocumentoLeido()
   const [idCargado, setIdCargado] = useState<string | null>(null)
   const [doc, setDoc] = useState('')
+  const [docLeido, setDocLeido] = useState(false)
   const [plate, setPlate] = useState('')
-  const [hecho, setHecho] = useState<Movimiento | null>(null)
+  // Todo lo que se muestra después de registrar sale de `hecho`, no del
+  // veredicto: la mutación lo invalida al terminar y `adentro` pasa a decir
+  // lo contrario de lo que se acaba de registrar.
+  const [hecho, setHecho] = useState<{ movimiento: Movimiento; esEgreso: boolean } | null>(null)
   const accionRef = useRef<HTMLButtonElement>(null)
+  const [altaAbierta, setAltaAbierta] = useState(false)
+  const [disparadorAlta, setDisparadorAlta] = useState<HTMLButtonElement | null>(null)
+  const [lecturaAlta, setLecturaAlta] = useState<LecturaDni | null>(null)
+  const [anulando, setAnulando] = useState(false)
 
   // Precarga de doc/patente al llegar el resultado: se ajusta durante el
-  // render (patrón oficial de React para esto), no en un efecto — evita un
-  // ciclo extra de render.
+  // render (patrón oficial de React para esto), no en un efecto.
   if (q.data && q.data.invitation.id !== idCargado) {
     setIdCargado(q.data.invitation.id)
-    setDoc(q.data.invitation.guestDoc ?? '')
+    const leido = documentoLeido.ver(q.data.invitation.id)
+    setDoc(leido ?? q.data.invitation.guestDoc ?? '')
+    setDocLeido(Boolean(leido))
     setPlate(q.data.invitation.plate ?? '')
   }
 
-  const salir = () => router.push('/garita/escanear')
+  // Vuelve a donde estaba: el escáner, la búsqueda, la agenda o el alta
+  // exprés. Una sola vez: el contador, Deshacer y Escape pueden coincidir, y
+  // dos back() seguidos retrocederían dos pantallas. Abierto directo (link o
+  // pestaña nueva) no hay a dónde volver, y va a la garita.
+  const saliendo = useRef(false)
+  function salir() {
+    if (saliendo.current) return
+    saliendo.current = true
+    if (window.history.length > 1) router.back()
+    else router.push('/garita')
+  }
 
   // El foco cae en el botón de acción recién cuando deja de cargar: Enter
   // registra sin tocar el mouse.
@@ -102,12 +144,65 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   }, [q.isPending])
 
   // Escape siempre vuelve. En la barrera no hay tiempo de buscar un botón.
+  // Con el alta abierta no escucha, y Radix hace preventDefault al cerrar el sheet: ese Esc no saca también del veredicto.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') salir() }
+    if (altaAbierta || anulando) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) salir() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [altaAbierta, anulando])
+
+  // Se consume al salir: volver a abrir esta invitación más tarde no lo trae.
+  useEffect(() => () => documentoLeido.borrar(id), [id, documentoLeido])
+
+  /*
+   * Con un ingreso pendiente, un DNI es el de quien está adelante: completa y
+   * enfoca "Registrar ingreso" (nunca registra solo). Si no, es el siguiente
+   * invitado. Un QR siempre es el siguiente; replace para que Volver lleve a
+   * donde estaba el guardia antes del primero.
+   */
+  // Dos lecturas seguidas pueden resolverse desordenadas: solo vale la última.
+  const secuencia = useRef(0)
+  async function leer(l: Lectura | null) {
+    // Escribiendo el motivo de una anulación, una lectura no es para esta pantalla.
+    if (anulando) return
+    if (!l) { anotar('No reconocido'); toast.error(NO_RECONOCIDO); return }
+    const mia = ++secuencia.current
+    if (l.tipo === 'qr') {
+      setAltaAbierta(false); setLecturaAlta(null)
+      try {
+        const r = await abrirQr(l.token, true, () => mia === secuencia.current)
+        if (mia === secuencia.current) anotar(`QR · ${r.invitation.guestName}`)
+      } catch (e) {
+        if (mia !== secuencia.current) return
+        anotar(`QR · ${mensajeDeError(e)}`)
+        toast.error(mensajeDeError(e))
+      }
+      return
+    }
+    if (altaAbierta) {
+      anotar(`DNI ${formatearDni(l.documento)} · completó el alta exprés`)
+      setLecturaAlta(l)
+      return
+    }
+    if (q.data && !hecho && !q.data.adentro && q.data.check.ok) {
+      anotar(`DNI ${formatearDni(l.documento)} · completó el documento`)
+      setDoc(l.documento)
+      setDocLeido(true)
+      accionRef.current?.focus()
+      return
+    }
+    dniPendiente.dejar(l)
+    router.push('/garita')
+  }
+  useLectora({ onLectura: (texto) => leer(interpretarLectura(texto)) })
+  // Un QR leído en el campo navega: se restituye el valor que tendría el campo (cambia el
+  // texto, así no se vuelve a disparar) sin dejarlo vacío si abrirQr falla.
+  const teclaDoc = useCampoLectora(doc, (l) => {
+    if (l.tipo === 'qr') setDoc(documentoLeido.ver(id) ?? q.data?.invitation.guestDoc ?? '')
+    leer(l)
+  })
 
   if (q.isPending) {
     return (
@@ -128,8 +223,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const resultado = q.data
   const { invitation: inv, check, adentro } = resultado
   // Un egreso no se valida: si está adentro, sale. `check` es del ingreso.
-  const esEgreso = Boolean(adentro)
-  const ok = esEgreso || check.ok
+  const esEgreso = hecho ? hecho.esEgreso : Boolean(adentro)
+  const ok = Boolean(hecho) || esEgreso || check.ok
 
   async function registrar() {
     try {
@@ -139,89 +234,192 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           invitationId: inv.id, guestName: inv.guestName,
           guestDoc: doc || undefined, plate: plate || undefined,
         })
-      // No sale: pasa a la confirmación, que es donde vive el Deshacer.
-      setHecho(mov)
+      setHecho({ movimiento: mov, esEgreso })
     } catch {
       // El toast de error ya lo muestra la mutación.
     }
   }
 
-  if (hecho) {
-    return (
-      <Confirmacion movimiento={hecho} esEgreso={esEgreso} guestName={inv.guestName}
-        onListo={salir}
-        onDeshacer={() => deshacerMov.mutate(hecho.id, { onSuccess: salir })}
-        deshaciendo={deshacerMov.isPending} />
-    )
-  }
-
   const motivo = !ok ? MOTIVO[(check as { reason: string }).reason] ?? 'Rechazado' : ''
+  const detalle = !ok ? detalleRechazo((check as { reason: string }).reason, inv, { franjas: resultado.franjas, tradeName: inv.tradeName }) : null
   const sinCupo = !ok && (check as { reason: string }).reason === 'no_capacity'
   const palabra = esEgreso ? 'EGRESO' : ok ? 'INGRESO' : 'NO PASA'
   const registrando = ingresar.isPending || egresar.isPending
 
+  // La línea de detalle se completa, no se reescribe: el ingreso que ya
+  // estaba queda, y la hora nueva se suma al lado.
+  const entro = hecho ? hecho.movimiento.enteredAt : adentro?.enteredAt
+  const salio = hecho?.esEgreso ? hecho.movimiento.exitedAt : null
+
+  const editable = ok && !esEgreso && !hecho
+  const borde = ok ? 'border-ink/15' : 'border-current/20'
+  const noCoincide = Boolean(editable && inv.guestDoc && soloDigitos(doc).length >= 7
+    && soloDigitos(doc) !== soloDigitos(inv.guestDoc))
+  const kbd = 'rounded border border-current/30 px-1.5 py-0.5 font-mono text-xs'
+
   return (
     <main aria-live="assertive"
-      className={`flex min-h-dvh flex-col justify-between gap-6 overflow-x-hidden p-6 sm:p-8 ${
-        ok ? 'bg-pass-field text-pass-ink' : 'bg-deny-field text-deny-ink'
-      }`}>
-      <div>
-        <motion.h1 initial={{ opacity: 0, scale: 1.12 }} animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.26, ease: [0.2, 0.9, 0.3, 1] }}
-          className="font-display text-5xl font-extrabold tracking-[-0.02em] sm:text-7xl">
-          {palabra}
-        </motion.h1>
+      className={`min-h-dvh overflow-x-hidden p-6 sm:p-10 lg:px-14 ${ok ? 'bg-verde-tint text-ink' : 'bg-no-pasa text-no-pasa-texto'}`}>
+      {/* Un solo árbol. Mobile: una columna, la acción al pie. Desde lg: lo que
+          decide a la izquierda, para leer de lejos; la ficha y la acción a la
+          derecha, para el guardia sentado. Solo cambia la grilla. */}
+      <div className="mx-auto grid min-h-[calc(100dvh-3rem)] w-full max-w-2xl grid-rows-[auto_1fr] gap-8 sm:min-h-[calc(100dvh-5rem)] lg:max-w-7xl lg:grid-cols-[3fr_2fr] lg:grid-rows-1 lg:items-center lg:gap-16">
+        <section className="min-w-0">
+          <motion.h1 initial={{ opacity: 0, scale: 1.12 }} animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.26, ease: [0.2, 0.9, 0.3, 1] }}
+            className="font-display origin-left text-6xl font-extrabold leading-[0.9] tracking-[-0.035em] sm:text-8xl lg:text-9xl xl:text-[10rem]">
+            {palabra}
+          </motion.h1>
 
-        {!ok && (
-          <p className="mt-3 text-2xl font-semibold sm:text-3xl">
-            {motivo}
-            {sinCupo && resultado.lastEntryAt && (
-              <span className="tabular"> · ya entró a las {hora(resultado.lastEntryAt)}</span>
-            )}
+          {!ok && (
+            <p className="mt-4 text-2xl font-semibold sm:text-3xl lg:text-4xl">
+              {motivo}
+              {sinCupo && resultado.lastEntryAt && (
+                <span className="tabular"> · ya entró a las {hora(resultado.lastEntryAt)}</span>
+              )}
+            </p>
+          )}
+          {detalle && <p className="mt-1 text-xl tabular opacity-80 sm:text-2xl lg:text-3xl">{detalle}</p>}
+
+          <p className={`mt-8 break-words border-t pt-5 text-3xl font-semibold leading-tight sm:text-4xl lg:text-6xl ${borde}`}>
+            {inv.guestName}
           </p>
-        )}
+        </section>
 
-        <p className="mt-6 break-words text-3xl font-semibold sm:text-4xl">{inv.guestName}</p>
-        <p className="mt-1 text-xl tabular opacity-80 sm:text-2xl">
-          {inv.unitLabel}
-          {inv.capacity > 1 && ` · ${resultado.usedCount} de ${inv.capacity} entraron`}
-        </p>
+        <section className={`flex min-w-0 flex-col justify-between gap-8 lg:justify-center lg:border-l lg:pl-12 ${borde}`}>
+          {/* Lo que el guardia compara con lo que tiene adelante: el documento y
+              el auto. Y el tipo, porque un proveedor no se trata como una visita. */}
+          <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-2.5 text-lg sm:text-xl">
+            {inv.note && <Dato etiqueta="Nota">{inv.note}</Dato>}
+            {editable ? (
+              <>
+                <dt className="self-start pt-2.5 opacity-70"><label htmlFor="doc-veredicto">Documento</label></dt>
+                <dd className="min-w-0">
+                  {/* El campo es claro en los dos temas: el dark:bg-input/30 del Input lo ensuciaría. */}
+                  <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
+                    aria-describedby={[docLeido && doc.trim() && 'doc-leido', noCoincide && 'doc-no-coincide', !doc.trim() && 'doc-falta'].filter(Boolean).join(' ') || undefined}
+                    onChange={(e) => { setDoc(e.target.value); setDocLeido(false) }}
+                    className="tabular h-12 border-control bg-card text-xl" />
+                  {docLeido && doc.trim() && <p id="doc-leido" className="mt-1 text-sm font-semibold">Leído del DNI</p>}
+                  {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo.
+                      Los dos números lado a lado: comparar es más rápido que leer una frase. */}
+                  {noCoincide && (
+                    <p id="doc-no-coincide" className="mt-1 text-base font-semibold tabular">
+                      No coincide · Invitación {inv.guestDoc} · {docLeido ? 'Leído' : 'Cargado'} {doc}
+                    </p>
+                  )}
+                  {/* Nadie entra sin documento: si la invitación no lo traía, se carga acá. */}
+                  {!doc.trim() && <p id="doc-falta" className="mt-1 text-sm font-semibold opacity-75">Hace falta para registrar el ingreso.</p>}
+                </dd>
+                <dt className="self-start pt-2.5 opacity-70"><label htmlFor="patente-veredicto">Patente</label></dt>
+                <dd className="min-w-0">
+                  <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                    className="tabular h-12 border-control bg-card text-xl uppercase" />
+                </dd>
+              </>
+            ) : (
+              <>
+                <Dato etiqueta="Documento">{doc || inv.guestDoc || '—'}</Dato>
+                <Dato etiqueta="Patente">{plate || inv.plate || '—'}</Dato>
+              </>
+            )}
+            <Dato etiqueta="Tipo">{KIND_LABEL[inv.kind]}{inv.tradeName && ` · ${inv.kind === 'frecuente' ? `${KIND_LABEL.proveedor} · ` : ''}${inv.tradeName}`}</Dato>
+            <Dato etiqueta="Lote">{inv.unitLabel}</Dato>
+            <Dato etiqueta="Invita">{inv.inviterName}</Dato>
+            {!esEgreso && <Dato etiqueta="Vigencia">{vigencia(inv)}</Dato>}
+            {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}
+            {inv.capacity > 1 && inv.kind !== 'frecuente' && (
+              <Dato etiqueta="Cupo">{resultado.usedCount} de {inv.capacity} entraron</Dato>
+            )}
+            {entro && (
+              <Dato etiqueta="Entró">
+                <motion.span key={`e-${entro}`} initial={hecho && !hecho.esEgreso ? { opacity: 0, y: 6 } : false}
+                  animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: SALIDA }} className="inline-block">
+                  {horaODia(entro, hoyISO())}
+                  {/* Cuánto lleva adentro: alguien con dos días salta a la vista. */}
+                  {esEgreso && !hecho && <span className="font-normal opacity-75"> · adentro hace {tiempoDesde(entro)}</span>}
+                </motion.span>
+              </Dato>
+            )}
+            {salio && (
+              <Dato etiqueta="Salió">
+                <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, ease: SALIDA }} className="inline-block">
+                  {hora(salio)}
+                </motion.span>
+              </Dato>
+            )}
+          </dl>
 
-        {adentro && (
-          <p className="mt-2 text-xl font-semibold tabular sm:text-2xl">entró a las {hora(adentro.enteredAt)}</p>
-        )}
+          <motion.div layout transition={{ duration: 0.32, ease: SALIDA }} className="w-full">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {hecho ? (
+                <motion.div key="registrado" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, ease: SALIDA }}>
+                  <AccionesRegistrado onListo={salir}
+                    onDeshacer={() => deshacerMov.mutate(hecho.movimiento.id, { onSuccess: salir })}
+                    deshaciendo={deshacerMov.isPending} />
+                </motion.div>
+              ) : ok ? (
+                <motion.div key="pendiente" exit={{ opacity: 0, y: -8, transition: { duration: 0.16 } }}
+                  className="flex flex-col gap-3">
+                  {/* Los datos se cargan al entrar, no al salir: a la salida ya están. */}
+                  <button ref={accionRef} onClick={registrar} disabled={registrando || (!esEgreso && !doc.trim())}
+                    className="flex min-h-16 items-center justify-center gap-2 rounded bg-ink text-xl font-bold text-card transition-colors disabled:bg-ink/40">
+                    {registrando && <Loader2 className="size-5 animate-spin" aria-hidden />}
+                    {registrando ? 'Registrando…' : esEgreso ? 'Registrar egreso' : 'Registrar ingreso'}
+                  </button>
+                  <p className="hidden text-sm opacity-70 lg:block"><kbd className={kbd}>Enter</kbd> registra · <kbd className={kbd}>Esc</kbd> vuelve</p>
+                  <button onClick={salir} className="min-h-11 underline underline-offset-4 opacity-70">
+                    Cancelar (Esc)
+                  </button>
+                  {/* Con alguien adentro no se anula (la API lo rechaza): ahí el paso es el egreso. */}
+                  {!esEgreso && (
+                    <button onClick={() => setAnulando(true)} className="min-h-11 text-sm underline underline-offset-4 opacity-60">
+                      Anular esta invitación…
+                    </button>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div key="rechazo" className="flex flex-col gap-3">
+                  <button ref={accionRef} onClick={salir}
+                    className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
+                    Volver (Esc)
+                  </button>
+                  {/* El vecino ya dijo que sí por teléfono. Una anulada no: ahí dijo que no. */}
+                  {(check as { reason: string }).reason !== 'revoked' && (
+                    <button onClick={(e) => { setDisparadorAlta(e.currentTarget); setAltaAbierta(true) }}
+                      className="min-h-11 text-base font-semibold underline underline-offset-4 opacity-80">
+                      Autorizar igual…
+                    </button>
+                  )}
+                  {(check as { reason: string }).reason !== 'revoked' && !esEgreso && (
+                    <button onClick={() => setAnulando(true)} className="min-h-11 text-sm underline underline-offset-4 opacity-70">
+                      Anular esta invitación…
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </section>
       </div>
 
-      {ok ? (
-        <div className="flex flex-col gap-3">
-          {/* Los datos se cargan al entrar, no al salir: a la salida ya están. */}
-          {!esEgreso && (
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <label className="flex flex-1 flex-col gap-1 font-semibold">
-                Documento
-                <Input value={doc} onChange={(e) => setDoc(e.target.value)} className="tabular h-14 text-xl" />
-              </label>
-              <label className="flex flex-1 flex-col gap-1 font-semibold">
-                Patente
-                <Input value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                  className="tabular h-14 text-xl uppercase" />
-              </label>
-            </div>
-          )}
-          <button ref={accionRef} onClick={registrar} disabled={registrando}
-            className="min-h-16 rounded bg-pass-ink text-xl font-bold text-pass-field disabled:opacity-60">
-            {registrando ? 'Registrando…' : esEgreso ? 'Registrar egreso' : 'Registrar ingreso'}
-          </button>
-          <button onClick={salir} className="underline underline-offset-4 opacity-70">
-            Cancelar (Esc)
-          </button>
-        </div>
-      ) : (
-        <button ref={accionRef} onClick={salir}
-          className="min-h-16 rounded border-2 border-deny-ink/40 text-xl font-bold">
-          Volver (Esc)
-        </button>
-      )}
+      <AnularInvitacion abierto={anulando} onAbiertoChange={setAnulando} invitacion={inv}
+        onAnulada={() => { toast.success('Invitación anulada.'); salir() }} />
+
+      <AltaExpres abierto={altaAbierta} disparador={disparadorAlta}
+        onAbiertoChange={(v) => { setAltaAbierta(v); if (!v) setLecturaAlta(null) }}
+        lectura={lecturaAlta}
+        inicial={{
+          guestName: inv.guestName,
+          guestDoc: doc || inv.guestDoc || '',
+          plate: plate || inv.plate || '',
+          unidad: { unitId: inv.unitId, unitLabel: inv.unitLabel, residentName: inv.inviterName },
+        }}
+        // replace: "Volver" en el veredicto nuevo lleva a donde estaba el guardia antes del rechazo.
+        onCreada={(nuevo) => router.replace(`/garita/invitacion/${nuevo}`)}
+        onQr={(token) => leer({ tipo: 'qr', token })} />
     </main>
   )
 }

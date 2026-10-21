@@ -2,10 +2,13 @@
 import { use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSesion } from '@/lib/sesion-contexto'
 import { useInvitacion } from '@/lib/queries/invitaciones'
+import { sePuedeEditar } from '@/lib/estado-invitacion'
+import { hoyISO } from '@/lib/fechas'
+import { Vacio } from '@/components/dominio/vacio'
 import { buttonVariants } from '@/components/ui/button'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
@@ -29,6 +32,10 @@ export default function EditarInvitacion({ params }: { params: Promise<{ id: str
         <SkeletonFilas filas={3} />
       ) : q.isError ? (
         <ErrorConReintento onReintentar={() => q.refetch()} reintentando={q.isFetching} />
+      ) : !sePuedeEditar(q.data, hoyISO()) ? (
+        // Se llega por URL directa: el pase ya no ofrece Editar en este caso.
+        <Vacio icono={Lock} titulo="Esta invitación ya no se puede editar"
+          detalle="Solo se editan las invitaciones que todavía no se usaron. Para invitar de nuevo, creá una nueva desde el pase." />
       ) : (
         <FormularioInvitacion units={me.units} invitacion={q.data}
           onListo={() => { toast.success('Cambios guardados'); router.replace(`/invitaciones/${id}`) }} />

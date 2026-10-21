@@ -4,8 +4,10 @@ import { motion } from 'motion/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, MapPin, SearchX, Sun } from 'lucide-react'
 import { api } from '@/lib/api'
-import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
+import { KIND_LABEL, PORTERIA, vigencia, type Invitation } from '@/lib/invitations'
 import { hoyISO } from '@/lib/fechas'
+import { type Franja } from '@/lib/franjas'
+import { HorarioRubro } from '@/components/dominio/horario-rubro'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,6 +30,8 @@ type Publica = {
   hasDoc: boolean
   hasPlate: boolean
   frozen: boolean
+  tradeName: string | null
+  franjas: Franja[]
 }
 
 /** Pide SOLO lo que falta. Los datos se piden una vez. */
@@ -47,7 +51,7 @@ function FormularioDatos({ token, faltaDoc, faltaPatente }: { token: string; fal
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (doc.trim() || plate.trim()) guardar.mutate() }}
-      className="flex flex-col gap-5 rounded-xl border border-line bg-card p-5">
+      className="flex flex-col gap-5 rounded-lg border border-line bg-card p-5">
       <div>
         <p className="font-display text-lg font-bold tracking-[-0.01em]">Entrá más rápido</p>
         <p className="mt-0.5 text-sm text-ink-soft">
@@ -98,7 +102,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
       <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-6">
         {encabezado}
         <Skeleton className="h-5 w-48" />
-        <Skeleton className="h-[34rem] w-full rounded-xl" />
+        <Skeleton className="h-[34rem] w-full rounded-lg" />
       </main>
     )
   }
@@ -125,7 +129,10 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
       {encabezado}
 
       <p className="text-ink-soft">
-        Te invita <strong className="text-ink">{inv.inviterName}</strong> · <span className="tabular">{inv.unitLabel}</span>
+        {inv.inviterName === PORTERIA
+          ? <strong className="text-ink">{PORTERIA}</strong>
+          : <>Te invita <strong className="text-ink">{inv.inviterName}</strong></>}
+        {' · '}<span className="tabular">{inv.unitLabel}</span>
       </p>
 
       {sello && <Nota tono="error">Esta invitación está {sello.toLowerCase()}. Pedile una nueva a quien te invitó.</Nota>}
@@ -149,13 +156,20 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
         </p>
       )}
 
+      {!sello && inv.tradeName && inv.franjas.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <HorarioRubro titulo={`Horario de ingreso · ${inv.tradeName}`} franjas={inv.franjas} />
+          <p className="text-sm text-ink-soft">Fuera de ese horario la guardia no te deja pasar.</p>
+        </section>
+      )}
+
       {!sello && !inv.frozen && (!inv.hasDoc || !inv.hasPlate) && (
         <FormularioDatos token={token} faltaDoc={!inv.hasDoc} faltaPatente={!inv.hasPlate} />
       )}
 
       {(address || mapUrl) && (
-        <section className="flex flex-col gap-3 rounded-xl border border-line bg-card p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Cómo llegar</p>
+        <section className="flex flex-col gap-3 rounded-lg border border-line bg-card p-5">
+          <p className="text-[13px] font-semibold text-ink-soft">Cómo llegar</p>
           {address && <p>{address}</p>}
           {mapUrl && (
             <a href={mapUrl} target="_blank" rel="noopener noreferrer"

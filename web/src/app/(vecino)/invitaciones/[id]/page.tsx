@@ -44,7 +44,7 @@ export default function DetalleInvitacion({ params, searchParams }: {
     return (
       <div className="flex flex-col items-center gap-6">
         {volver}
-        <Skeleton className="h-[34rem] w-full max-w-sm rounded-xl" />
+        <Skeleton className="h-[34rem] w-full max-w-sm rounded-lg" />
       </div>
     )
   }
@@ -73,6 +73,11 @@ export default function DetalleInvitacion({ params, searchParams }: {
   return (
     <div className="flex flex-col items-center gap-6">
       {volver}
+      {inv.revokedAt && inv.revokedReason !== null && (
+        <Nota tono="info" className="w-full max-w-sm">
+          Anulada por portería{inv.revokedReason ? `: ${inv.revokedReason}` : ''}
+        </Nota>
+      )}
       {creada === '1' && (
         <Nota tono="exito" className="w-full max-w-sm">Listo. Compartila con {inv.guestName}.</Nota>
       )}
@@ -87,6 +92,7 @@ export default function DetalleInvitacion({ params, searchParams }: {
       <p className="max-w-sm text-center text-sm text-ink-soft">
         {cupo ? `${cupo}. ` : ''}Quien lo reciba tiene que subir el brillo para que el lector lo tome.
       </p>
+      {inv.note && <p className="max-w-sm break-words text-center text-sm"><span className="text-ink-soft">Nota para la guardia: </span>{inv.note}</p>}
 
       <AccionesPase inv={inv} url={url}
         onAnular={() => setConfirmando(true)}

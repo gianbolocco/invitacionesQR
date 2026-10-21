@@ -5,7 +5,7 @@ import { Ban, Check, Copy, Loader2, Pencil, RotateCcw, Share2 } from 'lucide-rea
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { useMarca } from '@/lib/marca-cliente'
-import { estadoInvitacion } from '@/lib/estado-invitacion'
+import { estadoInvitacion, sePuedeEditar } from '@/lib/estado-invitacion'
 import { urlVolverAInvitar, type Invitation } from '@/lib/invitations'
 import { hoyISO } from '@/lib/fechas'
 
@@ -23,6 +23,7 @@ export function AccionesPase({ inv, url, onAnular, onHabilitar, habilitando }: {
   const marca = useMarca()
   const [copiado, setCopiado] = useState(false)
   const estado = estadoInvitacion(inv, hoyISO())
+  const editable = sePuedeEditar(inv, hoyISO())
 
   async function copiar() {
     try {
@@ -69,18 +70,28 @@ export function AccionesPase({ inv, url, onAnular, onHabilitar, habilitando }: {
   return (
     <div className="flex w-full max-w-sm flex-col gap-2">
       <Button size="lg" onClick={compartir}><Share2 aria-hidden />Compartir</Button>
-      <div className="grid grid-cols-2 gap-2">
+      {/* Editar solo mientras nunca se usó: después, la auditoría muestra estos
+          datos y editarlos reescribiría quién entró. */}
+      <div className={editable ? 'grid grid-cols-2 gap-2' : 'grid'}>
         <Button variant="outline" onClick={copiar}>
           {copiado ? <Check className="animate-in zoom-in duration-200" aria-hidden /> : <Copy aria-hidden />}
           {copiado ? 'Copiado' : 'Copiar link'}
         </Button>
-        <Link href={`/invitaciones/${inv.id}/editar`} className={buttonVariants({ variant: 'outline' })}>
-          <Pencil aria-hidden />Editar
-        </Link>
+        {editable && (
+          <Link href={`/invitaciones/${inv.id}/editar`} className={buttonVariants({ variant: 'outline' })}>
+            <Pencil aria-hidden />Editar
+          </Link>
+        )}
       </div>
-      <Button variant="ghost" className="text-peligro hover:bg-peligro/10 hover:text-peligro" onClick={onAnular}>
-        <Ban aria-hidden />Anular invitación
-      </Button>
+      {/* No se puede anular con el invitado adentro — el servidor lo
+          rechaza, así que acá ni se ofrece. */}
+      {estado === 'adentro' ? (
+        <p className="text-center text-sm text-ink-soft">No se puede anular mientras está adentro.</p>
+      ) : (
+        <Button variant="ghost" className="text-alto hover:bg-alto-tint hover:text-alto" onClick={onAnular}>
+          <Ban aria-hidden />Anular invitación
+        </Button>
+      )}
     </div>
   )
 }

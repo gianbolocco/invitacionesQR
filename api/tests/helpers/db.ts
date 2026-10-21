@@ -3,7 +3,7 @@ import { neighborhoods, units, people, unitMembers } from '../../src/db/schema.j
 
 export async function resetDb() {
   await pool.query(`truncate table
-    entry_log, invitation, unit_member, audit_log, auth_token, session, person, unit, neighborhood
+    entry_log, invitation, trade, unit_member, audit_log, auth_token, session, person, unit, neighborhood
     restart identity cascade`)
 }
 

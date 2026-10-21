@@ -129,6 +129,11 @@ export type EntryRow = {
   guardName: string | null
   exitedAt: string | null
   exitGuardName: string | null
+  manual: boolean
+  note: string | null
+  invitationNote: string | null
+  loadedAt: string | null
+  loaderName: string | null
 }
 
 export async function entriesLog(neighborhoodId: string, f: EntryFilters): Promise<EntryRow[]> {
@@ -136,11 +141,16 @@ export async function entriesLog(neighborhoodId: string, f: EntryFilters): Promi
     select e.id, e.entered_at as "enteredAt", e.exited_at as "exitedAt",
            e.guest_name as "guestName",
            e.guest_doc as "guestDoc", e.plate, u.label as "unitLabel",
-           g.name as "guardName", gs.name as "exitGuardName"
+           g.name as "guardName", gs.name as "exitGuardName",
+           (e.source = 'manual') as manual,
+           e.note, i.note as "invitationNote",
+           e.loaded_at as "loadedAt", lp.name as "loaderName"
     from entry_log e
     join unit u on u.id = e.unit_id
+    join invitation i on i.id = e.invitation_id
     left join person g on g.id = e.guard_id
     left join person gs on gs.id = e.exit_guard_id
+    left join person lp on lp.id = e.loaded_by
     where u.neighborhood_id = ${neighborhoodId}
       and (${f.from ?? null}::date is null or (e.entered_at at time zone ${TZ})::date >= ${f.from ?? null}::date)
       and (${f.to ?? null}::date is null or (e.entered_at at time zone ${TZ})::date <= ${f.to ?? null}::date)

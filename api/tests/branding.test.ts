@@ -51,7 +51,7 @@ describe('la marca pública', () => {
     await barrio()
     const res = await request(app).get('/branding').expect(200)
     // Quien lo consume no tiene que saber cuál es el default.
-    expect(res.body.color).toBe('#1e6b47')
+    expect(res.body.color).toBe('#2f5bff')
   })
 
   it('con color propio devuelve ese', async () => {
@@ -74,7 +74,7 @@ describe('la marca pública', () => {
   it('sin barrio en la base no revienta: devuelve los valores del producto', async () => {
     // Pasa entre que levanta la API y corre el seed.
     const res = await request(app).get('/branding').expect(200)
-    expect(res.body.color).toBe('#1e6b47')
+    expect(res.body.color).toBe('#2f5bff')
     expect(res.body.tieneLogo).toBe(false)
   })
 })

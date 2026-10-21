@@ -57,6 +57,8 @@ describe('agenda del día', () => {
     expect(res.body).toHaveLength(1)
     expect(res.body[0]).toMatchObject({
       guestName: 'Juan Pérez', unitLabel: 'Lote 142', inviterName: 'Martín', enteredCount: 0,
+      // La garita lo necesita para no mostrar como pendiente a una vencida.
+      validTo: hoy,
     })
   })
 

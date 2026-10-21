@@ -7,6 +7,14 @@ import { sql } from 'drizzle-orm'
 // Drizzle no trae bytea. pg ya lo convierte a Buffer y de vuelta.
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' })
 
+// Va antes que `neighborhoods` solo por el tipo; la tabla `trade` va después.
+export type Franja = {
+  days: number[]                               // 0 = domingo, como invitation.weekdays
+  from: string; to: string                     // 'HH:MM'; `to` excluido, '24:00' vale
+  season: { from: string; to: string } | null  // 'MM-DD'; puede cruzar el año
+  trades: string[] | null                      // ids de trade; null = todos los rubros
+}
+
 export const neighborhoods = pgTable('neighborhood', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
@@ -26,8 +34,17 @@ export const neighborhoods = pgTable('neighborhood', {
   // Cuándo se cambió el logo por última vez. Viaja como versión en la URL del
   // logo: la respuesta se cachea una hora y sin esto se vería el anterior.
   logoUpdatedAt: timestamp('logo_updated_at', { withTimezone: true }),
+  // Horas adentro antes de que la garita avise, por tipo. NULL = ese tipo no
+  // alerta. Una frecuente usa la de su subtipo (`invitation.frequent_as`).
+  overstayHoursVisita: smallint('overstay_hours_visita'),
+  overstayHoursProveedor: smallint('overstay_hours_proveedor'),
+  // Franjas de ingreso de proveedores. [] = sin restricción.
+  providerWindows: jsonb('provider_windows').$type<Franja[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [
+  check('neighborhood_overstay_visita_ck', sql`${t.overstayHoursVisita} between 1 and 72`),
+  check('neighborhood_overstay_proveedor_ck', sql`${t.overstayHoursProveedor} between 1 and 72`),
+])
 
 export const units = pgTable('unit', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -68,20 +85,40 @@ export const unitMembers = pgTable('unit_member', {
   personId: uuid('person_id').notNull().references(() => people.id),
 }, (t) => [primaryKey({ columns: [t.unitId, t.personId] })])
 
+export const trades = pgTable('trade', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  neighborhoodId: uuid('neighborhood_id').notNull().references(() => neighborhoods.id),
+  name: text('name').notNull(),
+  // Se archiva, no se borra: las invitaciones y las franjas lo siguen usando.
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, (t) => [uniqueIndex('trade_name_uq').on(t.neighborhoodId, sql`lower(${t.name})`)])
+
 export const invitations = pgTable('invitation', {
   id: uuid('id').primaryKey().defaultRandom(),
   unitId: uuid('unit_id').notNull().references(() => units.id),
   createdBy: uuid('created_by').notNull().references(() => people.id),
   kind: text('kind').notNull(),
+  // Solo en las frecuentes: si viene de visita (la empleada, el profesor) o
+  // como proveedor (el jardinero, el pintor de toda la semana). Decide el
+  // umbral de la alerta de permanencia y la marca en la garita.
+  frequentAs: text('frequent_as'),
+  tradeId: uuid('trade_id').references(() => trades.id),
   guestName: text('guest_name').notNull(),
   guestDoc: text('guest_doc'),
   plate: text('plate'),
+  // Lo que el vecino le deja dicho a la guardia ("viene en un Gol rojo"). No
+  // confundir con entry_log.note, que es la observación del guardia en una carga manual.
+  note: text('note'),
   validFrom: date('valid_from').notNull(),
   validTo: date('valid_to').notNull(),
   weekdays: smallint('weekdays').array(),
   capacity: integer('capacity').notNull().default(1),
   token: text('token').notNull(),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  // null = no la anuló la portería (la anuló el vecino, o no está anulada).
+  // Distinto de null = la anuló un guardia; '' es "sin motivo", porque el motivo
+  // es opcional. Es lo que el vecino lee después: "anulada por portería".
+  revokedReason: text('revoked_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex('invitation_token_uq').on(t.token),
@@ -89,8 +126,15 @@ export const invitations = pgTable('invitation', {
   index('invitation_creator_idx').on(t.createdBy, t.createdAt),
   // Sin 'evento': un evento es una invitación por invitado, no un tipo aparte.
   check('invitation_kind_ck', sql`${t.kind} in ('visita','frecuente','proveedor')`),
+  // Solo una frecuente lo lleva. Una frecuente sin él cuenta como visita: la API
+  // siempre lo completa, y así un insert crudo (tests, scripts) no se rompe.
+  check('invitation_frequent_as_ck', sql`${t.frequentAs} is null
+    or (${t.kind} = 'frecuente' and ${t.frequentAs} in ('visita','proveedor'))`),
+  check('invitation_trade_ck', sql`${t.tradeId} is null or ${t.kind} = 'proveedor'
+    or (${t.kind} = 'frecuente' and ${t.frequentAs} = 'proveedor')`),
   check('invitation_window_ck', sql`${t.validTo} >= ${t.validFrom}`),
   check('invitation_capacity_ck', sql`${t.capacity} >= 1`),
+  check('invitation_note_ck', sql`char_length(${t.note}) <= 140`),
 ])
 
 export const entryLogs = pgTable('entry_log', {
@@ -110,9 +154,16 @@ export const entryLogs = pgTable('entry_log', {
   guestDoc: text('guest_doc'),
   plate: text('plate'),
   note: text('note'),
+  // 'manual' = cargado después a mano (un corte de luz, una planilla de papel).
+  // La hora es la que se declaró, no la del servidor: la auditoría lo marca.
+  source: text('source').notNull().default('normal'),
+  loadedBy: uuid('loaded_by').references(() => people.id),
+  // Cuándo se cargó a mano. La hora del movimiento es la declarada; esta es la real.
+  loadedAt: timestamp('loaded_at', { withTimezone: true }),
 }, (t) => [
   index('entry_unit_idx').on(t.unitId, t.enteredAt),
   index('entry_invitation_idx').on(t.invitationId),
+  check('entry_source_ck', sql`${t.source} in ('normal','manual')`),
 ])
 
 export const auditLogs = pgTable('audit_log', {
