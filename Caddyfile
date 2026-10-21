@@ -36,6 +36,12 @@
 		-X-Powered-By
 	}
 
+	# Un ambiente de prueba (qa) es público pero no tiene que salir en los
+	# buscadores: se activa cargando NOINDEX con cualquier valor. En producción
+	# queda vacía y no se agrega nada.
+	@sin_indexar expression "{$NOINDEX}" != ""
+	header @sin_indexar X-Robots-Tag "noindex, nofollow"
+
 	handle_path /api/* {
 		reverse_proxy api:8080
 	}

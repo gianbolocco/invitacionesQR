@@ -1,6 +1,6 @@
 # Progreso del rediseño Pazzit
 
-Se actualiza al cerrar cada fase de `PLAN-REDISENO.md`: lo hecho, commits, pendiente, decisiones y
+Se actualiza al cerrar cada fase de `docs/rediseno/plan.md`: lo hecho, commits, pendiente, decisiones y
 desvíos del plan con su motivo.
 
 | Fase | Estado |

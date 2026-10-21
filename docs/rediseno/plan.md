@@ -1,10 +1,10 @@
 # Plan de rediseño: VisitPass → identidad Pazzit
 
 > Autosuficiente: quien implemente no vio la conversación que lo originó. Leé este archivo
-> entero, después `PROGRESO-REDISENO.md`, y arrancá por la primera fase pendiente.
+> entero, después `docs/rediseno/progreso.md`, y arrancá por la primera fase pendiente.
 > Reglas del repo en `CLAUDE.md` (español, voseo, hora de Buenos Aires, `AppError`, Next 16:
 > leer `web/AGENTS.md` antes de usar una API de Next). Si algo de este plan rompe
-> funcionalidad o no se puede hacer: frená, anotalo en `PROGRESO-REDISENO.md` y consultá.
+> funcionalidad o no se puede hacer: frená, anotalo en `docs/rediseno/progreso.md` y consultá.
 
 ## 0. Contexto y decisiones tomadas
 
@@ -462,7 +462,7 @@ Rama: `rediseno-pazzit` desde `dev`. Commits chicos (`style:` / `feat:` / `fix:`
 Al cerrar **cada** fase: `cd api && npm test` · `cd web && npm run check && npm run lint && npx tsc --noEmit` ·
 `docker compose up -d --build` · `cd web && npm run e2e` · recorrer a mano login → invitar → mandar pase → ver
 pase como invitado → escanear/validar → historial → auditoría → admin; regenerar capturas de las pantallas
-tocadas; actualizar `PROGRESO-REDISENO.md`.
+tocadas; actualizar `docs/rediseno/progreso.md`.
 Cuentas de prueba: las crea `web/e2e/preparar.ts` (contraseña de test en `web/e2e/sesion.ts`).
 
 **a. Fundaciones** — `globals.css` (tokens §1.1, escala, radios, sombras, curvas, reduced motion §4.4),
