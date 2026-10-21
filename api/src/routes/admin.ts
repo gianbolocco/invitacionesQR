@@ -117,7 +117,7 @@ adminRoutes.get('/neighborhood', async (req, res) => {
 
 adminRoutes.patch('/neighborhood', async (req, res) => {
   const body = z.object({
-    name: z.string().min(1).optional(),
+    name: z.string().trim().min(1).max(80).optional(),
     address: z.string().max(200).optional(),
     // Un link, no una API de mapas. Se valida que sea http(s) y nada más.
     mapUrl: z.union([z.string().url().startsWith('http'), z.literal('')]).optional(),

@@ -37,11 +37,9 @@ services:
       MAIL_FROM: ${MAIL_FROM:?falta MAIL_FROM}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      # El resto del barrio se hereda del compose de desarrollo. Estas dos se
-      # repiten solo para volverlas obligatorias: en desarrollo un barrio sin
-      # nombre o sin admin es un inconveniente, acá es una instalación en la que
-      # nadie puede entrar, y se descubre recién cuando alguien lo intenta.
-      BARRIO_NOMBRE: ${BARRIO_NOMBRE:?falta BARRIO_NOMBRE}
+      # Se repite solo para volverla obligatoria: en desarrollo un barrio sin
+      # admin es un inconveniente, acá es una instalación en la que nadie puede
+      # entrar, y se descubre recién cuando alguien lo intenta.
       ADMIN_EMAIL: ${ADMIN_EMAIL:?falta ADMIN_EMAIL}
     ports: !override []
     restart: unless-stopped

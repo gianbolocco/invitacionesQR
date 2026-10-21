@@ -3,12 +3,12 @@ import { neighborhoods } from './db/schema.js'
 import { createPerson } from './services/people.js'
 
 /**
- * Siembra el barrio y su primer admin desde el entorno.
+ * Siembra el barrio y su primer admin.
  *
  * Un despliegue es un barrio, así que esto corre una sola vez por instalación y
- * después no vuelve a hacer nada. Instalar un barrio nuevo es clonar el recurso
- * y cambiar estas variables; no hay pantalla de alta porque una pantalla que se
- * usa una vez y queda muerta es peor que cuatro variables.
+ * después no vuelve a hacer nada. Del entorno sale solo el mail del admin: el
+ * barrio nace con un nombre provisorio y el admin carga nombre, dirección y
+ * mapa desde Administración → Barrio, donde igual iba a tener que volver.
  *
  * El admin nace en `invited` con su token: elige la contraseña por el flujo
  * real, el mismo que cualquier vecino. Sin RESEND_API_KEY el link sale por el
@@ -22,17 +22,12 @@ export async function sembrar(): Promise<'sembrado' | 'ya_existe' | 'sin_configu
   const [existente] = await db.select().from(neighborhoods).limit(1)
   if (existente) return 'ya_existe'
 
-  const nombre = process.env.BARRIO_NOMBRE?.trim()
   const email = process.env.ADMIN_EMAIL?.trim()
 
-  // Faltando cualquiera de las dos no se siembra: adivinar sería peor.
-  if (!nombre || !email) return 'sin_configurar'
+  // Sin admin no se siembra: un barrio en el que nadie puede entrar no sirve.
+  if (!email) return 'sin_configurar'
 
-  const [barrio] = await db.insert(neighborhoods).values({
-    name: nombre,
-    address: process.env.BARRIO_DIRECCION?.trim() || null,
-    mapUrl: process.env.BARRIO_MAPA?.trim() || null,
-  }).returning()
+  const [barrio] = await db.insert(neighborhoods).values({ name: 'Mi barrio' }).returning()
 
   const { inviteToken } = await createPerson({
     neighborhoodId: barrio.id,

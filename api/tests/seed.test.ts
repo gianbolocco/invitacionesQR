@@ -18,9 +18,6 @@ describe('sembrar el barrio al instalar', () => {
   beforeEach(async () => {
     await resetDb()
     configurar({
-      BARRIO_NOMBRE: 'Los Aromos',
-      BARRIO_DIRECCION: 'Ruta 8 km 62',
-      BARRIO_MAPA: 'https://maps.google.com/?q=aromos',
       ADMIN_EMAIL: 'admin@aromos.test',
       ADMIN_NOMBRE: 'Gianluca',
     })
@@ -28,13 +25,14 @@ describe('sembrar el barrio al instalar', () => {
 
   afterEach(() => { process.env = { ...ENTORNO } })
 
-  it('crea el barrio con sus datos y el admin en invited', async () => {
+  it('crea el barrio con nombre provisorio y el admin en invited', async () => {
     expect(await sembrar()).toBe('sembrado')
 
+    // Nombre, dirección y mapa los carga el admin desde su pantalla.
     const [b] = await db.select().from(neighborhoods)
-    expect(b.name).toBe('Los Aromos')
-    expect(b.address).toBe('Ruta 8 km 62')
-    expect(b.mapUrl).toBe('https://maps.google.com/?q=aromos')
+    expect(b.name).toBe('Mi barrio')
+    expect(b.address).toBeNull()
+    expect(b.mapUrl).toBeNull()
 
     const [p] = await db.select().from(people)
     expect(p.email).toBe('admin@aromos.test')
@@ -62,28 +60,13 @@ describe('sembrar el barrio al instalar', () => {
   // decir eso y no "sin configurar".
   it('con el barrio ya hecho, no mira el entorno', async () => {
     expect(await sembrar()).toBe('sembrado')
-    configurar({ BARRIO_NOMBRE: undefined, ADMIN_EMAIL: undefined })
+    configurar({ ADMIN_EMAIL: undefined })
     expect(await sembrar()).toBe('ya_existe')
   })
 
-  it('sin BARRIO_NOMBRE no siembra, y no revienta', async () => {
-    configurar({ BARRIO_NOMBRE: undefined })
-    expect(await sembrar()).toBe('sin_configurar')
-    expect(await db.select().from(neighborhoods)).toHaveLength(0)
-  })
-
-  it('sin ADMIN_EMAIL tampoco siembra', async () => {
+  it('sin ADMIN_EMAIL no siembra, y no revienta', async () => {
     configurar({ ADMIN_EMAIL: undefined })
     expect(await sembrar()).toBe('sin_configurar')
     expect(await db.select().from(neighborhoods)).toHaveLength(0)
-  })
-
-  it('la dirección y el mapa son opcionales', async () => {
-    configurar({ BARRIO_DIRECCION: undefined, BARRIO_MAPA: undefined })
-    expect(await sembrar()).toBe('sembrado')
-
-    const [b] = await db.select().from(neighborhoods)
-    expect(b.address).toBeNull()
-    expect(b.mapUrl).toBeNull()
   })
 })

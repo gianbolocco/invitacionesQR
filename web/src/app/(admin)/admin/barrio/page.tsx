@@ -32,6 +32,7 @@ export default function BarrioPage() {
   const subirLogo = useSubirLogo()
   const quitarLogo = useQuitarLogo()
 
+  const [nombre, setNombre] = useState('')
   const [address, setAddress] = useState('')
   const [mapUrl, setMapUrl] = useState('')
   const [color, setColor] = useState<string | null>(null)
@@ -48,6 +49,7 @@ export default function BarrioPage() {
   // de en un efecto, para no disparar un ciclo de render de más.
   if (barrio.data && !cargado) {
     setCargado(true)
+    setNombre(barrio.data.name)
     setAddress(barrio.data.address ?? '')
     setMapUrl(barrio.data.mapUrl ?? '')
     setColor(barrio.data.brandColor)
@@ -57,14 +59,14 @@ export default function BarrioPage() {
 
   const horasInvalidas = ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
 
-  const marcaPreview = { ...marcaReal, nombre: barrio.data?.name ?? marcaReal.nombre, color: color ?? marcaReal.color }
+  const marcaPreview = { ...marcaReal, nombre: nombre.trim() || marcaReal.nombre, color: color ?? marcaReal.color }
 
   async function guardarForm(e: React.FormEvent) {
     e.preventDefault()
-    if (horasInvalidas) return
+    if (horasInvalidas || !nombre.trim()) return
     const horas = (t: TipoAlerta) => (alertas[t] === null ? null : horasValidas(alertas[t]!)!)
     await guardar.mutateAsync({
-      address, mapUrl, ...(color ? { brandColor: color } : {}),
+      name: nombre.trim(), address, mapUrl, ...(color ? { brandColor: color } : {}),
       overstayHours: { visita: horas('visita'), proveedor: horas('proveedor') },
     })
   }
@@ -91,6 +93,10 @@ export default function BarrioPage() {
           subtitulo="Esto aparece en el link que recibe el invitado, abajo de quién lo invitó." />
 
         <form onSubmit={guardarForm} className="flex flex-col gap-4 rounded-md border border-line bg-card p-5">
+          <Campo id="nombre" etiqueta="Nombre del barrio">
+            <Input id="nombre" value={nombre} placeholder="Los Aromos" maxLength={80} required
+              onChange={(e) => setNombre(e.target.value)} />
+          </Campo>
           <Campo id="direccion" etiqueta="Dirección">
             <Input id="direccion" value={address} placeholder="Ruta 8 km 62, Pilar"
               onChange={(e) => setAddress(e.target.value)} />

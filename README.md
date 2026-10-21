@@ -5,8 +5,8 @@ guardia por WhatsApp": el vecino genera una invitación, el invitado carga sus
 datos desde un link y se lleva un QR, y el guardia lo escanea en la barrera.
 
 **Un despliegue es un barrio.** El nombre, la dirección, el color y el logo son
-configuración de la instalación, no código. Instalar un barrio nuevo es levantar
-el stack con otras cuatro variables de entorno.
+datos que carga el admin, no código. Instalar un barrio nuevo es levantar el
+stack con el mail de su primer admin.
 
 ## Cómo funciona
 
@@ -64,19 +64,17 @@ Esto vale solo en desarrollo: con `NODE_ENV=production` la API no arranca sin
 ### Instalar un barrio
 
 ```
-BARRIO_NOMBRE=Los Aromos
-BARRIO_DIRECCION=Ruta 8 km 62, Pilar
-BARRIO_MAPA=https://maps.app.goo.gl/...
 ADMIN_EMAIL=admin@losaromos.com.ar
 ADMIN_NOMBRE=Nombre del administrador
 ```
 
-Al primer arranque se crean el barrio y su admin, y el link de alta sale por el
-log del contenedor (o por mail, si hay `RESEND_API_KEY`). El admin elige su
-contraseña con ese link, igual que cualquier vecino. Si la base ya tiene un
-barrio no se hace nada: cambiar estos valores después **no renombra nada**.
+Al primer arranque se crean el barrio (como "Mi barrio") y su admin, y el link
+de alta sale por el log del contenedor (o por mail, si hay `RESEND_API_KEY`). El
+admin elige su contraseña con ese link, igual que cualquier vecino. Si la base ya
+tiene un barrio no se hace nada.
 
-El color y el logo se cargan desde *Administración → Barrio*. El color sale de
+El nombre, la dirección, el link de mapas, el color y el logo se cargan desde
+*Administración → Barrio*. El color sale de
 una paleta cerrada de ocho: son los que mantienen legible el texto que va
 encima, en tema claro y oscuro.
 
@@ -141,7 +139,7 @@ la cubren y rehacer la app nunca toca los datos. Ver el encabezado de
    *Docker Compose Location* = `/docker-compose.coolify.yml`.
 4. En ese recurso, activar **Connect To Predefined Network** (si no, la API no
    alcanza la base) y cargar las variables: `DATABASE_URL` (la del paso 1),
-   `DOMINIO`, `RESEND_API_KEY`, `MAIL_FROM`, `BARRIO_NOMBRE`, `ADMIN_EMAIL`.
+   `DOMINIO`, `RESEND_API_KEY`, `MAIL_FROM`, `ADMIN_EMAIL`.
 5. Asignar el dominio al servicio `caddy` y desplegar.
 
 Para probar cambios antes de producción, usá una segunda aplicación Coolify con
