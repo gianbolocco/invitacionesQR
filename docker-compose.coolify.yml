@@ -70,10 +70,6 @@ services:
       MAIL_FROM: ${MAIL_FROM:?falta MAIL_FROM}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      # El barrio de esta instalación. Se siembra al primer arranque; si la
-      # base ya tiene uno, no se hace nada.
-      ADMIN_EMAIL: ${ADMIN_EMAIL:?falta ADMIN_EMAIL}
-      ADMIN_NOMBRE: ${ADMIN_NOMBRE:-}
     # /health chequea app y base. node -e con fetch porque node:24-slim no
     # trae curl ni wget. start_period: al arrancar corre migración y siembra.
     healthcheck:

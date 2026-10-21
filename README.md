@@ -53,7 +53,8 @@ docker compose up -d --build
 # api  http://localhost:8080
 ```
 
-La API corre las migraciones y siembra el barrio al arrancar.
+La API corre las migraciones al arrancar. Con la base vacía, el barrio y su
+admin se crean con un comando (ver *Instalar un barrio*).
 
 Sin `RESEND_API_KEY` los mails no se envían: **se imprimen en el log del
 contenedor**. El alta de un vecino y el "olvidé mi contraseña" se prueban
@@ -63,15 +64,18 @@ Esto vale solo en desarrollo: con `NODE_ENV=production` la API no arranca sin
 
 ### Instalar un barrio
 
-```
-ADMIN_EMAIL=admin@losaromos.com.ar
-ADMIN_NOMBRE=Nombre del administrador
+Con el stack levantado, desde la terminal del contenedor `api` (en Coolify:
+el recurso → *Terminal* → `api`; en local, `docker compose exec api sh`):
+
+```bash
+node dist/crear-admin-cli.js admin@losaromos.com.ar "Nombre del admin"
 ```
 
-Al primer arranque se crean el barrio (como "Mi barrio") y su admin, y el link
-de alta sale por el log del contenedor (o por mail, si hay `RESEND_API_KEY`). El
-admin elige su contraseña con ese link, igual que cualquier vecino. Si la base ya
-tiene un barrio no se hace nada.
+Con la base vacía crea el barrio (como "Mi barrio") y el admin, e imprime el
+link de alta (que también sale por mail, si hay `RESEND_API_KEY`). El admin elige
+su contraseña con ese link, igual que cualquier vecino. El mismo comando suma
+otro admin a un barrio que perdió el suyo, y con un admin que todavía no entró
+le reemite el link.
 
 El nombre, la dirección, el link de mapas, el color y el logo se cargan desde
 *Administración → Barrio*. El color sale de
@@ -139,8 +143,10 @@ la cubren y rehacer la app nunca toca los datos. Ver el encabezado de
    *Docker Compose Location* = `/docker-compose.coolify.yml`.
 4. En ese recurso, activar **Connect To Predefined Network** (si no, la API no
    alcanza la base) y cargar las variables: `DATABASE_URL` (la del paso 1),
-   `DOMINIO`, `RESEND_API_KEY`, `MAIL_FROM`, `ADMIN_EMAIL`.
+   `DOMINIO`, `RESEND_API_KEY`, `MAIL_FROM`.
 5. Asignar el dominio al servicio `caddy` y desplegar.
+6. En *Terminal*, servicio `api`, crear el admin con `node dist/crear-admin-cli.js`
+   (ver *Instalar un barrio*).
 
 Para probar cambios antes de producción, usá una segunda aplicación Coolify con
 la rama `qa` y una base de datos de pruebas separada. El webhook despliega solo
