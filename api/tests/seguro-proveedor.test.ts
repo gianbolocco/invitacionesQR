@@ -3,7 +3,7 @@ import request from 'supertest'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
 import { eq } from 'drizzle-orm'
-import { invitations, neighborhoods, people, units, unitMembers } from '../src/db/schema.js'
+import { entryLogs, invitations, neighborhoods, people, units, unitMembers } from '../src/db/schema.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
 import { hashPassword } from '../src/lib/crypto.js'
 import { resetDb } from './helpers/db.js'
@@ -115,5 +115,40 @@ describe('seguro del proveedor: carga en la invitación', () => {
     await request(app).patch(`/invitations/${inv.id}`).set('Cookie', vecino).send({ frequentAs: 'visita' }).expect(200)
     const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
     expect([fila.insuranceCompany, fila.insurancePolicy, fila.insuranceExpiresOn]).toEqual([null, null, null])
+  })
+
+  it('editar a un rubro que no lo pide borra el seguro', async () => {
+    const { invitar, rubro, vecino } = await escenario()
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true), insurance: seguro }).expect(201)
+    await request(app).patch(`/invitations/${inv.id}`).set('Cookie', vecino).send({ tradeId: await rubro('Agua') }).expect(200)
+    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
+    expect([fila.insuranceCompany, fila.insurancePolicy, fila.insuranceExpiresOn]).toEqual([null, null, null])
+  })
+
+  it('el link público no puede borrar el seguro (null da 400)', async () => {
+    const { invitar, rubro } = await escenario()
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true), insurance: seguro }).expect(201)
+    await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: null }).expect(400)
+    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
+    expect(fila.insurancePolicy).toBe('AP-123')
+  })
+
+  it('el link público con seguro después de entrar da 409', async () => {
+    const { invitar, rubro, u } = await escenario()
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
+    await db.insert(entryLogs).values({ invitationId: inv.id, unitId: u.id, guestName: 'Pedro' })
+    await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(409)
+  })
+
+  it('el link público con seguro en una visita da seguro_no_aplica', async () => {
+    const { invitar } = await escenario()
+    const { body: inv } = await invitar({ kind: 'visita' }).expect(201)
+    const r = await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(400)
+    expect(r.body.error).toBe('seguro_no_aplica')
+  })
+
+  it('una fecha inexistente da 400', async () => {
+    const { invitar, rubro } = await escenario()
+    await invitar({ tradeId: await rubro('Albañil', true), insurance: { ...seguro, expiresOn: '2026-02-30' } }).expect(400)
   })
 })
