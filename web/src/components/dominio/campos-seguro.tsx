@@ -6,15 +6,17 @@ import { CampoFecha } from '@/components/dominio/campo-fecha'
 export type ValorSeguro = { company: string; policy: string; expiresOn: string }
 
 /** Los tres datos del seguro. No sabe nada de la API ni de cuándo se exigen. */
-export function CamposSeguro({ valor, onCambio, errores, idBase }: {
+export function CamposSeguro({ valor, onCambio, onBlur, errores, idBase }: {
   valor: ValorSeguro
   onCambio: (v: ValorSeguro) => void
+  /** Al salir de cualquiera de los tres campos. */
+  onBlur?: () => void
   errores?: Partial<Record<keyof ValorSeguro, string | null>>
   idBase: string
 }) {
   const set = (k: keyof ValorSeguro) => (v: string) => onCambio({ ...valor, [k]: v })
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" onBlur={onBlur}>
       <Campo id={`${idBase}-compania`} etiqueta="Compañía" error={errores?.company}>
         <Input id={`${idBase}-compania`} value={valor.company} placeholder="Ej.: La Segunda" autoComplete="off"
           aria-invalid={Boolean(errores?.company) || undefined} aria-describedby={errores?.company ? `${idBase}-compania-nota` : undefined}

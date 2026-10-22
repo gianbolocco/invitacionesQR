@@ -229,11 +229,17 @@ export function useQuitarLogo() {
   })
 }
 
+/** Algunos navegadores no informan el tipo de un SVG arrastrado: se deduce de la extensión. */
+export function tipoDePlano(file: File): string {
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+  return file.type || ({ svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' } as Record<string, string>)[extension] || ''
+}
+
 export function useSubirPlano() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (file: File) => api('/admin/branding/plano', {
-      method: 'PUT', headers: { 'Content-Type': file.type }, body: file,
+      method: 'PUT', headers: { 'Content-Type': tipoDePlano(file) }, body: file,
     }),
     onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
   })

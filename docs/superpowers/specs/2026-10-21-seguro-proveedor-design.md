@@ -32,8 +32,8 @@ la invitación vigente aunque su póliza haya vencido hace meses.
    frecuente con `frequent_as = 'proveedor'`) con un rubro que lo pide. Un
    proveedor sin rubro no lo pide.
 2. **Completo** quiere decir los tres campos cargados. Si llega un campo
-   suelto, la API responde `400 seguro_incompleto`: se cargan los tres o
-   ninguno. Para borrarlo se mandan los tres en null.
+   suelto, zod lo rechaza con el 400 genérico (no hay código
+   `seguro_incompleto`): se cargan los tres o ninguno. Para borrarlo se mandan los tres en null.
 3. **Vigente** quiere decir `insurance_expires_on >= hoy` en Buenos Aires: la
    póliza vale hasta el día que vence, inclusive.
 4. **En la barrera, si lo pide y no está completo o venció, NO PASA:**
@@ -98,7 +98,10 @@ Migración `0018_seguro_proveedor`.
 - **Página pública:** devuelve `requiresInsurance` e
   `insuranceState: 'sin_cargar' | 'vigente' | 'vencido'`, **nunca los datos**.
   Sigue la regla de `hasDoc`: el link puede estar en manos de cualquiera. El
-  proveedor puede sobrescribir el seguro, pero el PATCH público no lo puede borrar.
+  proveedor puede sobrescribir el seguro, incluso después de haber entrado (un
+  frecuente lo renueva; documento y patente siguen congelados con `already_entered`),
+  pero el PATCH público no lo puede borrar y rechaza un vencimiento anterior a hoy
+  con `400 seguro_vencido`.
 - `GET /admin/insurance`: las filas de la regla 6.
 - **Auditoría y Excel:** columna **Seguro** (`La Segunda · 4471-22 · vence 12/04/2027`).
 
@@ -141,7 +144,7 @@ electricista sin cargar, y `insurance_warn_days = 15`.
 - **API:**
   - orden de `canEnter`: `no_capacity` gana sobre `no_insurance`; vence hoy,
     pasa; vencido ayer, no;
-  - `seguro_incompleto` y `seguro_no_aplica`;
+  - `seguro_no_aplica` y el 400 por seguro parcial; `seguro_vencido` y renovación tras un ingreso en el PATCH público;
   - ingreso con `insurance` que destraba el NO PASA y queda auditado;
   - `/admin/insurance`: filtra y ordena.
 - **Web check:** `estadoSeguro` y `textoVence`.

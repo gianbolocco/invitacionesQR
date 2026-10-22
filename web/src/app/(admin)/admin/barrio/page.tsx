@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { Upload, X } from 'lucide-react'
-import { useBarrio, useRubros, useGuardarBarrio, useSubirLogo, useQuitarLogo, useSubirPlano, useQuitarPlano, type HorasPermanencia } from '@/lib/queries/admin'
+import { useBarrio, useRubros, useGuardarBarrio, useSubirLogo, useQuitarLogo, useSubirPlano, useQuitarPlano, tipoDePlano, type HorasPermanencia } from '@/lib/queries/admin'
 import { ApiError } from '@/lib/api'
 import { logoUrl, planoUrl, useMarca } from '@/lib/marca-cliente'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
@@ -106,7 +106,7 @@ export default function BarrioPage() {
 
   async function subirElPlano(file: File) {
     setErrorPlano(null)
-    if (!['image/svg+xml', 'image/png', 'image/jpeg'].includes(file.type)) {
+    if (!['image/svg+xml', 'image/png', 'image/jpeg'].includes(tipoDePlano(file))) {
       setErrorPlano('Ese archivo no es un SVG, PNG ni JPG.')
       return
     }
@@ -211,7 +211,7 @@ export default function BarrioPage() {
               {diasInvalidos && <p id="dias-seguro-nota" role="alert" className="text-sm text-alto">Poné entre 1 y 90 días.</p>}
             </div>
             <p className="text-sm text-ink-soft">
-              La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Una frecuente usa las horas de lo que es: visita o proveedor.
+              La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Una frecuente usa las horas de lo que es: visita o proveedor. El seguro por vencer avisa en el tablero y en la garita esos días antes del vencimiento.
             </p>
           </fieldset>
 

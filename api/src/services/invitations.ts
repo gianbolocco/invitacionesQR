@@ -486,8 +486,13 @@ export async function fillGuestDetails(
   if (!inv) throw new AppError(404, 'not_found')
   if (inv.revokedAt) throw new AppError(409, 'revoked')
 
-  // Una vez que entró, entry_log ya guardó su copia: el histórico no se reescribe.
-  if ((await entriesOf(inv.id)) > 0) throw new AppError(409, 'already_entered')
+  // Una vez que entró, entry_log ya guardó su copia: documento y patente no se
+  // reescriben. El seguro sí se puede renovar: es lo que el proveedor frecuente necesita.
+  if ((data.guestDoc !== undefined || data.plate !== undefined) && (await entriesOf(inv.id)) > 0) {
+    throw new AppError(409, 'already_entered')
+  }
+  // El link lo tiene cualquiera: no puede cargar una póliza que ya venció.
+  if (data.insurance && data.insurance.expiresOn < todayInBuenosAires()) throw new AppError(400, 'seguro_vencido')
 
   await assertSeguro(inv.kind, inv.frequentAs, inv.tradeId, data.insurance)
 

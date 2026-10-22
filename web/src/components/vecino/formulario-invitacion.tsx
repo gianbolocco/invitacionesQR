@@ -167,7 +167,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
               El rubro {nombreRubro} necesita seguro para entrar. Si no lo tenés, lo puede cargar el proveedor desde su link.
             </p>
           </div>
-          <CamposSeguro idBase="seguro" valor={seguro} onCambio={(v) => { setSeguro(v); tocar('seguro') }}
+          <CamposSeguro idBase="seguro" valor={seguro} onCambio={setSeguro} onBlur={() => tocar('seguro')}
             errores={tocado.seguro ? erroresSeguro(seguro) : undefined} />
         </section>
       )}

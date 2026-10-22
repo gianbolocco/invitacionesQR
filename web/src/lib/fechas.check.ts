@@ -1,7 +1,7 @@
 /** `node src/lib/fechas.check.ts`. Node 24 corre TypeScript solo. */
 import assert from 'node:assert/strict'
 import {
-  hoyISO, sumarDias, unMesDespues, aFecha, aISO, fechaCorta, fechaNumerica, hora, fechaHora, horaODia, tiempoDesde, tituloDia, cupoTexto,
+  hoyISO, sumarDias, unMesDespues, aFecha, aISO, fechaCorta, fechaNumerica, fechaCompleta, hora, fechaHora, horaODia, tiempoDesde, tituloDia, cupoTexto,
 } from './fechas.ts'
 
 // Las 23:30 del 10 de octubre en Buenos Aires ya son el 11 en UTC: el día
@@ -20,6 +20,7 @@ assert.equal(sumarDias('2026-12-31', 1), '2027-01-01')
 assert.equal(aISO(aFecha('2026-03-05')), '2026-03-05')
 assert.equal(fechaCorta('2026-09-14'), '14 sept')
 assert.equal(fechaNumerica('2026-09-04'), '04/09')
+assert.equal(fechaCompleta('2027-04-12'), '12/04/2027')
 assert.equal(hora('2026-10-11T17:02:00Z'), '14:02')
 assert.equal(hora('2026-10-11T12:05:00Z'), '09:05')
 assert.equal(hora('2026-10-11T03:00:00Z'), '00:00')

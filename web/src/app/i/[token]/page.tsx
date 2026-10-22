@@ -3,7 +3,7 @@ import { use, useState } from 'react'
 import { motion } from 'motion/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, MapPin, SearchX, Sun } from 'lucide-react'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { KIND_LABEL, PORTERIA, vigencia, type Invitation } from '@/lib/invitations'
 import { hoyISO } from '@/lib/fechas'
 import { planoUrl, useMarca } from '@/lib/marca-cliente'
@@ -41,8 +41,8 @@ type Publica = {
 }
 
 /** Pide SOLO lo que falta. Los datos se piden una vez. */
-function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSeguro }: {
-  token: string; faltaDoc: boolean; faltaPatente: boolean
+function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSeguro, soloSeguro }: {
+  token: string; faltaDoc: boolean; faltaPatente: boolean; soloSeguro: boolean
   pideSeguro: boolean; estadoSeguro: Publica['insuranceState']
 }) {
   const qc = useQueryClient()
@@ -50,6 +50,7 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
   const [plate, setPlate] = useState('')
   const [seguro, setSeguro] = useState<ValorSeguro>({ company: '', policy: '', expiresOn: '' })
   const [errorSeguro, setErrorSeguro] = useState(false)
+  const [vencido, setVencido] = useState(false)
   const guardar = useMutation({
     mutationFn: () => api(`/invitations/public/${token}`, {
       method: 'PATCH',
@@ -59,6 +60,7 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
           ? { company: seguro.company.trim(), policy: seguro.policy.trim(), expiresOn: seguro.expiresOn } : undefined }),
     }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['publica', token] }),
+    onError: (e) => setVencido(e instanceof ApiError && e.code === 'seguro_vencido'),
   })
 
   if (guardar.isSuccess) return <Nota tono="exito">Listo. El guardia ya tiene tus datos.</Nota>
@@ -75,7 +77,9 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
       <div>
         <p className="font-display text-lg font-bold tracking-[-0.01em]">Entrá más rápido</p>
         <p className="mt-0.5 text-sm text-ink-soft">
-          {faltaDoc && faltaPatente
+          {soloSeguro
+            ? 'Renová tu seguro y el guardia no te lo tiene que pedir en la barrera.'
+            : faltaDoc && faltaPatente
             ? 'Cargá tus datos y el guardia no te los tiene que pedir en la barrera.'
             : !faltaDoc && !faltaPatente
               ? 'Cargá tu seguro y el guardia no te lo tiene que pedir en la barrera.'
@@ -84,13 +88,13 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
               : 'Si venís en auto, cargá la patente y no te la piden en la barrera.'}
         </p>
       </div>
-      {faltaDoc && (
+      {!soloSeguro && faltaDoc && (
         <Campo id="doc" etiqueta="Documento" ayuda="DNI, pasaporte o documento del país que sea.">
           <Input id="doc" value={doc} className="tabular" placeholder="30.123.456" aria-describedby="doc-nota"
             onChange={(e) => setDoc(e.target.value)} />
         </Campo>
       )}
-      {faltaPatente && (
+      {!soloSeguro && faltaPatente && (
         <Campo id="patente" etiqueta="Patente">
           <Input id="patente" value={plate} className="uppercase tabular" placeholder="AB 123 CD"
             onChange={(e) => setPlate(e.target.value)} />
@@ -108,7 +112,7 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
             errores={errorSeguro ? erroresSeguro(seguro) : undefined} />
         </div>
       )}
-      {guardar.isError && <Nota tono="error">No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.</Nota>}
+      {guardar.isError && <Nota tono="error">{vencido ? 'Esa fecha ya pasó: cargá el vencimiento de la póliza vigente.' : 'No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.'}</Nota>}
       <Button type="submit" disabled={guardar.isPending}>
         {guardar.isPending && <Loader2 className="animate-spin" aria-hidden />}
         Guardar
@@ -199,8 +203,9 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
         </section>
       )}
 
-      {!sello && !inv.frozen && (!inv.hasDoc || !inv.hasPlate || inv.requiresInsurance) && (
-        <FormularioDatos token={token} faltaDoc={!inv.hasDoc} faltaPatente={!inv.hasPlate}
+      {/* Ya entró: documento y patente quedan congelados, el seguro se puede renovar. */}
+      {!sello && (inv.frozen ? inv.requiresInsurance : (!inv.hasDoc || !inv.hasPlate || inv.requiresInsurance)) && (
+        <FormularioDatos token={token} faltaDoc={!inv.hasDoc} faltaPatente={!inv.hasPlate} soloSeguro={inv.frozen}
           pideSeguro={inv.requiresInsurance} estadoSeguro={inv.insuranceState} />
       )}
 

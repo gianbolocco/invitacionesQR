@@ -9,7 +9,7 @@ import { ApiError } from '@/lib/api'
 import { estadoSeguro, textoVence } from '@/lib/seguro'
 import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
-import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
+import { hoyISO, horaODia, tiempoDesde, fechaCompleta } from '@/lib/fechas'
 import { KIND_LABEL, vigencia } from '@/lib/invitations'
 import {
   useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
@@ -348,7 +348,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
             <Dato etiqueta="Lote">{inv.unitLabel}</Dato>
             <Dato etiqueta="Invita">{inv.inviterName}</Dato>
             {inv.requiresInsurance && !cargaSeguro && inv.insuranceExpiresOn && (
-              <Dato etiqueta="Seguro">{inv.insuranceCompany} · {inv.insurancePolicy} · vence {inv.insuranceExpiresOn.split('-').reverse().join('/')}</Dato>
+              <Dato etiqueta="Seguro">{inv.insuranceCompany} · {inv.insurancePolicy} · vence {fechaCompleta(inv.insuranceExpiresOn)}</Dato>
             )}
             {!esEgreso && <Dato etiqueta="Vigencia">{vigencia(inv)}</Dato>}
             {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}

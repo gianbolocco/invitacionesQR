@@ -101,8 +101,7 @@ describe('seguro del proveedor: carga en la invitación', () => {
     expect(r.body).toMatchObject({ requiresInsurance: true, insuranceState: 'vigente' })
     expect(JSON.stringify(r.body)).not.toMatch(/La Segunda|AP-123|insuranceCompany|insurancePolicy/)
 
-    await request(app).patch(`/invitations/public/${inv.token}`)
-      .send({ insurance: { ...seguro, expiresOn: '2000-01-01' } }).expect(200)
+    await db.update(invitations).set({ insuranceExpiresOn: '2000-01-01' }).where(eq(invitations.id, inv.id))
     const v = await request(app).get(`/invitations/public/${inv.token}`).expect(200)
     expect(v.body.insuranceState).toBe('vencido')
   })
@@ -133,11 +132,23 @@ describe('seguro del proveedor: carga en la invitación', () => {
     expect(fila.insurancePolicy).toBe('AP-123')
   })
 
-  it('el link público con seguro después de entrar da 409', async () => {
+  it('después de entrar el link renueva el seguro pero no el documento', async () => {
     const { invitar, rubro, u } = await escenario()
     const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
     await db.insert(entryLogs).values({ invitationId: inv.id, unitId: u.id, guestName: 'Pedro' })
-    await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(409)
+    await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(200)
+    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
+    expect(fila.insurancePolicy).toBe('AP-123')
+    const r = await request(app).patch(`/invitations/public/${inv.token}`).send({ guestDoc: '111', insurance: seguro }).expect(409)
+    expect(r.body.error).toBe('already_entered')
+  })
+
+  it('el link público no carga un vencimiento que ya pasó', async () => {
+    const { invitar, rubro } = await escenario()
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
+    const r = await request(app).patch(`/invitations/public/${inv.token}`)
+      .send({ insurance: { ...seguro, expiresOn: '2000-01-01' } }).expect(400)
+    expect(r.body.error).toBe('seguro_vencido')
   })
 
   it('el link público con seguro en una visita da seguro_no_aplica', async () => {

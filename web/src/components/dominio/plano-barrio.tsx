@@ -10,6 +10,7 @@ import { Maximize2, X } from 'lucide-react'
 export function PlanoBarrio({ src, lote }: { src: string; lote: string | null }) {
   const dialogo = useRef<HTMLDialogElement>(null)
   const disparador = useRef<HTMLButtonElement>(null)
+  const recorrido = useRef<HTMLDivElement>(null)
   const alt = lote ? `Plano del barrio con el lote ${lote} resaltado` : 'Plano del barrio'
 
   return (
@@ -17,7 +18,12 @@ export function PlanoBarrio({ src, lote }: { src: string; lote: string | null })
       <p className="text-[13px] font-semibold text-ink-soft">
         Plano del barrio{lote && <> · Tu destino: <span className="tabular text-ink">Lote {lote}</span></>}
       </p>
-      <button ref={disparador} type="button" onClick={() => dialogo.current?.showModal()}
+      <button ref={disparador} type="button" onClick={() => {
+          dialogo.current?.showModal()
+          // En pantalla angosta el plano es más ancho que la pantalla: arranca centrado, no en el borde.
+          const el = recorrido.current
+          if (el) el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2
+        }}
         className="relative block overflow-hidden rounded-md border border-line bg-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt} className="block h-auto w-full" />
@@ -38,7 +44,7 @@ export function PlanoBarrio({ src, lote }: { src: string; lote: string | null })
             </button>
           </div>
           {/* ponytail: pinch-zoom nativo del navegador; sin zoom propio con botones */}
-          <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 overflow-x-auto overflow-y-hidden"
+          <div ref={recorrido} className="flex min-h-0 flex-1 flex-col justify-center gap-3 overflow-x-auto overflow-y-hidden"
             style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
             {/* m-auto: centra si entra y deja scrollear desde el borde si no */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
