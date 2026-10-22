@@ -49,6 +49,14 @@ elige el rubro al invitar a un proveedor y ve cuándo puede entrar. Fuera de la
 franja, la garita muestra NO PASA · Fuera de horario, y el guardia puede
 **Autorizar igual**: queda en la auditoría.
 
+**Seguro del proveedor.** El admin marca en *Administración → Barrio* qué rubros
+piden seguro. La compañía, la póliza y el vencimiento los carga el vecino al
+invitar, el proveedor desde su link o el guardia en la garita. Sin seguro
+vigente la garita muestra NO PASA · Sin seguro (o Seguro vencido): el guardia lo
+carga ahí mismo y registra el ingreso, o usa **Autorizar igual**. Si el admin
+fija con cuántos días avisar, el guardia ve "vence en N días" antes de que
+venza, y el tablero del admin lista los seguros vencidos, por vencer y sin cargar.
+
 **El admin** da de alta vecinos y guardias, corrige lotes, edita los datos del
 barrio (las horas de la alerta de permanencia, los rubros y los horarios de
 proveedores incluidos) y ve el tablero.

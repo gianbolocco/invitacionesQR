@@ -29,7 +29,7 @@ insert into person (neighborhood_id, email, name, role, status, password_hash)
 -- Rubros sueltos de corridas anteriores: con alguno activo, las invitaciones
 -- de otros specs fallan con rubro_requerido.
 update trade set archived_at = now() where archived_at is null;
-update neighborhood set overstay_hours_visita = null, overstay_hours_proveedor = null, provider_windows = '[]';
+update neighborhood set overstay_hours_visita = null, overstay_hours_proveedor = null, provider_windows = '[]', insurance_warn_days = null;
 
 insert into unit_member (unit_id, person_id)
   select u.id, p.id from unit u, person p

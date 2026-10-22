@@ -1,6 +1,6 @@
 # Seguro del proveedor: diseño
 
-Estado: en revisión (21/10). Rama `seguro-y-plano`. Es el subproyecto 2 del
+Estado: implementado en la rama `seguro-y-plano` (21/10). Es el subproyecto 2 del
 mail de Alamo Alto; sigue a `2026-10-21-horarios-proveedores-design.md`, que
 introdujo los rubros.
 
@@ -93,11 +93,12 @@ Migración `0018_seguro_proveedor`.
   de `canEnter`, y se audita como `invitation.insurance_updated` a nombre del
   guardia.
 - **Lecturas.** El check de la garita y las filas del vecino devuelven
-  `requiresInsurance` e `insurance`; el check suma `insuranceWarnDays`.
+  `requiresInsurance` y los campos planos `insuranceCompany`, `insurancePolicy`
+  e `insuranceExpiresOn` (no un objeto `insurance`); el check suma `insuranceWarnDays`.
 - **Página pública:** devuelve `requiresInsurance` e
   `insuranceState: 'sin_cargar' | 'vigente' | 'vencido'`, **nunca los datos**.
   Sigue la regla de `hasDoc`: el link puede estar en manos de cualquiera. El
-  proveedor puede sobrescribir el seguro.
+  proveedor puede sobrescribir el seguro, pero el PATCH público no lo puede borrar.
 - `GET /admin/insurance`: las filas de la regla 6.
 - **Auditoría y Excel:** columna **Seguro** (`La Segunda · 4471-22 · vence 12/04/2027`).
 
