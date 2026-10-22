@@ -70,13 +70,13 @@ export default function BarrioPage() {
   }
 
   const diasInvalidos = diasSeguro !== null && diasValidos(diasSeguro) === undefined
-  const horasInvalidas = diasInvalidos || ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
+  const alertasInvalidas = diasInvalidos || ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
 
   const marcaPreview = { ...marcaReal, nombre: nombre.trim() || marcaReal.nombre, color: color ?? marcaReal.color }
 
   async function guardarForm(e: React.FormEvent) {
     e.preventDefault()
-    if (horasInvalidas || !nombre.trim()) return
+    if (alertasInvalidas || !nombre.trim()) return
     const horas = (t: TipoAlerta) => (alertas[t] === null ? null : horasValidas(alertas[t]!)!)
     await guardar.mutateAsync({
       name: nombre.trim(), address, mapUrl, ...(color ? { brandColor: color } : {}),
@@ -195,7 +195,7 @@ export default function BarrioPage() {
 
           {guardar.isError && <Nota tono="error">No se pudo guardar. Revisá el link de mapas (tiene que empezar con http) y las horas.</Nota>}
           {guardar.isSuccess && <Nota tono="exito">Guardado.</Nota>}
-          <Button type="submit" className="self-start" disabled={guardar.isPending || horasInvalidas}>
+          <Button type="submit" className="self-start" disabled={guardar.isPending || alertasInvalidas}>
             {guardar.isPending ? 'Guardando…' : 'Guardar'}
           </Button>
         </form>

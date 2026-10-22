@@ -20,7 +20,9 @@ export function SegurosVencimientos() {
   return (
     <section className="flex flex-col gap-3 rounded-md border border-line bg-card p-5" aria-labelledby="seguros-titulo">
       <h3 id="seguros-titulo" className="text-[13px] font-semibold text-ink-soft">Seguros de proveedores</h3>
-      {seguros.isPending ? (
+      {seguros.isError ? (
+        <p className="text-sm text-alto">No se pudieron cargar los seguros. Probá de nuevo.</p>
+      ) : seguros.isPending ? (
         <p className="text-sm text-ink-soft">Cargando…</p>
       ) : filas.length === 0 ? (
         <p className="text-sm text-ink-soft">No hay seguros vencidos ni por vencer.</p>

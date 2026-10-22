@@ -199,8 +199,9 @@ export function useGuardarBarrio() {
     onSuccess: (b) => {
       qc.setQueryData(claves.barrio, b)
       qc.invalidateQueries({ queryKey: claveMarca })
+      qc.invalidateQueries({ queryKey: claveSeguros })
     },
-    onError: () => toast.error('No se pudo guardar. Revisá el link de mapas (tiene que empezar con http) las horas (de 1 a 72) y los días del seguro (de 1 a 90).'),
+    onError: () => toast.error('No se pudo guardar. Revisá el link de mapas (tiene que empezar con http), las horas (de 1 a 72) y los días del seguro (de 1 a 90).'),
   })
 }
 
@@ -271,6 +272,8 @@ export type Rubro = { id: string; name: string; archivedAt: string | null; requi
 
 const claveRubros = ['admin', 'rubros'] as const
 
+const claveSeguros = ['admin', 'seguros'] as const
+
 export function useRubros() {
   return useQuery({ queryKey: claveRubros, queryFn: ({ signal }) => api<Rubro[]>('/admin/trades', { signal }) })
 }
@@ -291,7 +294,10 @@ export function useEditarRubro() {
   return useMutation({
     mutationFn: ({ id, ...datos }: { id: string; name?: string; archived?: boolean; requiresInsurance?: boolean }) =>
       api<Rubro>(`/admin/trades/${id}`, { method: 'PATCH', body: JSON.stringify(datos) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: claveRubros }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: claveRubros })
+      qc.invalidateQueries({ queryKey: claveSeguros })
+    },
     onError: (e) => toast.error(ERRORES_RUBRO[(e as ApiError).code] ?? 'No se pudo guardar el rubro. Probá de nuevo.'),
   })
 }
@@ -321,7 +327,7 @@ export type SeguroVencimiento = {
 
 export function useSegurosVencimientos() {
   return useQuery({
-    queryKey: ['admin', 'seguros'] as const,
+    queryKey: claveSeguros,
     queryFn: ({ signal }) => api<SeguroVencimiento[]>('/admin/insurance', { signal }),
   })
 }
