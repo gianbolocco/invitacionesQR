@@ -37,8 +37,8 @@ export function esColorDeLaPaleta(v: unknown): v is string {
  * un SVG con JavaScript adentro declarado como image/png sería un XSS servido
  * desde nuestro propio origen.
  *
- * Solo PNG y JPEG. El SVG se podría permitir con una CSP o sirviéndolo desde
- * otro dominio; mientras tanto, no aceptarlo es gratis.
+ * Es la verificación del logo: solo PNG y JPEG. El plano del barrio también
+ * acepta SVG, vía tipoDePlano().
  */
 export function tipoDeImagen(buf: Buffer): 'image/png' | 'image/jpeg' | null {
   if (buf.length < 4) return null
@@ -52,7 +52,7 @@ export function tipoDePlano(bytes: Buffer): 'image/svg+xml' | 'image/png' | 'ima
   const img = tipoDeImagen(bytes)
   if (img) return img
   const inicio = bytes.subarray(0, 1024).toString('utf8').replace(/^﻿/, '').trimStart()
-  return /^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(inicio) ? 'image/svg+xml' : null
+  return /^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i.test(inicio) ? 'image/svg+xml' : null
 }
 
 /** El lote de destino, pintado con el color del barrio. Va al final para ganarle a los estilos del archivo. */

@@ -60,7 +60,7 @@ describe('el plano del barrio', () => {
     const res = await request(app).get('/branding/plano?lote=87').buffer(true).expect(200)
     expect(res.body.toString()).toContain('#lote-87 rect{fill:')
     expect(res.headers['content-type']).toContain('image/svg+xml')
-    expect(res.headers['content-security-policy']).toBe("default-src 'none'; style-src 'unsafe-inline'")
+    expect(res.headers['content-security-policy']).toBe("default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'")
     expect(res.headers['x-content-type-options']).toBe('nosniff')
   })
 
@@ -85,6 +85,14 @@ describe('el plano del barrio', () => {
     await request(app).delete('/admin/branding/plano').set('Cookie', cookie).expect(200)
     expect((await request(app).get('/branding')).body.tienePlano).toBe(false)
     await request(app).get('/branding/plano').expect(404)
+  })
+})
+
+describe('tipoDePlano', () => {
+  it('acepta BOM + prólogo xml + DOCTYPE y rechaza HTML', () => {
+    const svg = '﻿<?xml version="1.0"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "x.dtd">\n<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    expect(tipoDePlano(Buffer.from(svg))).toBe('image/svg+xml')
+    expect(tipoDePlano(Buffer.from('<!doctype html><html><body></body></html>'))).toBeNull()
   })
 })
 

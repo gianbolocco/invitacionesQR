@@ -30,7 +30,7 @@ brandingRoutes.get('/plano', async (req, res) => {
   }
   // El SVG no se sanea: el front solo lo muestra con <img>, donde no corre
   // nada. Esta CSP cubre a quien lo abra directo por la URL.
-  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'")
+  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'")
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('Cache-Control', 'public, max-age=3600')
 
