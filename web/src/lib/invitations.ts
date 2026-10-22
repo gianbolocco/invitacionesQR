@@ -31,6 +31,10 @@ export type Invitation = {
   ultimoIngreso: string | null
   tradeId: string | null
   tradeName: string | null
+  insuranceCompany: string | null
+  insurancePolicy: string | null
+  insuranceExpiresOn: string | null
+  requiresInsurance: boolean
 }
 
 export const KIND_LABEL: Record<Invitation['kind'], string> = {
@@ -82,9 +86,14 @@ export function urlPublica(token: string): string {
 }
 
 /** "Volver a invitar": el formulario nuevo precargado con los datos de esta. */
-export function urlVolverAInvitar(inv: Pick<Invitation, 'kind' | 'guestName' | 'guestDoc' | 'plate'>): string {
+export function urlVolverAInvitar(inv: Pick<Invitation, 'kind' | 'guestName' | 'guestDoc' | 'plate' | 'insuranceCompany' | 'insurancePolicy' | 'insuranceExpiresOn'>): string {
   const p = new URLSearchParams({ kind: inv.kind, guestName: inv.guestName })
   if (inv.guestDoc) p.set('guestDoc', inv.guestDoc)
   if (inv.plate) p.set('plate', inv.plate)
+  if (inv.insuranceCompany && inv.insurancePolicy && inv.insuranceExpiresOn) {
+    p.set('insCompany', inv.insuranceCompany)
+    p.set('insPolicy', inv.insurancePolicy)
+    p.set('insExpires', inv.insuranceExpiresOn)
+  }
   return `/invitaciones/nueva?${p}`
 }

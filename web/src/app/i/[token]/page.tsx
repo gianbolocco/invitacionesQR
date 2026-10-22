@@ -11,6 +11,7 @@ import { HorarioRubro } from '@/components/dominio/horario-rubro'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CamposSeguro, estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
 import { Campo } from '@/components/dominio/campo'
 import { Marca } from '@/components/dominio/marca'
 import { Nota } from '@/components/dominio/nota'
@@ -32,17 +33,27 @@ type Publica = {
   frozen: boolean
   tradeName: string | null
   franjas: Franja[]
+  requiresInsurance: boolean
+  insuranceState: 'sin_cargar' | 'vigente' | 'vencido'
 }
 
 /** Pide SOLO lo que falta. Los datos se piden una vez. */
-function FormularioDatos({ token, faltaDoc, faltaPatente }: { token: string; faltaDoc: boolean; faltaPatente: boolean }) {
+function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSeguro }: {
+  token: string; faltaDoc: boolean; faltaPatente: boolean
+  pideSeguro: boolean; estadoSeguro: Publica['insuranceState']
+}) {
   const qc = useQueryClient()
   const [doc, setDoc] = useState('')
   const [plate, setPlate] = useState('')
+  const [seguro, setSeguro] = useState<ValorSeguro>({ company: '', policy: '', expiresOn: '' })
+  const [errorSeguro, setErrorSeguro] = useState(false)
   const guardar = useMutation({
     mutationFn: () => api(`/invitations/public/${token}`, {
       method: 'PATCH',
-      body: JSON.stringify({ guestDoc: doc.trim() || undefined, plate: plate.trim() || undefined }),
+      body: JSON.stringify({ guestDoc: doc.trim() || undefined, plate: plate.trim() || undefined,
+        // Nunca null desde acá: vaciar el seguro lo hace el vecino.
+        insurance: estadoSeguroCargado(seguro) === 'completo'
+          ? { company: seguro.company.trim(), policy: seguro.policy.trim(), expiresOn: seguro.expiresOn } : undefined }),
     }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['publica', token] }),
   })
@@ -50,14 +61,22 @@ function FormularioDatos({ token, faltaDoc, faltaPatente }: { token: string; fal
   if (guardar.isSuccess) return <Nota tono="exito">Listo. El guardia ya tiene tus datos.</Nota>
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); if (doc.trim() || plate.trim()) guardar.mutate() }}
+    <form onSubmit={(e) => {
+      e.preventDefault()
+      const parcial = pideSeguro && estadoSeguroCargado(seguro) === 'parcial'
+      setErrorSeguro(parcial)
+      if (parcial) return
+      if (doc.trim() || plate.trim() || (pideSeguro && estadoSeguroCargado(seguro) === 'completo')) guardar.mutate()
+    }}
       className="flex flex-col gap-5 rounded-lg border border-line bg-card p-5">
       <div>
         <p className="font-display text-lg font-bold tracking-[-0.01em]">Entrá más rápido</p>
         <p className="mt-0.5 text-sm text-ink-soft">
           {faltaDoc && faltaPatente
             ? 'Cargá tus datos y el guardia no te los tiene que pedir en la barrera.'
-            : faltaDoc
+            : !faltaDoc && !faltaPatente
+              ? 'Cargá tu seguro y el guardia no te lo tiene que pedir en la barrera.'
+              : faltaDoc
               ? 'Cargá tu documento y el guardia no te lo tiene que pedir en la barrera.'
               : 'Si venís en auto, cargá la patente y no te la piden en la barrera.'}
         </p>
@@ -73,6 +92,18 @@ function FormularioDatos({ token, faltaDoc, faltaPatente }: { token: string; fal
           <Input id="patente" value={plate} className="uppercase tabular" placeholder="AB 123 CD"
             onChange={(e) => setPlate(e.target.value)} />
         </Campo>
+      )}
+      {pideSeguro && (
+        <div className="flex flex-col gap-3 border-t border-line pt-5">
+          <div>
+            <p className="font-semibold">Tu seguro</p>
+            <p className="text-sm text-ink-soft">Sin un seguro vigente la guardia no te deja pasar.</p>
+          </div>
+          {estadoSeguro === 'vigente' && <p className="text-sm font-semibold text-verde">Ya hay un seguro vigente cargado. Cargalo de nuevo solo si cambió.</p>}
+          {estadoSeguro === 'vencido' && <p className="text-sm font-semibold text-alto">El seguro cargado está vencido.</p>}
+          <CamposSeguro idBase="seguro" valor={seguro} onCambio={setSeguro} />
+          {errorSeguro && <Nota tono="error">Completá los tres datos del seguro o dejalos vacíos.</Nota>}
+        </div>
       )}
       {guardar.isError && <Nota tono="error">No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.</Nota>}
       <Button type="submit" disabled={guardar.isPending}>
@@ -163,8 +194,9 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
         </section>
       )}
 
-      {!sello && !inv.frozen && (!inv.hasDoc || !inv.hasPlate) && (
-        <FormularioDatos token={token} faltaDoc={!inv.hasDoc} faltaPatente={!inv.hasPlate} />
+      {!sello && !inv.frozen && (!inv.hasDoc || !inv.hasPlate || inv.requiresInsurance) && (
+        <FormularioDatos token={token} faltaDoc={!inv.hasDoc} faltaPatente={!inv.hasPlate}
+          pideSeguro={inv.requiresInsurance} estadoSeguro={inv.insuranceState} />
       )}
 
       {(address || mapUrl) && (
