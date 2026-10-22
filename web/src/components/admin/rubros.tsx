@@ -1,10 +1,10 @@
 'use client'
 import { useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil, ShieldCheck } from 'lucide-react'
 import { useCrearRubro, useEditarRubro, useRubros, type Rubro } from '@/lib/queries/admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 function Chip({ rubro, archivado }: { rubro: Rubro; archivado: boolean }) {
   const editar = useEditarRubro()
@@ -30,6 +30,7 @@ function Chip({ rubro, archivado }: { rubro: Rubro; archivado: boolean }) {
   return (
     <span className={`inline-flex h-9 items-center gap-1 rounded-full bg-surface-sunk pl-3 text-sm font-medium ${archivado ? 'text-ink-soft' : 'text-ink'}`}>
       {rubro.name}
+      {rubro.requiresInsurance && <ShieldCheck className="size-4 text-ink-soft" role="img" aria-label="Pide seguro" />}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" aria-label={`Acciones de ${rubro.name}`}
@@ -39,6 +40,12 @@ function Chip({ rubro, archivado }: { rubro: Rubro; archivado: boolean }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => { setNombre(rubro.name); setRenombrando(true) }}>Renombrar</DropdownMenuItem>
+          {!archivado && (
+            <DropdownMenuCheckboxItem checked={rubro.requiresInsurance}
+              onCheckedChange={(v) => editar.mutate({ id: rubro.id, requiresInsurance: v === true })}>
+              Pide seguro
+            </DropdownMenuCheckboxItem>
+          )}
           <DropdownMenuItem onSelect={() => editar.mutate({ id: rubro.id, archived: !archivado })}>
             {archivado ? 'Desarchivar' : 'Archivar'}
           </DropdownMenuItem>

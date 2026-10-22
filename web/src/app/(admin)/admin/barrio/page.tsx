@@ -27,6 +27,12 @@ function horasValidas(v: string): number | undefined {
   return /^\d+$/.test(v.trim()) && n >= 1 && n <= 72 ? n : undefined
 }
 
+/** '15' → 15; lo que no es un entero de 1 a 90 → undefined. */
+function diasValidos(v: string): number | undefined {
+  const n = Number(v)
+  return /^\d+$/.test(v.trim()) && n >= 1 && n <= 90 ? n : undefined
+}
+
 export default function BarrioPage() {
   const barrio = useBarrio()
   const marcaReal = useMarca()
@@ -43,6 +49,8 @@ export default function BarrioPage() {
   const [errorLogo, setErrorLogo] = useState<string | null>(null)
   // null = ese tipo no alerta; un string = lo que está tipeado en las horas.
   const [alertas, setAlertas] = useState<Record<TipoAlerta, string | null>>({ visita: null, proveedor: null })
+  // Mismo criterio para el seguro: null = no avisa.
+  const [diasSeguro, setDiasSeguro] = useState<string | null>(null)
   const [cargado, setCargado] = useState(false)
   const inputArchivo = useRef<HTMLInputElement>(null)
 
@@ -58,9 +66,11 @@ export default function BarrioPage() {
     setColor(barrio.data.brandColor)
     const h = barrio.data.overstayHours
     setAlertas({ visita: h.visita?.toString() ?? null, proveedor: h.proveedor?.toString() ?? null })
+    setDiasSeguro(barrio.data.insuranceWarnDays?.toString() ?? null)
   }
 
-  const horasInvalidas = ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
+  const diasInvalidos = diasSeguro !== null && diasValidos(diasSeguro) === undefined
+  const horasInvalidas = diasInvalidos || ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
 
   const marcaPreview = { ...marcaReal, nombre: nombre.trim() || marcaReal.nombre, color: color ?? marcaReal.color }
 
@@ -71,6 +81,7 @@ export default function BarrioPage() {
     await guardar.mutateAsync({
       name: nombre.trim(), address, mapUrl, ...(color ? { brandColor: color } : {}),
       overstayHours: { visita: horas('visita'), proveedor: horas('proveedor') },
+      insuranceWarnDays: diasSeguro === null ? null : diasValidos(diasSeguro)!,
     })
   }
 
@@ -125,7 +136,7 @@ export default function BarrioPage() {
           </fieldset>
 
           <fieldset className="flex flex-col gap-3 border-t border-line pt-4">
-            <legend className="mb-1 text-[13px] font-semibold text-ink-soft">Alertas de permanencia</legend>
+            <legend className="mb-1 text-[13px] font-semibold text-ink-soft">Alertas</legend>
             {ALERTAS.map(({ tipo, etiqueta, sugerida }) => {
               const valor = alertas[tipo]
               const error = valor !== null && horasValidas(valor) === undefined ? 'Poné entre 1 y 72 horas.' : null
@@ -155,6 +166,28 @@ export default function BarrioPage() {
                 </div>
               )
             })}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-2">
+                <label className="flex min-w-36 items-center gap-3 text-sm font-semibold">
+                  <Switch checked={diasSeguro !== null} aria-label="Avisar por seguro por vencer"
+                    onCheckedChange={(on) => setDiasSeguro(on ? '15' : null)} />
+                  Seguro por vencer
+                </label>
+                {diasSeguro !== null ? (
+                  <span className="flex items-center gap-2 text-sm text-ink-soft">
+                    avisar
+                    <Input id="dias-seguro" type="number" inputMode="numeric" min={1} max={90} step={1}
+                      aria-label="Días de aviso antes del vencimiento del seguro" aria-invalid={diasInvalidos}
+                      aria-describedby={diasInvalidos ? 'dias-seguro-nota' : undefined}
+                      className="w-20 tabular" value={diasSeguro} onChange={(e) => setDiasSeguro(e.target.value)} />
+                    días antes
+                  </span>
+                ) : (
+                  <span className="text-sm text-ink-soft">No avisa</span>
+                )}
+              </div>
+              {diasInvalidos && <p id="dias-seguro-nota" role="alert" className="text-sm text-alto">Poné entre 1 y 90 días.</p>}
+            </div>
             <p className="text-sm text-ink-soft">
               La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Una frecuente usa las horas de lo que es: visita o proveedor.
             </p>

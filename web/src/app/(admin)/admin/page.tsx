@@ -6,6 +6,7 @@ import { BarChart, type Barra } from '@/components/bar-chart'
 import {
   useActividadPorGuardia, useEntradasPorDia, useEntradasPorHora, useInvitacionesPorPersona, useKpis,
 } from '@/lib/queries/admin'
+import { SegurosVencimientos } from '@/components/admin/seguros-vencimientos'
 import { fechaHora } from '@/lib/fechas'
 
 /** undefined cuando la semana pasada no hay con qué comparar: mostrar "+∞%" confunde más de lo que informa. */
@@ -75,6 +76,8 @@ export default function TableroPage() {
             )}
           </>
         )}
+
+        <SegurosVencimientos />
 
         <div className="grid gap-8 lg:grid-cols-2">
           <BarChart title="Ingresos por día · últimos 30" bars={dias} />

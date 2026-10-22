@@ -179,6 +179,8 @@ export type Barrio = {
   brandColor: string | null
   /** Horas adentro antes de alertar a la garita; null = ese tipo no alerta. */
   overstayHours: HorasPermanencia
+  /** Días antes del vencimiento del seguro para avisar; null = no avisa. */
+  insuranceWarnDays: number | null
   paleta: string[]
   providerWindows: Franja[]
 }
@@ -192,13 +194,13 @@ export function useBarrio() {
 export function useGuardarBarrio() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (datos: { name?: string; address: string; mapUrl: string; brandColor?: string; overstayHours?: HorasPermanencia }) =>
+    mutationFn: (datos: { name?: string; address: string; mapUrl: string; brandColor?: string; overstayHours?: HorasPermanencia; insuranceWarnDays?: number | null }) =>
       api<Barrio>('/admin/neighborhood', { method: 'PATCH', body: JSON.stringify(datos) }),
     onSuccess: (b) => {
       qc.setQueryData(claves.barrio, b)
       qc.invalidateQueries({ queryKey: claveMarca })
     },
-    onError: () => toast.error('No se pudo guardar. Revisá el link de mapas (tiene que empezar con http) y las horas (de 1 a 72).'),
+    onError: () => toast.error('No se pudo guardar. Revisá el link de mapas (tiene que empezar con http) las horas (de 1 a 72) y los días del seguro (de 1 a 90).'),
   })
 }
 
@@ -265,7 +267,7 @@ export function useImportarTanda() {
 
 export { ApiError }
 
-export type Rubro = { id: string; name: string; archivedAt: string | null }
+export type Rubro = { id: string; name: string; archivedAt: string | null; requiresInsurance: boolean }
 
 const claveRubros = ['admin', 'rubros'] as const
 
@@ -287,7 +289,7 @@ export function useCrearRubro() {
 export function useEditarRubro() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...datos }: { id: string; name?: string; archived?: boolean }) =>
+    mutationFn: ({ id, ...datos }: { id: string; name?: string; archived?: boolean; requiresInsurance?: boolean }) =>
       api<Rubro>(`/admin/trades/${id}`, { method: 'PATCH', body: JSON.stringify(datos) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: claveRubros }),
     onError: (e) => toast.error(ERRORES_RUBRO[(e as ApiError).code] ?? 'No se pudo guardar el rubro. Probá de nuevo.'),
@@ -303,5 +305,23 @@ export function useGuardarFranjas() {
     onError: (e) => toast.error((e as ApiError).code === 'franja_invalida'
       ? 'Revisá las franjas: cada una necesita al menos un día y un horario de inicio anterior al de fin.'
       : 'No se pudieron guardar los horarios. Probá de nuevo.'),
+  })
+}
+
+export type SeguroVencimiento = {
+  id: string
+  estado: 'vencido' | 'por_vencer' | 'sin_cargar'
+  guestName: string
+  tradeName: string
+  unitLabel: string
+  company: string | null
+  policy: string | null
+  expiresOn: string | null
+}
+
+export function useSegurosVencimientos() {
+  return useQuery({
+    queryKey: ['admin', 'seguros'] as const,
+    queryFn: ({ signal }) => api<SeguroVencimiento[]>('/admin/insurance', { signal }),
   })
 }
