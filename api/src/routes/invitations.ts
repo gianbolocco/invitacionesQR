@@ -14,6 +14,15 @@ import { validarUuid } from '../middleware/uuidParam.js'
 
 export const invitationRoutes = Router()
 
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-MM-DD')
+
+/** Las tres partes o nada (null lo borra): la base también lo exige. */
+export const zSeguro = z.object({
+  company: z.string().trim().min(1).max(80),
+  policy: z.string().trim().min(1).max(40),
+  expiresOn: isoDate,
+}).nullable()
+
 /* ---------- Públicas: sin sesión. Van ANTES del router protegido. ---------- */
 
 invitationRoutes.get('/public/:token', async (req, res) => {
@@ -35,6 +44,7 @@ invitationRoutes.patch('/public/:token', publicWriteLimit, async (req, res) => {
   const body = z.object({
     guestDoc: z.string().max(40).optional(),
     plate: z.string().max(20).optional(),
+    insurance: zSeguro.optional(),
   }).parse(req.body)
 
   await fillGuestDetails(String(req.params.token), body)
@@ -45,7 +55,6 @@ invitationRoutes.patch('/public/:token', publicWriteLimit, async (req, res) => {
 invitationRoutes.use(requireAuth)
 validarUuid(invitationRoutes)
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-MM-DD')
 
 const createSchema = z.object({
   unitId: z.string().uuid(),
@@ -60,6 +69,7 @@ const createSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).optional(),
   capacity: z.number().int().min(1),
   tradeId: z.string().uuid().nullable().optional(),
+  insurance: zSeguro.optional(),
 }).refine((v) => v.validTo >= v.validFrom, { message: 'La ventana está invertida', path: ['validTo'] })
 
 invitationRoutes.post('/', async (req, res) => {
@@ -97,7 +107,7 @@ invitationRoutes.get('/historial', async (req, res) => {
 invitationRoutes.get('/trades', async (req, res) => {
   const nid = req.person!.neighborhoodId
   const [rubros, barrio] = await Promise.all([listTrades(nid), getNeighborhood(nid)])
-  res.json({ trades: rubros.map(({ id, name }) => ({ id, name })), providerWindows: barrio.providerWindows })
+  res.json({ trades: rubros.map(({ id, name, requiresInsurance }) => ({ id, name, requiresInsurance })), providerWindows: barrio.providerWindows })
 })
 
 /** El detalle de una invitación, para la pantalla del pase. */
@@ -121,6 +131,7 @@ const editSchema = z.object({
   capacity: z.number().int().min(1).optional(),
   frequentAs: z.enum(['visita', 'proveedor']).optional(),
   tradeId: z.string().uuid().nullable().optional(),
+  insurance: zSeguro.optional(),
 })
 
 invitationRoutes.patch('/:id', async (req, res) => {

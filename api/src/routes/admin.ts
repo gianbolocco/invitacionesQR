@@ -139,6 +139,7 @@ adminRoutes.patch('/trades/:id', async (req, res) => {
   const body = z.object({
     name: z.string().trim().min(1).max(40).optional(),
     archived: z.boolean().optional(),
+    requiresInsurance: z.boolean().optional(),
   }).parse(req.body)
   res.json(await updateTrade(req.person!.neighborhoodId, req.person!.id, req.params.id, body))
 })
@@ -158,6 +159,7 @@ adminRoutes.patch('/neighborhood', async (req, res) => {
       visita: z.number().int().min(1).max(72).nullable().optional(),
       proveedor: z.number().int().min(1).max(72).nullable().optional(),
     }).optional(),
+    insuranceWarnDays: z.number().int().min(1).max(90).nullable().optional(),
   }).parse({ ...req.body, providerWindows: undefined })
 
   res.json(await updateNeighborhood(req.person!.neighborhoodId, req.person!.id,

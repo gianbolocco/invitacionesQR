@@ -7,6 +7,7 @@ import { todayInBuenosAires, unMesDespues } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { PORTERIA } from '../lib/porteria.js'
 import { aplicaFranjas, type Franja } from '../lib/franjas.js'
+import { pideSeguro, seguroCompleto, seguroVigente, type Seguro } from '../lib/seguro.js'
 
 export type CreateInvitationInput = {
   unitId: string
@@ -23,6 +24,8 @@ export type CreateInvitationInput = {
   weekdays?: number[]
   capacity: number
   tradeId?: string | null
+  /** undefined: sin tocar; null: sin seguro. */
+  insurance?: Seguro | null
   neighborhoodId: string
 }
 
@@ -119,6 +122,26 @@ async function assertRubro(neighborhoodId: string, kind: string, frequentAs: str
   if (hay) throw new AppError(400, 'rubro_requerido')
 }
 
+async function rubroPideSeguro(tradeId: string | null | undefined): Promise<boolean> {
+  if (!tradeId) return false
+  const [t] = await db.select({ r: trades.requiresInsurance }).from(trades).where(eq(trades.id, tradeId)).limit(1)
+  return t?.r === true
+}
+
+/** El seguro solo se carga si el rubro de quien entra a trabajar lo pide; borrarlo (null) siempre se puede. */
+export async function assertSeguro(
+  kind: string, frequentAs: string | null, tradeId: string | null | undefined, insurance: Seguro | null | undefined,
+) {
+  if (insurance === undefined || insurance === null) return
+  if (!pideSeguro(kind, frequentAs, await rubroPideSeguro(tradeId))) throw new AppError(400, 'seguro_no_aplica')
+}
+
+const columnasSeguro = (i: Seguro | null) => ({
+  insuranceCompany: i?.company.trim() ?? null,
+  insurancePolicy: i?.policy.trim() ?? null,
+  insuranceExpiresOn: i?.expiresOn ?? null,
+})
+
 /** Las franjas que le tocan a un rubro: las de todos los rubros y las que lo nombran. */
 export function franjasDelRubro(franjas: Franja[], kind: string, frequentAs: string | null, tradeId: string | null): Franja[] {
   if (!aplicaFranjas(kind, frequentAs)) return []
@@ -130,6 +153,7 @@ export async function createInvitation(input: CreateInvitationInput) {
   assertRangoDeFrecuente(input.kind, input.frequentAs, input.validFrom, input.validTo)
   const frequentAs = input.kind === 'frecuente' ? (input.frequentAs ?? 'visita') : null
   await assertRubro(input.neighborhoodId, input.kind, frequentAs, input.tradeId)
+  await assertSeguro(input.kind, frequentAs, input.tradeId, input.insurance)
 
   const [inv] = await db.insert(invitations).values({
     unitId: input.unitId,
@@ -145,6 +169,7 @@ export async function createInvitation(input: CreateInvitationInput) {
     validTo: input.validTo,
     weekdays: input.weekdays?.length ? input.weekdays : null,
     capacity: input.capacity,
+    ...(input.insurance ? columnasSeguro(input.insurance) : {}),
     token: randomToken(16),
   }).returning()
 
@@ -186,6 +211,10 @@ const columnas = {
   createdBy: invitations.createdBy,
   tradeId: invitations.tradeId,
   tradeName: trades.name,
+  requiresInsurance: trades.requiresInsurance,
+  insuranceCompany: invitations.insuranceCompany,
+  insurancePolicy: invitations.insurancePolicy,
+  insuranceExpiresOn: invitations.insuranceExpiresOn,
   creatorName: nombreOEtiquetaSql,
   unitId: invitations.unitId,
   unitLabel: units.label,
@@ -226,7 +255,7 @@ export async function listForUnits(unitIds: string[]) {
       isNull(invitations.revokedAt),
       gte(invitations.validTo, hoy),
     ))
-    .groupBy(invitations.id, people.name, people.role, units.label, trades.name)
+    .groupBy(invitations.id, people.name, people.role, units.label, trades.name, trades.requiresInsurance)
     // El cupo se mide sobre el count de ingresos, así que va en HAVING. Quien
     // está adentro sigue en la home aunque haya agotado el cupo: es justo lo
     // que el vecino quiere ver ("ya llegó").
@@ -291,7 +320,7 @@ export async function searchInvitations(
   const [rows, [conteo]] = await Promise.all([
     consultaInvitaciones()
       .where(donde)
-      .groupBy(invitations.id, people.name, people.role, units.label, trades.name)
+      .groupBy(invitations.id, people.name, people.role, units.label, trades.name, trades.requiresInsurance)
       .orderBy(desc(invitations.createdAt))
       .limit(pageSize)
       .offset((page - 1) * pageSize),
@@ -311,7 +340,7 @@ export async function searchInvitations(
 export async function getInvitation(id: string, personId: string) {
   const [row] = await consultaInvitaciones()
     .where(eq(invitations.id, id))
-    .groupBy(invitations.id, people.name, people.role, units.label, trades.name)
+    .groupBy(invitations.id, people.name, people.role, units.label, trades.name, trades.requiresInsurance)
     .limit(1)
   if (!row) throw new AppError(404, 'not_found')
   await assertMemberOfUnit(personId, row.unitId)
@@ -385,6 +414,10 @@ export async function findPublicByToken(token: string) {
     frequentAs: invitations.frequentAs,
     tradeId: invitations.tradeId,
     tradeName: trades.name,
+    tradeRequiresInsurance: trades.requiresInsurance,
+    insuranceCompany: invitations.insuranceCompany,
+    insurancePolicy: invitations.insurancePolicy,
+    insuranceExpiresOn: invitations.insuranceExpiresOn,
     providerWindows: neighborhoods.providerWindows,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
@@ -405,10 +438,17 @@ export async function findPublicByToken(token: string) {
 
   if (!row) return null
 
+  const completo = seguroCompleto(row.insuranceCompany, row.insurancePolicy, row.insuranceExpiresOn)
+  const insuranceState = !completo ? 'sin_cargar'
+    : !seguroVigente(row.insuranceExpiresOn!, new Date()) ? 'vencido' : 'vigente'
+
   return {
     guestName: row.guestName,
     kind: row.kind,
     tradeName: row.tradeName,
+    // Solo el estado: el link puede estar en manos de cualquiera, los datos no salen.
+    requiresInsurance: pideSeguro(row.kind, row.frequentAs, row.tradeRequiresInsurance),
+    insuranceState,
     franjas: franjasDelRubro(row.providerWindows, row.kind, row.frequentAs, row.tradeId),
     validFrom: row.validFrom,
     validTo: row.validTo,
@@ -439,7 +479,7 @@ async function entriesOf(invitationId: string): Promise<number> {
  */
 export async function fillGuestDetails(
   token: string,
-  data: { guestDoc?: string; plate?: string },
+  data: { guestDoc?: string; plate?: string; insurance?: Seguro | null },
 ): Promise<void> {
   const [inv] = await db.select().from(invitations)
     .where(eq(invitations.token, token)).limit(1)
@@ -449,9 +489,13 @@ export async function fillGuestDetails(
   // Una vez que entró, entry_log ya guardó su copia: el histórico no se reescribe.
   if ((await entriesOf(inv.id)) > 0) throw new AppError(409, 'already_entered')
 
-  const patch: { guestDoc?: string; plate?: string } = {}
+  await assertSeguro(inv.kind, inv.frequentAs, inv.tradeId, data.insurance)
+
+  const patch: { guestDoc?: string; plate?: string } & Partial<ReturnType<typeof columnasSeguro>> = {}
   if (!inv.guestDoc && data.guestDoc?.trim()) patch.guestDoc = data.guestDoc.trim()
   if (!inv.plate && data.plate?.trim()) patch.plate = data.plate.trim().toUpperCase()
+
+  if (data.insurance !== undefined) Object.assign(patch, columnasSeguro(data.insurance))
 
   if (Object.keys(patch).length) {
     await db.update(invitations).set(patch).where(eq(invitations.id, inv.id))
@@ -484,6 +528,7 @@ export type EditInvitationInput = {
   capacity?: number
   frequentAs?: 'visita' | 'proveedor'
   tradeId?: string | null
+  insurance?: Seguro | null
 }
 
 /**
@@ -534,7 +579,15 @@ export async function editInvitation(
     await assertRubro(neighborhoodId, inv.kind, frequentAs, input.tradeId === undefined ? inv.tradeId : input.tradeId)
   }
 
+  // Sin seguro nuevo, el viejo se borra si lo nuevo ya no lo pide (a visita, o a un rubro que no lo exige).
+  let seguro = input.insurance
+  if (seguro !== undefined) await assertSeguro(inv.kind, frequentAs, tradeId === undefined ? inv.tradeId : tradeId, seguro)
+  else if (tradeId !== undefined || input.frequentAs !== undefined) {
+    if (!pideSeguro(inv.kind, frequentAs, await rubroPideSeguro(tradeId === undefined ? inv.tradeId : tradeId))) seguro = null
+  }
+
   const [actualizada] = await db.update(invitations).set({
+    ...(seguro !== undefined ? columnasSeguro(seguro) : {}),
     ...(tradeId !== undefined ? { tradeId } : {}),
     ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),
     ...(input.guestDoc !== undefined ? { guestDoc: input.guestDoc?.trim() || null } : {}),
