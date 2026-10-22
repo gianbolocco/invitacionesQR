@@ -92,9 +92,12 @@ Migración `0018_seguro_proveedor`.
   viene, se guarda dentro de la transacción, después del `FOR UPDATE` y antes
   de `canEnter`, y se audita como `invitation.insurance_updated` a nombre del
   guardia.
-- **Lecturas.** El check de la garita, la página pública y las filas del vecino
-  devuelven `requiresInsurance`, `insurance` e `insuranceWarnDays` (este último
-  solo en el check).
+- **Lecturas.** El check de la garita y las filas del vecino devuelven
+  `requiresInsurance` e `insurance`; el check suma `insuranceWarnDays`.
+- **Página pública:** devuelve `requiresInsurance` e
+  `insuranceState: 'sin_cargar' | 'vigente' | 'vencido'`, **nunca los datos**.
+  Sigue la regla de `hasDoc`: el link puede estar en manos de cualquiera. El
+  proveedor puede sobrescribir el seguro.
 - `GET /admin/insurance`: las filas de la regla 6.
 - **Auditoría y Excel:** columna **Seguro** (`La Segunda · 4471-22 · vence 12/04/2027`).
 
