@@ -1,5 +1,5 @@
 import {
-  pgTable, uuid, text, timestamp, integer, smallint, jsonb, date, primaryKey, index, uniqueIndex, check,
+  pgTable, uuid, text, timestamp, integer, smallint, jsonb, date, boolean, primaryKey, index, uniqueIndex, check,
   customType,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
@@ -40,8 +40,11 @@ export const neighborhoods = pgTable('neighborhood', {
   overstayHoursProveedor: smallint('overstay_hours_proveedor'),
   // Franjas de ingreso de proveedores. [] = sin restricción.
   providerWindows: jsonb('provider_windows').$type<Franja[]>().notNull().default([]),
+  // Días de anticipación con que se avisa que un seguro está por vencer. NULL = no avisa.
+  insuranceWarnDays: smallint('insurance_warn_days'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
+  check('neighborhood_insurance_warn_ck', sql`${t.insuranceWarnDays} between 1 and 90`),
   check('neighborhood_overstay_visita_ck', sql`${t.overstayHoursVisita} between 1 and 72`),
   check('neighborhood_overstay_proveedor_ck', sql`${t.overstayHoursProveedor} between 1 and 72`),
 ])
@@ -91,6 +94,8 @@ export const trades = pgTable('trade', {
   name: text('name').notNull(),
   // Se archiva, no se borra: las invitaciones y las franjas lo siguen usando.
   archivedAt: timestamp('archived_at', { withTimezone: true }),
+  // Los proveedores de este rubro tienen que declarar un seguro vigente.
+  requiresInsurance: boolean('requires_insurance').notNull().default(false),
 }, (t) => [uniqueIndex('trade_name_uq').on(t.neighborhoodId, sql`lower(${t.name})`)])
 
 export const invitations = pgTable('invitation', {
@@ -119,6 +124,11 @@ export const invitations = pgTable('invitation', {
   // Distinto de null = la anuló un guardia; '' es "sin motivo", porque el motivo
   // es opcional. Es lo que el vecino lee después: "anulada por portería".
   revokedReason: text('revoked_reason'),
+  // Seguro declarado del proveedor. Los tres o ninguno: un seguro a medias no se
+  // puede verificar en la barrera.
+  insuranceCompany: text('insurance_company'),
+  insurancePolicy: text('insurance_policy'),
+  insuranceExpiresOn: date('insurance_expires_on'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex('invitation_token_uq').on(t.token),
@@ -135,6 +145,10 @@ export const invitations = pgTable('invitation', {
   check('invitation_window_ck', sql`${t.validTo} >= ${t.validFrom}`),
   check('invitation_capacity_ck', sql`${t.capacity} >= 1`),
   check('invitation_note_ck', sql`char_length(${t.note}) <= 140`),
+  check('invitation_insurance_company_ck', sql`char_length(${t.insuranceCompany}) <= 80`),
+  check('invitation_insurance_policy_ck', sql`char_length(${t.insurancePolicy}) <= 40`),
+  check('invitation_insurance_all_or_none_ck', sql`(${t.insuranceCompany} is null) = (${t.insurancePolicy} is null)
+    and (${t.insurancePolicy} is null) = (${t.insuranceExpiresOn} is null)`),
 ])
 
 export const entryLogs = pgTable('entry_log', {

@@ -127,6 +127,13 @@
       "when": 1792614421652,
       "tag": "0017_horarios_proveedores",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792627286474,
+      "tag": "0018_seguro_proveedor",
+      "breakpoints": true
     }
   ]
 }
