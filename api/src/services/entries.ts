@@ -43,6 +43,7 @@ async function loadForCheck(where: SQL) {
     unitLabel: units.label,
     // Para el veredicto: a quién llamar si hay dudas. Si la creó un guardia
     // (alta exprés), no se muestra su nombre, igual que en la agenda.
+    creatorRole: people.role,
     inviterName: sql<string>`case when ${people.role} = 'guard' then ${PORTERIA} else ${people.name} end`,
   }).from(invitations)
     .innerJoin(units, eq(units.id, invitations.unitId))
@@ -57,11 +58,13 @@ type LoadedInvitation = NonNullable<Awaited<ReturnType<typeof loadForCheck>>>
 
 /** Lo que canEnter necesita del seguro, a partir de las columnas crudas (el rubro puede ser null). */
 function aLike<T extends {
+  creatorRole: string
   kind: string; frequentAs: string | null; requiresInsurance: boolean | null
   insuranceCompany: string | null; insurancePolicy: string | null; insuranceExpiresOn: string | null
 }>(row: T) {
   return {
     ...row,
+    porteria: row.creatorRole === 'guard',
     requiresInsurance: pideSeguro(row.kind, row.frequentAs, row.requiresInsurance),
     insuranceComplete: seguroCompleto(row.insuranceCompany, row.insurancePolicy, row.insuranceExpiresOn),
   }
@@ -145,6 +148,8 @@ export async function registerEntry(
     if (!target) throw new AppError(404, 'not_found')
 
     const { usedCount } = await usage(invitationId, tx)
+    // Después del FOR UPDATE: quién la creó decide si canEnter mira franjas y seguro.
+    const [{ creatorRole }] = await tx.select({ creatorRole: people.role }).from(people).where(eq(people.id, target.createdBy))
 
     // Después del FOR UPDATE de arriba, que sigue siendo lo que serializa el cupo.
     const [{ providerWindows, nid }] = await tx.select({ providerWindows: neighborhoods.providerWindows, nid: neighborhoods.id })
@@ -164,7 +169,7 @@ export async function registerEntry(
       await audit(guardId, nid, 'invitation.insurance_updated', 'invitation', invitationId, data.insurance, tx)
     }
 
-    const check = canEnter(aLike({ ...target, ...seguro, requiresInsurance: rubro?.requiresInsurance ?? null }), new Date(), usedCount, providerWindows)
+    const check = canEnter(aLike({ ...target, creatorRole, ...seguro, requiresInsurance: rubro?.requiresInsurance ?? null }), new Date(), usedCount, providerWindows)
     if (!check.ok) throw new AppError(409, check.reason)
 
     const [entry] = await tx.insert(entryLogs).values({

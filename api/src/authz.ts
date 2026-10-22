@@ -14,6 +14,8 @@ export type InvitationLike = {
   requiresInsurance: boolean
   insuranceComplete: boolean
   insuranceExpiresOn: string | null
+  /** La creó la portería (alta exprés): el guardia ya decidió horario y seguro. */
+  porteria: boolean
 }
 
 export type EntryReason = 'revoked' | 'not_yet' | 'expired' | 'wrong_weekday' | 'outside_hours' | 'no_capacity' | 'no_insurance' | 'insurance_expired'
@@ -40,13 +42,14 @@ export function canEnter(inv: InvitationLike, now: Date, usedCount: number, fran
     return { ok: false, reason: 'wrong_weekday' }
   }
 
-  if (aplicaFranjas(inv.kind, inv.frequentAs) && !dentroDeFranja(franjas, inv.tradeId, now)) {
+  // Lo creó la portería: el guardia ya decidió, ni franjas ni seguro.
+  if (!inv.porteria && aplicaFranjas(inv.kind, inv.frequentAs) && !dentroDeFranja(franjas, inv.tradeId, now)) {
     return { ok: false, reason: 'outside_hours' }
   }
 
   if (usedCount >= inv.capacity) return { ok: false, reason: 'no_capacity' }
 
-  if (inv.requiresInsurance) {
+  if (inv.requiresInsurance && !inv.porteria) {
     if (!inv.insuranceComplete || !inv.insuranceExpiresOn) return { ok: false, reason: 'no_insurance' }
     if (!seguroVigente(inv.insuranceExpiresOn, now)) return { ok: false, reason: 'insurance_expired' }
   }

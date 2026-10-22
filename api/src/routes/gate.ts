@@ -51,6 +51,9 @@ gateRoutes.post('/invitations', async (req, res) => {
     guestDoc: z.string().optional(),
     plate: z.string().optional(),
     note: z.string().trim().max(140).optional(),
+    kind: z.enum(['visita', 'proveedor']).optional(),
+    tradeId: z.string().uuid().nullable().optional(),
+    insurance: zSeguro.optional(),
   }).parse(req.body)
 
   res.status(201).json(await createExpressInvitation({

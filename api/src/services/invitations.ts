@@ -55,6 +55,9 @@ export type CreateExpressInvitationInput = {
   note?: string
   createdBy: string
   neighborhoodId: string
+  kind?: 'visita' | 'proveedor'
+  tradeId?: string | null
+  insurance?: Seguro | null
 }
 
 /**
@@ -70,6 +73,8 @@ export type CreateExpressInvitationInput = {
  */
 export async function createExpressInvitation(input: CreateExpressInvitationInput) {
   await assertUnitInNeighborhood(input.unitId, input.neighborhoodId)
+  await assertRubro(input.neighborhoodId, input.kind ?? 'visita', null, input.tradeId)
+  await assertSeguro(input.kind ?? 'visita', null, input.tradeId, input.insurance)
 
   const [inv] = await db.insert(invitations)
     .values(valoresDePorteria(input, todayInBuenosAires()))
@@ -83,7 +88,9 @@ export function valoresDePorteria(input: CreateExpressInvitationInput, dia: stri
   return {
     unitId: input.unitId,
     createdBy: input.createdBy,
-    kind: 'visita' as const,
+    kind: input.kind ?? 'visita',
+    tradeId: input.tradeId ?? null,
+    ...(input.insurance ? columnasSeguro(input.insurance) : {}),
     guestName: input.guestName.trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
