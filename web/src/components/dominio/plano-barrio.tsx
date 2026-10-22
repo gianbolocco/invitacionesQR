@@ -29,14 +29,22 @@ export function PlanoBarrio({ src, lote }: { src: string; lote: string | null })
       <dialog ref={dialogo} aria-label="Plano del barrio ampliado"
         onClose={() => disparador.current?.focus()}
         className="m-0 h-dvh max-h-none w-dvw max-w-none bg-escaner-fondo text-escaner-texto backdrop:bg-black/80">
-        <button type="button" onClick={() => dialogo.current?.close()}
-          className="fixed top-3 right-3 z-10 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-escaner-texto px-4 text-sm font-semibold text-escaner-fondo">
-          <X className="size-4" aria-hidden />Cerrar
-        </button>
-        {/* ponytail: pinch-zoom nativo del navegador; sin zoom propio con botones */}
-        <div className="h-full overflow-auto" style={{ touchAction: 'pinch-zoom' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt={alt} className="block h-auto w-full bg-white" />
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <p className="font-semibold">{lote ? <>Plano · <span className="tabular">Lote {lote}</span></> : 'Plano del barrio'}</p>
+            <button type="button" onClick={() => dialogo.current?.close()}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-escaner-texto px-4 text-sm font-semibold text-escaner-fondo">
+              <X className="size-4" aria-hidden />Cerrar
+            </button>
+          </div>
+          {/* ponytail: pinch-zoom nativo del navegador; sin zoom propio con botones */}
+          <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 overflow-x-auto overflow-y-hidden"
+            style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
+            {/* m-auto: centra si entra y deja scrollear desde el borde si no */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt={alt} className="mx-auto block h-[min(480px,70dvh)] w-auto max-w-none shrink-0 bg-white sm:h-auto sm:max-h-[78dvh] sm:w-full sm:max-w-full sm:object-contain" />
+            <p className="px-4 text-center text-sm text-escaner-texto/70 sm:hidden">Deslizá para recorrer el plano</p>
+          </div>
         </div>
       </dialog>
     </section>
