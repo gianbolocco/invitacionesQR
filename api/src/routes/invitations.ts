@@ -16,7 +16,11 @@ export const invitationRoutes = Router()
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-MM-DD')
   // 2026-02-30 pasa el patrón y Postgres lo rechaza con 500: ida y vuelta por Date.
-  .refine((v) => new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v, 'Fecha inexistente')
+  // Con mes 13 el Date es inválido y toISOString tira: se mira antes.
+  .refine((v) => {
+    const d = new Date(`${v}T00:00:00Z`)
+    return !isNaN(+d) && d.toISOString().slice(0, 10) === v
+  }, 'Fecha inexistente')
 
 /** Las tres partes o nada (null lo borra): la base también lo exige. */
 export const zSeguro = z.object({

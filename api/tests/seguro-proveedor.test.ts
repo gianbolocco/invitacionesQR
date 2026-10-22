@@ -3,7 +3,7 @@ import request from 'supertest'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
 import { eq } from 'drizzle-orm'
-import { entryLogs, invitations, neighborhoods, people, units, unitMembers } from '../src/db/schema.js'
+import { auditLogs, entryLogs, invitations, neighborhoods, people, units, unitMembers } from '../src/db/schema.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
 import { hashPassword } from '../src/lib/crypto.js'
 import { resetDb } from './helpers/db.js'
@@ -150,5 +150,124 @@ describe('seguro del proveedor: carga en la invitación', () => {
   it('una fecha inexistente da 400', async () => {
     const { invitar, rubro } = await escenario()
     await invitar({ tradeId: await rubro('Albañil', true), insurance: { ...seguro, expiresOn: '2026-02-30' } }).expect(400)
+  })
+
+  it('una fecha de mes 13 da 400 y no 500', async () => {
+    const { invitar, rubro } = await escenario()
+    await invitar({ tradeId: await rubro('Albañil', true), insurance: { ...seguro, expiresOn: '2026-13-45' } }).expect(400)
+  })
+})
+
+describe('seguro del proveedor: barrera', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  async function conGuardia() {
+    const e = await escenario()
+    await db.insert(people).values({
+      neighborhoodId: e.n.id, email: 'guardia@example.com', name: 'Guardia', role: 'guard', status: 'active',
+      passwordHash: await hashPassword(PASS),
+    })
+    const r = await request(app).post('/auth/login').send({ email: 'guardia@example.com', password: PASS })
+    return { ...e, guardia: r.headers['set-cookie'] as unknown as string[] }
+  }
+  const entrada = (invitationId: string, extra: object = {}) =>
+    ({ invitationId, guestName: 'Pedro', guestDoc: '30111222', ...extra })
+
+  it('el check de un albañil sin seguro trae no_insurance y los datos del seguro', async () => {
+    const { guardia, invitar, rubro, admin } = await conGuardia()
+    await request(app).patch('/admin/neighborhood').set('Cookie', admin).send({ insuranceWarnDays: 15 }).expect(200)
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
+    const r = await request(app).get(`/gate/invitation/${inv.id}`).set('Cookie', guardia).expect(200)
+    expect(r.body.check).toEqual({ ok: false, reason: 'no_insurance' })
+    expect(r.body.invitation).toMatchObject({
+      requiresInsurance: true, insuranceCompany: null, insurancePolicy: null, insuranceExpiresOn: null,
+    })
+    expect(r.body.insuranceWarnDays).toBe(15)
+  })
+
+  it('sin insurance la entrada da 409 no_insurance', async () => {
+    const { guardia, invitar, rubro } = await conGuardia()
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
+    const r = await request(app).post('/gate/entries').set('Cookie', guardia).send(entrada(inv.id)).expect(409)
+    expect(r.body.error).toBe('no_insurance')
+  })
+
+  it('con insurance vigente entra, la invitación guarda el seguro y queda auditado', async () => {
+    const { guardia, invitar, rubro } = await conGuardia()
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
+    await request(app).post('/gate/entries').set('Cookie', guardia).send(entrada(inv.id, { insurance: seguro })).expect(201)
+    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
+    expect(fila.insurancePolicy).toBe('AP-123')
+    const [g] = await db.select().from(people).where(eq(people.email, 'guardia@example.com'))
+    const logs = await db.select().from(auditLogs).where(eq(auditLogs.action, 'invitation.insurance_updated'))
+    expect(logs).toHaveLength(1)
+    expect(logs[0]).toMatchObject({ actorId: g.id, entityId: inv.id })
+  })
+
+  it('con insurance vencido da 409 insurance_expired y no deja nada guardado', async () => {
+    const { guardia, invitar, rubro } = await conGuardia()
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
+    const r = await request(app).post('/gate/entries').set('Cookie', guardia)
+      .send(entrada(inv.id, { insurance: { ...seguro, expiresOn: '2000-01-01' } })).expect(409)
+    expect(r.body.error).toBe('insurance_expired')
+    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
+    expect(fila.insurancePolicy).toBeNull()
+    expect(await db.select().from(auditLogs).where(eq(auditLogs.action, 'invitation.insurance_updated'))).toHaveLength(0)
+  })
+
+  it('insurance en un rubro que no lo pide no se guarda', async () => {
+    const { guardia, invitar, rubro } = await conGuardia()
+    const { body: inv } = await invitar({ tradeId: await rubro('Agua') }).expect(201)
+    await request(app).post('/gate/entries').set('Cookie', guardia).send(entrada(inv.id, { insurance: seguro })).expect(201)
+    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
+    expect(fila.insurancePolicy).toBeNull()
+  })
+
+  it('la auditoría y el Excel traen el seguro', async () => {
+    const { guardia, invitar, rubro } = await conGuardia()
+    await invitar({ tradeId: await rubro('Albañil', true), insurance: seguro }).expect(201)
+    const r = await request(app).get('/gate/audit').set('Cookie', guardia).expect(200)
+    expect(r.body.rows[0]).toMatchObject({ insuranceCompany: 'La Segunda', insurancePolicy: 'AP-123', insuranceExpiresOn: '2999-01-01' })
+    await request(app).get('/gate/audit.xlsx').set('Cookie', guardia).expect(200)
+  })
+})
+
+describe('seguro del proveedor: lista de vencimientos', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  const en = (dias: number) => {
+    const d = new Date(`${hoy}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + dias)
+    return d.toISOString().slice(0, 10)
+  }
+
+  it('devuelve vencido, por vencer y sin cargar, y deja afuera el resto', async () => {
+    const { admin, invitar, rubro, vecino } = await escenario()
+    await request(app).patch('/admin/neighborhood').set('Cookie', admin).send({ insuranceWarnDays: 15 }).expect(200)
+    const alba = await rubro('Albañil', true)
+    const agua = await rubro('Agua')
+    const con = (guestName: string, expiresOn: string) =>
+      invitar({ tradeId: alba, guestName, insurance: { ...seguro, expiresOn } }).expect(201)
+    await invitar({ tradeId: alba, guestName: 'Sin cargar' }).expect(201)
+    await con('Por vencer', en(5))
+    await con('Vencido', en(-3))
+    await con('Lejano', en(100))
+    const { body: anulada } = await con('Anulada', en(-3))
+    await request(app).post(`/invitations/${anulada.id}/revoke`).set('Cookie', vecino).expect(200)
+    await invitar({ tradeId: alba, guestName: 'De ventana', validFrom: en(-9), validTo: en(-8) }).expect(201)
+    await invitar({ tradeId: agua, guestName: 'Agua' }).expect(201)
+
+    const r = await request(app).get('/admin/insurance').set('Cookie', admin).expect(200)
+    expect(r.body.map((f: { guestName: string; estado: string }) => [f.guestName, f.estado])).toEqual([
+      ['Vencido', 'vencido'], ['Por vencer', 'por_vencer'], ['Sin cargar', 'sin_cargar'],
+    ])
+    expect(r.body[0]).toMatchObject({ tradeName: 'Albañil', unitLabel: 'Lote 1', company: 'La Segunda', policy: 'AP-123', expiresOn: en(-3) })
+  })
+
+  it('sin insuranceWarnDays no hay por vencer', async () => {
+    const { admin, invitar, rubro } = await escenario()
+    await invitar({ tradeId: await rubro('Albañil', true), insurance: { ...seguro, expiresOn: en(5) } }).expect(201)
+    const r = await request(app).get('/admin/insurance').set('Cookie', admin).expect(200)
+    expect(r.body).toEqual([])
   })
 })

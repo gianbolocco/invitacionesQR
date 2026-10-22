@@ -16,6 +16,7 @@ import { COLOR_DEFAULT } from '../lib/marca.js'
 import { entriesLog } from '../services/reports.js'
 import { getNeighborhood } from '../services/neighborhoods.js'
 import { escucharAvisos } from '../lib/avisos.js'
+import { zSeguro } from './invitations.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
@@ -71,6 +72,8 @@ gateRoutes.post('/entries', async (req, res) => {
     guestDoc: z.string().trim().min(1),
     plate: z.string().optional(),
     note: z.string().optional(),
+    // Sin null: la barrera carga o renueva el seguro, no lo borra.
+    insurance: zSeguro.unwrap().optional(),
   }).parse(req.body)
 
   // El guardia sale de la sesión, no del body: un dato de auditoría no puede
@@ -240,6 +243,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Patente', key: 'patente' },
           { header: 'Tipo', key: 'tipo' },
           { header: 'Rubro', key: 'rubro' },
+          { header: 'Seguro', key: 'seguro', width: 36 },
           { header: 'Unidad', key: 'unidad' },
           { header: 'Invitó', key: 'invito', width: 24 },
           { header: 'Desde', key: 'desde', formato: 'fecha' },
@@ -257,6 +261,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           patente: r.plate ?? '',
           tipo: KIND_EXCEL[r.kind] ?? r.kind,
           rubro: r.tradeName ?? '',
+          seguro: r.insuranceCompany ? `${r.insuranceCompany} · ${r.insurancePolicy} · vence ${dd(r.insuranceExpiresOn!)}` : '',
           unidad: r.unitLabel,
           invito: r.inviterName,
           desde: diaExcel(r.validFrom),

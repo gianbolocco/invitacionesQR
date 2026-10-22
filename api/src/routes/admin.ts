@@ -9,7 +9,7 @@ import {
 } from '../services/people.js'
 import { importPeopleRows, previewPeopleCsv } from '../services/people-import.js'
 import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
-import { listTrades, createTrade, updateTrade } from '../services/trades.js'
+import { listTrades, createTrade, updateTrade, vencimientosDeSeguro } from '../services/trades.js'
 import { guardarLogo, borrarLogo } from '../services/branding.js'
 import { AppError } from '../lib/errors.js'
 import { contrasena } from '../lib/contrasena.js'
@@ -142,6 +142,11 @@ adminRoutes.patch('/trades/:id', async (req, res) => {
     requiresInsurance: z.boolean().optional(),
   }).parse(req.body)
   res.json(await updateTrade(req.person!.neighborhoodId, req.person!.id, req.params.id, body))
+})
+
+/** Seguros de proveedores vencidos, por vencer o sin cargar. */
+adminRoutes.get('/insurance', async (req, res) => {
+  res.json(await vencimientosDeSeguro(req.person!.neighborhoodId))
 })
 
 adminRoutes.patch('/neighborhood', async (req, res) => {

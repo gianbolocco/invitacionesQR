@@ -5,6 +5,7 @@ import { canEnter, type EntryCheck } from '../authz.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { audit } from '../lib/audit.js'
+import { pideSeguro, seguroCompleto, type Seguro } from '../lib/seguro.js'
 import { PORTERIA } from '../lib/porteria.js'
 import { assertUnitInNeighborhood, valoresDePorteria, franjasDelRubro } from './invitations.js'
 
@@ -24,6 +25,11 @@ async function loadForCheck(where: SQL) {
     tradeId: invitations.tradeId,
     tradeName: trades.name,
     providerWindows: neighborhoods.providerWindows,
+    insuranceWarnDays: neighborhoods.insuranceWarnDays,
+    requiresInsurance: trades.requiresInsurance,
+    insuranceCompany: invitations.insuranceCompany,
+    insurancePolicy: invitations.insurancePolicy,
+    insuranceExpiresOn: invitations.insuranceExpiresOn,
     guestName: invitations.guestName,
     guestDoc: invitations.guestDoc,
     plate: invitations.plate,
@@ -49,9 +55,22 @@ async function loadForCheck(where: SQL) {
 
 type LoadedInvitation = NonNullable<Awaited<ReturnType<typeof loadForCheck>>>
 
+/** Lo que canEnter necesita del seguro, a partir de las columnas crudas (el rubro puede ser null). */
+function aLike<T extends {
+  kind: string; frequentAs: string | null; requiresInsurance: boolean | null
+  insuranceCompany: string | null; insurancePolicy: string | null; insuranceExpiresOn: string | null
+}>(row: T) {
+  return {
+    ...row,
+    requiresInsurance: pideSeguro(row.kind, row.frequentAs, row.requiresInsurance),
+    insuranceComplete: seguroCompleto(row.insuranceCompany, row.insurancePolicy, row.insuranceExpiresOn),
+  }
+}
+
 async function buildCheck(invitation: LoadedInvitation) {
   const { usedCount, lastEntryAt } = await usage(invitation.id)
-  const { providerWindows, ...inv } = invitation
+  const { providerWindows, insuranceWarnDays, ...crudo } = invitation
+  const inv = aLike(crudo)
   const check: EntryCheck = canEnter(inv, new Date(), usedCount, providerWindows)
   const abierta = await openEntry(invitation.id)
 
@@ -59,6 +78,7 @@ async function buildCheck(invitation: LoadedInvitation) {
     invitation: inv,
     // Solo las franjas de su rubro, nunca la lista entera del barrio.
     franjas: franjasDelRubro(providerWindows, invitation.kind, invitation.frequentAs, invitation.tradeId),
+    insuranceWarnDays,
     check,
     usedCount,
     lastEntryAt,
@@ -117,7 +137,7 @@ export async function checkById(id: string) {
 export async function registerEntry(
   invitationId: string,
   guardId: string | null,
-  data: { guestName: string; guestDoc?: string; plate?: string; note?: string },
+  data: { guestName: string; guestDoc?: string; plate?: string; note?: string; insurance?: Seguro },
 ) {
   return db.transaction(async (tx) => {
     const [target] = await tx.select().from(invitations)
@@ -127,10 +147,24 @@ export async function registerEntry(
     const { usedCount } = await usage(invitationId, tx)
 
     // Después del FOR UPDATE de arriba, que sigue siendo lo que serializa el cupo.
-    const [{ providerWindows }] = await tx.select({ providerWindows: neighborhoods.providerWindows })
+    const [{ providerWindows, nid }] = await tx.select({ providerWindows: neighborhoods.providerWindows, nid: neighborhoods.id })
       .from(units).innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
       .where(eq(units.id, target.unitId)).limit(1)
-    const check = canEnter(target, new Date(), usedCount, providerWindows)
+    const [rubro] = target.tradeId
+      ? await tx.select({ requiresInsurance: trades.requiresInsurance }).from(trades).where(eq(trades.id, target.tradeId))
+      : []
+    const pide = pideSeguro(target.kind, target.frequentAs, rubro?.requiresInsurance ?? null)
+
+    // El seguro que trae el guardia se guarda ANTES de canEnter y en esta misma
+    // transacción: si canEnter rechaza, el throw lo revierte junto con su auditoría.
+    let seguro = { insuranceCompany: target.insuranceCompany, insurancePolicy: target.insurancePolicy, insuranceExpiresOn: target.insuranceExpiresOn }
+    if (data.insurance && pide) {
+      seguro = { insuranceCompany: data.insurance.company, insurancePolicy: data.insurance.policy, insuranceExpiresOn: data.insurance.expiresOn }
+      await tx.update(invitations).set(seguro).where(eq(invitations.id, invitationId))
+      await audit(guardId, nid, 'invitation.insurance_updated', 'invitation', invitationId, data.insurance, tx)
+    }
+
+    const check = canEnter(aLike({ ...target, ...seguro, requiresInsurance: rubro?.requiresInsurance ?? null }), new Date(), usedCount, providerWindows)
     if (!check.ok) throw new AppError(409, check.reason)
 
     const [entry] = await tx.insert(entryLogs).values({
@@ -586,6 +620,9 @@ export type AuditRow = {
   kind: 'visita' | 'frecuente' | 'proveedor'
   frequentAs: 'visita' | 'proveedor' | null
   tradeName: string | null
+  insuranceCompany: string | null
+  insurancePolicy: string | null
+  insuranceExpiresOn: string | null
   unitLabel: string
   inviterName: string
   validFrom: string
@@ -772,6 +809,9 @@ async function auditRows(
       i.kind,
       i.frequent_as       as "frequentAs",
       t.name                      as "tradeName",
+      i.insurance_company         as "insuranceCompany",
+      i.insurance_policy          as "insurancePolicy",
+      i.insurance_expires_on::text as "insuranceExpiresOn",
       u.label                     as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.valid_from                as "validFrom",
