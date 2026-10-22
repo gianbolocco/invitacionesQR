@@ -6,6 +6,8 @@ const s = (expiresOn: string | null, requiresInsurance = true) =>
 const HOY = '2026-10-21'
 assert.equal(estadoSeguro(s('2027-01-01', false), HOY, 15), 'no_aplica')
 assert.equal(estadoSeguro(s(null), HOY, 15), 'sin_cargar')
+assert.equal(estadoSeguro({ ...s('2027-01-01'), insuranceCompany: ' ' }, HOY, 15), 'sin_cargar')
+assert.equal(estadoSeguro({ ...s('2027-01-01'), insurancePolicy: null }, HOY, 15), 'sin_cargar')
 assert.equal(estadoSeguro(s('2026-10-20'), HOY, 15), 'vencido')
 assert.equal(estadoSeguro(s('2026-10-21'), HOY, 15), 'por_vencer')   // vence hoy: vale, pero avisa
 assert.equal(estadoSeguro(s('2026-11-05'), HOY, 15), 'por_vencer')   // 15 días justos

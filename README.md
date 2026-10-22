@@ -27,7 +27,7 @@ la trazabilidad de quién entró y quién no.
 
 **El guardia** tiene su propia cuenta —cada movimiento queda a nombre de quien
 estaba logueado, que es lo que hace auditable el "¿quién lo dejó pasar?"—, la
-lista del día, el escáner y la auditoría exportable a Excel. El buscador de la
+lista del día, el escáner y la auditoría exportable a Excel (cada fila abre su detalle en un panel: proveedor, invitación y movimientos). El buscador de la
 garita muestra los resultados flotando sobre la pantalla (en el celular, a
 pantalla completa) y se maneja con el teclado: flechas, Enter y Esc.
 
@@ -55,7 +55,7 @@ invitar, el proveedor desde su link o el guardia en la garita. Sin seguro
 vigente la garita muestra NO PASA · Sin seguro (o Seguro vencido): el guardia lo
 carga ahí mismo y registra el ingreso, o usa **Autorizar igual**. Si el admin
 fija con cuántos días avisar, el guardia ve "vence en N días" antes de que
-venza, y el tablero del admin lista los seguros vencidos, por vencer y sin cargar.
+venza; la auditoría y el Excel muestran el estado del seguro de cada proveedor.
 
 El alta exprés de la garita (**Autorizar sin invitación**) puede ser visita o
 proveedor, con su rubro y el seguro si quiere cargarlo. A un proveedor que

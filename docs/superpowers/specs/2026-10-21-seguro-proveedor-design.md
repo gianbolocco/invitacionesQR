@@ -47,13 +47,7 @@ la invitación vigente aunque su póliza haya vencido hace meses.
    avisa), en *Barrio → Alertas*, junto a las de permanencia. En el veredicto
    (INGRESO) aparece la línea "Seguro vence en 5 días (26/10)" en `espera`. No
    bloquea.
-6. **Lista del admin.** En el tablero, el bloque "Seguros de proveedores" tiene
-   **una fila por invitación** vigente que pide seguro y lo tiene sin cargar,
-   vencido o por vencer.
-   - Columnas: estado, invitado, rubro, lote, compañía · póliza y vence.
-   - Orden: vencidos, por vencer (el más cercano primero) y sin cargar.
-   - Una póliza repetida en varios lotes **no** se agrupa: son invitaciones
-     distintas.
+6. **Lista del admin.** Se sacó el 22/10: los vencimientos se ven en la auditoría y en el Excel.
 7. Los egresos y la carga manual no se tocan, como siempre.
 
 ## canEnter
@@ -102,7 +96,7 @@ Migración `0018_seguro_proveedor`.
   frecuente lo renueva; documento y patente siguen congelados con `already_entered`),
   pero el PATCH público no lo puede borrar y rechaza un vencimiento anterior a hoy
   con `400 seguro_vencido`.
-- `GET /admin/insurance`: las filas de la regla 6.
+- `GET /admin/insurance`: se sacó el 22/10 junto con la regla 6.
 - **Auditoría y Excel:** columna **Seguro** (`La Segunda · 4471-22 · vence 12/04/2027`).
 
 ## Pantallas

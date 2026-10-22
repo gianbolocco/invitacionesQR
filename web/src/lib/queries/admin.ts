@@ -199,7 +199,6 @@ export function useGuardarBarrio() {
     onSuccess: (b) => {
       qc.setQueryData(claves.barrio, b)
       qc.invalidateQueries({ queryKey: claveMarca })
-      qc.invalidateQueries({ queryKey: claveSeguros })
     },
     onError: () => toast.error('No se pudo guardar. Revisá el link de mapas (tiene que empezar con http), las horas (de 1 a 72) y los días del seguro (de 1 a 90).'),
   })
@@ -296,8 +295,6 @@ export type Rubro = { id: string; name: string; archivedAt: string | null; requi
 
 const claveRubros = ['admin', 'rubros'] as const
 
-const claveSeguros = ['admin', 'seguros'] as const
-
 export function useRubros() {
   return useQuery({ queryKey: claveRubros, queryFn: ({ signal }) => api<Rubro[]>('/admin/trades', { signal }) })
 }
@@ -318,10 +315,7 @@ export function useEditarRubro() {
   return useMutation({
     mutationFn: ({ id, ...datos }: { id: string; name?: string; archived?: boolean; requiresInsurance?: boolean }) =>
       api<Rubro>(`/admin/trades/${id}`, { method: 'PATCH', body: JSON.stringify(datos) }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: claveRubros })
-      qc.invalidateQueries({ queryKey: claveSeguros })
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveRubros }),
     onError: (e) => toast.error(ERRORES_RUBRO[(e as ApiError).code] ?? 'No se pudo guardar el rubro. Probá de nuevo.'),
   })
 }
@@ -335,23 +329,5 @@ export function useGuardarFranjas() {
     onError: (e) => toast.error((e as ApiError).code === 'franja_invalida'
       ? 'Revisá las franjas: cada una necesita al menos un día y un horario de inicio anterior al de fin.'
       : 'No se pudieron guardar los horarios. Probá de nuevo.'),
-  })
-}
-
-export type SeguroVencimiento = {
-  id: string
-  estado: 'vencido' | 'por_vencer' | 'sin_cargar'
-  guestName: string
-  tradeName: string
-  unitLabel: string
-  company: string | null
-  policy: string | null
-  expiresOn: string | null
-}
-
-export function useSegurosVencimientos() {
-  return useQuery({
-    queryKey: claveSeguros,
-    queryFn: ({ signal }) => api<SeguroVencimiento[]>('/admin/insurance', { signal }),
   })
 }

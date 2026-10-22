@@ -7,7 +7,7 @@ import { hoyISO, sumarDias } from '@/lib/fechas'
 import { useDemora } from '@/lib/use-demora'
 import { useMedia } from '@/lib/use-media'
 import { usePreferencia } from '@/lib/use-preferencia'
-import { paramsDe, useAuditoria, type FiltrosAuditoria } from '@/lib/queries/auditoria'
+import { paramsDe, useAuditoria, type AuditRow, type FiltrosAuditoria } from '@/lib/queries/auditoria'
 import { ChromeAdmin } from '@/components/admin/chrome'
 import { ChromeGarita } from '@/components/garita/chrome'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
@@ -22,6 +22,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabla } from '@/components/auditoria/tabla'
 import { Tarjetas } from '@/components/auditoria/tarjetas'
+import { Detalle } from '@/components/auditoria/detalle'
 import { cn } from '@/lib/utils'
 
 type Vista = 'tabla' | 'tarjetas'
@@ -58,6 +59,7 @@ export default function AuditoriaPage() {
   const [tipo, setTipo] = useState<FiltrosAuditoria['tipo']>('todos')
   const [texto, setTexto] = useState('')
   const [page, setPage] = useState(1)
+  const [abierta, setAbierta] = useState<AuditRow | null>(null)
 
   const medio = useMedia('(min-width: 768px)')
   const [guardada, guardar] = usePreferencia<Vista>('visitpass.auditoria.vista')
@@ -101,6 +103,7 @@ export default function AuditoriaPage() {
   const lista = consulta.data?.rows ?? []
   const counts = consulta.data?.counts
   const total = consulta.data?.total ?? 0
+  const warnDays = consulta.data?.insuranceWarnDays ?? null
   const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const todos = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0
   // Se llega acá desde las dos secciones: cada rol ve el marco de la suya.
@@ -177,7 +180,7 @@ export default function AuditoriaPage() {
         ) : (
           // Mientras llega la búsqueda nueva, la lista anterior queda a media luz en vez de saltar.
           <div className={cn('transition-opacity duration-150', consulta.isPlaceholderData && 'opacity-60')}>
-            {vista === 'tabla' ? <Tabla filas={lista} /> : <Tarjetas filas={lista} />}
+            {vista === 'tabla' ? <Tabla filas={lista} warnDays={warnDays} onAbrir={setAbierta} /> : <Tarjetas filas={lista} warnDays={warnDays} onAbrir={setAbierta} />}
           </div>
         )}
 
@@ -192,6 +195,7 @@ export default function AuditoriaPage() {
           </nav>
         )}
       </div>
+      <Detalle fila={abierta} warnDays={warnDays} onCerrar={() => setAbierta(null)} />
     </Chrome>
   )
 }

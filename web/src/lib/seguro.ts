@@ -14,7 +14,9 @@ export function estadoSeguro(
   warnDays: number | null,
 ): EstadoSeguro {
   if (!inv.requiresInsurance) return 'no_aplica'
-  if (!inv.insuranceExpiresOn) return 'sin_cargar'
+  // Igual que seguroCompleto de la API: con un dato en blanco, el seguro no está cargado.
+  const lleno = (v: string | null) => Boolean(v?.trim())
+  if (!lleno(inv.insuranceCompany) || !lleno(inv.insurancePolicy) || !inv.insuranceExpiresOn) return 'sin_cargar'
   const dias = diasHasta(inv.insuranceExpiresOn, hoy)
   if (dias < 0) return 'vencido'
   return warnDays !== null && dias <= warnDays ? 'por_vencer' : 'vigente'

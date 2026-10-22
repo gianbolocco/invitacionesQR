@@ -25,6 +25,15 @@ export type AuditRow = {
   manual: boolean
   /** null = no la anuló la portería. '' = la anuló sin dejar motivo. */
   revokedReason: string | null
+  requiresInsurance: boolean
+  insuranceCompany: string | null
+  insurancePolicy: string | null
+  insuranceExpiresOn: string | null
+  /** Días de la semana de la invitación (0 = domingo); null = todos. */
+  weekdays: number[] | null
+  note: string | null
+  /** La dio de alta la portería, no un vecino. */
+  porteria: boolean
 }
 
 export type AuditEstado = AuditRow['status']
@@ -35,6 +44,7 @@ export type Pagina = {
   page: number
   pageSize: number
   counts: Record<AuditEstado, number>
+  insuranceWarnDays: number | null
 }
 
 export type Movimiento = {

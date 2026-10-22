@@ -50,20 +50,22 @@ test('el guardia pasa la planilla del corte y la auditoría la muestra completa'
 
     await g.goto('/auditoria')
     const buscar = g.getByLabel('Buscar en la auditoría')
-    const desplegar = g.getByRole('button', { name: /^(Ver|Ocultar) (los|el)/ })
+    const fila = (n: string) => g.getByRole('button', { name: `Ver detalle de ${n}` })
 
     // Esperar a que la lista ya sea la filtrada: antes se ven las filas de la búsqueda anterior.
     await buscar.fill(nombre)
-    await expect(g.getByRole('button', { name: /^(Ver|Ocultar) (los|el)/ })).toHaveCount(1)
-    await expect(g.getByText(nombre)).toBeVisible()
+    await expect(fila(nombre)).toHaveCount(1)
     await expect(g.getByText('Carga manual').first()).toBeVisible()
-    await desplegar.first().click()
-    await expect(g.getByText(/AB123CD/)).toBeVisible()
-    await expect(g.getByText(/Cargado a mano por/)).toBeVisible()
+    await fila(nombre).click()
+    const panel = g.getByRole('dialog')
+    await expect(panel.getByText(/AB123CD/)).toBeVisible()
+    await expect(panel.getByText(/Cargado a mano por/)).toBeVisible()
+    await g.keyboard.press('Escape')
+    await expect(panel).toBeHidden()
+    await expect(fila(nombre)).toBeFocused()
 
     await buscar.fill(sinInvitacion)
-    await expect(g.getByRole('button', { name: /^(Ver|Ocultar) (los|el)/ })).toHaveCount(1)
-    await expect(g.getByText(sinInvitacion)).toBeVisible()
+    await expect(fila(sinInvitacion)).toHaveCount(1)
     await expect(g.getByText('Carga manual').first()).toBeVisible()
     await expect(g.getByText('Autorizado por portería').first()).toBeVisible()
 
