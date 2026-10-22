@@ -16,3 +16,16 @@ export function seguroCompleto(company: string | null, policy: string | null, ex
 export function seguroVigente(expiresOn: string, now: Date): boolean {
   return expiresOn >= todayInBuenosAires(now)
 }
+
+/** Lo que se lee en una planilla. Mismas reglas que estadoSeguro del front. */
+export function estadoSeguro(
+  r: { requiresInsurance: boolean; company: string | null; policy: string | null; expiresOn: string | null },
+  warnDays: number | null,
+  now: Date = new Date(),
+): 'No aplica' | 'Sin cargar' | 'Vencido' | 'Por vencer' | 'Vigente' {
+  if (!r.requiresInsurance) return 'No aplica'
+  if (!seguroCompleto(r.company, r.policy, r.expiresOn)) return 'Sin cargar'
+  if (!seguroVigente(r.expiresOn!, now)) return 'Vencido'
+  const dias = (Date.parse(r.expiresOn!) - Date.parse(todayInBuenosAires(now))) / 86_400_000
+  return warnDays && dias <= warnDays ? 'Por vencer' : 'Vigente'
+}

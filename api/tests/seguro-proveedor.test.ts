@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
+import ExcelJS from 'exceljs'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
 import { eq } from 'drizzle-orm'
@@ -234,51 +235,58 @@ describe('seguro del proveedor: barrera', () => {
     expect(fila.insurancePolicy).toBeNull()
   })
 
-  it('la auditoría y el Excel traen el seguro', async () => {
-    const { guardia, invitar, rubro } = await conGuardia()
-    await invitar({ tradeId: await rubro('Albañil', true), insurance: seguro }).expect(201)
-    const r = await request(app).get('/gate/audit').set('Cookie', guardia).expect(200)
-    expect(r.body.rows[0]).toMatchObject({ insuranceCompany: 'La Segunda', insurancePolicy: 'AP-123', insuranceExpiresOn: '2999-01-01' })
-    await request(app).get('/gate/audit.xlsx').set('Cookie', guardia).expect(200)
-  })
-})
-
-describe('seguro del proveedor: lista de vencimientos', () => {
-  beforeEach(async () => { await resetDb(); resetRateLimits() })
-
-  const en = (dias: number) => {
-    const d = new Date(`${hoy}T00:00:00Z`)
-    d.setUTCDate(d.getUTCDate() + dias)
-    return d.toISOString().slice(0, 10)
-  }
-
-  it('devuelve vencido, por vencer y sin cargar, y deja afuera el resto', async () => {
-    const { admin, invitar, rubro, vecino } = await escenario()
-    await request(app).patch('/admin/neighborhood').set('Cookie', admin).send({ insuranceWarnDays: 15 }).expect(200)
+  it('la auditoría y el Excel traen el detalle del proveedor', async () => {
+    const { guardia, invitar, rubro, admin } = await conGuardia()
+    await request(app).patch('/admin/neighborhood').set('Cookie', admin).send({ insuranceWarnDays: 30 }).expect(200)
     const alba = await rubro('Albañil', true)
-    const agua = await rubro('Agua')
-    const con = (guestName: string, expiresOn: string) =>
-      invitar({ tradeId: alba, guestName, insurance: { ...seguro, expiresOn } }).expect(201)
-    await invitar({ tradeId: alba, guestName: 'Sin cargar' }).expect(201)
-    await con('Por vencer', en(5))
-    await con('Vencido', en(-3))
-    await con('Lejano', en(100))
-    const { body: anulada } = await con('Anulada', en(-3))
-    await request(app).post(`/invitations/${anulada.id}/revoke`).set('Cookie', vecino).expect(200)
-    await invitar({ tradeId: alba, guestName: 'De ventana', validFrom: en(-9), validTo: en(-8) }).expect(201)
-    await invitar({ tradeId: agua, guestName: 'Agua' }).expect(201)
+    const { body: inv } = await invitar({ tradeId: alba, guestName: 'Con seguro', insurance: seguro, note: 'Gol rojo', weekdays: [1, 3, 5] }).expect(201)
+    await invitar({ tradeId: alba, guestName: 'Sin seguro' }).expect(201)
+    await invitar({ tradeId: alba, guestName: 'Por vencer', insurance: { ...seguro, expiresOn: hoy } }).expect(201)
+    await invitar({ tradeId: await rubro('Agua'), guestName: 'No aplica' }).expect(201)
+    const { body: entra } = await invitar({ tradeId: alba, guestName: 'Entra', insurance: seguro }).expect(201)
+    await request(app).post('/gate/entries').set('Cookie', guardia).send(entrada(entra.id)).expect(201)
 
-    const r = await request(app).get('/admin/insurance').set('Cookie', admin).expect(200)
-    expect(r.body.map((f: { guestName: string; estado: string }) => [f.guestName, f.estado])).toEqual([
-      ['Vencido', 'vencido'], ['Por vencer', 'por_vencer'], ['Sin cargar', 'sin_cargar'],
-    ])
-    expect(r.body[0]).toMatchObject({ tradeName: 'Albañil', unitLabel: 'Lote 1', company: 'La Segunda', policy: 'AP-123', expiresOn: en(-3) })
-  })
+    const r = await request(app).get('/gate/audit').set('Cookie', guardia).expect(200)
+    expect(r.body.insuranceWarnDays).toBe(30)
+    const fila = r.body.rows.find((x: { guestName: string }) => x.guestName === 'Con seguro')
+    expect(fila).toMatchObject({
+      insuranceCompany: 'La Segunda', insurancePolicy: 'AP-123', insuranceExpiresOn: '2999-01-01',
+      requiresInsurance: true, weekdays: [1, 3, 5], note: 'Gol rojo', porteria: false, frequentAs: null,
+    })
 
-  it('sin insuranceWarnDays no hay por vencer', async () => {
-    const { admin, invitar, rubro } = await escenario()
-    await invitar({ tradeId: await rubro('Albañil', true), insurance: { ...seguro, expiresOn: en(5) } }).expect(201)
-    const r = await request(app).get('/admin/insurance').set('Cookie', admin).expect(200)
-    expect(r.body).toEqual([])
+    const res = await request(app).get('/gate/audit.xlsx').set('Cookie', guardia)
+      .buffer(true).parse((q, cb) => {
+        const t: Buffer[] = []
+        q.on('data', (d: Buffer) => t.push(d))
+        q.on('end', () => cb(null, Buffer.concat(t)))
+      }).expect(200)
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body as Buffer)
+    const leer = (hoja: string) => {
+      const ws = wb.getWorksheet(hoja)!
+      const cab = (ws.getRow(1).values as unknown[]).map(String)
+      const filas = new Map<string, (t: string) => unknown>()
+      ws.eachRow((row, n) => {
+        if (n > 1) filas.set(String(row.getCell(cab.indexOf('Invitado')).value), (t) => row.getCell(cab.indexOf(t)).value)
+      })
+      return { cab, filas }
+    }
+    const inv1 = leer('Invitaciones')
+    expect(inv1.cab).not.toContain('Seguro')
+    expect(inv1.cab).toEqual(expect.arrayContaining(['Frecuente como', 'Días', 'Compañía', 'Póliza', 'Vence seguro', 'Estado seguro', 'Nota del vecino', 'Autorizó portería']))
+    const con = inv1.filas.get('Con seguro')!
+    expect(con('Compañía')).toBe('La Segunda')
+    expect(con('Póliza')).toBe('AP-123')
+    expect(con('Vence seguro')).toBeInstanceOf(Date)
+    expect(con('Estado seguro')).toBe('Vigente')
+    expect(con('Días')).toBe('Lun, Mié, Vie')
+    expect(con('Nota del vecino')).toBe('Gol rojo')
+    expect(inv1.filas.get('Sin seguro')!('Estado seguro')).toBe('Sin cargar')
+    expect(inv1.filas.get('Por vencer')!('Estado seguro')).toBe('Por vencer')
+    expect(inv1.filas.get('No aplica')!('Estado seguro')).toBe('No aplica')
+
+    const ing = leer('Ingresos')
+    expect(ing.cab).toContain('Rubro')
+    expect(ing.filas.get('Pedro')!('Rubro')).toBe('Albañil')
   })
 })

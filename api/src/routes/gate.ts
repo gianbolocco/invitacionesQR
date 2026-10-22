@@ -11,6 +11,7 @@ import { searchUnits, listUnits } from '../services/units.js'
 import { createExpressInvitation, revokeByGuard } from '../services/invitations.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { slug } from '../lib/slug.js'
+import { estadoSeguro } from '../lib/seguro.js'
 import { buildWorkbook, diaExcel, fechaExcel, XLSX_MIME } from '../lib/excel.js'
 import { COLOR_DEFAULT } from '../lib/marca.js'
 import { entriesLog } from '../services/reports.js'
@@ -174,6 +175,8 @@ const KIND_EXCEL: Record<string, string> = {
 const guardia = (nombre: string | null, manual: boolean) =>
   nombre && manual ? `Carga manual · ${nombre}` : nombre ?? ''
 
+const DIAS_CORTOS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
 const dd = (iso: string) => iso.split('-').reverse().join('/')
 
 /**
@@ -246,7 +249,12 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Patente', key: 'patente' },
           { header: 'Tipo', key: 'tipo' },
           { header: 'Rubro', key: 'rubro' },
-          { header: 'Seguro', key: 'seguro', width: 36 },
+          { header: 'Frecuente como', key: 'frecuenteComo', width: 16 },
+          { header: 'Días', key: 'dias', width: 22 },
+          { header: 'Compañía', key: 'compania', width: 22 },
+          { header: 'Póliza', key: 'poliza', width: 16 },
+          { header: 'Vence seguro', key: 'venceSeguro', formato: 'fecha' },
+          { header: 'Estado seguro', key: 'estadoSeguro', width: 16 },
           { header: 'Unidad', key: 'unidad' },
           { header: 'Invitó', key: 'invito', width: 24 },
           { header: 'Desde', key: 'desde', formato: 'fecha' },
@@ -257,6 +265,8 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Salida', key: 'salida', width: 18, formato: 'fechaHora' },
           { header: 'Guardia salida', key: 'guardiaSalida', width: 20 },
           { header: 'Carga manual', key: 'manual' },
+          { header: 'Nota del vecino', key: 'notaVecino', width: 30 },
+          { header: 'Autorizó portería', key: 'porteria', width: 18 },
         ],
         filas: auditoria.map((r) => ({
           invitado: r.guestName,
@@ -264,7 +274,15 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           patente: r.plate ?? '',
           tipo: KIND_EXCEL[r.kind] ?? r.kind,
           rubro: r.tradeName ?? '',
-          seguro: r.insuranceCompany ? `${r.insuranceCompany} · ${r.insurancePolicy} · vence ${dd(r.insuranceExpiresOn!)}` : '',
+          frecuenteComo: r.kind === 'frecuente' ? (r.frequentAs === 'proveedor' ? 'A trabajar' : 'Visita') : '',
+          dias: r.weekdays?.map((d) => DIAS_CORTOS[d]).join(', ') ?? '',
+          compania: r.insuranceCompany ?? '',
+          poliza: r.insurancePolicy ?? '',
+          venceSeguro: r.insuranceExpiresOn ? diaExcel(r.insuranceExpiresOn) : '',
+          estadoSeguro: estadoSeguro(
+            { requiresInsurance: r.requiresInsurance, company: r.insuranceCompany, policy: r.insurancePolicy, expiresOn: r.insuranceExpiresOn },
+            barrio.insuranceWarnDays,
+          ),
           unidad: r.unitLabel,
           invito: r.inviterName,
           desde: diaExcel(r.validFrom),
@@ -275,6 +293,8 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           salida: r.exitedAt ? fechaExcel(r.exitedAt) : '',
           guardiaSalida: guardia(r.exitGuardName, r.manual),
           manual: r.manual ? 'Sí' : 'No',
+          notaVecino: r.note ?? '',
+          porteria: r.porteria ? 'Sí' : '',
         })),
       },
       {
@@ -287,6 +307,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Invitado', key: 'invitado', width: 26 },
           { header: 'DNI', key: 'dni' },
           { header: 'Patente', key: 'patente' },
+          { header: 'Rubro', key: 'rubro' },
           { header: 'Unidad', key: 'unidad' },
           { header: 'Origen', key: 'origen' },
           { header: 'Cargado el', key: 'cargado', width: 18, formato: 'fechaHora' },
@@ -301,6 +322,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           invitado: e.guestName,
           dni: e.guestDoc ?? '',
           patente: e.plate ?? '',
+          rubro: e.tradeName ?? '',
           unidad: e.unitLabel,
           origen: e.manual ? 'Carga manual' : 'Escaneo',
           cargado: e.loadedAt ? fechaExcel(e.loadedAt) : '',

@@ -132,6 +132,7 @@ export type EntryRow = {
   manual: boolean
   note: string | null
   invitationNote: string | null
+  tradeName: string | null
   loadedAt: string | null
   loaderName: string | null
 }
@@ -143,11 +144,12 @@ export async function entriesLog(neighborhoodId: string, f: EntryFilters): Promi
            e.guest_doc as "guestDoc", e.plate, u.label as "unitLabel",
            g.name as "guardName", gs.name as "exitGuardName",
            (e.source = 'manual') as manual,
-           e.note, i.note as "invitationNote",
+           e.note, i.note as "invitationNote", t.name as "tradeName",
            e.loaded_at as "loadedAt", lp.name as "loaderName"
     from entry_log e
     join unit u on u.id = e.unit_id
     join invitation i on i.id = e.invitation_id
+    left join trade t on t.id = i.trade_id
     left join person g on g.id = e.guard_id
     left join person gs on gs.id = e.exit_guard_id
     left join person lp on lp.id = e.loaded_by

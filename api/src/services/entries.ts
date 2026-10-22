@@ -625,6 +625,14 @@ export type AuditRow = {
   kind: 'visita' | 'frecuente' | 'proveedor'
   frequentAs: 'visita' | 'proveedor' | null
   tradeName: string | null
+  /** El rubro pide seguro Y esta invitación es de quien entra a trabajar. */
+  requiresInsurance: boolean
+  /** 0 = domingo. null = todos los días. */
+  weekdays: number[] | null
+  /** Lo que el vecino le dejó dicho a la guardia. */
+  note: string | null
+  /** La creó la portería (alta exprés), no un vecino. */
+  porteria: boolean
   insuranceCompany: string | null
   insurancePolicy: string | null
   insuranceExpiresOn: string | null
@@ -670,6 +678,8 @@ export type AuditPage = {
   page: number
   pageSize: number
   counts: Record<AuditStatus, number>
+  /** Días de aviso de vencimiento del barrio; null = sin aviso. */
+  insuranceWarnDays: number | null
 }
 
 /**
@@ -688,16 +698,17 @@ export async function auditInvitations(
 ): Promise<AuditPage> {
   const page = Math.max(1, f.page ?? 1)
   const pageSize = Math.min(200, Math.max(1, f.pageSize ?? 50))
-  const [rows, counts] = await Promise.all([
+  const [rows, counts, [barrio]] = await Promise.all([
     auditRows(neighborhoodId, f, pageSize, (page - 1) * pageSize),
     auditCounts(neighborhoodId, f),
+    db.select({ dias: neighborhoods.insuranceWarnDays }).from(neighborhoods).where(eq(neighborhoods.id, neighborhoodId)),
   ])
 
   const total = f.status
     ? counts[f.status]
     : Object.values(counts).reduce((a, b) => a + b, 0)
 
-  return { rows, total, page, pageSize, counts }
+  return { rows, total, page, pageSize, counts, insuranceWarnDays: barrio?.dias ?? null }
 }
 
 /**
@@ -814,6 +825,10 @@ async function auditRows(
       i.kind,
       i.frequent_as       as "frequentAs",
       t.name                      as "tradeName",
+      t.requires_insurance        as "tradeRequiresInsurance",
+      i.weekdays,
+      i.note,
+      (p.role = 'guard')          as porteria,
       i.insurance_company         as "insuranceCompany",
       i.insurance_policy          as "insurancePolicy",
       i.insurance_expires_on::text as "insuranceExpiresOn",
@@ -854,5 +869,9 @@ async function auditRows(
     limit ${limit} offset ${offset}
   `)
 
-  return res.rows as unknown as AuditRow[]
+  return (res.rows as unknown as (Omit<AuditRow, 'requiresInsurance'> & { tradeRequiresInsurance: boolean | null })[])
+    .map(({ tradeRequiresInsurance, ...r }) => ({
+      ...r,
+      requiresInsurance: pideSeguro(r.kind, r.frequentAs, tradeRequiresInsurance),
+    }))
 }
