@@ -3,6 +3,10 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Campo } from '@/components/dominio/campo'
+import { Chips } from '@/components/dominio/chips'
+import { CamposSeguro, erroresSeguro, estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useRubrosDelBarrio } from '@/lib/queries/invitaciones'
 import { Fila } from '@/components/dominio/fila'
 import { useDemora } from '@/lib/use-demora'
 import { useBuscarUnidades, useAltaExpres } from '@/lib/queries/garita'
@@ -14,12 +18,17 @@ import {
 } from '@/components/ui/sheet'
 
 /** Lo que ya se sabe de una invitación rechazada que se autoriza igual. */
-export type InicialAlta = { guestName: string; guestDoc: string; plate: string; unidad: UnidadHit }
+export type InicialAlta = {
+  guestName: string; guestDoc: string; plate: string; unidad: UnidadHit
+  kind: 'visita' | 'proveedor'; tradeId: string; seguro: ValorSeguro
+}
+
+const SIN_SEGURO: ValorSeguro = { company: '', policy: '', expiresOn: '' }
 
 /**
- * El alta exprés: nombre + lote nada más. Tipo, ventana y cupo quedan fijos
- * (visita, solo hoy, una persona) — es alguien parado en la puerta ahora, no
- * una invitación a futuro.
+ * El alta exprés: visita o proveedor, con lote. Ventana y cupo quedan fijos
+ * (solo hoy, una persona) — es alguien parado en la puerta ahora, no una
+ * invitación a futuro. Lo autoriza la portería: no se controla horario ni seguro.
  */
 export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lectura = null, onQr, inicial }: {
   abierto: boolean
@@ -36,6 +45,17 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const [guestDoc, setGuestDoc] = useState('')
   const [plate, setPlate] = useState('')
   const [nota, setNota] = useState('')
+  const [kind, setKind] = useState<'visita' | 'proveedor'>('visita')
+  const [rubro, setRubro] = useState('')
+  const [seguro, setSeguro] = useState<ValorSeguro>(SIN_SEGURO)
+  const [intento, setIntento] = useState(false)
+  const { data: rubros } = useRubrosDelBarrio()
+  const listaRubros = rubros?.trades ?? []
+  // Sin rubros activos en el barrio no hay campo; un rubro precargado que ya no está activo no vale.
+  const pideRubro = kind === 'proveedor' && listaRubros.length > 0
+  const rubroActual = listaRubros.find((t) => t.id === rubro)
+  const pideSeguro = pideRubro && Boolean(rubroActual?.requiresInsurance)
+  const errorRubro = intento && pideRubro && !rubroActual ? 'Elegí el rubro.' : null
   const qDemorada = useDemora(qUnidad)
   const unidades = useBuscarUnidades(unidad ? '' : qDemorada.trim())
   const alta = useAltaExpres()
@@ -70,11 +90,14 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const [abiertoVisto, setAbiertoVisto] = useState(abierto)
   if (abierto !== abiertoVisto) {
     setAbiertoVisto(abierto)
-    if (!abierto) { setNombreEscaneado(''); setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate(''); setNota('') }
+    if (!abierto) { setNombreEscaneado(''); setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate(''); setNota('')
+      setKind('visita'); setRubro(''); setSeguro(SIN_SEGURO); setIntento(false)
+    }
     // "Autorizar igual": todo lo que ya se sabe de la invitación rechazada, lote incluido.
     else if (inicial) {
       setGuestName(inicial.guestName); setUnidad(inicial.unidad)
       setGuestDoc(inicial.guestDoc); setPlate(inicial.plate)
+      setKind(inicial.kind); setRubro(inicial.tradeId); setSeguro(inicial.seguro)
     }
   }
 
@@ -93,9 +116,16 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
     if (!unidad) return
+    setIntento(true)
+    if ((pideRubro && !rubroActual) || (pideSeguro && estadoSeguroCargado(seguro) === 'parcial')) return
     const inv = await alta.mutateAsync({
       unitId: unidad.unitId, guestName, guestDoc: guestDoc || undefined, plate: plate || undefined,
       note: nota.trim() || undefined,
+      kind,
+      tradeId: pideRubro ? rubro : null,
+      // Los tres datos o ninguno: uno a medias no se manda (el campo lo marca).
+      insurance: pideSeguro && estadoSeguroCargado(seguro) === 'completo'
+        ? { company: seguro.company.trim(), policy: seguro.policy.trim(), expiresOn: seguro.expiresOn } : undefined,
     })
     cerrar(false)
     onCreada(inv.id)
@@ -111,6 +141,12 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
           <SheetDescription>Para cuando el vecino aprobó por teléfono. Vale solo por hoy.</SheetDescription>
         </SheetHeader>
         <form onSubmit={enviar} className="flex flex-col gap-4 px-4 pb-8">
+          <Campo id="tipo-expres" etiqueta="Tipo">
+            <Chips etiqueta="Tipo de ingreso" valor={kind}
+              onCambio={(v) => { setKind(v); if (v === 'visita') { setRubro(''); setSeguro(SIN_SEGURO); setIntento(false) } }}
+              opciones={[{ valor: 'visita', etiqueta: 'Visita' }, { valor: 'proveedor', etiqueta: 'Proveedor' }]} />
+          </Campo>
+
           <Campo id="nombre-expres" etiqueta="Nombre del invitado">
             <Input id="nombre-expres" required onKeyDown={teclaNombre} value={guestName} onChange={(e) => setGuestName(e.target.value)} />
           </Campo>
@@ -139,6 +175,33 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
               </>
             )}
           </Campo>
+
+          {kind === 'proveedor' && (
+            <>
+              {pideRubro && (
+                <Campo id="rubro-expres" etiqueta="Rubro" error={errorRubro}>
+                  <Select value={rubroActual ? rubro : ''} onValueChange={(v) => {
+                    setRubro(v)
+                    if (!listaRubros.find((t) => t.id === v)?.requiresInsurance) setSeguro(SIN_SEGURO)
+                  }}>
+                    <SelectTrigger id="rubro-expres" className="h-11! w-full" aria-invalid={Boolean(errorRubro) || undefined}>
+                      <SelectValue placeholder="Elegí el rubro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {listaRubros.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Campo>
+              )}
+              {pideSeguro && (
+                <section className="flex flex-col gap-4 rounded-md bg-surface-sunk/70 p-4">
+                  <p className="font-semibold">Seguro (opcional)</p>
+                  <CamposSeguro idBase="seguro-expres" valor={seguro} onCambio={setSeguro} errores={intento ? erroresSeguro(seguro) : undefined} />
+                </section>
+              )}
+              <p className="text-sm text-ink-soft">Lo autorizás vos: no se controla el horario ni el seguro.</p>
+            </>
+          )}
 
           <Campo id="doc-expres" etiqueta="Documento">
             <Input id="doc-expres" onKeyDown={teclaDoc} value={guestDoc} className="tabular" placeholder="30.123.456"

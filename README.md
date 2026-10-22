@@ -57,6 +57,10 @@ carga ahí mismo y registra el ingreso, o usa **Autorizar igual**. Si el admin
 fija con cuántos días avisar, el guardia ve "vence en N días" antes de que
 venza, y el tablero del admin lista los seguros vencidos, por vencer y sin cargar.
 
+El alta exprés de la garita (**Autorizar sin invitación**) puede ser visita o
+proveedor, con su rubro y el seguro si quiere cargarlo. A un proveedor que
+autoriza la portería no se le controla horario ni seguro.
+
 **El admin** da de alta vecinos y guardias, corrige lotes, edita los datos del
 barrio (las horas de la alerta de permanencia, los rubros y los horarios de
 proveedores incluidos) y ve el tablero.

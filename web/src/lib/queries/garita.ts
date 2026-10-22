@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { api, apiBase, ApiError } from '@/lib/api'
 import { hoyISO } from '@/lib/fechas'
 import {
-  porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres,
+  porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres, mensajeAltaExpres,
   cargarManual, mensajeCargaManual, anularPorPorteria, mensajeAnulacion, type Resultado,
 } from '@/lib/gate'
 import type { LecturaDni } from '@/lib/lectora'
@@ -236,7 +236,7 @@ export function useAltaExpres() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: altaExpres,
-    onError: () => toast.error('No se pudo crear la invitación. Probá de nuevo.'),
+    onError: (e) => toast.error(mensajeAltaExpres(e) ?? 'No se pudo crear la invitación. Probá de nuevo.'),
     onSuccess: () => invalidarGarita(qc),
   })
 }

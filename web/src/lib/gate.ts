@@ -13,6 +13,8 @@ export type Resultado = {
   invitation: {
     id: string
     kind: 'visita' | 'frecuente' | 'proveedor'
+    frequentAs: 'visita' | 'proveedor' | null
+    tradeId: string | null
     guestName: string
     guestDoc: string | null
     plate: string | null
@@ -137,8 +139,21 @@ export const registrarEgreso = (invitationId: string) =>
 
 export const buscarUnidades = (q: string) => api<UnidadHit[]>(`/gate/units?q=${encodeURIComponent(q)}`)
 
-export const altaExpres = (datos: { unitId: string; guestName: string; guestDoc?: string; plate?: string; note?: string }) =>
-  api<{ id: string }>('/gate/invitations', { method: 'POST', body: JSON.stringify(datos) })
+export const altaExpres = (datos: {
+  unitId: string; guestName: string; guestDoc?: string; plate?: string; note?: string
+  kind: 'visita' | 'proveedor'; tradeId?: string | null
+  insurance?: { company: string; policy: string; expiresOn: string }
+}) => api<{ id: string }>('/gate/invitations', { method: 'POST', body: JSON.stringify(datos) })
+
+/** Lo que la API le rechaza al alta exprés y el guardia puede corregir; null si es otra cosa. */
+export function mensajeAltaExpres(error: unknown): string | null {
+  const codigo = error instanceof ApiError ? error.code : ''
+  return ({
+    rubro_requerido: 'Elegí el rubro.',
+    rubro_invalido: 'Ese rubro ya no está disponible. Elegí otro.',
+    seguro_no_aplica: 'Este rubro no pide seguro.',
+  } as Record<string, string>)[codigo] ?? null
+}
 
 export const deshacer = (entryId: string) =>
   api<{ deshecho: 'ingreso' | 'egreso' }>(`/gate/entries/${entryId}/undo`, { method: 'POST' })

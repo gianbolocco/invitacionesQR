@@ -57,8 +57,8 @@ export function Tabla({ filas }: { filas: AuditRow[] }) {
                 <tr className={cn('border-b border-line align-top transition-colors duration-150',
                   abierto ? 'bg-surface-sunk/60' : 'hover:bg-surface-sunk/40')}>
                   <td className="px-4 py-3">
-                    <span className="flex items-center gap-2">
-                      <span className="min-w-0 truncate font-semibold">{r.guestName}</span>
+                    <span className="block break-words font-semibold">{r.guestName}</span>
+                    <span className="mt-1 flex flex-wrap gap-1 empty:hidden">
                       <TagTipo kind={r.kind} frequentAs={r.frequentAs} tradeName={r.tradeName} />
                       {r.manual && <TagManual />}
                     </span>
