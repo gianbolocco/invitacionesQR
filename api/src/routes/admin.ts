@@ -10,7 +10,7 @@ import {
 import { importPeopleRows, previewPeopleCsv } from '../services/people-import.js'
 import { getNeighborhood, updateNeighborhood } from '../services/neighborhoods.js'
 import { listTrades, createTrade, updateTrade, vencimientosDeSeguro } from '../services/trades.js'
-import { guardarLogo, borrarLogo } from '../services/branding.js'
+import { guardarLogo, borrarLogo, guardarPlano, borrarPlano } from '../services/branding.js'
 import { AppError } from '../lib/errors.js'
 import { contrasena } from '../lib/contrasena.js'
 import { rateLimit } from '../middleware/rateLimit.js'
@@ -203,5 +203,21 @@ adminRoutes.put('/branding/logo',
 
 adminRoutes.delete('/branding/logo', async (req, res) => {
   await borrarLogo(req.person!.id)
+  res.json({ ok: true })
+})
+
+/* Mismo criterio que el logo: el formato real lo decide tipoDePlano() por los bytes. */
+adminRoutes.put('/branding/plano',
+  express.raw({ type: ['image/svg+xml', 'image/png', 'image/jpeg'], limit: '1mb' }),
+  async (req, res) => {
+    const bytes = req.body
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0) {
+      throw new AppError(400, 'formato_no_soportado')
+    }
+    res.json(await guardarPlano(bytes, req.person!.id))
+  })
+
+adminRoutes.delete('/branding/plano', async (req, res) => {
+  await borrarPlano(req.person!.id)
   res.json({ ok: true })
 })

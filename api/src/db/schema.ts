@@ -34,6 +34,11 @@ export const neighborhoods = pgTable('neighborhood', {
   // Cuándo se cambió el logo por última vez. Viaja como versión en la URL del
   // logo: la respuesta se cachea una hora y sin esto se vería el anterior.
   logoUpdatedAt: timestamp('logo_updated_at', { withTimezone: true }),
+  // El plano del barrio (SVG, PNG o JPG), en la base como el logo. Viaja como
+  // versión en la URL por la misma razón.
+  mapImage: bytea('map_image'),
+  mapImageMime: text('map_image_mime'),
+  mapImageUpdatedAt: timestamp('map_image_updated_at', { withTimezone: true }),
   // Horas adentro antes de que la garita avise, por tipo. NULL = ese tipo no
   // alerta. Una frecuente usa la de su subtipo (`invitation.frequent_as`).
   overstayHoursVisita: smallint('overstay_hours_visita'),

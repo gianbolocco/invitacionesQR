@@ -46,3 +46,18 @@ export function tipoDeImagen(buf: Buffer): 'image/png' | 'image/jpeg' | null {
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'
   return null
 }
+
+/** SVG: texto (con o sin BOM / <?xml) que tiene un elemento <svg. PNG y JPG, por la firma de siempre. */
+export function tipoDePlano(bytes: Buffer): 'image/svg+xml' | 'image/png' | 'image/jpeg' | null {
+  const img = tipoDeImagen(bytes)
+  if (img) return img
+  const inicio = bytes.subarray(0, 1024).toString('utf8').replace(/^﻿/, '').trimStart()
+  return /^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(inicio) ? 'image/svg+xml' : null
+}
+
+/** El lote de destino, pintado con el color del barrio. Va al final para ganarle a los estilos del archivo. */
+export function resaltarLote(svg: string, lote: string, color: string): string {
+  const css = `<style>#lote-${lote} rect{fill:${color}}#lote-${lote} text{fill:#fff;font-weight:700}</style>`
+  const i = svg.lastIndexOf('</svg>')
+  return i === -1 ? svg : svg.slice(0, i) + css + svg.slice(i)
+}
