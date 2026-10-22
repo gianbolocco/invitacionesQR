@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { CircleAlert, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -9,7 +9,7 @@ import { Chips, ChipsMultiples } from '@/components/dominio/chips'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
 import { Nota } from '@/components/dominio/nota'
 import { HorarioRubro } from '@/components/dominio/horario-rubro'
-import { CamposSeguro, estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
+import { CamposSeguro, erroresSeguro, estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
 import { DIAS, KIND_LABEL, type Invitation } from '@/lib/invitations'
 import { fechaCorta, hoyISO, unMesDespues } from '@/lib/fechas'
 import { ApiError } from '@/lib/api'
@@ -167,12 +167,8 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
               El rubro {nombreRubro} necesita seguro para entrar. Si no lo tenés, lo puede cargar el proveedor desde su link.
             </p>
           </div>
-          <CamposSeguro idBase="seguro" valor={seguro} onCambio={(v) => { setSeguro(v); tocar('seguro') }} />
-          {mostrar('seguro') && (
-            <p role="alert" className="flex items-start gap-1.5 text-sm text-alto">
-              <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />{mostrar('seguro')}
-            </p>
-          )}
+          <CamposSeguro idBase="seguro" valor={seguro} onCambio={(v) => { setSeguro(v); tocar('seguro') }}
+            errores={tocado.seguro ? erroresSeguro(seguro) : undefined} />
         </section>
       )}
       {choques.length > 0 && (

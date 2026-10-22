@@ -11,7 +11,7 @@ import { HorarioRubro } from '@/components/dominio/horario-rubro'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { CamposSeguro, estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
+import { CamposSeguro, erroresSeguro, estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
 import { Campo } from '@/components/dominio/campo'
 import { Marca } from '@/components/dominio/marca'
 import { Nota } from '@/components/dominio/nota'
@@ -101,8 +101,8 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
           </div>
           {estadoSeguro === 'vigente' && <p className="text-sm font-semibold text-verde">Ya hay un seguro vigente cargado. Cargalo de nuevo solo si cambió.</p>}
           {estadoSeguro === 'vencido' && <p className="text-sm font-semibold text-alto">El seguro cargado está vencido.</p>}
-          <CamposSeguro idBase="seguro" valor={seguro} onCambio={setSeguro} />
-          {errorSeguro && <Nota tono="error">Completá los tres datos del seguro o dejalos vacíos.</Nota>}
+          <CamposSeguro idBase="seguro" valor={seguro} onCambio={(v) => { setSeguro(v); setErrorSeguro(false) }}
+            errores={errorSeguro ? erroresSeguro(seguro) : undefined} />
         </div>
       )}
       {guardar.isError && <Nota tono="error">No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.</Nota>}
