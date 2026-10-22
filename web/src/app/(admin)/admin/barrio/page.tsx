@@ -1,8 +1,9 @@
 'use client'
 import { useRef, useState } from 'react'
 import { Upload, X } from 'lucide-react'
-import { useBarrio, useRubros, useGuardarBarrio, useSubirLogo, useQuitarLogo, type HorasPermanencia } from '@/lib/queries/admin'
-import { logoUrl, useMarca } from '@/lib/marca-cliente'
+import { useBarrio, useRubros, useGuardarBarrio, useSubirLogo, useQuitarLogo, useSubirPlano, useQuitarPlano, type HorasPermanencia } from '@/lib/queries/admin'
+import { ApiError } from '@/lib/api'
+import { logoUrl, planoUrl, useMarca } from '@/lib/marca-cliente'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { VistaPreviaMarca } from '@/components/admin/vista-previa-marca'
 import { Rubros } from '@/components/admin/rubros'
@@ -40,6 +41,8 @@ export default function BarrioPage() {
   const rubros = useRubros()
   const subirLogo = useSubirLogo()
   const quitarLogo = useQuitarLogo()
+  const subirPlano = useSubirPlano()
+  const quitarPlano = useQuitarPlano()
 
   const [nombre, setNombre] = useState('')
   const [address, setAddress] = useState('')
@@ -53,6 +56,9 @@ export default function BarrioPage() {
   const [diasSeguro, setDiasSeguro] = useState<string | null>(null)
   const [cargado, setCargado] = useState(false)
   const inputArchivo = useRef<HTMLInputElement>(null)
+  const [arrastrandoPlano, setArrastrandoPlano] = useState(false)
+  const [errorPlano, setErrorPlano] = useState<string | null>(null)
+  const inputPlano = useRef<HTMLInputElement>(null)
 
   // Se precarga una sola vez, cuando llegan los datos: después el admin
   // manda sobre lo que escribe, la query no le pisa el formulario. Se
@@ -96,6 +102,22 @@ export default function BarrioPage() {
       return
     }
     await subirLogo.mutateAsync(file).catch(() => setErrorLogo('No se pudo subir. Probá de nuevo.'))
+  }
+
+  async function subirElPlano(file: File) {
+    setErrorPlano(null)
+    if (!['image/svg+xml', 'image/png', 'image/jpeg'].includes(file.type)) {
+      setErrorPlano('Ese archivo no es un SVG, PNG ni JPG.')
+      return
+    }
+    if (file.size > 1_000_000) {
+      setErrorPlano('El archivo pesa más de 1 MB.')
+      return
+    }
+    await subirPlano.mutateAsync(file).catch((e: unknown) => setErrorPlano(
+      e instanceof ApiError && e.code === 'formato_no_soportado' ? 'Ese archivo no es un SVG, PNG ni JPG.'
+        : e instanceof ApiError && e.status === 413 ? 'El archivo pesa más de 1 MB.'
+        : 'No se pudo subir. Probá de nuevo.'))
   }
 
   if (barrio.isPending) return <p className="text-ink-soft">Cargando…</p>
@@ -235,6 +257,46 @@ export default function BarrioPage() {
           {marcaReal.tieneLogo && (
             <Button variant="outline" onClick={() => quitarLogo.mutate()} disabled={quitarLogo.isPending}>
               <X aria-hidden />Quitar el logo
+            </Button>
+          )}
+        </div>
+
+        <div className="flex flex-col items-start gap-3 rounded-md border border-line bg-card p-5">
+          <p className="text-[13px] font-semibold text-ink-soft">Plano del barrio</p>
+          {marcaReal.tienePlano ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={planoUrl(marcaReal, null) ?? ''} alt="Plano del barrio"
+              className="max-h-64 w-auto max-w-full rounded-md bg-white object-contain ring-1 ring-black/5" />
+          ) : (
+            <p className="text-ink-soft">Sin plano, el invitado no ve ninguno.</p>
+          )}
+
+          <button type="button"
+            onClick={() => inputPlano.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setArrastrandoPlano(true) }}
+            onDragLeave={() => setArrastrandoPlano(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setArrastrandoPlano(false)
+              const file = e.dataTransfer.files[0]
+              if (file) subirElPlano(file)
+            }}
+            disabled={subirPlano.isPending}
+            className={`flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 text-center text-sm
+              ${arrastrandoPlano ? 'border-azul bg-azul-tint' : 'border-line'} disabled:opacity-50`}>
+            <Upload className="size-5 text-ink-soft" aria-hidden />
+            <span>{subirPlano.isPending ? 'Subiendo…' : 'Arrastrá el plano, o tocá para elegirlo'}</span>
+            <span className="text-xs text-ink-soft">SVG, PNG o JPG, hasta 1 MB. Si es un SVG con los lotes como lote-N, el invitado ve su lote resaltado.</span>
+          </button>
+          <input ref={inputPlano} type="file" accept=".svg,.png,.jpg,.jpeg,image/svg+xml,image/png,image/jpeg" className="sr-only"
+            aria-label="Archivo del plano"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) subirElPlano(f); e.target.value = '' }} />
+
+          {errorPlano && <Nota tono="error">{errorPlano}</Nota>}
+
+          {marcaReal.tienePlano && (
+            <Button variant="outline" onClick={() => quitarPlano.mutate()} disabled={quitarPlano.isPending}>
+              <X aria-hidden />Quitar el plano
             </Button>
           )}
         </div>

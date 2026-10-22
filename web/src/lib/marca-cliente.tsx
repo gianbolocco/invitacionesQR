@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, apiBase } from './api'
+import { urlPlano } from './plano'
 import { MARCA_DEFAULT, type Marca } from './marca'
 
 export const claveMarca = ['marca'] as const
@@ -36,6 +37,11 @@ export function useMarca(): Marca {
  */
 export function logoUrl(m: Marca): string | null {
   return m.tieneLogo ? `${apiBase}/branding/logo?v=${m.logoVersion ?? 0}` : null
+}
+
+/** La URL del plano del barrio (con su versión y, si hay, el lote a resaltar). */
+export function planoUrl(m: Marca, lote: string | null): string | null {
+  return m.tienePlano ? urlPlano(apiBase, m.planoVersion ?? 0, lote) : null
 }
 
 /**

@@ -61,6 +61,10 @@ venza, y el tablero del admin lista los seguros vencidos, por vencer y sin carga
 barrio (las horas de la alerta de permanencia, los rubros y los horarios de
 proveedores incluidos) y ve el tablero.
 
+**El plano del barrio**: el admin sube una imagen (SVG, PNG o JPG, hasta 1 MB) y el
+invitado la ve en su link. Si es un SVG con los lotes como `lote-N`, el lote del
+invitado aparece resaltado. El de Alamo Alto está en `docs/barrios/`.
+
 ## Correr en desarrollo
 
 ```bash

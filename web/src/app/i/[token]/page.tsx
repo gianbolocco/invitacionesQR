@@ -6,6 +6,8 @@ import { Loader2, MapPin, SearchX, Sun } from 'lucide-react'
 import { api } from '@/lib/api'
 import { KIND_LABEL, PORTERIA, vigencia, type Invitation } from '@/lib/invitations'
 import { hoyISO } from '@/lib/fechas'
+import { planoUrl, useMarca } from '@/lib/marca-cliente'
+import { loteDeLabel } from '@/lib/plano'
 import { type Franja } from '@/lib/franjas'
 import { HorarioRubro } from '@/components/dominio/horario-rubro'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -13,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CamposSeguro, erroresSeguro, estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
 import { Campo } from '@/components/dominio/campo'
+import { PlanoBarrio } from '@/components/dominio/plano-barrio'
 import { Marca } from '@/components/dominio/marca'
 import { Nota } from '@/components/dominio/nota'
 import { Pase } from '@/components/dominio/pase'
@@ -116,6 +119,7 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
 
 export default function InvitacionPublica({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
+  const marca = useMarca()
   const q = useQuery({
     queryKey: ['publica', token],
     queryFn: ({ signal }) => api<Publica>(`/invitations/public/${token}`, { signal }),
@@ -154,6 +158,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
   const sello = anulada ? 'Anulada' : vencida ? 'Vencida' : undefined
   const url = typeof window === 'undefined' ? '' : window.location.href
   const { address, mapUrl } = inv.neighborhood
+  const lote = loteDeLabel(inv.unitLabel)
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-6">
@@ -211,6 +216,8 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
           )}
         </section>
       )}
+
+      {marca.tienePlano && <PlanoBarrio src={planoUrl(marca, lote) ?? ''} lote={lote} />}
     </main>
   )
 }

@@ -229,6 +229,24 @@ export function useQuitarLogo() {
   })
 }
 
+export function useSubirPlano() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => api('/admin/branding/plano', {
+      method: 'PUT', headers: { 'Content-Type': file.type }, body: file,
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
+  })
+}
+
+export function useQuitarPlano() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api('/admin/branding/plano', { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
+  })
+}
+
 export type FilaPreview = {
   line: number
   name: string

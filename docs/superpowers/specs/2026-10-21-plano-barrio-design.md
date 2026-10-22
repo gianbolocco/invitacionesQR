@@ -1,6 +1,6 @@
 # Plano del barrio: diseño
 
-Estado: en revisión (21/10). Rama `seguro-y-plano`. Es el subproyecto 3 del
+Estado: implementado (21/10). Rama `seguro-y-plano`. Es el subproyecto 3 del
 mail de Alamo Alto.
 
 ## Problema
