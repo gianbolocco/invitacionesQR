@@ -27,6 +27,9 @@ export function vigenciaCorta(r: Pick<AuditRow, 'validFrom' | 'validTo'>): strin
     : `${fechaNumerica(r.validFrom)}–${fechaNumerica(r.validTo)}`
 }
 
+/** Un clic que terminó de seleccionar texto (para copiar un DNI) no abre el panel. */
+export const haySeleccion = () => Boolean(window.getSelection()?.toString())
+
 export const COLOR_SEGURO = { por_vencer: 'text-espera', vencido: 'text-alto', sin_cargar: 'text-alto', vigente: 'text-ink', no_aplica: 'text-ink-soft' } as const
 export const TEXTO_SEGURO = { por_vencer: 'Por vencer', vencido: 'Vencido', sin_cargar: 'Sin cargar', vigente: 'Vigente', no_aplica: '' } as const
 
@@ -50,7 +53,7 @@ export function NombreFila({ r, warnDays, onAbrir }: { r: AuditRow; warnDays: nu
   return (
     <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-1.5">
-        <button type="button" onClick={(e) => { e.stopPropagation(); onAbrir() }} aria-label={`Ver detalle de ${r.guestName}`} data-fila={r.id}
+        <button type="button" onClick={(e) => { e.stopPropagation(); if (e.detail === 0 || !haySeleccion()) onAbrir() }} aria-label={`Ver detalle de ${r.guestName}`} data-fila={r.id}
           className="min-w-0 break-words rounded-sm text-left font-bold after:absolute after:inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           {r.guestName}
         </button>
@@ -100,7 +103,7 @@ export function Tabla({ filas, warnDays, onAbrir }: { filas: AuditRow[]; warnDay
         </thead>
         <tbody>
           {filas.map((r) => (
-            <tr key={r.id} onClick={() => onAbrir(r)}
+            <tr key={r.id} onClick={() => { if (!haySeleccion()) onAbrir(r) }}
               className="cursor-pointer border-b border-line align-top transition-colors duration-150 hover:bg-surface-sunk/40">
               <td className="relative px-4 py-3">
                 <NombreFila r={r} warnDays={warnDays} onAbrir={() => onAbrir(r)} />

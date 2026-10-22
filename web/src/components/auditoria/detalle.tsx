@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { fechaCompleta, hoyISO } from '@/lib/fechas'
@@ -61,18 +61,20 @@ function Proveedor({ r, warnDays }: { r: AuditRow; warnDays: number | null }) {
  * Todo lo de una fila de la auditoría: el proveedor, la invitación y cada
  * movimiento. Un panel a un costado en escritorio, de abajo en el celular.
  */
-export function Detalle({ fila, warnDays, onCerrar }: { fila: AuditRow | null; warnDays: number | null; onCerrar: () => void }) {
-  // Radix devuelve el foco al Trigger, y acá no hay: se lo damos a mano a la fila que abrió el panel.
-  const ultima = useRef<string | null>(null)
-  useEffect(() => { if (fila) ultima.current = fila.id }, [fila])
+export function Detalle({ fila: abierta, warnDays, onCerrar }: { fila: AuditRow | null; warnDays: number | null; onCerrar: () => void }) {
+  // Al cerrar, `abierta` vuelve a null pero el panel tarda en deslizarse: se muestra la última fila para que no salga en blanco.
+  // También es la fila a la que vuelve el foco (Radix lo devuelve al Trigger, y acá no hay).
+  const [ultima, setUltima] = useState<AuditRow | null>(null)
+  if (abierta && abierta !== ultima) setUltima(abierta)
+  const fila = abierta ?? ultima
   const tipo = !fila ? '' : fila.kind === 'frecuente'
     ? (fila.frequentAs === 'proveedor' ? 'Frecuente · viene a trabajar' : 'Frecuente')
     : fila.kind === 'proveedor' ? 'Proveedor' : 'Visita'
   return (
-    <Sheet open={fila !== null} onOpenChange={(abierto) => { if (!abierto) onCerrar() }}>
+    <Sheet open={abierta !== null} onOpenChange={(abierto) => { if (!abierto) onCerrar() }}>
       <SheetContent onCloseAutoFocus={(e) => {
         e.preventDefault()
-        document.querySelector<HTMLElement>(`[data-fila="${ultima.current}"]`)?.focus()
+        document.querySelector<HTMLElement>(`[data-fila="${ultima?.id}"]`)?.focus()
       }}>
         {fila && (
           <>
