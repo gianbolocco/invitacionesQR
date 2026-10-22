@@ -6,7 +6,8 @@
 -- El admin se crea aparte con crear-admin-cli. Las cuentas de demo entran con "pass123" (vecinos por
 -- mail, guardias por usuario: ramon, julio).
 --
--- Carga también los rubros de proveedores y las franjas horarias de Alamo Alto.
+-- Carga también los rubros de proveedores, las franjas horarias de Alamo Alto
+-- y los rubros que piden seguro (con proveedores vencido, por vencer y sin seguro).
 --
 -- Correrlo a la mañana de la demo: los horarios de "adentro" salen de now().
 
@@ -51,6 +52,9 @@ begin
   insert into trade (neighborhood_id, name)
   select nid, t from unnest(array['Jardinero','Piletero','Electricista','Plomero','Carpintero','Albañil',
     'Corralón','Gasista','Techista','Agua','Flete']) t;
+  -- Piden seguro vigente: Albañil, Gasista, Electricista y Techista; aviso a 15 días.
+  update trade set requires_insurance = true where name in ('Albañil','Gasista','Electricista','Techista');
+  update neighborhood set insurance_warn_days = 15 where id = nid;
   update neighborhood set provider_windows = jsonb_build_array(
     jsonb_build_object('days', jsonb_build_array(1,2,3,4,5), 'from', '08:00', 'to', '17:00',
       'season', jsonb_build_object('from', '04-01', 'to', '10-31'), 'trades', null),
@@ -165,6 +169,26 @@ begin
   values (l12, laura, 'frecuente', 'proveedor', 'Ariel Gómez', '30.555.666',
     hoy - 10, hoy + 60, '{1,3,6}', 999, md5(random()::text), ahora - interval '10 days',
     (select id from trade where name = 'Jardinero'));
+
+  -- Seguros: albañil con la póliza vencida hace 9 días (la barrera lo rechaza),
+  -- gasista frecuente que vence en 5 días (cae en el aviso de 15) y electricista sin seguro.
+  insert into invitation (unit_id, created_by, kind, guest_name, guest_doc, plate,
+    valid_from, valid_to, capacity, token, created_at, trade_id,
+    insurance_company, insurance_policy, insurance_expires_on)
+  values (l27, martin, 'proveedor', 'Ramiro Peralta', '27.345.901', 'AD 301 MN',
+    hoy, hoy, 1, md5(random()::text), ahora - interval '1 day', (select id from trade where name = 'Albañil'),
+    'La Segunda', 'AP-4471823', hoy - 9);
+  insert into invitation (unit_id, created_by, kind, frequent_as, guest_name, guest_doc,
+    valid_from, valid_to, weekdays, capacity, token, created_at, trade_id,
+    insurance_company, insurance_policy, insurance_expires_on)
+  values (l34, sofia, 'frecuente', 'proveedor', 'Osvaldo Benavídez', '22.870.134',
+    hoy - 30, hoy + 60, null, 999, md5(random()::text), ahora - interval '30 days',
+    (select id from trade where name = 'Gasista'),
+    'Sancor Seguros', '0082-559310', hoy + 5);
+  insert into invitation (unit_id, created_by, kind, guest_name, guest_doc,
+    valid_from, valid_to, capacity, token, created_at, trade_id)
+  values (l55, pablo, 'proveedor', 'Gustavo Lescano', '29.654.312',
+    hoy, hoy, 1, md5(random()::text), ahora - interval '1 day', (select id from trade where name = 'Electricista'));
 
   -- Visita de ayer que nunca registró la salida: la garita la marca en amarillo.
   insert into invitation (unit_id, created_by, kind, guest_name, guest_doc, plate,
