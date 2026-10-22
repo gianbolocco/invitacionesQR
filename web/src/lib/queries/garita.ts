@@ -200,7 +200,8 @@ export function useRegistrarIngreso() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: registrarIngreso,
-    onError: () => toast.error('No se pudo registrar. Probá de nuevo.'),
+    // La fecha vencida del seguro se avisa en el campo, no en un toast.
+    onError: (e) => { if (!(e instanceof ApiError && e.code === 'insurance_expired')) toast.error('No se pudo registrar. Probá de nuevo.') },
     onSettled: () => invalidarGarita(qc),
   })
 }

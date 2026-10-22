@@ -26,7 +26,13 @@ export type Resultado = {
     inviterName: string
     note: string | null
     tradeName: string | null
+    requiresInsurance: boolean
+    insuranceCompany: string | null
+    insurancePolicy: string | null
+    insuranceExpiresOn: string | null
   }
+  /** Días de aviso antes del vencimiento del seguro; null si el barrio no avisa. */
+  insuranceWarnDays: number | null
   /** Las franjas del rubro de un proveedor; [] para el resto. */
   franjas: Franja[]
   check: Check
@@ -68,7 +74,12 @@ export const MOTIVO: Record<string, string> = {
   outside_hours: 'Fuera de horario',
   no_esta_adentro: 'No figura adentro',
   fuera_de_plazo: 'Pasó el tiempo para deshacer',
+  no_insurance: 'Sin seguro',
+  insurance_expired: 'Seguro vencido',
 }
+
+/** Los rechazos que la guardia puede resolver cargando el seguro ahí mismo. */
+export const rechazoPorSeguro = (c: Check) => !c.ok && (c.reason === 'no_insurance' || c.reason === 'insurance_expired')
 
 /**
  * El dato concreto detrás del motivo, para que el guardia se lo pueda decir al
@@ -76,9 +87,16 @@ export const MOTIVO: Record<string, string> = {
  */
 export function detalleRechazo(
   reason: string,
-  inv: { validFrom: string; validTo: string; weekdays: number[] | null },
+  inv: {
+    validFrom: string; validTo: string; weekdays: number[] | null
+    insuranceCompany?: string | null; insurancePolicy?: string | null; insuranceExpiresOn?: string | null
+  },
   extra?: { franjas: Franja[]; tradeName: string | null },
 ): string | null {
+  if (reason === 'no_insurance') return 'Su rubro pide seguro y no tiene uno cargado'
+  if (reason === 'insurance_expired' && inv.insuranceExpiresOn) {
+    return `Venció el ${fechaNumerica(inv.insuranceExpiresOn)} · ${inv.insuranceCompany} · Póliza ${inv.insurancePolicy}`
+  }
   if (reason === 'outside_hours') {
     if (!extra) return null
     return detalleFueraDeHorario(extra.franjas, extra.tradeName ?? 'Proveedor', new Date())
@@ -111,6 +129,7 @@ export const registrarIngreso = (datos: {
   guestName: string
   guestDoc?: string
   plate?: string
+  insurance?: { company: string; policy: string; expiresOn: string }
 }) => api<Movimiento>('/gate/entries', { method: 'POST', body: JSON.stringify(datos) })
 
 export const registrarEgreso = (invitationId: string) =>

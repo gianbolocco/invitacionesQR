@@ -4,7 +4,9 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2 } from 'lucide-react'
-import { MOTIVO, detalleRechazo, hora, mensajeDeError, type Movimiento } from '@/lib/gate'
+import { MOTIVO, detalleRechazo, hora, mensajeDeError, rechazoPorSeguro, type Movimiento } from '@/lib/gate'
+import { ApiError } from '@/lib/api'
+import { estadoSeguro, textoVence } from '@/lib/seguro'
 import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
 import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
@@ -105,6 +107,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const [doc, setDoc] = useState('')
   const [docLeido, setDocLeido] = useState(false)
   const [plate, setPlate] = useState('')
+  const [seguro, setSeguro] = useState({ company: '', policy: '', expiresOn: '' })
+  const [fechaPasada, setFechaPasada] = useState(false)
   // Todo lo que se muestra después de registrar sale de `hecho`, no del
   // veredicto: la mutación lo invalida al terminar y `adentro` pasa a decir
   // lo contrario de lo que se acaba de registrar.
@@ -123,6 +127,10 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     setDoc(leido ?? q.data.invitation.guestDoc ?? '')
     setDocLeido(Boolean(leido))
     setPlate(q.data.invitation.plate ?? '')
+    setSeguro({
+      company: q.data.invitation.insuranceCompany ?? '', policy: q.data.invitation.insurancePolicy ?? '',
+      expiresOn: q.data.invitation.insuranceExpiresOn ?? '',
+    })
   }
 
   // Vuelve a donde estaba: el escáner, la búsqueda, la agenda o el alta
@@ -186,7 +194,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
       setLecturaAlta(l)
       return
     }
-    if (q.data && !hecho && !q.data.adentro && q.data.check.ok) {
+    if (q.data && !hecho && !q.data.adentro && (q.data.check.ok || rechazoPorSeguro(q.data.check))) {
       anotar(`DNI ${formatearDni(l.documento)} · completó el documento`)
       setDoc(l.documento)
       setDocLeido(true)
@@ -226,17 +234,24 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const esEgreso = hecho ? hecho.esEgreso : Boolean(adentro)
   const ok = Boolean(hecho) || esEgreso || check.ok
 
+  // NO PASA por seguro: el guardia carga la póliza y el ingreso se registra en el mismo paso.
+  const cargaSeguro = !ok && rechazoPorSeguro(check)
+  const seguroCompleto = Boolean(seguro.company.trim() && seguro.policy.trim() && seguro.expiresOn)
+
   async function registrar() {
+    setFechaPasada(false)
     try {
       const mov = esEgreso
         ? await egresar.mutateAsync(inv.id)
         : await ingresar.mutateAsync({
           invitationId: inv.id, guestName: inv.guestName,
           guestDoc: doc || undefined, plate: plate || undefined,
+          insurance: cargaSeguro ? { company: seguro.company.trim(), policy: seguro.policy.trim(), expiresOn: seguro.expiresOn } : undefined,
         })
       setHecho({ movimiento: mov, esEgreso })
-    } catch {
-      // El toast de error ya lo muestra la mutación.
+    } catch (e) {
+      // El toast de error ya lo muestra la mutación, salvo la fecha vencida: va bajo el campo.
+      if (e instanceof ApiError && e.code === 'insurance_expired') setFechaPasada(true)
     }
   }
 
@@ -251,8 +266,9 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const entro = hecho ? hecho.movimiento.enteredAt : adentro?.enteredAt
   const salio = hecho?.esEgreso ? hecho.movimiento.exitedAt : null
 
-  const editable = ok && !esEgreso && !hecho
+  const editable = (ok && !esEgreso && !hecho) || cargaSeguro
   const borde = ok ? 'border-ink/15' : 'border-current/20'
+  const avisoSeguro = ok && !esEgreso && estadoSeguro(inv, hoyISO(), resultado.insuranceWarnDays) === 'por_vencer'
   const noCoincide = Boolean(editable && inv.guestDoc && soloDigitos(doc).length >= 7
     && soloDigitos(doc) !== soloDigitos(inv.guestDoc))
   const kbd = 'rounded border border-current/30 px-1.5 py-0.5 font-mono text-xs'
@@ -280,6 +296,11 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
             </p>
           )}
           {detalle && <p className="mt-1 text-xl tabular opacity-80 sm:text-2xl lg:text-3xl">{detalle}</p>}
+          {avisoSeguro && inv.insuranceExpiresOn && (
+            <p className="mt-1 text-xl font-semibold tabular text-espera sm:text-2xl lg:text-3xl">
+              Seguro {textoVence(inv.insuranceExpiresOn, hoyISO())}
+            </p>
+          )}
 
           <p className={`mt-8 break-words border-t pt-5 text-3xl font-semibold leading-tight sm:text-4xl lg:text-6xl ${borde}`}>
             {inv.guestName}
@@ -326,6 +347,9 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
             <Dato etiqueta="Tipo">{KIND_LABEL[inv.kind]}{inv.tradeName && ` · ${inv.kind === 'frecuente' ? `${KIND_LABEL.proveedor} · ` : ''}${inv.tradeName}`}</Dato>
             <Dato etiqueta="Lote">{inv.unitLabel}</Dato>
             <Dato etiqueta="Invita">{inv.inviterName}</Dato>
+            {inv.requiresInsurance && !cargaSeguro && inv.insuranceExpiresOn && (
+              <Dato etiqueta="Seguro">{inv.insuranceCompany} · {inv.insurancePolicy} · vence {inv.insuranceExpiresOn.split('-').reverse().join('/')}</Dato>
+            )}
             {!esEgreso && <Dato etiqueta="Vigencia">{vigencia(inv)}</Dato>}
             {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}
             {inv.capacity > 1 && inv.kind !== 'frecuente' && (
@@ -350,6 +374,31 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               </Dato>
             )}
           </dl>
+
+          {cargaSeguro && !hecho && (
+            <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-2.5 text-lg sm:text-xl">
+              <dt className="self-start pt-2.5 opacity-70"><label htmlFor="seguro-compania">Compañía</label></dt>
+              <dd className="min-w-0">
+                <Input id="seguro-compania" value={seguro.company} autoComplete="off"
+                  onChange={(e) => setSeguro({ ...seguro, company: e.target.value })}
+                  className="h-12 border-control bg-card text-xl" />
+              </dd>
+              <dt className="self-start pt-2.5 opacity-70"><label htmlFor="seguro-poliza">Póliza</label></dt>
+              <dd className="min-w-0">
+                <Input id="seguro-poliza" value={seguro.policy} autoComplete="off"
+                  onChange={(e) => setSeguro({ ...seguro, policy: e.target.value })}
+                  className="tabular h-12 border-control bg-card text-xl" />
+              </dd>
+              <dt className="self-start pt-2.5 opacity-70"><label htmlFor="seguro-vence">Vence</label></dt>
+              <dd className="min-w-0">
+                <Input id="seguro-vence" type="date" value={seguro.expiresOn}
+                  aria-invalid={fechaPasada || undefined} aria-describedby={fechaPasada ? 'seguro-vence-nota' : undefined}
+                  onChange={(e) => { setSeguro({ ...seguro, expiresOn: e.target.value }); setFechaPasada(false) }}
+                  className="tabular h-12 border-control bg-card text-xl" />
+                {fechaPasada && <p id="seguro-vence-nota" className="mt-1 text-base font-semibold">La fecha cargada ya pasó.</p>}
+              </dd>
+            </dl>
+          )}
 
           <motion.div layout transition={{ duration: 0.32, ease: SALIDA }} className="w-full">
             <AnimatePresence mode="popLayout" initial={false}>
@@ -382,10 +431,23 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 </motion.div>
               ) : (
                 <motion.div key="rechazo" className="flex flex-col gap-3">
-                  <button ref={accionRef} onClick={salir}
-                    className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
-                    Volver (Esc)
-                  </button>
+                  {cargaSeguro ? (
+                    <>
+                      <button ref={accionRef} onClick={registrar} disabled={registrando || !seguroCompleto || !doc.trim()}
+                        className="flex min-h-16 w-full items-center justify-center gap-2 rounded bg-no-pasa-texto text-xl font-bold text-no-pasa disabled:opacity-40">
+                        {registrando && <Loader2 className="size-5 animate-spin" aria-hidden />}
+                        {registrando ? 'Registrando…' : 'Guardar seguro y registrar ingreso'}
+                      </button>
+                      <button onClick={salir} className="min-h-14 w-full rounded border-2 border-current/40 text-lg font-bold">
+                        Volver (Esc)
+                      </button>
+                    </>
+                  ) : (
+                    <button ref={accionRef} onClick={salir}
+                      className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
+                      Volver (Esc)
+                    </button>
+                  )}
                   {/* El vecino ya dijo que sí por teléfono. Una anulada no: ahí dijo que no. */}
                   {(check as { reason: string }).reason !== 'revoked' && (
                     <button onClick={(e) => { setDisparadorAlta(e.currentTarget); setAltaAbierta(true) }}
