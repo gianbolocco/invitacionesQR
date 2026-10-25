@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, MapPin, SearchX, Sun } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { KIND_LABEL, PORTERIA, vigencia, type Invitation } from '@/lib/invitations'
-import { hoyISO } from '@/lib/fechas'
+import { fechaCompleta, hoyISO } from '@/lib/fechas'
 import { planoUrl, useMarca } from '@/lib/marca-cliente'
 import { loteDeLabel } from '@/lib/plano'
 import { type Franja } from '@/lib/franjas'
@@ -38,12 +38,15 @@ type Publica = {
   franjas: Franja[]
   requiresInsurance: boolean
   insuranceState: 'sin_cargar' | 'vigente' | 'vencido'
+  insuranceExpiresOn: string | null
+  insuranceVerified: boolean
 }
 
 /** Pide SOLO lo que falta. Los datos se piden una vez. */
-function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSeguro, soloSeguro }: {
+function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSeguro, soloSeguro, venceSeguro, seguroVerificado }: {
   token: string; faltaDoc: boolean; faltaPatente: boolean; soloSeguro: boolean
   pideSeguro: boolean; estadoSeguro: Publica['insuranceState']
+  venceSeguro: string | null; seguroVerificado: boolean
 }) {
   const qc = useQueryClient()
   const [doc, setDoc] = useState('')
@@ -51,6 +54,10 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
   const [seguro, setSeguro] = useState<ValorSeguro>({ company: '', policy: '', expiresOn: '' })
   const [errorSeguro, setErrorSeguro] = useState(false)
   const [vencido, setVencido] = useState(false)
+  const [faltaDocSeguro, setFaltaDocSeguro] = useState(false)
+  const [verificado, setVerificado] = useState(false)
+  // Con el seguro verificado por la guardia el link no puede tocarlo.
+  const cargaSeguro = pideSeguro && !seguroVerificado
   const guardar = useMutation({
     mutationFn: () => api(`/invitations/public/${token}`, {
       method: 'PATCH',
@@ -60,7 +67,11 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
           ? { company: seguro.company.trim(), policy: seguro.policy.trim(), expiresOn: seguro.expiresOn } : undefined }),
     }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['publica', token] }),
-    onError: (e) => setVencido(e instanceof ApiError && e.code === 'seguro_vencido'),
+    onError: (e) => {
+      setVencido(e instanceof ApiError && e.code === 'seguro_vencido')
+      setFaltaDocSeguro(e instanceof ApiError && e.code === 'doc_required')
+      setVerificado(e instanceof ApiError && e.code === 'seguro_verificado')
+    },
   })
 
   if (guardar.isSuccess) return <Nota tono="exito">Listo. El guardia ya tiene tus datos.</Nota>
@@ -68,10 +79,15 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
   return (
     <form onSubmit={(e) => {
       e.preventDefault()
-      const parcial = pideSeguro && estadoSeguroCargado(seguro) === 'parcial'
+      const parcial = cargaSeguro && estadoSeguroCargado(seguro) === 'parcial'
       setErrorSeguro(parcial)
       if (parcial) return
-      if (doc.trim() || plate.trim() || (pideSeguro && estadoSeguroCargado(seguro) === 'completo')) guardar.mutate()
+      // El seguro queda guardado a nombre del DNI: sin DNI no hay a quién asignarlo.
+      if (cargaSeguro && faltaDoc && estadoSeguroCargado(seguro) === 'completo' && !doc.trim()) {
+        setFaltaDocSeguro(true)
+        return
+      }
+      if (doc.trim() || plate.trim() || (cargaSeguro && estadoSeguroCargado(seguro) === 'completo')) guardar.mutate()
     }}
       className="flex flex-col gap-5 rounded-lg border border-line bg-card p-5">
       <div>
@@ -88,10 +104,13 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
               : 'Si venís en auto, cargá la patente y no te la piden en la barrera.'}
         </p>
       </div>
-      {!soloSeguro && faltaDoc && (
-        <Campo id="doc" etiqueta="Documento" ayuda="DNI, pasaporte o documento del país que sea.">
+      {/* Un frecuente que ya entró y no tenía DNI lo necesita para el seguro. */}
+      {faltaDoc && (soloSeguro ? pideSeguro : true) && (
+        <Campo id="doc" etiqueta="Documento" ayuda="DNI, pasaporte o documento del país que sea."
+          error={faltaDocSeguro ? 'Para guardar el seguro, cargá tu documento.' : null}>
           <Input id="doc" value={doc} className="tabular" placeholder="30.123.456" aria-describedby="doc-nota"
-            onChange={(e) => setDoc(e.target.value)} />
+            aria-invalid={faltaDocSeguro || undefined}
+            onChange={(e) => { setDoc(e.target.value); setFaltaDocSeguro(false) }} />
         </Campo>
       )}
       {!soloSeguro && faltaPatente && (
@@ -106,13 +125,23 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
             <p className="font-semibold">Tu seguro</p>
             <p className="text-sm text-ink-soft">Sin un seguro vigente la guardia no te deja pasar.</p>
           </div>
-          {estadoSeguro === 'vigente' && <p className="text-sm font-semibold text-verde">Ya hay un seguro vigente cargado. Cargalo de nuevo solo si cambió.</p>}
-          {estadoSeguro === 'vencido' && <p className="text-sm font-semibold text-alto">El seguro cargado está vencido.</p>}
-          <CamposSeguro idBase="seguro" valor={seguro} onCambio={(v) => { setSeguro(v); setErrorSeguro(false) }}
-            errores={errorSeguro ? erroresSeguro(seguro) : undefined} />
+          {seguroVerificado && venceSeguro ? (
+            <p className="text-sm font-semibold text-verde">La guardia ya verificó tu seguro: vence el {fechaCompleta(venceSeguro)}.</p>
+          ) : (
+            <>
+              {estadoSeguro === 'vigente' && venceSeguro && (
+                <p className="text-sm font-semibold text-verde">
+                  Tu seguro vence el {fechaCompleta(venceSeguro)}. Cargalo de nuevo solo si lo renovaste.
+                </p>
+              )}
+              {estadoSeguro === 'vencido' && <p className="text-sm font-semibold text-alto">Tu seguro está vencido. Cargá el nuevo.</p>}
+              <CamposSeguro idBase="seguro" valor={seguro} onCambio={(v) => { setSeguro(v); setErrorSeguro(false) }}
+                errores={errorSeguro ? erroresSeguro(seguro) : undefined} />
+            </>
+          )}
         </div>
       )}
-      {guardar.isError && <Nota tono="error">{vencido ? 'Esa fecha ya pasó: cargá el vencimiento de la póliza vigente.' : 'No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.'}</Nota>}
+      {guardar.isError && <Nota tono="error">{vencido ? 'Esa fecha ya pasó: cargá el vencimiento de la póliza vigente.' : verificado && venceSeguro ? `La guardia ya verificó tu seguro: vence el ${fechaCompleta(venceSeguro)}.` : 'No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.'}</Nota>}
       <Button type="submit" disabled={guardar.isPending}>
         {guardar.isPending && <Loader2 className="animate-spin" aria-hidden />}
         Guardar
@@ -163,6 +192,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
   const url = typeof window === 'undefined' ? '' : window.location.href
   const { address, mapUrl } = inv.neighborhood
   const lote = loteDeLabel(inv.unitLabel)
+  const pideCarga = inv.requiresInsurance && !inv.insuranceVerified
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-6">
@@ -204,9 +234,10 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
       )}
 
       {/* Ya entró: documento y patente quedan congelados, el seguro se puede renovar. */}
-      {!sello && (inv.frozen ? inv.requiresInsurance : (!inv.hasDoc || !inv.hasPlate || inv.requiresInsurance)) && (
+      {!sello && (inv.frozen ? pideCarga : (!inv.hasDoc || !inv.hasPlate || pideCarga)) && (
         <FormularioDatos token={token} faltaDoc={!inv.hasDoc} faltaPatente={!inv.hasPlate} soloSeguro={inv.frozen}
-          pideSeguro={inv.requiresInsurance} estadoSeguro={inv.insuranceState} />
+          pideSeguro={inv.requiresInsurance} estadoSeguro={inv.insuranceState}
+          venceSeguro={inv.insuranceExpiresOn} seguroVerificado={inv.insuranceVerified} />
       )}
 
       {(address || mapUrl) && (
