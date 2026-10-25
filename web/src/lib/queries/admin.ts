@@ -203,13 +203,14 @@ export function useBarrio() {
 export function useGuardarBarrio() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (datos: { name?: string; address: string; mapUrl: string; brandColor?: string; overstayHours?: HorasPermanencia; insuranceWarnDays?: number | null; vehicleInsuranceRequired?: boolean; vehicleInsuranceOverride?: boolean }) =>
+    // Todo opcional: cada pestaña de Configuración guarda solo lo suyo.
+    mutationFn: (datos: { name?: string; address?: string; mapUrl?: string; brandColor?: string; overstayHours?: HorasPermanencia; insuranceWarnDays?: number | null; vehicleInsuranceRequired?: boolean; vehicleInsuranceOverride?: boolean }) =>
       api<Barrio>('/admin/neighborhood', { method: 'PATCH', body: JSON.stringify(datos) }),
     onSuccess: (b) => {
       qc.setQueryData(claves.barrio, b)
       qc.invalidateQueries({ queryKey: claveMarca })
     },
-    onError: () => toast.error('No se pudo guardar. Revisá el link de mapas (tiene que empezar con http), las horas (de 1 a 72) y los días del seguro (de 1 a 90).'),
+    // Sin toast: cada pestaña de Configuración muestra el error en su propia sección.
   })
 }
 

@@ -9,7 +9,7 @@ test('la garita marca a quien pasó su tiempo adentro y lo deja filtrar', async 
   // El admin prende la alerta de visitas en 1 h. Los dos proyectos lo hacen a la
   // vez, así que solo se prende si está apagada: un clic de más la apagaría.
   await entrar(page, 'admin')
-  await page.goto('/admin/barrio')
+  await page.goto('/admin/barrio?tab=garita')
   const interruptor = page.getByRole('switch', { name: 'Alertar por visitas' })
   if ((await interruptor.getAttribute('aria-checked')) !== 'true') await interruptor.click()
   await page.getByLabel('Horas para visitas').fill('1')
