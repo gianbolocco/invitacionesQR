@@ -13,7 +13,7 @@ test('la garita marca a quien pasó su tiempo adentro y lo deja filtrar', async 
   const interruptor = page.getByRole('switch', { name: 'Alertar por visitas' })
   if ((await interruptor.getAttribute('aria-checked')) !== 'true') await interruptor.click()
   await page.getByLabel('Horas para visitas').fill('1')
-  await page.getByRole('button', { name: 'Guardar' }).click()
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click()
   await expect(page.getByText('Guardado.')).toBeVisible()
 
   const { viewport, userAgent, isMobile, hasTouch, deviceScaleFactor } = test.info().project.use

@@ -31,6 +31,7 @@ export type Invitation = {
   ultimoIngreso: string | null
   tradeId: string | null
   tradeName: string | null
+  requiresInsurance: boolean
 }
 
 export const KIND_LABEL: Record<Invitation['kind'], string> = {

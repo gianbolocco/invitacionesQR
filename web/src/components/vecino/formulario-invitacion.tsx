@@ -13,6 +13,8 @@ import { DIAS, KIND_LABEL, type Invitation } from '@/lib/invitations'
 import { fechaCorta, hoyISO, unMesDespues } from '@/lib/fechas'
 import { ApiError } from '@/lib/api'
 import { useCrearInvitacion, useEditarInvitacion, useRubrosDelBarrio, type DatosInvitacion } from '@/lib/queries/invitaciones'
+import { useCrearContacto } from '@/lib/queries/contactos'
+import { lineaContacto, type Contacto } from '@/lib/contactos'
 import { diaDe, diasSinFranja, franjasDelRubro, nombreDiaPlural } from '@/lib/franjas'
 
 type Kind = Invitation['kind']
@@ -23,10 +25,13 @@ const AYUDA_TIPO: Record<Kind, string> = {
   proveedor: 'Un servicio, un día: el técnico, el delivery, el flete.',
 }
 
-export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
+export function FormularioInvitacion({ units, inicial, invitacion, contacto, onCambiarContacto, onListo }: {
   units: { id: string; label: string }[]
-  inicial?: Partial<{ kind: Kind; guestName: string; guestDoc: string; plate: string }>
+  inicial?: Partial<{ kind: Kind; guestName: string; guestDoc: string; plate: string; tradeId: string; unitId: string }>
   invitacion?: Invitation
+  /** Con contacto, nombre y documento los trae él: en lugar de los campos va su tarjeta. */
+  contacto?: Contacto
+  onCambiarContacto?: () => void
   onListo: (inv: Invitation) => void
 }) {
   const hoy = hoyISO()
@@ -36,8 +41,8 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   const mutacion = editando ? editar : crear
 
   const [kind, setKind] = useState<Kind>(invitacion?.kind ?? inicial?.kind ?? 'visita')
-  const [frecuenteComo, setFrecuenteComo] = useState<'visita' | 'proveedor'>(invitacion?.frequentAs ?? 'visita')
-  const [unitId, setUnitId] = useState(invitacion?.unitId ?? units[0]?.id ?? '')
+  const [frecuenteComo, setFrecuenteComo] = useState<'visita' | 'proveedor'>(invitacion?.frequentAs ?? (inicial?.kind === 'proveedor' ? 'proveedor' : 'visita'))
+  const [unitId, setUnitId] = useState(invitacion?.unitId ?? inicial?.unitId ?? units[0]?.id ?? '')
   const [guestName, setGuestName] = useState(invitacion?.guestName ?? inicial?.guestName ?? '')
   const [guestDoc, setGuestDoc] = useState(invitacion?.guestDoc ?? inicial?.guestDoc ?? '')
   const [plate, setPlate] = useState(invitacion?.plate ?? inicial?.plate ?? '')
@@ -46,9 +51,11 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   // Un mes: el tope de una visita frecuente, que es la que se elige por defecto.
   const [validTo, setValidTo] = useState(invitacion?.validTo ?? unMesDespues(hoy))
   const [dias, setDias] = useState<string[]>((invitacion?.weekdays ?? []).map(String))
-  const [rubro, setRubro] = useState(invitacion?.tradeId ?? '')
+  const [rubro, setRubro] = useState(invitacion?.tradeId ?? inicial?.tradeId ?? '')
   const [tocado, setTocado] = useState<Record<string, boolean>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
+  const [guardarContacto, setGuardarContacto] = useState(false)
+  const crearContacto = useCrearContacto()
 
   const frecuente = kind === 'frecuente'
   const { data: rubros } = useRubrosDelBarrio()
@@ -62,6 +69,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   const diasRevisar = frecuente ? (dias.length ? dias.map(Number) : [0, 1, 2, 3, 4, 5, 6]) : [diaDe(validFrom)]
   const choques = pideRubro && rubro ? diasSinFranja(rubros?.providerWindows ?? [], rubro, diasRevisar) : []
   const nombreRubro = listaRubros.find((t) => t.id === rubro)?.name ?? invitacion?.tradeName ?? ''
+  const pideSeguro = pideRubro && Boolean(listaRubros.find((t) => t.id === rubro)?.requiresInsurance)
   // Una visita frecuente dura hasta un mes (la API lo exige igual); la de proveedor no tiene tope.
   const tope = frecuente && frecuenteComo === 'visita' ? unMesDespues(validFrom) : undefined
 
@@ -105,6 +113,13 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       const inv = editando
         ? await editar.mutateAsync(datos)
         : await crear.mutateAsync({ ...datos, unitId })
+      // La invitación ya está creada: si guardar el contacto falla, el toast avisa y se sigue.
+      if (!editando && !contacto && guardarContacto) {
+        await crearContacto.mutateAsync({
+          kind: comoProveedor ? 'proveedor' : 'visita', name: guestName.trim(),
+          doc: guestDoc.trim() || null, tradeId: pideRubro && rubro ? rubro : null, unitId,
+        }).catch(() => {})
+      }
       onListo(inv)
     } catch (e) {
       if (e instanceof ApiError && e.code === 'frecuente_mas_de_un_mes') {
@@ -128,7 +143,9 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   const campoRubro = pideRubro && (
     <>
       <Campo id="rubro" etiqueta="Rubro" error={mostrar('rubro')}>
-        <Select value={rubro} onValueChange={(v) => { setRubro(v); tocar('rubro') }}>
+        <Select value={rubro} onValueChange={(v) => {
+          setRubro(v); tocar('rubro')
+        }}>
           <SelectTrigger id="rubro" className="h-11! w-full" aria-invalid={Boolean(mostrar('rubro')) || undefined}>
             <SelectValue placeholder="Elegí el rubro" />
           </SelectTrigger>
@@ -141,6 +158,11 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
         </Select>
       </Campo>
       <HorarioRubro titulo="Puede entrar" franjas={franjasRubro} />
+      {pideSeguro && (
+        <p role="status" className="rounded-md bg-surface-sunk/70 p-3 text-sm text-ink-soft">
+          El rubro {nombreRubro} necesita seguro para entrar. Lo carga él desde su link o la guardia en la entrada.
+        </p>
+      )}
       {choques.length > 0 && (
         <p role="status" className="rounded-md bg-espera-tint p-3 text-sm font-semibold text-espera">
           Los {new Intl.ListFormat('es', { type: 'conjunction' }).format(choques.map((d) => nombreDiaPlural(d).toLowerCase()))} no entra el rubro {nombreRubro}:
@@ -171,11 +193,23 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
           </Campo>
         )}
 
-        <Campo id="nombre" etiqueta="Nombre del invitado" error={mostrar('guestName')}>
-          <Input id="nombre" value={guestName} placeholder="Juan Pérez" autoComplete="off"
-            aria-invalid={Boolean(mostrar('guestName')) || undefined} aria-describedby="nombre-nota"
-            onChange={(e) => setGuestName(e.target.value)} onBlur={() => tocar('guestName')} />
-        </Campo>
+        {contacto ? (
+          <div className="flex items-center justify-between gap-3 rounded-md bg-verde-tint p-4">
+            <div className="min-w-0">
+              <p className="truncate font-semibold">{contacto.name}</p>
+              <p className="truncate text-sm text-ink-soft tabular">{lineaContacto(contacto)}</p>
+            </div>
+            {onCambiarContacto && (
+              <Button type="button" variant="ghost" size="sm" onClick={onCambiarContacto}>Cambiar</Button>
+            )}
+          </div>
+        ) : (
+          <Campo id="nombre" etiqueta="Nombre del invitado" error={mostrar('guestName')}>
+            <Input id="nombre" value={guestName} placeholder="Juan Pérez" autoComplete="off"
+              aria-invalid={Boolean(mostrar('guestName')) || undefined} aria-describedby="nombre-nota"
+              onChange={(e) => setGuestName(e.target.value)} onBlur={() => tocar('guestName')} />
+          </Campo>
+        )}
 
         {!frecuente && campoRubro}
 
@@ -218,11 +252,13 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
           <p className="font-semibold">Para entrar más rápido</p>
           <p className="text-sm text-ink-soft">Opcional. Si lo cargás, el guardia no lo tiene que pedir en la barrera.</p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Campo id="doc" etiqueta="Documento">
-            <Input id="doc" value={guestDoc} className="tabular" placeholder="30.123.456"
-              onChange={(e) => setGuestDoc(e.target.value)} />
-          </Campo>
+        <div className={contacto ? 'grid gap-4' : 'grid gap-4 sm:grid-cols-2'}>
+          {!contacto && (
+            <Campo id="doc" etiqueta="Documento">
+              <Input id="doc" value={guestDoc} className="tabular" placeholder="30.123.456"
+                onChange={(e) => setGuestDoc(e.target.value)} />
+            </Campo>
+          )}
           <Campo id="patente" etiqueta="Patente">
             <Input id="patente" value={plate} className="uppercase tabular" placeholder="AB 123 CD"
               onChange={(e) => setPlate(e.target.value)} />
@@ -238,11 +274,19 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
           className="w-full resize-none rounded-sm border-2 border-control bg-card px-3.5 py-2.5 text-base text-ink outline-none placeholder:text-ink-soft focus-visible:border-azul-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus" />
       </Campo>
 
+      {!editando && !contacto && (
+        <label className="flex min-h-11 items-center gap-3 text-base font-semibold">
+          <input type="checkbox" className="size-5 accent-azul" checked={guardarContacto}
+            onChange={(e) => setGuardarContacto(e.target.checked)} />
+          Guardar en contactos
+        </label>
+      )}
+
       {errorGeneral && <Nota tono="error">{errorGeneral}</Nota>}
 
-      <Button type="submit" size="lg" disabled={mutacion.isPending}>
-        {mutacion.isPending && <Loader2 className="animate-spin" aria-hidden />}
-        {mutacion.isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear invitación'}
+      <Button type="submit" size="lg" disabled={mutacion.isPending || crearContacto.isPending}>
+        {(mutacion.isPending || crearContacto.isPending) && <Loader2 className="animate-spin" aria-hidden />}
+        {mutacion.isPending || crearContacto.isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear invitación'}
       </Button>
     </form>
   )

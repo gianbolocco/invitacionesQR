@@ -380,3 +380,49 @@ test('dos DNI seguidos en el alta exprés no mezclan nombre y documento', async 
   await expect(page.getByLabel('Documento', { exact: true })).toHaveValue(docB)
   await expect(page.getByLabel('Nombre del invitado')).toHaveValue(`Juan Zzbbb${docB}`)
 })
+
+test('la garita autoriza un proveedor sin invitación aunque su rubro esté fuera de horario', async ({ page, browser }) => {
+  const API = process.env.E2E_API_URL ?? 'http://localhost:8080'
+  const rubro = `Gasista E2E ${test.info().project.name} ${Date.now()}`
+  const nombre = `Proveedor exprés E2E ${Date.now()}`
+  let rubroId: string | undefined
+  let originales: unknown
+
+  await entrar(page, 'admin')
+  try {
+    originales = (await (await page.request.get(`${API}/admin/neighborhood`)).json()).providerWindows
+    const creado = await page.request.post(`${API}/admin/trades`, { data: { name: rubro } })
+    rubroId = (await creado.json()).id as string
+    // Cerrado todo el día salvo un minuto a medianoche: la portería lo autoriza igual.
+    const franja = await page.request.patch(`${API}/admin/neighborhood`, { data: { providerWindows: [
+      ...(originales as unknown[]),
+      { days: [0, 1, 2, 3, 4, 5, 6], from: '00:00', to: '00:01', season: null, trades: [rubroId] },
+    ] } })
+    expect(franja.ok()).toBe(true)
+
+    const guardia = await browser.newContext()
+    const g = await guardia.newPage()
+    await entrar(g, 'guardia')
+    await g.goto('/garita')
+    await g.getByRole('button', { name: 'Autorizar sin invitación' }).click()
+    await g.getByRole('button', { name: 'Proveedor', exact: true }).click()
+    await g.getByLabel('Nombre del invitado').fill(nombre)
+    await g.getByLabel('Lote').fill('900')
+    await g.getByRole('dialog').getByText('Vecina E2E').click()
+    await g.getByLabel('Rubro').click()
+    await g.getByRole('option', { name: rubro }).click()
+    await g.getByRole('button', { name: 'Autorizar ingreso' }).click()
+
+    await expect(g).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
+    await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
+    await expect(g.getByText(`Proveedor · ${rubro}`)).toBeVisible()
+    await g.getByLabel('Documento').fill('30777666')
+    await g.getByRole('button', { name: 'Registrar ingreso' }).click()
+    await expect(g.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
+    await guardia.close()
+  } finally {
+    // La base de desarrollo no se limpia: se devuelve lo que había y se archiva el rubro.
+    if (originales) await page.request.patch(`${API}/admin/neighborhood`, { data: { providerWindows: originales } })
+    if (rubroId) await page.request.patch(`${API}/admin/trades/${rubroId}`, { data: { archived: true } })
+  }
+})

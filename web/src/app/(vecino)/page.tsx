@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'motion/react'
 import { Home as Casa, Plus, Ticket } from 'lucide-react'
@@ -10,6 +11,8 @@ import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { Vacio } from '@/components/dominio/vacio'
 import { FilaInvitacion } from '@/components/vecino/fila-invitacion'
+import { ElegirContacto } from '@/components/vecino/elegir-contacto'
+import { useContactos } from '@/lib/queries/contactos'
 import { cn } from '@/lib/utils'
 
 const NUEVA = '/invitaciones/nueva'
@@ -19,17 +22,26 @@ export default function InicioVecino() {
   const q = useInvitaciones()
   const variasUnidades = me.units.length > 1
   const sinUnidad = me.units.length === 0
+  const contactos = useContactos()
+  const [eligiendo, setEligiendo] = useState(false)
+  // Sin contactos no hay nada que elegir: directo al formulario, como antes.
+  const hayContactos = (contactos.data?.length ?? 0) > 0
+  const nueva = (className: string) => hayContactos ? (
+    <button type="button" onClick={() => setEligiendo(true)} className={className}>
+      <Plus aria-hidden />Nueva invitación
+    </button>
+  ) : (
+    <Link href={NUEVA} className={className}>
+      <Plus aria-hidden />Nueva invitación
+    </Link>
+  )
 
   return (
     <div className="flex flex-col gap-7 pb-24 sm:pb-0">
       <EncabezadoPagina
         antetitulo={me.units[0]?.label ?? 'Tu casa'}
         titulo={<>Hola, <em>{me.name.split(' ')[0]}.</em></>}
-        acciones={!sinUnidad && (
-          <Link href={NUEVA} className={cn(buttonVariants({ size: 'lg' }), 'hidden sm:inline-flex')}>
-            <Plus aria-hidden />Nueva invitación
-          </Link>
-        )} />
+        acciones={!sinUnidad && nueva(cn(buttonVariants({ size: 'lg' }), 'hidden sm:inline-flex'))} />
 
       {sinUnidad ? (
         <Vacio icono={Casa} titulo="Todavía no tenés una unidad"
@@ -66,13 +78,9 @@ export default function InicioVecino() {
         </section>
       )}
 
-      {!sinUnidad && (
-        <Link href={NUEVA}
-          className={cn(buttonVariants({ size: 'lg' }),
-            'fixed inset-x-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] z-20 shadow-(--sombra-flotante) sm:hidden')}>
-          <Plus aria-hidden />Nueva invitación
-        </Link>
-      )}
+      {!sinUnidad && nueva(cn(buttonVariants({ size: 'lg' }),
+        'fixed inset-x-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] z-20 shadow-(--sombra-flotante) sm:hidden'))}
+      <ElegirContacto abierto={eligiendo} onAbiertoChange={setEligiendo} />
     </div>
   )
 }

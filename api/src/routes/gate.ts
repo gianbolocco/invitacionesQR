@@ -11,11 +11,17 @@ import { searchUnits, listUnits } from '../services/units.js'
 import { createExpressInvitation, revokeByGuard } from '../services/invitations.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { slug } from '../lib/slug.js'
+import { estadoSeguro, etiquetaClave } from '../lib/seguro.js'
 import { buildWorkbook, diaExcel, fechaExcel, XLSX_MIME } from '../lib/excel.js'
 import { COLOR_DEFAULT } from '../lib/marca.js'
 import { entriesLog } from '../services/reports.js'
 import { getNeighborhood } from '../services/neighborhoods.js'
 import { escucharAvisos } from '../lib/avisos.js'
+import { normalizarPatente } from '../lib/padron.js'
+import { guardarProveedor, guardarVehiculo } from '../services/padron.js'
+import { db } from '../db/index.js'
+import { zSeguro } from './invitations.js'
+import { AppError } from '../lib/errors.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
@@ -27,6 +33,17 @@ gateRoutes.get('/check/:token', async (req, res) => {
 
 gateRoutes.get('/invitation/:id', async (req, res) => {
   res.json(await checkById(req.params.id))
+})
+
+/**
+ * El veredicto con lo que el guardia tiene tipeado (documento y patente). POST
+ * y no GET por lo mismo que /search: el DNI en la query queda en los logs de
+ * cada proxy. Es una lectura: no avisa a las otras garitas.
+ */
+gateRoutes.post('/invitation/:id/verdict', async (req, res) => {
+  res.locals.soloLectura = true
+  const datos = z.object({ doc: z.string().max(40).optional(), plate: z.string().max(20).optional() }).parse(req.body)
+  res.json(await checkById(req.params.id, datos))
 })
 
 // POST y no GET: el DNI en la query queda en los logs de acceso de cada proxy.
@@ -50,6 +67,8 @@ gateRoutes.post('/invitations', async (req, res) => {
     guestDoc: z.string().optional(),
     plate: z.string().optional(),
     note: z.string().trim().max(140).optional(),
+    kind: z.enum(['visita', 'proveedor']).optional(),
+    tradeId: z.string().uuid().nullable().optional(),
   }).parse(req.body)
 
   res.status(201).json(await createExpressInvitation({
@@ -71,7 +90,14 @@ gateRoutes.post('/entries', async (req, res) => {
     guestDoc: z.string().trim().min(1),
     plate: z.string().optional(),
     note: z.string().optional(),
+    // Sin null: la barrera carga o renueva un seguro, no lo borra.
+    insurance: zSeguro.unwrap().optional(),
+    vehicleInsurance: zSeguro.unwrap().optional(),
+  }).refine((b) => !b.vehicleInsurance || normalizarPatente(b.plate ?? '') !== '', {
+    message: 'El seguro del auto va con su patente', path: ['plate'],
   }).parse(req.body)
+  // Como en los PUT de corrección: el admin registra ingresos pero no carga seguros.
+  if ((body.insurance || body.vehicleInsurance) && req.person!.role !== 'guard') throw new AppError(403, 'forbidden')
 
   // El guardia sale de la sesión, no del body: un dato de auditoría no puede
   // depender de lo que mande el cliente ni de que alguien elija bien.
@@ -82,6 +108,36 @@ gateRoutes.post('/entries', async (req, res) => {
 gateRoutes.post('/exits', async (req, res) => {
   const body = z.object({ invitationId: z.string().uuid() }).parse(req.body)
   res.status(201).json(await registerExit(body.invitationId, req.person!.id))
+})
+
+/**
+ * Corregir un seguro sin registrar el ingreso: el guardia corrige y aprieta
+ * Volver, y el dato bueno no se pierde. Lo usan también el veredicto y la
+ * pantalla Seguros. El DNI y la patente van en el body, nunca en la URL.
+ * El admin mira los seguros, no los carga: el que ve el certificado es el guardia.
+ */
+gateRoutes.put('/providers/insurance', requireRole('guard'), async (req, res) => {
+  const body = z.object({
+    doc: z.string().trim().min(1).max(40),
+    name: z.string().trim().min(1).max(120),
+    insurance: zSeguro.unwrap(),
+  }).parse(req.body)
+  await db.transaction((tx) => guardarProveedor(tx, {
+    neighborhoodId: req.person!.neighborhoodId, doc: body.doc, name: body.name,
+    insurance: body.insurance, source: 'garita', actorId: req.person!.id,
+  }))
+  res.json({ ok: true })
+})
+
+gateRoutes.put('/vehicles/insurance', requireRole('guard'), async (req, res) => {
+  const body = z.object({
+    plate: z.string().trim().max(20).refine((p) => normalizarPatente(p) !== ''),
+    insurance: zSeguro.unwrap(),
+  }).parse(req.body)
+  await db.transaction((tx) => guardarVehiculo(tx, {
+    neighborhoodId: req.person!.neighborhoodId, plate: body.plate, insurance: body.insurance, actorId: req.person!.id,
+  }))
+  res.json({ ok: true })
 })
 
 /**
@@ -142,6 +198,8 @@ const auditFilters = z.object({
   status: z.enum(['adentro', 'concluida', 'esperando', 'vencida', 'anulada']).optional(),
   kind: z.enum(['visita', 'frecuente', 'proveedor']).optional(),
   q: z.string().trim().max(80).optional(),
+  // Llega como string desde la query: z.coerce.boolean() daría true con 'false'.
+  sinSeguro: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 })
@@ -168,6 +226,8 @@ const KIND_EXCEL: Record<string, string> = {
 const guardia = (nombre: string | null, manual: boolean) =>
   nombre && manual ? `Carga manual · ${nombre}` : nombre ?? ''
 
+const DIAS_CORTOS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
 const dd = (iso: string) => iso.split('-').reverse().join('/')
 
 /**
@@ -182,12 +242,14 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
   const f = auditFilters.parse(req.query)
   const nid = req.person!.neighborhoodId
 
-  const [auditoria, ingresos, barrio, unidades] = await Promise.all([
+  const [auditoria, todosLosIngresos, barrio, unidades] = await Promise.all([
     auditAll(nid, f),
     entriesLog(nid, { from: f.from, to: f.to, unitId: f.unitId }),
     getNeighborhood(nid),
     listUnits(nid),
   ])
+  // Con "solo autorizados sin seguro", la hoja de ingresos trae solo esos: la portada lo dice.
+  const ingresos = f.sinSeguro ? todosLosIngresos.filter((e) => e.autorizadoSinSeguro) : todosLosIngresos
 
   const porEstado = (s: string) => auditoria.filter((r) => r.status === s).length
   const ahora = new Intl.DateTimeFormat('es-AR', {
@@ -207,6 +269,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
             ['Período', f.from || f.to ? `${f.from ? dd(f.from) : 'el inicio'} al ${f.to ? dd(f.to) : 'hoy'}` : 'Todo'],
             ['Estado', f.status ? ESTADO_EXCEL[f.status] : 'Todos'],
             ['Unidad', f.unitId ? (unidades.find((u) => u.id === f.unitId)?.label ?? '—') : 'Todas'],
+            ['Autorizados sin seguro', f.sinSeguro ? 'Solo esos' : 'Todos'],
           ],
         },
         {
@@ -240,6 +303,14 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Patente', key: 'patente' },
           { header: 'Tipo', key: 'tipo' },
           { header: 'Rubro', key: 'rubro' },
+          { header: 'Frecuente como', key: 'frecuenteComo', width: 16 },
+          { header: 'Días', key: 'dias', width: 22 },
+          { header: 'Compañía', key: 'compania', width: 22 },
+          { header: 'Póliza', key: 'poliza', width: 16 },
+          { header: 'Vence seguro', key: 'venceSeguro', formato: 'fecha' },
+          { header: 'Estado seguro', key: 'estadoSeguro', width: 16 },
+          { header: 'Seguro auto', key: 'seguroAuto', width: 24 },
+          { header: 'Vence seguro auto', key: 'venceAuto', formato: 'fecha' },
           { header: 'Unidad', key: 'unidad' },
           { header: 'Invitó', key: 'invito', width: 24 },
           { header: 'Desde', key: 'desde', formato: 'fecha' },
@@ -250,6 +321,9 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Salida', key: 'salida', width: 18, formato: 'fechaHora' },
           { header: 'Guardia salida', key: 'guardiaSalida', width: 20 },
           { header: 'Carga manual', key: 'manual' },
+          { header: 'Nota del vecino', key: 'notaVecino', width: 30 },
+          { header: 'Autorizó sin seguro', key: 'sinSeguro', width: 18 },
+          { header: 'Autorizó portería', key: 'porteria', width: 18 },
         ],
         filas: auditoria.map((r) => ({
           invitado: r.guestName,
@@ -257,6 +331,17 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           patente: r.plate ?? '',
           tipo: KIND_EXCEL[r.kind] ?? r.kind,
           rubro: r.tradeName ?? '',
+          frecuenteComo: r.kind === 'frecuente' ? (r.frequentAs === 'proveedor' ? 'A trabajar' : 'Visita') : '',
+          dias: r.weekdays?.map((d) => DIAS_CORTOS[d]).join(', ') ?? '',
+          compania: r.insuranceCompany ?? '',
+          poliza: r.insurancePolicy ?? '',
+          venceSeguro: r.insuranceExpiresOn ? diaExcel(r.insuranceExpiresOn) : '',
+          estadoSeguro: estadoSeguro(
+            { requiresInsurance: r.requiresInsurance, company: r.insuranceCompany, policy: r.insurancePolicy, expiresOn: r.insuranceExpiresOn },
+            barrio.insuranceWarnDays,
+          ),
+          seguroAuto: r.vehicleCompany ? `${r.vehicleCompany} · ${r.vehiclePolicy}` : '',
+          venceAuto: r.vehicleExpiresOn ? diaExcel(r.vehicleExpiresOn) : '',
           unidad: r.unitLabel,
           invito: r.inviterName,
           desde: diaExcel(r.validFrom),
@@ -267,6 +352,9 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           salida: r.exitedAt ? fechaExcel(r.exitedAt) : '',
           guardiaSalida: guardia(r.exitGuardName, r.manual),
           manual: r.manual ? 'Sí' : 'No',
+          notaVecino: r.note ?? '',
+          sinSeguro: r.autorizadoSinSeguro ? 'Sí' : '',
+          porteria: r.porteria ? 'Sí' : '',
         })),
       },
       {
@@ -279,6 +367,10 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Invitado', key: 'invitado', width: 26 },
           { header: 'DNI', key: 'dni' },
           { header: 'Patente', key: 'patente' },
+          { header: 'Seguro proveedor (al ingresar)', key: 'fotoProv', width: 18 },
+          { header: 'Seguro auto (al ingresar)', key: 'fotoAuto', width: 18 },
+          { header: 'Autorizó sin seguro', key: 'sinSeguro', width: 20 },
+          { header: 'Rubro', key: 'rubro' },
           { header: 'Unidad', key: 'unidad' },
           { header: 'Origen', key: 'origen' },
           { header: 'Cargado el', key: 'cargado', width: 18, formato: 'fechaHora' },
@@ -293,6 +385,11 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           invitado: e.guestName,
           dni: e.guestDoc ?? '',
           patente: e.plate ?? '',
+          fotoProv: etiquetaClave(e.providerInsurance),
+          fotoAuto: etiquetaClave(e.vehicleInsurance),
+          // Quién: el guardia del ingreso.
+          sinSeguro: e.autorizadoSinSeguro ? (e.guardName ?? 'Sí') : '',
+          rubro: e.tradeName ?? '',
           unidad: e.unitLabel,
           origen: e.manual ? 'Carga manual' : 'Escaneo',
           cargado: e.loadedAt ? fechaExcel(e.loadedAt) : '',

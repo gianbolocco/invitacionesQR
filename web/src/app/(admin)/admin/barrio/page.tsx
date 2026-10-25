@@ -1,8 +1,9 @@
 'use client'
 import { useRef, useState } from 'react'
 import { Upload, X } from 'lucide-react'
-import { useBarrio, useRubros, useGuardarBarrio, useSubirLogo, useQuitarLogo, type HorasPermanencia } from '@/lib/queries/admin'
-import { logoUrl, useMarca } from '@/lib/marca-cliente'
+import { useBarrio, useRubros, useGuardarBarrio, useSubirLogo, useQuitarLogo, useSubirPlano, useQuitarPlano, tipoDePlano, type HorasPermanencia } from '@/lib/queries/admin'
+import { ApiError } from '@/lib/api'
+import { logoUrl, planoUrl, useMarca } from '@/lib/marca-cliente'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { VistaPreviaMarca } from '@/components/admin/vista-previa-marca'
 import { Rubros } from '@/components/admin/rubros'
@@ -27,6 +28,12 @@ function horasValidas(v: string): number | undefined {
   return /^\d+$/.test(v.trim()) && n >= 1 && n <= 72 ? n : undefined
 }
 
+/** '15' → 15; lo que no es un entero de 1 a 90 → undefined. */
+function diasValidos(v: string): number | undefined {
+  const n = Number(v)
+  return /^\d+$/.test(v.trim()) && n >= 1 && n <= 90 ? n : undefined
+}
+
 export default function BarrioPage() {
   const barrio = useBarrio()
   const marcaReal = useMarca()
@@ -34,6 +41,8 @@ export default function BarrioPage() {
   const rubros = useRubros()
   const subirLogo = useSubirLogo()
   const quitarLogo = useQuitarLogo()
+  const subirPlano = useSubirPlano()
+  const quitarPlano = useQuitarPlano()
 
   const [nombre, setNombre] = useState('')
   const [address, setAddress] = useState('')
@@ -43,8 +52,15 @@ export default function BarrioPage() {
   const [errorLogo, setErrorLogo] = useState<string | null>(null)
   // null = ese tipo no alerta; un string = lo que está tipeado en las horas.
   const [alertas, setAlertas] = useState<Record<TipoAlerta, string | null>>({ visita: null, proveedor: null })
+  // Mismo criterio para el seguro: null = no avisa.
+  const [diasSeguro, setDiasSeguro] = useState<string | null>(null)
+  const [pideAuto, setPideAuto] = useState(false)
+  const [excepcionAuto, setExcepcionAuto] = useState(true)
   const [cargado, setCargado] = useState(false)
   const inputArchivo = useRef<HTMLInputElement>(null)
+  const [arrastrandoPlano, setArrastrandoPlano] = useState(false)
+  const [errorPlano, setErrorPlano] = useState<string | null>(null)
+  const inputPlano = useRef<HTMLInputElement>(null)
 
   // Se precarga una sola vez, cuando llegan los datos: después el admin
   // manda sobre lo que escribe, la query no le pisa el formulario. Se
@@ -58,19 +74,25 @@ export default function BarrioPage() {
     setColor(barrio.data.brandColor)
     const h = barrio.data.overstayHours
     setAlertas({ visita: h.visita?.toString() ?? null, proveedor: h.proveedor?.toString() ?? null })
+    setDiasSeguro(barrio.data.insuranceWarnDays?.toString() ?? null)
+    setPideAuto(barrio.data.vehicleInsuranceRequired)
+    setExcepcionAuto(barrio.data.vehicleInsuranceOverride)
   }
 
-  const horasInvalidas = ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
+  const diasInvalidos = diasSeguro !== null && diasValidos(diasSeguro) === undefined
+  const alertasInvalidas = diasInvalidos || ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
 
   const marcaPreview = { ...marcaReal, nombre: nombre.trim() || marcaReal.nombre, color: color ?? marcaReal.color }
 
   async function guardarForm(e: React.FormEvent) {
     e.preventDefault()
-    if (horasInvalidas || !nombre.trim()) return
+    if (alertasInvalidas || !nombre.trim()) return
     const horas = (t: TipoAlerta) => (alertas[t] === null ? null : horasValidas(alertas[t]!)!)
     await guardar.mutateAsync({
       name: nombre.trim(), address, mapUrl, ...(color ? { brandColor: color } : {}),
       overstayHours: { visita: horas('visita'), proveedor: horas('proveedor') },
+      insuranceWarnDays: diasSeguro === null ? null : diasValidos(diasSeguro)!,
+      vehicleInsuranceRequired: pideAuto, vehicleInsuranceOverride: excepcionAuto,
     })
   }
 
@@ -87,10 +109,26 @@ export default function BarrioPage() {
     await subirLogo.mutateAsync(file).catch(() => setErrorLogo('No se pudo subir. Probá de nuevo.'))
   }
 
+  async function subirElPlano(file: File) {
+    setErrorPlano(null)
+    if (!['image/svg+xml', 'image/png', 'image/jpeg'].includes(tipoDePlano(file))) {
+      setErrorPlano('Ese archivo no es un SVG, PNG ni JPG.')
+      return
+    }
+    if (file.size > 1_000_000) {
+      setErrorPlano('El archivo pesa más de 1 MB.')
+      return
+    }
+    await subirPlano.mutateAsync(file).catch((e: unknown) => setErrorPlano(
+      e instanceof ApiError && e.code === 'formato_no_soportado' ? 'Ese archivo no es un SVG, PNG ni JPG.'
+        : e instanceof ApiError && e.status === 413 ? 'El archivo pesa más de 1 MB.'
+        : 'No se pudo subir. Probá de nuevo.'))
+  }
+
   if (barrio.isPending) return <p className="text-ink-soft">Cargando…</p>
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="flex flex-col gap-6">
         <EncabezadoPagina titulo={barrio.data?.name ?? 'Barrio'}
           subtitulo="Esto aparece en el link que recibe el invitado, abajo de quién lo invitó." />
@@ -125,7 +163,7 @@ export default function BarrioPage() {
           </fieldset>
 
           <fieldset className="flex flex-col gap-3 border-t border-line pt-4">
-            <legend className="mb-1 text-[13px] font-semibold text-ink-soft">Alertas de permanencia</legend>
+            <legend className="mb-1 text-[13px] font-semibold text-ink-soft">Alertas</legend>
             {ALERTAS.map(({ tipo, etiqueta, sugerida }) => {
               const valor = alertas[tipo]
               const error = valor !== null && horasValidas(valor) === undefined ? 'Poné entre 1 y 72 horas.' : null
@@ -155,14 +193,47 @@ export default function BarrioPage() {
                 </div>
               )
             })}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-2">
+                <label className="flex min-w-36 items-center gap-3 text-sm font-semibold">
+                  <Switch checked={diasSeguro !== null} aria-label="Avisar por seguro por vencer"
+                    onCheckedChange={(on) => setDiasSeguro(on ? '15' : null)} />
+                  Seguro por vencer
+                </label>
+                {diasSeguro !== null ? (
+                  <span className="flex items-center gap-2 text-sm text-ink-soft">
+                    avisar
+                    <Input id="dias-seguro" type="number" inputMode="numeric" min={1} max={90} step={1}
+                      aria-label="Días de aviso antes del vencimiento del seguro" aria-invalid={diasInvalidos}
+                      aria-describedby={diasInvalidos ? 'dias-seguro-nota' : undefined}
+                      className="w-20 tabular" value={diasSeguro} onChange={(e) => setDiasSeguro(e.target.value)} />
+                    días antes
+                  </span>
+                ) : (
+                  <span className="text-sm text-ink-soft">No avisa</span>
+                )}
+              </div>
+              {diasInvalidos && <p id="dias-seguro-nota" role="alert" className="text-sm text-alto">Poné entre 1 y 90 días.</p>}
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
+                <Switch checked={pideAuto} onCheckedChange={setPideAuto} aria-label="Pedir seguro del auto" />
+                Pedir seguro del auto
+              </label>
+              <label className={`flex min-h-11 items-center gap-3 pl-12 text-sm ${pideAuto ? '' : 'text-ink-soft'}`}>
+                <Switch checked={excepcionAuto} disabled={!pideAuto} onCheckedChange={setExcepcionAuto}
+                  aria-label="Permitir autorizar igual sin seguro del auto" />
+                Permitir autorizar igual sin seguro del auto
+              </label>
+            </div>
             <p className="text-sm text-ink-soft">
-              La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Una frecuente usa las horas de lo que es: visita o proveedor.
+              La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Una frecuente usa las horas de lo que es: visita o proveedor. El seguro por vencer avisa en el tablero y en la garita esos días antes del vencimiento. Con el seguro del auto pedido, la garita frena a todo el que entra en auto sin un seguro vigente cargado; si no permitís autorizar igual, ese auto no entra (la persona puede entrar a pie).
             </p>
           </fieldset>
 
           {guardar.isError && <Nota tono="error">No se pudo guardar. Revisá el link de mapas (tiene que empezar con http) y las horas.</Nota>}
           {guardar.isSuccess && <Nota tono="exito">Guardado.</Nota>}
-          <Button type="submit" className="self-start" disabled={guardar.isPending || horasInvalidas}>
+          <Button type="submit" className="self-start" disabled={guardar.isPending || alertasInvalidas}>
             {guardar.isPending ? 'Guardando…' : 'Guardar'}
           </Button>
         </form>
@@ -206,6 +277,46 @@ export default function BarrioPage() {
           )}
         </div>
 
+        <div className="flex flex-col items-start gap-3 rounded-md border border-line bg-card p-5">
+          <p className="text-[13px] font-semibold text-ink-soft">Plano del barrio</p>
+          {marcaReal.tienePlano ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={planoUrl(marcaReal, null) ?? ''} alt="Plano del barrio"
+              className="max-h-64 w-auto max-w-full rounded-md bg-white object-contain ring-1 ring-black/5" />
+          ) : (
+            <p className="text-ink-soft">Sin plano, el invitado no ve ninguno.</p>
+          )}
+
+          <button type="button"
+            onClick={() => inputPlano.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setArrastrandoPlano(true) }}
+            onDragLeave={() => setArrastrandoPlano(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setArrastrandoPlano(false)
+              const file = e.dataTransfer.files[0]
+              if (file) subirElPlano(file)
+            }}
+            disabled={subirPlano.isPending}
+            className={`flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 text-center text-sm
+              ${arrastrandoPlano ? 'border-azul bg-azul-tint' : 'border-line'} disabled:opacity-50`}>
+            <Upload className="size-5 text-ink-soft" aria-hidden />
+            <span>{subirPlano.isPending ? 'Subiendo…' : 'Arrastrá el plano, o tocá para elegirlo'}</span>
+            <span className="text-xs text-ink-soft">SVG, PNG o JPG, hasta 1 MB. Si es un SVG con los lotes como lote-N, el invitado ve su lote resaltado.</span>
+          </button>
+          <input ref={inputPlano} type="file" accept=".svg,.png,.jpg,.jpeg,image/svg+xml,image/png,image/jpeg" className="sr-only"
+            aria-label="Archivo del plano"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) subirElPlano(f); e.target.value = '' }} />
+
+          {errorPlano && <Nota tono="error">{errorPlano}</Nota>}
+
+          {marcaReal.tienePlano && (
+            <Button variant="outline" onClick={() => quitarPlano.mutate()} disabled={quitarPlano.isPending}>
+              <X aria-hidden />Quitar el plano
+            </Button>
+          )}
+        </div>
+
         {barrio.data?.mapUrl && (
           <a href={barrio.data.mapUrl} target="_blank" rel="noopener noreferrer"
             className="text-sm text-azul-text underline underline-offset-4">
@@ -216,7 +327,7 @@ export default function BarrioPage() {
         <section aria-labelledby="proveedores" className="flex flex-col gap-3">
           <h2 id="proveedores" className="text-[13px] font-semibold text-ink-soft">Proveedores</h2>
           {barrio.data && (
-            <div className="grid items-start gap-4 xl:grid-cols-[1fr_17rem]">
+            <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
               <div className="flex flex-col gap-4">
                 <HorariosProveedores inicial={barrio.data.providerWindows} rubros={rubros.data ?? []} />
                 <Rubros />

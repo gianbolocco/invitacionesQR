@@ -14,6 +14,21 @@ import { validarUuid } from '../middleware/uuidParam.js'
 
 export const invitationRoutes = Router()
 
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-MM-DD')
+  // 2026-02-30 pasa el patrón y Postgres lo rechaza con 500: ida y vuelta por Date.
+  // Con mes 13 el Date es inválido y toISOString tira: se mira antes.
+  .refine((v) => {
+    const d = new Date(`${v}T00:00:00Z`)
+    return !isNaN(+d) && d.toISOString().slice(0, 10) === v
+  }, 'Fecha inexistente')
+
+/** Las tres partes o nada (null lo borra): la base también lo exige. */
+export const zSeguro = z.object({
+  company: z.string().trim().min(1).max(80),
+  policy: z.string().trim().min(1).max(40),
+  expiresOn: isoDate,
+}).nullable()
+
 /* ---------- Públicas: sin sesión. Van ANTES del router protegido. ---------- */
 
 invitationRoutes.get('/public/:token', async (req, res) => {
@@ -35,6 +50,8 @@ invitationRoutes.patch('/public/:token', publicWriteLimit, async (req, res) => {
   const body = z.object({
     guestDoc: z.string().max(40).optional(),
     plate: z.string().max(20).optional(),
+    // Sin null: el link lo tiene cualquiera y no puede borrar el seguro. Renovarlo sí.
+    insurance: zSeguro.unwrap().optional(),
   }).parse(req.body)
 
   await fillGuestDetails(String(req.params.token), body)
@@ -45,7 +62,6 @@ invitationRoutes.patch('/public/:token', publicWriteLimit, async (req, res) => {
 invitationRoutes.use(requireAuth)
 validarUuid(invitationRoutes)
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-MM-DD')
 
 const createSchema = z.object({
   unitId: z.string().uuid(),
@@ -97,7 +113,7 @@ invitationRoutes.get('/historial', async (req, res) => {
 invitationRoutes.get('/trades', async (req, res) => {
   const nid = req.person!.neighborhoodId
   const [rubros, barrio] = await Promise.all([listTrades(nid), getNeighborhood(nid)])
-  res.json({ trades: rubros.map(({ id, name }) => ({ id, name })), providerWindows: barrio.providerWindows })
+  res.json({ trades: rubros.map(({ id, name, requiresInsurance }) => ({ id, name, requiresInsurance })), providerWindows: barrio.providerWindows })
 })
 
 /** El detalle de una invitación, para la pantalla del pase. */

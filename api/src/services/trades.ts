@@ -26,11 +26,12 @@ export async function createTrade(nid: string, actorId: string, name: string) {
 }
 
 export async function updateTrade(
-  nid: string, actorId: string, id: string, data: { name?: string; archived?: boolean },
+  nid: string, actorId: string, id: string, data: { name?: string; archived?: boolean; requiresInsurance?: boolean },
 ) {
   try {
     const [t] = await db.update(trades).set({
       ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.requiresInsurance !== undefined ? { requiresInsurance: data.requiresInsurance } : {}),
       ...(data.archived !== undefined ? { archivedAt: data.archived ? new Date() : null } : {}),
     }).where(and(eq(trades.id, id), eq(trades.neighborhoodId, nid))).returning()
     if (!t) throw new AppError(404, 'not_found')

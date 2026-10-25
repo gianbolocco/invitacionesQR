@@ -7,6 +7,8 @@ import { todayInBuenosAires, unMesDespues } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { PORTERIA } from '../lib/porteria.js'
 import { aplicaFranjas, type Franja } from '../lib/franjas.js'
+import { pideSeguro, seguroVigente, type Seguro } from '../lib/seguro.js'
+import { buscarProveedor, guardarProveedor } from './padron.js'
 
 export type CreateInvitationInput = {
   unitId: string
@@ -52,6 +54,8 @@ export type CreateExpressInvitationInput = {
   note?: string
   createdBy: string
   neighborhoodId: string
+  kind?: 'visita' | 'proveedor'
+  tradeId?: string | null
 }
 
 /**
@@ -67,6 +71,7 @@ export type CreateExpressInvitationInput = {
  */
 export async function createExpressInvitation(input: CreateExpressInvitationInput) {
   await assertUnitInNeighborhood(input.unitId, input.neighborhoodId)
+  await assertRubro(input.neighborhoodId, input.kind ?? 'visita', null, input.tradeId)
 
   const [inv] = await db.insert(invitations)
     .values(valoresDePorteria(input, todayInBuenosAires()))
@@ -80,7 +85,8 @@ export function valoresDePorteria(input: CreateExpressInvitationInput, dia: stri
   return {
     unitId: input.unitId,
     createdBy: input.createdBy,
-    kind: 'visita' as const,
+    kind: input.kind ?? 'visita',
+    tradeId: input.tradeId ?? null,
     guestName: input.guestName.trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
@@ -117,6 +123,20 @@ async function assertRubro(neighborhoodId: string, kind: string, frequentAs: str
   const [hay] = await db.select({ id: trades.id }).from(trades)
     .where(and(eq(trades.neighborhoodId, neighborhoodId), isNull(trades.archivedAt))).limit(1)
   if (hay) throw new AppError(400, 'rubro_requerido')
+}
+
+async function rubroPideSeguro(tradeId: string | null | undefined): Promise<boolean> {
+  if (!tradeId) return false
+  const [t] = await db.select({ r: trades.requiresInsurance }).from(trades).where(eq(trades.id, tradeId)).limit(1)
+  return t?.r === true
+}
+
+/** El seguro solo se carga si el rubro de quien entra a trabajar lo pide; borrarlo (null) siempre se puede. */
+export async function assertSeguro(
+  kind: string, frequentAs: string | null, tradeId: string | null | undefined, insurance: Seguro | null | undefined,
+) {
+  if (insurance === undefined || insurance === null) return
+  if (!pideSeguro(kind, frequentAs, await rubroPideSeguro(tradeId))) throw new AppError(400, 'seguro_no_aplica')
 }
 
 /** Las franjas que le tocan a un rubro: las de todos los rubros y las que lo nombran. */
@@ -186,6 +206,7 @@ const columnas = {
   createdBy: invitations.createdBy,
   tradeId: invitations.tradeId,
   tradeName: trades.name,
+  requiresInsurance: trades.requiresInsurance,
   creatorName: nombreOEtiquetaSql,
   unitId: invitations.unitId,
   unitLabel: units.label,
@@ -226,7 +247,7 @@ export async function listForUnits(unitIds: string[]) {
       isNull(invitations.revokedAt),
       gte(invitations.validTo, hoy),
     ))
-    .groupBy(invitations.id, people.name, people.role, units.label, trades.name)
+    .groupBy(invitations.id, people.name, people.role, units.label, trades.name, trades.requiresInsurance)
     // El cupo se mide sobre el count de ingresos, así que va en HAVING. Quien
     // está adentro sigue en la home aunque haya agotado el cupo: es justo lo
     // que el vecino quiere ver ("ya llegó").
@@ -291,7 +312,7 @@ export async function searchInvitations(
   const [rows, [conteo]] = await Promise.all([
     consultaInvitaciones()
       .where(donde)
-      .groupBy(invitations.id, people.name, people.role, units.label, trades.name)
+      .groupBy(invitations.id, people.name, people.role, units.label, trades.name, trades.requiresInsurance)
       .orderBy(desc(invitations.createdAt))
       .limit(pageSize)
       .offset((page - 1) * pageSize),
@@ -311,7 +332,7 @@ export async function searchInvitations(
 export async function getInvitation(id: string, personId: string) {
   const [row] = await consultaInvitaciones()
     .where(eq(invitations.id, id))
-    .groupBy(invitations.id, people.name, people.role, units.label, trades.name)
+    .groupBy(invitations.id, people.name, people.role, units.label, trades.name, trades.requiresInsurance)
     .limit(1)
   if (!row) throw new AppError(404, 'not_found')
   await assertMemberOfUnit(personId, row.unitId)
@@ -385,6 +406,8 @@ export async function findPublicByToken(token: string) {
     frequentAs: invitations.frequentAs,
     tradeId: invitations.tradeId,
     tradeName: trades.name,
+    tradeRequiresInsurance: trades.requiresInsurance,
+    neighborhoodId: neighborhoods.id,
     providerWindows: neighborhoods.providerWindows,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
@@ -405,10 +428,20 @@ export async function findPublicByToken(token: string) {
 
   if (!row) return null
 
+  const proveedor = row.guestDoc ? await buscarProveedor(row.neighborhoodId, row.guestDoc) : null
+  const s = proveedor?.insurance ?? null
+  const insuranceState = !s ? 'sin_cargar' : !seguroVigente(s.expiresOn, new Date()) ? 'vencido' : 'vigente'
+
   return {
     guestName: row.guestName,
     kind: row.kind,
     tradeName: row.tradeName,
+    // Solo el estado: el link puede estar en manos de cualquiera, los datos no salen.
+    requiresInsurance: pideSeguro(row.kind, row.frequentAs, row.tradeRequiresInsurance),
+    insuranceState,
+    // El vencimiento sí ("tu seguro vence el 12/03"): compañía y póliza nunca.
+    insuranceExpiresOn: s?.expiresOn ?? null,
+    insuranceVerified: seguroVerificado(proveedor),
     franjas: franjasDelRubro(row.providerWindows, row.kind, row.frequentAs, row.tradeId),
     validFrom: row.validFrom,
     validTo: row.validTo,
@@ -422,6 +455,10 @@ export async function findPublicByToken(token: string) {
     hasPlate: Boolean(row.plate),
     frozen: (await entriesOf(row.id)) > 0,
   }
+}
+
+function seguroVerificado(p: Awaited<ReturnType<typeof buscarProveedor>>): boolean {
+  return p?.insuranceSource === 'garita' && !!p.insurance && seguroVigente(p.insurance.expiresOn, new Date())
 }
 
 async function entriesOf(invitationId: string): Promise<number> {
@@ -439,23 +476,46 @@ async function entriesOf(invitationId: string): Promise<number> {
  */
 export async function fillGuestDetails(
   token: string,
-  data: { guestDoc?: string; plate?: string },
+  data: { guestDoc?: string; plate?: string; insurance?: Seguro },
 ): Promise<void> {
-  const [inv] = await db.select().from(invitations)
+  const [fila] = await db.select({ inv: invitations, nid: units.neighborhoodId }).from(invitations)
+    .innerJoin(units, eq(units.id, invitations.unitId))
     .where(eq(invitations.token, token)).limit(1)
-  if (!inv) throw new AppError(404, 'not_found')
+  if (!fila) throw new AppError(404, 'not_found')
+  const { inv, nid } = fila
   if (inv.revokedAt) throw new AppError(409, 'revoked')
 
-  // Una vez que entró, entry_log ya guardó su copia: el histórico no se reescribe.
-  if ((await entriesOf(inv.id)) > 0) throw new AppError(409, 'already_entered')
+  // Una vez que entró, entry_log ya guardó su copia: documento y patente no se
+  // reescriben. El seguro sí se puede renovar: es lo que el proveedor frecuente necesita.
+  if ((data.guestDoc !== undefined || data.plate !== undefined) && (await entriesOf(inv.id)) > 0) {
+    throw new AppError(409, 'already_entered')
+  }
+  // El link lo tiene cualquiera: no puede cargar una póliza que ya venció.
+  if (data.insurance && data.insurance.expiresOn < todayInBuenosAires()) throw new AppError(400, 'seguro_vencido')
+  await assertSeguro(inv.kind, inv.frequentAs, inv.tradeId, data.insurance)
 
   const patch: { guestDoc?: string; plate?: string } = {}
   if (!inv.guestDoc && data.guestDoc?.trim()) patch.guestDoc = data.guestDoc.trim()
   if (!inv.plate && data.plate?.trim()) patch.plate = data.plate.trim().toUpperCase()
 
-  if (Object.keys(patch).length) {
-    await db.update(invitations).set(patch).where(eq(invitations.id, inv.id))
-  }
+  // El seguro vive en el padrón, por DNI: sin DNI no hay a quién asignarlo.
+  // Vale el de la invitación; si no tenía, el que manda el proveedor ahora.
+  const doc = inv.guestDoc ?? patch.guestDoc
+  if (data.insurance && !doc) throw new AppError(400, 'doc_required')
+
+  // Lo que verificó la guardia (con la póliza a la vista) no lo pisa un link que
+  // tiene cualquiera; recién cuando vence el link puede cargar uno nuevo.
+  if (data.insurance && seguroVerificado(await buscarProveedor(nid, doc!))) throw new AppError(409, 'seguro_verificado')
+
+  await db.transaction(async (tx) => {
+    if (Object.keys(patch).length) await tx.update(invitations).set(patch).where(eq(invitations.id, inv.id))
+    if (data.insurance) {
+      await guardarProveedor(tx, {
+        neighborhoodId: nid, doc: doc!, name: inv.guestName, tradeId: inv.tradeId,
+        insurance: data.insurance, source: 'link', actorId: null,
+      })
+    }
+  })
 }
 
 /** Deshacer una anulación. */

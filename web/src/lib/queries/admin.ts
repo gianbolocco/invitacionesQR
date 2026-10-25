@@ -41,6 +41,11 @@ export type Kpis = {
   staleInside: number
   entriesSameDayLastWeek: number
   invitedNeverLoggedIn: number
+  /** Autos y proveedores con el seguro vencido que entraron en el último mes. */
+  segurosVencidos: number
+  segurosPorVencer: number
+  /** Ingresos de los últimos 7 días por un alta exprés con algún seguro faltante. */
+  autorizadosSinSeguro: number
 }
 export type PorDia = { day: string; total: number }
 export type PorHora = { hour: number; total: number }
@@ -179,6 +184,12 @@ export type Barrio = {
   brandColor: string | null
   /** Horas adentro antes de alertar a la garita; null = ese tipo no alerta. */
   overstayHours: HorasPermanencia
+  /** Días antes del vencimiento del seguro para avisar; null = no avisa. */
+  insuranceWarnDays: number | null
+  /** La garita frena el auto que entra sin seguro vigente cargado. */
+  vehicleInsuranceRequired: boolean
+  /** Si está apagado, ese auto no entra ni con autorización (la persona puede entrar a pie). */
+  vehicleInsuranceOverride: boolean
   paleta: string[]
   providerWindows: Franja[]
 }
@@ -192,13 +203,13 @@ export function useBarrio() {
 export function useGuardarBarrio() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (datos: { name?: string; address: string; mapUrl: string; brandColor?: string; overstayHours?: HorasPermanencia }) =>
+    mutationFn: (datos: { name?: string; address: string; mapUrl: string; brandColor?: string; overstayHours?: HorasPermanencia; insuranceWarnDays?: number | null; vehicleInsuranceRequired?: boolean; vehicleInsuranceOverride?: boolean }) =>
       api<Barrio>('/admin/neighborhood', { method: 'PATCH', body: JSON.stringify(datos) }),
     onSuccess: (b) => {
       qc.setQueryData(claves.barrio, b)
       qc.invalidateQueries({ queryKey: claveMarca })
     },
-    onError: () => toast.error('No se pudo guardar. Revisá el link de mapas (tiene que empezar con http) y las horas (de 1 a 72).'),
+    onError: () => toast.error('No se pudo guardar. Revisá el link de mapas (tiene que empezar con http), las horas (de 1 a 72) y los días del seguro (de 1 a 90).'),
   })
 }
 
@@ -222,6 +233,30 @@ export function useQuitarLogo() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => api('/admin/branding/logo', { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
+  })
+}
+
+/** Algunos navegadores no informan el tipo de un SVG arrastrado: se deduce de la extensión. */
+export function tipoDePlano(file: File): string {
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+  return file.type || ({ svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' } as Record<string, string>)[extension] || ''
+}
+
+export function useSubirPlano() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => api('/admin/branding/plano', {
+      method: 'PUT', headers: { 'Content-Type': tipoDePlano(file) }, body: file,
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
+  })
+}
+
+export function useQuitarPlano() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api('/admin/branding/plano', { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
   })
 }
@@ -265,7 +300,7 @@ export function useImportarTanda() {
 
 export { ApiError }
 
-export type Rubro = { id: string; name: string; archivedAt: string | null }
+export type Rubro = { id: string; name: string; archivedAt: string | null; requiresInsurance: boolean }
 
 const claveRubros = ['admin', 'rubros'] as const
 
@@ -287,7 +322,7 @@ export function useCrearRubro() {
 export function useEditarRubro() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...datos }: { id: string; name?: string; archived?: boolean }) =>
+    mutationFn: ({ id, ...datos }: { id: string; name?: string; archived?: boolean; requiresInsurance?: boolean }) =>
       api<Rubro>(`/admin/trades/${id}`, { method: 'PATCH', body: JSON.stringify(datos) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: claveRubros }),
     onError: (e) => toast.error(ERRORES_RUBRO[(e as ApiError).code] ?? 'No se pudo guardar el rubro. Probá de nuevo.'),

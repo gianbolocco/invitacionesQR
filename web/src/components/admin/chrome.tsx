@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  ArrowLeft, ClipboardList, LayoutDashboard, LogOut, MoreHorizontal, Palette, ShieldCheck, Users,
+  ArrowLeft, ClipboardList, FileCheck, LayoutDashboard, LogOut, MoreHorizontal, Palette, ShieldCheck, Users,
 } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { logout } from '@/lib/session'
@@ -18,13 +18,14 @@ const PESTANAS = [
   { href: '/admin/guardias', etiqueta: 'Guardias' },
   { href: '/admin/barrio', etiqueta: 'Barrio' },
   { href: '/auditoria', etiqueta: 'Auditoría' },
+  { href: '/seguros', etiqueta: 'Seguros' },
 ]
 
 /**
  * El marco del admin, pensado desde el escritorio: header de Pazzit con el
- * barrio y el rol, y los cinco destinos como pestañas — sobra lugar. En
- * mobile, los cuatro de uso diario van en la barra inferior; Barrio es una
- * tarea de configuración, no de todos los días, y queda detrás de "Más".
+ * barrio y el rol, y los seis destinos como pestañas — sobra lugar. En
+ * mobile, los cuatro de uso diario van en la barra inferior; Barrio y Seguros
+ * son de consulta o configuración, no de todos los días, y quedan detrás de "Más".
  */
 export function ChromeAdmin({ children }: { children: React.ReactNode }) {
   const me = useSesion()
@@ -49,7 +50,7 @@ export function ChromeAdmin({ children }: { children: React.ReactNode }) {
             <span className="hidden shrink-0 font-semibold text-white/80 lg:inline">· Administración</span>
           </Link>
 
-          {/* Cinco pestañas no entran en una tablet: hasta 1024px sigue la barra de abajo. */}
+          {/* Seis pestañas no entran en una tablet: hasta 1024px sigue la barra de abajo. */}
           <nav aria-label="Secciones" className="hidden items-center gap-1 lg:flex">
             {PESTANAS.map((p) => (
               <Link key={p.href} href={p.href} aria-current={activo(p.href) ? 'page' : undefined} className={claseTab(activo(p.href))}>
@@ -91,6 +92,10 @@ export function ChromeAdmin({ children }: { children: React.ReactNode }) {
             <Link href="/admin/barrio" onClick={() => setMasAbierto(false)}
               className="flex min-h-14 items-center gap-3 rounded-sm px-3 text-base font-semibold hover-fino:bg-azul-tint">
               <Palette className="size-5 text-ink-soft" aria-hidden />Barrio
+            </Link>
+            <Link href="/seguros" onClick={() => setMasAbierto(false)}
+              className="flex min-h-14 items-center gap-3 rounded-sm px-3 text-base font-semibold hover-fino:bg-azul-tint">
+              <FileCheck className="size-5 text-ink-soft" aria-hidden />Seguros
             </Link>
           </nav>
         </SheetContent>

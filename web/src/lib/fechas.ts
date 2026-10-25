@@ -125,3 +125,8 @@ export function cupoTexto(inv: { kind: string; capacity: number; usedCount: numb
 export function fechaConAnio(iso: string): string {
   return CON_ANIO.format(new Date(iso))
 }
+
+/** "12/04/2027": una fecha ISO (sin hora) con año. Se arma a mano, como fechaNumerica. */
+export function fechaCompleta(iso: string): string {
+  return iso.split('-').reverse().join('/')
+}

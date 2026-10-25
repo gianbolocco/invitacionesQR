@@ -25,6 +25,21 @@ export type AuditRow = {
   manual: boolean
   /** null = no la anuló la portería. '' = la anuló sin dejar motivo. */
   revokedReason: string | null
+  requiresInsurance: boolean
+  insuranceCompany: string | null
+  insurancePolicy: string | null
+  insuranceExpiresOn: string | null
+  /** El seguro del auto HOY, por la patente de la invitación. El de cada ingreso está en sus movimientos. */
+  vehicleCompany: string | null
+  vehiclePolicy: string | null
+  vehicleExpiresOn: string | null
+  /** Algún ingreso fue un alta exprés con un seguro faltante. */
+  autorizadoSinSeguro: boolean
+  /** Días de la semana de la invitación (0 = domingo); null = todos. */
+  weekdays: number[] | null
+  note: string | null
+  /** La dio de alta la portería, no un vecino. */
+  porteria: boolean
 }
 
 export type AuditEstado = AuditRow['status']
@@ -35,6 +50,7 @@ export type Pagina = {
   page: number
   pageSize: number
   counts: Record<AuditEstado, number>
+  insuranceWarnDays: number | null
 }
 
 export type Movimiento = {
@@ -51,6 +67,10 @@ export type Movimiento = {
   /** ISO. Solo en cargas manuales. */
   loadedAt: string | null
   loaderName: string | null
+  /** Cómo estaban los seguros al ingresar; null = antes del padrón o carga manual. */
+  providerInsurance: string | null
+  vehicleInsurance: string | null
+  autorizadoSinSeguro: boolean
 }
 
 export type FiltrosAuditoria = {
@@ -59,6 +79,8 @@ export type FiltrosAuditoria = {
   estado: 'todos' | AuditEstado
   tipo: 'todos' | AuditRow['kind']
   q: string
+  /** Solo las que entraron por un alta exprés con algún seguro faltante. */
+  sinSeguro: boolean
 }
 
 /** Sin page/pageSize: la usa también el link de exportar, que trae todo el rango. */
@@ -67,6 +89,7 @@ export function paramsDe(f: FiltrosAuditoria): URLSearchParams {
   if (f.estado !== 'todos') p.set('status', f.estado)
   if (f.tipo !== 'todos') p.set('kind', f.tipo)
   if (f.q.trim()) p.set('q', f.q.trim())
+  if (f.sinSeguro) p.set('sinSeguro', 'true')
   return p
 }
 

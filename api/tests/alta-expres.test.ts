@@ -3,7 +3,7 @@ import request from 'supertest'
 import { eq } from 'drizzle-orm'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
-import { neighborhoods, units, people, unitMembers, invitations } from '../src/db/schema.js'
+import { neighborhoods, units, people, unitMembers, invitations, trades } from '../src/db/schema.js'
 import { hashPassword } from '../src/lib/crypto.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
 import { registerEntry } from '../src/services/entries.js'
@@ -235,5 +235,36 @@ describe('a quién se le atribuye una invitación de garita', () => {
     const res = await request(app).get(`/gate/agenda?date=${hoy}`).set('Cookie', cookie).expect(200)
     const fila = res.body.find((r: { guestName: string }) => r.guestName === 'Normal')
     expect(fila.inviterName).toBe('Martín Pérez')
+  })
+})
+
+describe('alta exprés de proveedor', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  const rubro = async (neighborhoodId: string, requiresInsurance = false) =>
+    (await db.insert(trades).values({ neighborhoodId, name: 'Electricista', requiresInsurance }).returning())[0]
+
+  it('con rubros cargados exige el rubro', async () => {
+    const { cookie, unit142, neighborhoodId } = await escenario()
+    await rubro(neighborhoodId)
+    const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
+      .send({ unitId: unit142.id, guestName: 'Plomero', kind: 'proveedor' }).expect(400)
+    expect(res.body.error).toBe('rubro_requerido')
+  })
+
+  it('un proveedor de portería entra fuera de franja y sin seguro', async () => {
+    const { cookie, unit142, neighborhoodId } = await escenario()
+    const t = await rubro(neighborhoodId, true)
+    await db.update(neighborhoods).set({
+      providerWindows: [{ days: [0, 1, 2, 3, 4, 5, 6], from: '00:00', to: '00:01', season: null, trades: null }],
+    }).where(eq(neighborhoods.id, neighborhoodId))
+    const creada = await request(app).post('/gate/invitations').set('Cookie', cookie)
+      .send({ unitId: unit142.id, guestName: 'Plomero', kind: 'proveedor', tradeId: t.id }).expect(201).then((r) => r.body)
+    expect(creada).toMatchObject({ kind: 'proveedor', tradeId: t.id })
+
+    const check = await request(app).get(`/gate/invitation/${creada.id}`).set('Cookie', cookie).expect(200)
+    expect(check.body.check.ok).toBe(true)
+    await request(app).post('/gate/entries').set('Cookie', cookie)
+      .send({ invitationId: creada.id, guestName: 'Plomero', guestDoc: '30111222' }).expect(201)
   })
 })

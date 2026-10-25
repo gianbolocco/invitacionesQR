@@ -65,7 +65,7 @@ function SheetContent({
           (side === "bottom" || side === "auto") &&
             "before:mx-auto before:mt-2 before:h-1 before:w-9 before:shrink-0 before:rounded-full before:bg-line",
           side === "auto" &&
-            "max-sm:inset-x-0 max-sm:bottom-0 max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:rounded-t-lg max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:slide-in-from-bottom sm:inset-y-0 sm:right-0 sm:h-full sm:w-[480px] sm:border-l sm:border-line sm:before:hidden sm:data-[state=closed]:slide-out-to-right sm:data-[state=open]:slide-in-from-right",
+            "max-sm:inset-x-0 max-sm:bottom-0 max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:rounded-t-lg max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:slide-in-from-bottom sm:inset-y-0 sm:right-0 sm:h-full sm:overflow-y-auto sm:w-[480px] sm:border-l sm:border-line sm:before:hidden sm:data-[state=closed]:slide-out-to-right sm:data-[state=open]:slide-in-from-right",
           side === "right" &&
             "inset-y-0 right-0 h-full w-3/4 border-l border-line data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-[480px]",
           side === "left" &&

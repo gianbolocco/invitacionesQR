@@ -6,6 +6,9 @@ const base: InvitationLike = {
   validFrom: '2026-09-14', validTo: '2026-09-14',
   weekdays: null, capacity: 1, revokedAt: null,
   kind: 'visita', frequentAs: null, tradeId: null,
+  requiresInsurance: false, insuranceComplete: false, insuranceExpiresOn: null,
+  porteria: false,
+  vehicleRequiresInsurance: false, vehicleInsuranceExpiresOn: null, vehicleOverride: true,
 }
 
 // 2026-09-14 es lunes. 15:00 en Buenos Aires = 18:00 UTC.
@@ -85,4 +88,46 @@ describe('canEnter', () => {
       .toEqual({ ok: false, reason: 'wrong_weekday' }))
   it('el horario gana sobre el cupo', () =>
     expect(canEnter(prov, lunes15h, 1, solo8a12)).toEqual({ ok: false, reason: 'outside_hours' }))
+
+  const conSeguro = { ...base, kind: 'proveedor', requiresInsurance: true }
+  it('sin seguro no pasa', () =>
+    expect(canEnter(conSeguro, lunes15h, 0)).toEqual({ ok: false, reason: 'no_insurance' }))
+  it('seguro vencido no pasa', () =>
+    expect(canEnter({ ...conSeguro, insuranceComplete: true, insuranceExpiresOn: '2026-09-13' }, lunes15h, 0))
+      .toEqual({ ok: false, reason: 'insurance_expired' }))
+  it('vence hoy, pasa', () =>
+    expect(canEnter({ ...conSeguro, insuranceComplete: true, insuranceExpiresOn: '2026-09-14' }, lunes15h, 0))
+      .toEqual({ ok: true }))
+  it('el cupo gana sobre el seguro', () =>
+    expect(canEnter(conSeguro, lunes15h, 1)).toEqual({ ok: false, reason: 'no_capacity' }))
+  it('un rubro que no pide seguro no lo mira', () =>
+    expect(canEnter({ ...base, kind: 'proveedor' }, lunes15h, 0)).toEqual({ ok: true }))
+
+  it('un proveedor de portería no mira las franjas', () =>
+    expect(canEnter({ ...prov, porteria: true }, lunes15h, 0, solo8a12)).toEqual({ ok: true }))
+  it('un proveedor de portería no necesita seguro', () =>
+    expect(canEnter({ ...conSeguro, porteria: true }, lunes15h, 0)).toEqual({ ok: true }))
+  it('la portería no salta el cupo', () =>
+    expect(canEnter({ ...prov, porteria: true }, lunes15h, 1, solo8a12)).toEqual({ ok: false, reason: 'no_capacity' }))
+
+  const enAuto = { ...base, vehicleRequiresInsurance: true }
+  it('un auto sin seguro no pasa', () =>
+    expect(canEnter(enAuto, lunes15h, 0)).toEqual({ ok: false, reason: 'no_vehicle_insurance' }))
+  it('un auto con el seguro vencido no pasa', () =>
+    expect(canEnter({ ...enAuto, vehicleInsuranceExpiresOn: '2026-09-13' }, lunes15h, 0))
+      .toEqual({ ok: false, reason: 'vehicle_insurance_expired' }))
+  it('el seguro del auto que vence hoy, pasa', () =>
+    expect(canEnter({ ...enAuto, vehicleInsuranceExpiresOn: '2026-09-14' }, lunes15h, 0)).toEqual({ ok: true }))
+  it('sin patente o con el switch apagado no se mira el auto', () =>
+    expect(canEnter(base, lunes15h, 0)).toEqual({ ok: true }))
+  it('el seguro del proveedor gana sobre el del auto', () =>
+    expect(canEnter({ ...conSeguro, vehicleRequiresInsurance: true }, lunes15h, 0))
+      .toEqual({ ok: false, reason: 'no_insurance' }))
+  it('el cupo gana sobre el seguro del auto', () =>
+    expect(canEnter(enAuto, lunes15h, 1)).toEqual({ ok: false, reason: 'no_capacity' }))
+  it('la portería saltea el seguro del auto si el barrio lo permite', () =>
+    expect(canEnter({ ...enAuto, porteria: true }, lunes15h, 0)).toEqual({ ok: true }))
+  it('la portería no saltea el seguro del auto si el barrio no lo permite', () =>
+    expect(canEnter({ ...enAuto, porteria: true, vehicleOverride: false }, lunes15h, 0))
+      .toEqual({ ok: false, reason: 'no_vehicle_insurance' }))
 })

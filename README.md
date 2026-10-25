@@ -16,6 +16,9 @@ tres tipos —visita, frecuente y proveedor— y son todos la misma tabla, con
 distinta ventana de validez y distinto cupo. Una frecuente dice si viene de
 visita (la empleada, el profesor) o a trabajar (el jardinero): la de visita dura
 hasta un mes, y en la garita la otra se marca también como proveedor.
+Guarda a los que vienen seguido en **Contactos** (los ven todos los de la
+casa). *Nueva invitación* arranca por a quién: elegir un contacto deja solo la
+fecha. De un proveedor ve si su seguro está al día, nunca la póliza.
 
 **El invitado** recibe un link. Ahí ve quién lo invita, a qué unidad y cómo
 llegar, carga su documento y su patente si quiere, y se queda con su QR.
@@ -27,7 +30,7 @@ la trazabilidad de quién entró y quién no.
 
 **El guardia** tiene su propia cuenta —cada movimiento queda a nombre de quien
 estaba logueado, que es lo que hace auditable el "¿quién lo dejó pasar?"—, la
-lista del día, el escáner y la auditoría exportable a Excel. El buscador de la
+lista del día, el escáner y la auditoría exportable a Excel (cada fila abre su detalle en un panel: proveedor, invitación y movimientos). El buscador de la
 garita muestra los resultados flotando sobre la pantalla (en el celular, a
 pantalla completa) y se maneja con el teclado: flechas, Enter y Esc.
 
@@ -49,9 +52,47 @@ elige el rubro al invitar a un proveedor y ve cuándo puede entrar. Fuera de la
 franja, la garita muestra NO PASA · Fuera de horario, y el guardia puede
 **Autorizar igual**: queda en la auditoría.
 
+**Seguro del proveedor.** El admin marca en *Administración → Barrio* qué rubros
+piden seguro. El seguro vive en un **padrón del barrio, por DNI**: se carga una
+vez y vale para todos los lotes donde trabaja. Lo carga el proveedor desde su
+link (con su DNI) o el guardia en la garita; el vecino ya no lo carga. Lo que
+verificó un guardia no lo pisa un link hasta que vence. Sin seguro vigente la
+garita muestra NO PASA · Sin seguro (o Seguro vencido): el guardia lo carga ahí
+mismo y registra el ingreso, o usa **Autorizar igual**. Si el admin fija con
+cuántos días avisar, el guardia ve "vence en N días" antes de que venza.
+
+**Seguro del auto.** Si el admin lo pide (*Barrio → Alertas*), la garita frena a
+todo el que entra en auto sin un seguro vigente cargado para esa patente. Lo
+carga **solo la guardia**, con el certificado a la vista, y queda en el padrón
+por patente: la próxima vez ese auto pasa sin que se lo pidan, venga al lote que
+venga. Borrar la patente es "viene a pie". Un segundo switch decide si la
+portería puede autorizar igual un auto sin seguro. Cada ingreso guarda cómo
+estaban los dos seguros ese día: renovarlos después no cambia la auditoría.
+
+El veredicto de la garita se ordena en tres secciones —**Visitante/Proveedor**,
+**Vehículo** e **Invitación**— con el estado de cada seguro al lado del título y
+"Corregir" para actualizarlo. Se recalcula al cambiar el documento o la patente.
+
+**Seguros.** La pantalla *Seguros* (garita y admin) lista los autos y los
+proveedores ordenados por vencimiento, con filtros (vencidos, por vencer,
+vigentes, sin cargar), buscador y Excel. El guardia corrige desde ahí; el admin
+solo mira. El tablero avisa los vencidos que siguen entrando, los que vencen
+pronto y los ingresos autorizados sin seguro, y lleva a donde se resuelven. La
+auditoría y su Excel muestran el seguro del auto y cómo estaba cada seguro **el
+día del ingreso**.
+
+El alta exprés de la garita (**Autorizar sin invitación**) puede ser visita o
+proveedor, con su rubro; los seguros se cargan en el veredicto que abre después.
+A un proveedor que autoriza la portería no se le controla horario ni el seguro
+del proveedor (el del auto, solo si el admin lo permite).
+
 **El admin** da de alta vecinos y guardias, corrige lotes, edita los datos del
 barrio (las horas de la alerta de permanencia, los rubros y los horarios de
 proveedores incluidos) y ve el tablero.
+
+**El plano del barrio**: el admin sube una imagen (SVG, PNG o JPG, hasta 1 MB) y el
+invitado la ve en su link. Si es un SVG con los lotes como `lote-N`, el lote del
+invitado aparece resaltado. El de Alamo Alto está en `docs/barrios/`.
 
 ## Correr en desarrollo
 

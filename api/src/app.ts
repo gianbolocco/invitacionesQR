@@ -8,7 +8,9 @@ import { authRoutes } from './routes/auth.js'
 import { googleRoutes } from './routes/google.js'
 import { adminRoutes } from './routes/admin.js'
 import { invitationRoutes } from './routes/invitations.js'
+import { contactRoutes } from './routes/contacts.js'
 import { gateRoutes } from './routes/gate.js'
+import { insuranceRoutes } from './routes/seguros.js'
 import { brandingRoutes } from './routes/branding.js'
 import { reportRoutes } from './routes/reports.js'
 import { avisarAlEscribir } from './lib/avisos.js'
@@ -40,7 +42,9 @@ export function buildApp() {
   app.use(['/admin', '/invitations', '/gate'], avisarAlEscribir)
   app.use('/admin', adminRoutes)
   app.use('/invitations', invitationRoutes)
+  app.use('/contacts', contactRoutes)
   app.use('/gate', gateRoutes)
+  app.use('/insurance', insuranceRoutes)
   app.use('/branding', brandingRoutes)
   app.use('/reports', reportRoutes)
 

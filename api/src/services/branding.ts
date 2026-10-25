@@ -3,7 +3,7 @@ import { db } from '../db/index.js'
 import { neighborhoods } from '../db/schema.js'
 import { audit } from '../lib/audit.js'
 import { AppError } from '../lib/errors.js'
-import { COLOR_DEFAULT, tipoDeImagen } from '../lib/marca.js'
+import { COLOR_DEFAULT, tipoDeImagen, tipoDePlano } from '../lib/marca.js'
 
 /**
  * La marca del barrio, para quien todavía no tiene sesión.
@@ -20,6 +20,8 @@ export async function getBranding() {
     brandColor: neighborhoods.brandColor,
     logoMime: neighborhoods.logoMime,
     logoUpdatedAt: neighborhoods.logoUpdatedAt,
+    mapImageMime: neighborhoods.mapImageMime,
+    mapImageUpdatedAt: neighborhoods.mapImageUpdatedAt,
   }).from(neighborhoods).limit(1)
 
   return {
@@ -29,6 +31,8 @@ export async function getBranding() {
     color: row?.brandColor ?? COLOR_DEFAULT,
     tieneLogo: Boolean(row?.logoMime),
     logoVersion: row?.logoMime && row.logoUpdatedAt ? row.logoUpdatedAt.getTime() : null,
+    tienePlano: Boolean(row?.mapImageMime),
+    planoVersion: row?.mapImageMime && row.mapImageUpdatedAt ? row.mapImageUpdatedAt.getTime() : null,
   }
 }
 
@@ -60,4 +64,28 @@ export async function borrarLogo(actorId: string) {
   const id = await idDelBarrio()
   await db.update(neighborhoods).set({ logo: null, logoMime: null, logoUpdatedAt: null }).where(eq(neighborhoods.id, id))
   await audit(actorId, id, 'branding.logo_removed', 'neighborhood', id)
+}
+
+export async function guardarPlano(bytes: Buffer, actorId: string) {
+  const mime = tipoDePlano(bytes)
+  if (!mime) throw new AppError(400, 'formato_no_soportado')
+
+  const id = await idDelBarrio()
+  await db.update(neighborhoods).set({ mapImage: bytes, mapImageMime: mime, mapImageUpdatedAt: new Date() }).where(eq(neighborhoods.id, id))
+
+  await audit(actorId, id, 'branding.plano_updated', 'neighborhood', id, { mime })
+  return { mime }
+}
+
+export async function leerPlano(): Promise<{ bytes: Buffer; mime: string } | null> {
+  const [row] = await db.select({ img: neighborhoods.mapImage, mime: neighborhoods.mapImageMime })
+    .from(neighborhoods).limit(1)
+  if (!row?.img || !row.mime) return null
+  return { bytes: row.img, mime: row.mime }
+}
+
+export async function borrarPlano(actorId: string) {
+  const id = await idDelBarrio()
+  await db.update(neighborhoods).set({ mapImage: null, mapImageMime: null, mapImageUpdatedAt: null }).where(eq(neighborhoods.id, id))
+  await audit(actorId, id, 'branding.plano_removed', 'neighborhood', id)
 }

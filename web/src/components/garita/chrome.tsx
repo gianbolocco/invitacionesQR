@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, ClipboardList, LogOut, ScanLine, Settings2 } from 'lucide-react'
+import { CalendarDays, ClipboardList, FileCheck, LogOut, ScanLine, Settings2 } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { logout } from '@/lib/session'
 import { Marca } from '@/components/dominio/marca'
@@ -31,6 +31,7 @@ export function ChromeGarita({ children }: { children: React.ReactNode }) {
   const items: ItemBarra[] = [
     { href: '/garita', etiqueta: 'Garita', icono: CalendarDays, activo: path === '/garita' },
     { href: '/auditoria', etiqueta: 'Auditoría', icono: ClipboardList, activo: path.startsWith('/auditoria') },
+    { href: '/seguros', etiqueta: 'Seguros', icono: FileCheck, activo: path.startsWith('/seguros') },
   ]
 
   return (

@@ -5,7 +5,11 @@ import { canEnter, type EntryCheck } from '../authz.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { audit } from '../lib/audit.js'
+import { pideSeguro, claveSeguro, type Seguro } from '../lib/seguro.js'
+import { aplicaFranjas } from '../lib/franjas.js'
+import { normalizarDoc, normalizarPatente } from '../lib/padron.js'
 import { PORTERIA } from '../lib/porteria.js'
+import { buscarProveedor, buscarVehiculo, guardarProveedor, guardarVehiculo, ultimaPatente, type ProveedorPadron, type VehiculoPadron } from './padron.js'
 import { assertUnitInNeighborhood, valoresDePorteria, franjasDelRubro } from './invitations.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
@@ -24,6 +28,11 @@ async function loadForCheck(where: SQL) {
     tradeId: invitations.tradeId,
     tradeName: trades.name,
     providerWindows: neighborhoods.providerWindows,
+    insuranceWarnDays: neighborhoods.insuranceWarnDays,
+    requiresInsurance: trades.requiresInsurance,
+    neighborhoodId: neighborhoods.id,
+    vehicleInsuranceRequired: neighborhoods.vehicleInsuranceRequired,
+    vehicleInsuranceOverride: neighborhoods.vehicleInsuranceOverride,
     guestName: invitations.guestName,
     guestDoc: invitations.guestDoc,
     plate: invitations.plate,
@@ -37,6 +46,7 @@ async function loadForCheck(where: SQL) {
     unitLabel: units.label,
     // Para el veredicto: a quién llamar si hay dudas. Si la creó un guardia
     // (alta exprés), no se muestra su nombre, igual que en la agenda.
+    creatorRole: people.role,
     inviterName: sql<string>`case when ${people.role} = 'guard' then ${PORTERIA} else ${people.name} end`,
   }).from(invitations)
     .innerJoin(units, eq(units.id, invitations.unitId))
@@ -49,9 +59,53 @@ async function loadForCheck(where: SQL) {
 
 type LoadedInvitation = NonNullable<Awaited<ReturnType<typeof loadForCheck>>>
 
-async function buildCheck(invitation: LoadedInvitation) {
+/** Lo que el check necesita del padrón: los dos seguros y los switches del barrio. */
+export type Padron = {
+  provider: ProveedorPadron | null
+  vehicle: VehiculoPadron | null
+  /** Vino en auto: hay una patente cargada (la de la invitación o la que tipeó el guardia). */
+  hayPatente: boolean
+  vehicleInsuranceRequired: boolean
+  vehicleInsuranceOverride: boolean
+}
+
+/** Lo que canEnter necesita, a partir de las columnas crudas (el rubro puede ser null) y del padrón. */
+export function aLike<T extends {
+  creatorRole: string
+  kind: string; frequentAs: string | null; requiresInsurance: boolean | null
+}>(row: T, padron: Padron) {
+  const s = padron.provider?.insurance ?? null
+  return {
+    ...row,
+    porteria: row.creatorRole === 'guard',
+    requiresInsurance: pideSeguro(row.kind, row.frequentAs, row.requiresInsurance),
+    // Los mismos tres campos planos de antes, ahora del padrón: la web los sigue leyendo así.
+    insuranceCompany: s?.company ?? null,
+    insurancePolicy: s?.policy ?? null,
+    insuranceExpiresOn: s?.expiresOn ?? null,
+    insuranceComplete: s !== null,
+    vehicleRequiresInsurance: padron.vehicleInsuranceRequired && padron.hayPatente,
+    vehicleInsuranceExpiresOn: padron.vehicle?.insurance.expiresOn ?? null,
+    vehicleOverride: padron.vehicleInsuranceOverride,
+  }
+}
+
+/**
+ * `datos` es lo que el guardia tiene tipeado en el veredicto. Sin él, vale lo
+ * de la invitación. El veredicto se recalcula acá, con el único canEnter, cada
+ * vez que el guardia cambia el documento o la patente.
+ */
+async function buildCheck(invitation: LoadedInvitation, datos: { doc?: string; plate?: string } = {}) {
   const { usedCount, lastEntryAt } = await usage(invitation.id)
-  const { providerWindows, ...inv } = invitation
+  const { providerWindows, insuranceWarnDays, neighborhoodId, vehicleInsuranceRequired, vehicleInsuranceOverride, ...crudo } = invitation
+  const doc = datos.doc ?? invitation.guestDoc ?? ''
+  const plate = datos.plate ?? invitation.plate ?? ''
+  const [provider, vehicle, lastPlate] = await Promise.all([
+    buscarProveedor(neighborhoodId, doc),
+    buscarVehiculo(neighborhoodId, plate),
+    ultimaPatente(neighborhoodId, doc),
+  ])
+  const inv = aLike(crudo, { provider, vehicle, hayPatente: normalizarPatente(plate) !== '', vehicleInsuranceRequired, vehicleInsuranceOverride })
   const check: EntryCheck = canEnter(inv, new Date(), usedCount, providerWindows)
   const abierta = await openEntry(invitation.id)
 
@@ -59,9 +113,15 @@ async function buildCheck(invitation: LoadedInvitation) {
     invitation: inv,
     // Solo las franjas de su rubro, nunca la lista entera del barrio.
     franjas: franjasDelRubro(providerWindows, invitation.kind, invitation.frequentAs, invitation.tradeId),
+    insuranceWarnDays,
     check,
     usedCount,
     lastEntryAt,
+    provider: provider && { insurance: provider.insurance, insuranceSource: provider.insuranceSource, updatedAt: provider.updatedAt },
+    vehicle: vehicle && { plate: vehicle.plate, insurance: vehicle.insurance, updatedByName: vehicle.updatedByName, updatedAt: vehicle.updatedAt },
+    lastPlate,
+    vehicleInsuranceRequired,
+    vehicleInsuranceOverride,
     /*
      * Si viene, el próximo movimiento es un egreso y `check` no aplica: un
      * egreso no se valida. El cliente decide a qué endpoint pegar con esto, y
@@ -102,10 +162,10 @@ export async function checkByToken(token: string) {
   return buildCheck(invitation)
 }
 
-export async function checkById(id: string) {
+export async function checkById(id: string, datos?: { doc?: string; plate?: string }) {
   const invitation = await loadForCheck(eq(invitations.id, id))
   if (!invitation) throw new AppError(404, 'not_found')
-  return buildCheck(invitation)
+  return buildCheck(invitation, datos)
 }
 
 /**
@@ -117,7 +177,7 @@ export async function checkById(id: string) {
 export async function registerEntry(
   invitationId: string,
   guardId: string | null,
-  data: { guestName: string; guestDoc?: string; plate?: string; note?: string },
+  data: { guestName: string; guestDoc?: string; plate?: string; note?: string; insurance?: Seguro; vehicleInsurance?: Seguro },
 ) {
   return db.transaction(async (tx) => {
     const [target] = await tx.select().from(invitations)
@@ -125,12 +185,43 @@ export async function registerEntry(
     if (!target) throw new AppError(404, 'not_found')
 
     const { usedCount } = await usage(invitationId, tx)
+    // Después del FOR UPDATE: quién la creó decide si canEnter mira franjas y seguro.
+    const [{ creatorRole }] = await tx.select({ creatorRole: people.role }).from(people).where(eq(people.id, target.createdBy))
 
     // Después del FOR UPDATE de arriba, que sigue siendo lo que serializa el cupo.
-    const [{ providerWindows }] = await tx.select({ providerWindows: neighborhoods.providerWindows })
-      .from(units).innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
+    const [barrio] = await tx.select({
+      providerWindows: neighborhoods.providerWindows, nid: neighborhoods.id, warnDays: neighborhoods.insuranceWarnDays,
+      vehicleInsuranceRequired: neighborhoods.vehicleInsuranceRequired, vehicleInsuranceOverride: neighborhoods.vehicleInsuranceOverride,
+    }).from(units).innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
       .where(eq(units.id, target.unitId)).limit(1)
-    const check = canEnter(target, new Date(), usedCount, providerWindows)
+    const [rubro] = target.tradeId
+      ? await tx.select({ requiresInsurance: trades.requiresInsurance }).from(trades).where(eq(trades.id, target.tradeId))
+      : []
+    const pide = pideSeguro(target.kind, target.frequentAs, rubro?.requiresInsurance ?? null)
+    const doc = data.guestDoc?.trim() ?? ''
+    // Misma regla que buildCheck: lo tipeado manda, si no la de la invitación; '' es a pie.
+    const plate = (data.plate ?? target.plate ?? '').trim()
+
+    // El padrón se escribe ANTES de canEnter y en esta misma transacción: si
+    // canEnter rechaza, el throw lo revierte junto con su auditoría.
+    if (aplicaFranjas(target.kind, target.frequentAs) && normalizarDoc(doc) !== '') {
+      await guardarProveedor(tx, {
+        neighborhoodId: barrio.nid, doc, name: data.guestName, tradeId: target.tradeId ?? undefined,
+        insurance: pide ? data.insurance : undefined, actorId: guardId,
+      })
+    }
+    if (data.vehicleInsurance) {
+      await guardarVehiculo(tx, { neighborhoodId: barrio.nid, plate, insurance: data.vehicleInsurance, actorId: guardId })
+    }
+
+    const provider = await buscarProveedor(barrio.nid, doc, tx)
+    const vehicle = await buscarVehiculo(barrio.nid, plate, tx)
+    const inv = aLike({ ...target, creatorRole, requiresInsurance: rubro?.requiresInsurance ?? null }, {
+      provider, vehicle, hayPatente: normalizarPatente(plate) !== '',
+      vehicleInsuranceRequired: barrio.vehicleInsuranceRequired, vehicleInsuranceOverride: barrio.vehicleInsuranceOverride,
+    })
+    const ahora = new Date()
+    const check = canEnter(inv, ahora, usedCount, barrio.providerWindows)
     if (!check.ok) throw new AppError(409, check.reason)
 
     const [entry] = await tx.insert(entryLogs).values({
@@ -138,17 +229,20 @@ export async function registerEntry(
       unitId: target.unitId,
       guardId,
       guestName: data.guestName.trim(),
-      guestDoc: data.guestDoc?.trim() || null,
-      plate: data.plate?.trim().toUpperCase() || null,
+      guestDoc: doc || null,
+      plate: plate.toUpperCase() || null,
       note: data.note?.trim() || null,
+      // La foto de los seguros en este momento: el padrón cambia, la auditoría no.
+      // Se calcula sin las excepciones de la portería: así se ve lo que se autorizó igual.
+      providerInsurance: claveSeguro(pide, provider?.insurance ?? null, barrio.warnDays, ahora),
+      vehicleInsurance: claveSeguro(inv.vehicleRequiresInsurance, vehicle?.insurance ?? null, barrio.warnDays, ahora),
     }).returning()
 
     // Si la invitación no tenía documento, el que se tipeó en la puerta
     // queda ahí: la próxima vez (frecuente, proveedor) ya viene precargado.
     // La fila de la invitación ya está bloqueada por el FOR UPDATE de arriba.
-    if (!target.guestDoc && data.guestDoc?.trim()) {
-      await tx.update(invitations).set({ guestDoc: data.guestDoc.trim() })
-        .where(eq(invitations.id, invitationId))
+    if (!target.guestDoc && doc) {
+      await tx.update(invitations).set({ guestDoc: doc }).where(eq(invitations.id, invitationId))
     }
 
     return entry
@@ -586,6 +680,23 @@ export type AuditRow = {
   kind: 'visita' | 'frecuente' | 'proveedor'
   frequentAs: 'visita' | 'proveedor' | null
   tradeName: string | null
+  /** El rubro pide seguro Y esta invitación es de quien entra a trabajar. */
+  requiresInsurance: boolean
+  /** 0 = domingo. null = todos los días. */
+  weekdays: number[] | null
+  /** Lo que el vecino le dejó dicho a la guardia. */
+  note: string | null
+  /** La creó la portería (alta exprés), no un vecino. */
+  porteria: boolean
+  insuranceCompany: string | null
+  insurancePolicy: string | null
+  insuranceExpiresOn: string | null
+  /** El seguro del auto HOY, por la patente de la invitación. El de cada ingreso está en sus movimientos. */
+  vehicleCompany: string | null
+  vehiclePolicy: string | null
+  vehicleExpiresOn: string | null
+  /** Algún ingreso fue un alta exprés con un seguro faltante: "Autorizar igual". */
+  autorizadoSinSeguro: boolean
   unitLabel: string
   inviterName: string
   validFrom: string
@@ -618,6 +729,8 @@ export type AuditFilters = {
   kind?: 'visita' | 'frecuente' | 'proveedor'
   /** Texto libre: nombre, documento, patente, unidad o quién invita. */
   q?: string
+  /** Solo las que entraron por un alta exprés con algún seguro faltante. */
+  sinSeguro?: boolean
   page?: number
   pageSize?: number
 }
@@ -628,6 +741,8 @@ export type AuditPage = {
   page: number
   pageSize: number
   counts: Record<AuditStatus, number>
+  /** Días de aviso de vencimiento del barrio; null = sin aviso. */
+  insuranceWarnDays: number | null
 }
 
 /**
@@ -646,16 +761,17 @@ export async function auditInvitations(
 ): Promise<AuditPage> {
   const page = Math.max(1, f.page ?? 1)
   const pageSize = Math.min(200, Math.max(1, f.pageSize ?? 50))
-  const [rows, counts] = await Promise.all([
+  const [rows, counts, [barrio]] = await Promise.all([
     auditRows(neighborhoodId, f, pageSize, (page - 1) * pageSize),
     auditCounts(neighborhoodId, f),
+    db.select({ dias: neighborhoods.insuranceWarnDays }).from(neighborhoods).where(eq(neighborhoods.id, neighborhoodId)),
   ])
 
   const total = f.status
     ? counts[f.status]
     : Object.values(counts).reduce((a, b) => a + b, 0)
 
-  return { rows, total, page, pageSize, counts }
+  return { rows, total, page, pageSize, counts, insuranceWarnDays: barrio?.dias ?? null }
 }
 
 /**
@@ -693,6 +809,9 @@ function filtrosAuditoria(neighborhoodId: string, f: AuditFilters) {
       or u.label ilike ${patron}::text
       or p.name ilike ${patron}::text
       or regexp_replace(coalesce(i.guest_doc, ''), '\\D', '', 'g') like ${patronDoc}::text)
+    and (not ${f.sinSeguro ?? false}::boolean or (p.role = 'guard' and exists (
+      select 1 from entry_log es where es.invitation_id = i.id
+        and (es.provider_insurance in ('sin_cargar','vencido') or es.vehicle_insurance in ('sin_cargar','vencido')))))
   `
 }
 
@@ -772,6 +891,19 @@ async function auditRows(
       i.kind,
       i.frequent_as       as "frequentAs",
       t.name                      as "tradeName",
+      t.requires_insurance        as "tradeRequiresInsurance",
+      i.weekdays,
+      i.note,
+      (p.role = 'guard')          as porteria,
+      pv.insurance_company         as "insuranceCompany",
+      pv.insurance_policy          as "insurancePolicy",
+      pv.insurance_expires_on::text as "insuranceExpiresOn",
+      ve.insurance_company        as "vehicleCompany",
+      ve.insurance_policy         as "vehiclePolicy",
+      ve.insurance_expires_on::text as "vehicleExpiresOn",
+      (p.role = 'guard' and exists (select 1 from entry_log es where es.invitation_id = i.id
+        and (es.provider_insurance in ('sin_cargar','vencido') or es.vehicle_insurance in ('sin_cargar','vencido'))))
+                                  as "autorizadoSinSeguro",
       u.label                     as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.valid_from                as "validFrom",
@@ -795,6 +927,11 @@ async function auditRows(
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
     left join trade t on t.id = i.trade_id
+    -- El seguro del proveedor vive en el padrón, por DNI normalizado (lib/padron.ts).
+    left join provider pv on pv.neighborhood_id = u.neighborhood_id
+      and pv.doc = upper(regexp_replace(coalesce(i.guest_doc, ''), '[^0-9A-Za-z]', '', 'g'))
+    left join vehicle ve on ve.neighborhood_id = u.neighborhood_id
+      and ve.plate = upper(regexp_replace(coalesce(i.plate, ''), '[^0-9A-Za-z]', '', 'g'))
     left join uso on uso.invitation_id = i.id
     left join ultimo on ultimo.invitation_id = i.id
     where ${filtrosAuditoria(neighborhoodId, f)}
@@ -809,5 +946,9 @@ async function auditRows(
     limit ${limit} offset ${offset}
   `)
 
-  return res.rows as unknown as AuditRow[]
+  return (res.rows as unknown as (Omit<AuditRow, 'requiresInsurance'> & { tradeRequiresInsurance: boolean | null })[])
+    .map(({ tradeRequiresInsurance, ...r }) => ({
+      ...r,
+      requiresInsurance: pideSeguro(r.kind, r.frequentAs, tradeRequiresInsurance),
+    }))
 }

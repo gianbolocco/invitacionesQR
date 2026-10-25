@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { use, useState } from 'react'
 import { Download, Inbox, LayoutGrid, Search, SearchX, Table2, X } from 'lucide-react'
 import { apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
@@ -7,7 +7,7 @@ import { hoyISO, sumarDias } from '@/lib/fechas'
 import { useDemora } from '@/lib/use-demora'
 import { useMedia } from '@/lib/use-media'
 import { usePreferencia } from '@/lib/use-preferencia'
-import { paramsDe, useAuditoria, type FiltrosAuditoria } from '@/lib/queries/auditoria'
+import { paramsDe, useAuditoria, type AuditRow, type FiltrosAuditoria } from '@/lib/queries/auditoria'
 import { ChromeAdmin } from '@/components/admin/chrome'
 import { ChromeGarita } from '@/components/garita/chrome'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
@@ -22,6 +22,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabla } from '@/components/auditoria/tabla'
 import { Tarjetas } from '@/components/auditoria/tarjetas'
+import { Detalle } from '@/components/auditoria/detalle'
 import { cn } from '@/lib/utils'
 
 type Vista = 'tabla' | 'tarjetas'
@@ -50,14 +51,23 @@ function rangoActivo(from: string, to: string): Rango {
   return 'otro'
 }
 
-export default function AuditoriaPage() {
+const SEGUROS: { valor: 'todos' | 'sinSeguro'; etiqueta: string }[] = [
+  { valor: 'todos', etiqueta: 'Todos' },
+  { valor: 'sinSeguro', etiqueta: 'Autorizados sin seguro' },
+]
+
+/** `?sinSeguro=1` llega desde el aviso del tablero. */
+export default function AuditoriaPage({ searchParams }: { searchParams: Promise<{ sinSeguro?: string }> }) {
+  const sp = use(searchParams)
   const me = useMe()
+  const [sinSeguro, setSinSeguro] = useState(sp.sinSeguro === '1')
   const [from, setFrom] = useState(sumarDias(hoyISO(), -7))
   const [to, setTo] = useState(hoyISO())
   const [estado, setEstado] = useState<FiltrosAuditoria['estado']>('todos')
   const [tipo, setTipo] = useState<FiltrosAuditoria['tipo']>('todos')
   const [texto, setTexto] = useState('')
   const [page, setPage] = useState(1)
+  const [abierta, setAbierta] = useState<AuditRow | null>(null)
 
   const medio = useMedia('(min-width: 768px)')
   const [guardada, guardar] = usePreferencia<Vista>('visitpass.auditoria.vista')
@@ -66,7 +76,7 @@ export default function AuditoriaPage() {
 
   // El buscador espera a que se deje de tipear: "martin" son seis teclas, no seis consultas.
   const q = useDemora(texto)
-  const filtros: FiltrosAuditoria = { from, to, estado, tipo, q }
+  const filtros: FiltrosAuditoria = { from, to, estado, tipo, q, sinSeguro }
   const consulta = useAuditoria(filtros, page, PAGE_SIZE, Boolean(me))
 
   /** Cada cambio de filtro vuelve a la primera página: la 3 de otra búsqueda no existe. */
@@ -88,7 +98,10 @@ export default function AuditoriaPage() {
   if (tipo !== 'todos') aplicados.push({
     clave: 'tipo', etiqueta: TIPOS.find((t) => t.valor === tipo)!.etiqueta, quitar: () => cambiar(setTipo)('todos'),
   })
-  function limpiarPanel() { setTipo('todos'); aplicarRango('7') }
+  if (sinSeguro) aplicados.push({
+    clave: 'sinSeguro', etiqueta: 'Autorizados sin seguro', quitar: () => cambiar(setSinSeguro)(false),
+  })
+  function limpiarPanel() { setTipo('todos'); setSinSeguro(false); aplicarRango('7') }
 
   const hayFiltros = texto !== '' || estado !== 'todos' || aplicados.length > 0
   function limpiar() { setTexto(''); setEstado('todos'); limpiarPanel() }
@@ -101,6 +114,7 @@ export default function AuditoriaPage() {
   const lista = consulta.data?.rows ?? []
   const counts = consulta.data?.counts
   const total = consulta.data?.total ?? 0
+  const warnDays = consulta.data?.insuranceWarnDays ?? null
   const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const todos = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0
   // Se llega acá desde las dos secciones: cada rol ve el marco de la suya.
@@ -150,6 +164,10 @@ export default function AuditoriaPage() {
               <SeccionFiltro titulo="Tipo de invitación">
                 <Chips etiqueta="Tipo de invitación" valor={tipo} onCambio={cambiar(setTipo)} opciones={TIPOS} />
               </SeccionFiltro>
+              <SeccionFiltro titulo="Seguros">
+                <Chips etiqueta="Seguros" valor={sinSeguro ? 'sinSeguro' : 'todos'}
+                  onCambio={(v) => cambiar(setSinSeguro)(v === 'sinSeguro')} opciones={SEGUROS} />
+              </SeccionFiltro>
             </HojaFiltros>
           </div>
           <FiltrosAplicados aplicados={aplicados} onLimpiar={limpiarPanel} />
@@ -177,7 +195,7 @@ export default function AuditoriaPage() {
         ) : (
           // Mientras llega la búsqueda nueva, la lista anterior queda a media luz en vez de saltar.
           <div className={cn('transition-opacity duration-150', consulta.isPlaceholderData && 'opacity-60')}>
-            {vista === 'tabla' ? <Tabla filas={lista} /> : <Tarjetas filas={lista} />}
+            {vista === 'tabla' ? <Tabla filas={lista} warnDays={warnDays} onAbrir={setAbierta} /> : <Tarjetas filas={lista} warnDays={warnDays} onAbrir={setAbierta} />}
           </div>
         )}
 
@@ -192,6 +210,7 @@ export default function AuditoriaPage() {
           </nav>
         )}
       </div>
+      <Detalle fila={abierta} warnDays={warnDays} onCerrar={() => setAbierta(null)} />
     </Chrome>
   )
 }

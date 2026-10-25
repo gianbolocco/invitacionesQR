@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { Kpi } from '@/components/dominio/kpi'
 import { Fila } from '@/components/dominio/fila'
@@ -42,7 +43,10 @@ export default function TableroPage() {
 
   const maxInvit = Math.max(1, ...(porPersona.data ?? []).map((p) => p.total))
   const k = kpis.data
-  const hayAtencion = k && (k.unitsWithoutResidents > 0 || k.staleInside > 0 || k.invitedNeverLoggedIn > 0)
+  const hayAtencion = k && (k.unitsWithoutResidents > 0 || k.staleInside > 0 || k.invitedNeverLoggedIn > 0
+    || k.segurosVencidos > 0 || k.segurosPorVencer > 0 || k.autorizadosSinSeguro > 0)
+  // Los avisos de seguros llevan a donde se resuelven: la pantalla Seguros o la auditoría filtrada.
+  const enlace = 'rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 
   return (
       <div className="flex flex-col gap-8">
@@ -69,6 +73,21 @@ export default function TableroPage() {
                   )}
                   {k.invitedNeverLoggedIn > 0 && (
                     <Kpi tono="atencion" etiqueta="Invitados que nunca entraron" valor={k.invitedNeverLoggedIn} />
+                  )}
+                  {k.segurosVencidos > 0 && (
+                    <Link href="/seguros?estado=vencido" className={enlace}>
+                      <Kpi tono="atencion" etiqueta="Seguros vencidos que siguen entrando" valor={k.segurosVencidos} />
+                    </Link>
+                  )}
+                  {k.segurosPorVencer > 0 && (
+                    <Link href="/seguros?estado=por_vencer" className={enlace}>
+                      <Kpi tono="atencion" etiqueta="Seguros por vencer" valor={k.segurosPorVencer} />
+                    </Link>
+                  )}
+                  {k.autorizadosSinSeguro > 0 && (
+                    <Link href="/auditoria?sinSeguro=1" className={enlace}>
+                      <Kpi tono="atencion" etiqueta="Autorizados sin seguro · 7 días" valor={k.autorizadosSinSeguro} />
+                    </Link>
                   )}
                 </div>
               </div>

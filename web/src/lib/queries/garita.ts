@@ -6,9 +6,11 @@ import { toast } from 'sonner'
 import { api, apiBase, ApiError } from '@/lib/api'
 import { hoyISO } from '@/lib/fechas'
 import {
-  porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres,
-  cargarManual, mensajeCargaManual, anularPorPorteria, mensajeAnulacion, type Resultado,
+  porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres, mensajeAltaExpres,
+  cargarManual, mensajeCargaManual, anularPorPorteria, mensajeAnulacion, veredictoCon, corregirSeguroProveedor,
+  corregirSeguroAuto, MOTIVO, type Resultado,
 } from '@/lib/gate'
+import type { SeguroDatos } from '@/lib/seguro'
 import type { LecturaDni } from '@/lib/lectora'
 
 export type AgendaRow = {
@@ -107,6 +109,40 @@ export function useVeredicto(id: string) {
 }
 
 /**
+ * El veredicto recalculado con el documento y la patente que tiene tipeados el
+ * guardia: el único canEnter vive en la API. `datos` null = todavía son los de
+ * la invitación y alcanza con el veredicto inicial. Mientras llega uno nuevo
+ * queda el anterior: el NO PASA no parpadea con cada tecla.
+ */
+export function useVeredictoEnVivo(id: string, datos: { doc: string; plate: string } | null) {
+  return useQuery({
+    queryKey: [...claves.veredicto(id), 'vivo', datos?.doc ?? '', datos?.plate ?? ''] as const,
+    queryFn: ({ signal }) => veredictoCon(id, datos!, signal),
+    enabled: datos !== null,
+    placeholderData: keepPreviousData,
+    // Un reintento y no tres: con la red caída, "No se pudo recalcular" tiene que aparecer enseguida.
+    retry: 1,
+  })
+}
+
+export type Correccion =
+  | { tipo: 'proveedor'; doc: string; name: string; insurance: SeguroDatos }
+  | { tipo: 'auto'; plate: string; insurance: SeguroDatos }
+
+/** "Corregir" sin registrar: queda en el padrón aunque el guardia apriete Volver. */
+export function useCorregirSeguro() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ tipo, ...datos }: Correccion) => tipo === 'auto'
+      ? corregirSeguroAuto(datos as { plate: string; insurance: SeguroDatos })
+      : corregirSeguroProveedor(datos as { doc: string; name: string; insurance: SeguroDatos }),
+    onSuccess: () => toast.success('Seguro actualizado.'),
+    onError: () => toast.error('No se pudo guardar el seguro. Probá de nuevo.'),
+    onSettled: () => invalidarGarita(qc),
+  })
+}
+
+/**
  * El escáner ya trae el resultado completo al validar el token. Se precarga
  * acá antes de navegar, así la pantalla del veredicto no lo vuelve a pedir
  * ni parpadea con un skeleton que ya tiene los datos.
@@ -196,11 +232,24 @@ function invalidarGarita(qc: QueryClient): Promise<void> {
   return qc.invalidateQueries({ queryKey: ['garita'] })
 }
 
+/** Qué seguro mandado tenía la fecha pasada. Si no se mandó, el rechazo es por el guardado y va como motivo. */
+export function fechaPasadaDe(e: unknown, vars: { insurance?: unknown; vehicleInsurance?: unknown }) {
+  if (!(e instanceof ApiError)) return null
+  if (e.code === 'insurance_expired' && vars.insurance) return 'proveedor'
+  if (e.code === 'vehicle_insurance_expired' && vars.vehicleInsurance) return 'auto'
+  return null
+}
+
 export function useRegistrarIngreso() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: registrarIngreso,
-    onError: () => toast.error('No se pudo registrar. Probá de nuevo.'),
+    onError: (e, vars) => {
+      // La fecha vencida de un seguro recién cargado se avisa bajo su campo, no en un toast.
+      if (fechaPasadaDe(e, vars)) return
+      // Otro 409 (cupo, horario, ya vencida) dice el motivo real: "Probá de nuevo" daría lo mismo.
+      toast.error((e instanceof ApiError && MOTIVO[e.code]) || 'No se pudo registrar. Probá de nuevo.')
+    },
     onSettled: () => invalidarGarita(qc),
   })
 }
@@ -235,7 +284,7 @@ export function useAltaExpres() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: altaExpres,
-    onError: () => toast.error('No se pudo crear la invitación. Probá de nuevo.'),
+    onError: (e) => toast.error(mensajeAltaExpres(e) ?? 'No se pudo crear la invitación. Probá de nuevo.'),
     onSuccess: () => invalidarGarita(qc),
   })
 }

@@ -157,7 +157,7 @@ export function useAnularInvitacion() {
 export function useRubrosDelBarrio() {
   return useQuery({
     queryKey: ['invitaciones', 'rubros'] as const,
-    queryFn: ({ signal }) => api<{ trades: { id: string; name: string }[]; providerWindows: Franja[] }>('/invitations/trades', { signal }),
+    queryFn: ({ signal }) => api<{ trades: { id: string; name: string; requiresInsurance: boolean }[]; providerWindows: Franja[] }>('/invitations/trades', { signal }),
     staleTime: 5 * 60_000,
   })
 }

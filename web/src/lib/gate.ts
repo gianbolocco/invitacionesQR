@@ -4,6 +4,7 @@ import { fechaNumerica } from './fechas'
 import { DIAS } from './invitations'
 import type { ItemManual } from './carga-manual'
 import { detalleFueraDeHorario, type Franja } from './franjas'
+import type { SeguroDatos } from './seguro'
 
 export type Check = { ok: true } | { ok: false; reason: string }
 
@@ -13,6 +14,8 @@ export type Resultado = {
   invitation: {
     id: string
     kind: 'visita' | 'frecuente' | 'proveedor'
+    frequentAs: 'visita' | 'proveedor' | null
+    tradeId: string | null
     guestName: string
     guestDoc: string | null
     plate: string | null
@@ -26,7 +29,13 @@ export type Resultado = {
     inviterName: string
     note: string | null
     tradeName: string | null
+    requiresInsurance: boolean
+    insuranceCompany: string | null
+    insurancePolicy: string | null
+    insuranceExpiresOn: string | null
   }
+  /** Días de aviso antes del vencimiento del seguro; null si el barrio no avisa. */
+  insuranceWarnDays: number | null
   /** Las franjas del rubro de un proveedor; [] para el resto. */
   franjas: Franja[]
   check: Check
@@ -34,6 +43,15 @@ export type Resultado = {
   lastEntryAt: string | null
   /** Si viene, el próximo movimiento es un egreso y `check` no aplica. */
   adentro: Adentro
+  /** El proveedor en el padrón, por el DNI cargado. null = no está (o no es proveedor). */
+  provider: { insurance: SeguroDatos | null; insuranceSource: 'garita' | 'link' | null; updatedAt: string | null } | null
+  /** El auto en el padrón, por la patente cargada. null = no está cargado. */
+  vehicle: { plate: string; insurance: SeguroDatos; updatedByName: string | null; updatedAt: string } | null
+  /** La última patente con la que entró este DNI: una sugerencia, no un vínculo. */
+  lastPlate: string | null
+  vehicleInsuranceRequired: boolean
+  /** La portería puede autorizar igual un auto sin seguro. */
+  vehicleInsuranceOverride: boolean
 }
 
 /** Una fila de la bitácora, como la devuelven el ingreso y el egreso. */
@@ -68,7 +86,18 @@ export const MOTIVO: Record<string, string> = {
   outside_hours: 'Fuera de horario',
   no_esta_adentro: 'No figura adentro',
   fuera_de_plazo: 'Pasó el tiempo para deshacer',
+  no_insurance: 'Sin seguro',
+  insurance_expired: 'Seguro vencido',
+  no_vehicle_insurance: 'Sin seguro del auto',
+  vehicle_insurance_expired: 'Seguro del auto vencido',
 }
+
+/** Los rechazos del auto: se resuelven cargando su seguro o entrando a pie. */
+export const rechazoPorAuto = (c: Check) => !c.ok && (c.reason === 'no_vehicle_insurance' || c.reason === 'vehicle_insurance_expired')
+
+/** Los rechazos que la guardia puede resolver cargando un seguro ahí mismo. */
+export const rechazoPorSeguro = (c: Check) =>
+  !c.ok && (c.reason === 'no_insurance' || c.reason === 'insurance_expired' || rechazoPorAuto(c))
 
 /**
  * El dato concreto detrás del motivo, para que el guardia se lo pueda decir al
@@ -76,9 +105,21 @@ export const MOTIVO: Record<string, string> = {
  */
 export function detalleRechazo(
   reason: string,
-  inv: { validFrom: string; validTo: string; weekdays: number[] | null },
-  extra?: { franjas: Franja[]; tradeName: string | null },
+  inv: {
+    validFrom: string; validTo: string; weekdays: number[] | null
+    insuranceCompany?: string | null; insurancePolicy?: string | null; insuranceExpiresOn?: string | null
+  },
+  extra?: { franjas: Franja[]; tradeName: string | null; plate?: string; vehicle?: Resultado['vehicle'] },
 ): string | null {
+  if (reason === 'no_vehicle_insurance') return `${extra?.plate || 'El auto'} no tiene seguro cargado. Pedile el certificado.`
+  if (reason === 'vehicle_insurance_expired' && extra?.vehicle) {
+    const s = extra.vehicle.insurance
+    return `Venció el ${fechaNumerica(s.expiresOn)} · ${s.company} · Póliza ${s.policy}`
+  }
+  if (reason === 'no_insurance') return 'Su rubro pide seguro y no tiene uno cargado'
+  if (reason === 'insurance_expired' && inv.insuranceExpiresOn) {
+    return `Venció el ${fechaNumerica(inv.insuranceExpiresOn)} · ${inv.insuranceCompany} · Póliza ${inv.insurancePolicy}`
+  }
   if (reason === 'outside_hours') {
     if (!extra) return null
     return detalleFueraDeHorario(extra.franjas, extra.tradeName ?? 'Proveedor', new Date())
@@ -106,11 +147,23 @@ export function mensajeDeError(error: unknown): string {
 
 export const porId = (id: string) => api<Resultado>(`/gate/invitation/${id}`)
 
+/** El veredicto con lo que el guardia tiene tipeado. POST: el DNI no va en la URL. */
+export const veredictoCon = (id: string, datos: { doc: string; plate: string }, signal?: AbortSignal) =>
+  api<Resultado>(`/gate/invitation/${id}/verdict`, { method: 'POST', body: JSON.stringify(datos), signal })
+
+export const corregirSeguroProveedor = (datos: { doc: string; name: string; insurance: SeguroDatos }) =>
+  api<{ ok: true }>('/gate/providers/insurance', { method: 'PUT', body: JSON.stringify(datos) })
+
+export const corregirSeguroAuto = (datos: { plate: string; insurance: SeguroDatos }) =>
+  api<{ ok: true }>('/gate/vehicles/insurance', { method: 'PUT', body: JSON.stringify(datos) })
+
 export const registrarIngreso = (datos: {
   invitationId: string
   guestName: string
   guestDoc?: string
   plate?: string
+  insurance?: { company: string; policy: string; expiresOn: string }
+  vehicleInsurance?: SeguroDatos
 }) => api<Movimiento>('/gate/entries', { method: 'POST', body: JSON.stringify(datos) })
 
 export const registrarEgreso = (invitationId: string) =>
@@ -118,8 +171,19 @@ export const registrarEgreso = (invitationId: string) =>
 
 export const buscarUnidades = (q: string) => api<UnidadHit[]>(`/gate/units?q=${encodeURIComponent(q)}`)
 
-export const altaExpres = (datos: { unitId: string; guestName: string; guestDoc?: string; plate?: string; note?: string }) =>
-  api<{ id: string }>('/gate/invitations', { method: 'POST', body: JSON.stringify(datos) })
+export const altaExpres = (datos: {
+  unitId: string; guestName: string; guestDoc?: string; plate?: string; note?: string
+  kind: 'visita' | 'proveedor'; tradeId?: string | null
+}) => api<{ id: string }>('/gate/invitations', { method: 'POST', body: JSON.stringify(datos) })
+
+/** Lo que la API le rechaza al alta exprés y el guardia puede corregir; null si es otra cosa. */
+export function mensajeAltaExpres(error: unknown): string | null {
+  const codigo = error instanceof ApiError ? error.code : ''
+  return ({
+    rubro_requerido: 'Elegí el rubro.',
+    rubro_invalido: 'Ese rubro ya no está disponible. Elegí otro.',
+  } as Record<string, string>)[codigo] ?? null
+}
 
 export const deshacer = (entryId: string) =>
   api<{ deshecho: 'ingreso' | 'egreso' }>(`/gate/entries/${entryId}/undo`, { method: 'POST' })

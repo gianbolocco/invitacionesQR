@@ -1,32 +1,41 @@
 'use client'
-import { use, useEffect, useRef, useState } from 'react'
+import { use, useCallback, useEffect, useRef, useState } from 'react'
+import { useSesion } from '@/lib/sesion-contexto'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2 } from 'lucide-react'
-import { MOTIVO, detalleRechazo, hora, mensajeDeError, type Movimiento } from '@/lib/gate'
+import { MOTIVO, detalleRechazo, hora, mensajeDeError, rechazoPorAuto, rechazoPorSeguro, type Movimiento } from '@/lib/gate'
+import { estadoDe, textoVence } from '@/lib/seguro'
+import { mismaPatente, normalizarDoc, normalizarPatente } from '@/lib/padron'
+import { useDemora } from '@/lib/use-demora'
 import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
-import { hoyISO, horaODia, tiempoDesde } from '@/lib/fechas'
-import { KIND_LABEL, vigencia } from '@/lib/invitations'
+import { hoyISO, horaODia, tiempoDesde, fechaCompleta } from '@/lib/fechas'
+import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
 import {
   useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
+  useVeredictoEnVivo, useCorregirSeguro, fechaPasadaDe,
 } from '@/lib/queries/garita'
 import { Input } from '@/components/ui/input'
 import { AltaExpres } from '@/components/garita/alta-expres'
 import { AnularInvitacion } from '@/components/garita/anular-invitacion'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
+import { SeccionSeguro } from '@/components/garita/seccion-seguro'
+import { estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
 
 /** Segundos que la confirmación espera antes de volver sola a la pantalla anterior. */
 const SEGUNDOS_CONFIRMACION = 8
 
 const SALIDA = [0.2, 0.8, 0.2, 1] as const
 
+const VACIO: ValorSeguro = { company: '', policy: '', expiresOn: '' }
+
 /** Una fila de la ficha. dt + dd sueltos: los acomoda la grilla de la <dl>. */
 function Dato({ etiqueta, children }: { etiqueta: React.ReactNode; children: React.ReactNode }) {
   return (
     <>
-      <dt className="opacity-70">{etiqueta}</dt>
+      <dt className="opacity-80">{etiqueta}</dt>
       <dd className="min-w-0 break-words font-semibold tabular">{children}</dd>
     </>
   )
@@ -93,6 +102,7 @@ function AccionesRegistrado({ onListo, onDeshacer, deshaciendo }: {
 export default function VeredictoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const cargaGuardia = useSesion().role === 'guard'
   const q = useVeredicto(id)
   const ingresar = useRegistrarIngreso()
   const egresar = useRegistrarEgreso()
@@ -105,11 +115,21 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const [doc, setDoc] = useState('')
   const [docLeido, setDocLeido] = useState(false)
   const [plate, setPlate] = useState('')
+  const [seguro, setSeguro] = useState<ValorSeguro>(VACIO)
+  const [seguroAuto, setSeguroAuto] = useState<ValorSeguro>(VACIO)
+  // Qué seguro está corrigiendo el guardia (uno que ya estaba cargado).
+  const [corrigiendo, setCorrigiendo] = useState<{ proveedor: boolean; auto: boolean }>({ proveedor: false, auto: false })
+  const [fechaPasada, setFechaPasada] = useState(false)
+  const [fechaPasadaAuto, setFechaPasadaAuto] = useState(false)
+  const corregir = useCorregirSeguro()
   // Todo lo que se muestra después de registrar sale de `hecho`, no del
   // veredicto: la mutación lo invalida al terminar y `adentro` pasa a decir
   // lo contrario de lo que se acaba de registrar.
   const [hecho, setHecho] = useState<{ movimiento: Movimiento; esEgreso: boolean } | null>(null)
   const accionRef = useRef<HTMLButtonElement>(null)
+  // Nunca se limpia: al dar vuelta INGRESO ↔ NO PASA el botón que sale se desmonta
+  // después de su animación, cuando el nuevo ya tomó la ref, y la dejaría en null.
+  const fijarAccion = useCallback((el: HTMLButtonElement | null) => { if (el) accionRef.current = el }, [])
   const [altaAbierta, setAltaAbierta] = useState(false)
   const [disparadorAlta, setDisparadorAlta] = useState<HTMLButtonElement | null>(null)
   const [lecturaAlta, setLecturaAlta] = useState<LecturaDni | null>(null)
@@ -123,7 +143,39 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     setDoc(leido ?? q.data.invitation.guestDoc ?? '')
     setDocLeido(Boolean(leido))
     setPlate(q.data.invitation.plate ?? '')
+    setSeguro(VACIO); setSeguroAuto(VACIO); setCorrigiendo({ proveedor: false, auto: false })
   }
+
+  // Lo copiado con "Corregir" es de ESA patente y de ESE documento: si cambian, se
+  // descarta, así una póliza precargada para un auto nunca se guarda en otro. Lo
+  // que el guardia tipeó de cero queda: corregir una letra de la patente no lo borra.
+  const [claves, setClaves] = useState({ doc: '', plate: '' })
+  if (normalizarPatente(plate) !== claves.plate) {
+    setClaves((c) => ({ ...c, plate: normalizarPatente(plate) }))
+    if (corrigiendo.auto) { setSeguroAuto(VACIO); setFechaPasadaAuto(false); setCorrigiendo((c) => ({ ...c, auto: false })) }
+  }
+  if (normalizarDoc(doc) !== claves.doc) {
+    setClaves((c) => ({ ...c, doc: normalizarDoc(doc) }))
+    if (corrigiendo.proveedor) { setSeguro(VACIO); setFechaPasada(false); setCorrigiendo((c) => ({ ...c, proveedor: false })) }
+  }
+
+  // El veredicto se recalcula en la API cuando el guardia cambia documento o
+  // patente (300 ms después de la última tecla). Mientras sean los de la
+  // invitación, vale el inicial.
+  const docDemorado = useDemora(doc)
+  const plateDemorada = useDemora(plate)
+  const base = q.data
+  const distinto = (d: string, p: string) => Boolean(base) && (normalizarDoc(d) !== normalizarDoc(base?.invitation.guestDoc ?? '')
+    || !mismaPatente(p, base?.invitation.plate ?? null))
+  // Los dos: al cargar, la demora arranca en '' y tarda 300 ms en alcanzar la precarga;
+  // sin mirar el valor actual, pediría (y mostraría) un veredicto sin documento ni patente.
+  const cambio = distinto(doc, plate) && distinto(docDemorado, plateDemorada)
+  const vivo = useVeredictoEnVivo(id, cambio ? { doc: docDemorado, plate: plateDemorada } : null)
+  // El veredicto mostrado es de lo que está tipeado. Si no (la demora, la consulta en
+  // curso con keepPreviousData, o un error), sus seguros son de otra clave: no se
+  // muestran ni se copian. Registrar sigue habilitado: lo decide la API.
+  const alDia = !distinto(doc, plate) || Boolean(vivo.data && !vivo.isPlaceholderData && !vivo.isError
+    && normalizarDoc(docDemorado) === normalizarDoc(doc) && mismaPatente(plateDemorada, plate))
 
   // Vuelve a donde estaba: el escáner, la búsqueda, la agenda o el alta
   // exprés. Una sola vez: el contador, Deshacer y Escape pueden coincidir, y
@@ -142,6 +194,16 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     if (!q.isPending) accionRef.current?.focus()
   }, [q.isPending])
+
+  // Si el veredicto en vivo da vuelta (NO PASA ↔ INGRESO, p. ej. tras "Viene a pie"),
+  // el foco vuelve a la acción para que Enter siga registrando. Escribiendo en un
+  // campo, no: sería robarle el cursor al guardia.
+  const vigente = (cambio && vivo.data) || q.data
+  const desenlace = vigente ? (vigente.check.ok ? 'ok' : vigente.check.reason) : ''
+  useEffect(() => {
+    const a = document.activeElement
+    if (!a || a === document.body || a instanceof HTMLButtonElement) accionRef.current?.focus()
+  }, [desenlace])
 
   // Escape siempre vuelve. En la barrera no hay tiempo de buscar un botón.
   // Con el alta abierta no escucha, y Radix hace preventDefault al cerrar el sheet: ese Esc no saca también del veredicto.
@@ -186,7 +248,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
       setLecturaAlta(l)
       return
     }
-    if (q.data && !hecho && !q.data.adentro && q.data.check.ok) {
+    if (q.data && !hecho && !q.data.adentro && (q.data.check.ok || rechazoPorSeguro(q.data.check))) {
       anotar(`DNI ${formatearDni(l.documento)} · completó el documento`)
       setDoc(l.documento)
       setDocLeido(true)
@@ -220,28 +282,71 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     )
   }
 
-  const resultado = q.data
+  // El de la invitación hasta que el guardia cambia algo; después, el recalculado.
+  const resultado = vigente ?? q.data
   const { invitation: inv, check, adentro } = resultado
   // Un egreso no se valida: si está adentro, sale. `check` es del ingreso.
   const esEgreso = hecho ? hecho.esEgreso : Boolean(adentro)
   const ok = Boolean(hecho) || esEgreso || check.ok
 
+  const hoy = hoyISO()
+  const warn = resultado.insuranceWarnDays
+  const esProveedor = inv.kind === 'proveedor' || inv.frequentAs === 'proveedor'
+  const estadoProv = estadoDe(resultado.provider?.insurance ?? null, inv.requiresInsurance, hoy, warn)
+  const pideAuto = resultado.vehicleInsuranceRequired && normalizarPatente(plate) !== ''
+  const estadoAuto = estadoDe(resultado.vehicle?.insurance ?? null, pideAuto, hoy, warn)
+  const falta = (e: string) => e === 'sin_cargar' || e === 'vencido'
+
+  // Campos abiertos: lo que falta o venció, y lo que el guardia está corrigiendo.
+  // Con alguien adentro (egreso), ya registrado o rechazado por otra cosa (horario,
+  // vencida), nada se abre: no habría con qué guardarlo.
+  // El admin también abre el veredicto, pero los seguros los carga solo el guardia
+  // (la API rechaza al admin): para él no hay campos ni "Corregir".
+  const activo = cargaGuardia && !hecho && !esEgreso && (check.ok || rechazoPorSeguro(check))
+  const abiertoProv = activo && (falta(estadoProv) || corrigiendo.proveedor)
+  const abiertoAuto = activo && (falta(estadoAuto) || corrigiendo.auto)
+  const completoProv = estadoSeguroCargado(seguro) === 'completo'
+  const completoAuto = estadoSeguroCargado(seguroAuto) === 'completo'
+
+  // NO PASA por seguro: el guardia carga lo que falta y el ingreso se registra en el mismo paso.
+  const cargaSeguro = cargaGuardia && !ok && rechazoPorSeguro(check)
+  // Completo es obligatorio en la sección que causa el rechazo, y en el auto si también
+  // le falta: canEnter frena en el primer motivo, y la API rechazaría el ingreso por el
+  // segundo. Con check.ok (p. ej. un alta exprés, que no controla seguros) es opcional:
+  // vacío no traba, a medias sí, porque no se sabría qué se quiso cargar.
+  const parcial = (v: ValorSeguro) => estadoSeguroCargado(v) === 'parcial'
+  const exigeAuto = cargaSeguro && (rechazoPorAuto(check) || falta(estadoAuto))
+  const exigeProv = cargaSeguro && !rechazoPorAuto(check)
+  const listoParaGuardar = (!abiertoProv || (exigeProv ? completoProv : !parcial(seguro)))
+    && (!abiertoAuto || (exigeAuto ? completoAuto : !parcial(seguroAuto)))
+  const mandaProv = abiertoProv && completoProv
+  const mandaAuto = abiertoAuto && completoAuto
+  const datos = (v: ValorSeguro) => ({ company: v.company.trim(), policy: v.policy.trim(), expiresOn: v.expiresOn })
+
   async function registrar() {
+    setFechaPasada(false); setFechaPasadaAuto(false)
+    const vars = {
+      invitationId: inv.id, guestName: inv.guestName,
+      // plate va siempre, '' incluido: sin la clave la API usa la de la invitación, y "Viene a pie" la tiene que pisar.
+      guestDoc: doc || undefined, plate,
+      insurance: mandaProv ? datos(seguro) : undefined,
+      vehicleInsurance: mandaAuto ? datos(seguroAuto) : undefined,
+    }
     try {
-      const mov = esEgreso
-        ? await egresar.mutateAsync(inv.id)
-        : await ingresar.mutateAsync({
-          invitationId: inv.id, guestName: inv.guestName,
-          guestDoc: doc || undefined, plate: plate || undefined,
-        })
+      const mov = esEgreso ? await egresar.mutateAsync(inv.id) : await ingresar.mutateAsync(vars)
       setHecho({ movimiento: mov, esEgreso })
-    } catch {
-      // El toast de error ya lo muestra la mutación.
+    } catch (e) {
+      // El toast de error ya lo muestra la mutación, salvo la fecha pasada de un seguro mandado: va bajo su campo.
+      if (esEgreso) return
+      const cual = fechaPasadaDe(e, vars)
+      if (cual === 'proveedor') setFechaPasada(true)
+      if (cual === 'auto') setFechaPasadaAuto(true)
     }
   }
 
   const motivo = !ok ? MOTIVO[(check as { reason: string }).reason] ?? 'Rechazado' : ''
-  const detalle = !ok ? detalleRechazo((check as { reason: string }).reason, inv, { franjas: resultado.franjas, tradeName: inv.tradeName }) : null
+  const detalle = !ok ? detalleRechazo((check as { reason: string }).reason, inv,
+    { franjas: resultado.franjas, tradeName: inv.tradeName, plate, vehicle: alDia ? resultado.vehicle : null }) : null
   const sinCupo = !ok && (check as { reason: string }).reason === 'no_capacity'
   const palabra = esEgreso ? 'EGRESO' : ok ? 'INGRESO' : 'NO PASA'
   const registrando = ingresar.isPending || egresar.isPending
@@ -251,8 +356,18 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const entro = hecho ? hecho.movimiento.enteredAt : adentro?.enteredAt
   const salio = hecho?.esEgreso ? hecho.movimiento.exitedAt : null
 
-  const editable = ok && !esEgreso && !hecho
+  const editable = (ok && !esEgreso && !hecho) || cargaSeguro
   const borde = ok ? 'border-ink/15' : 'border-current/20'
+  const avisoSeguro = alDia && ok && !esEgreso && estadoProv === 'por_vencer'
+  const avisoAuto = alDia && ok && !esEgreso && estadoAuto === 'por_vencer'
+  // "Autorizar igual" no sirve para un auto sin seguro si el barrio no lo permite.
+  const puedeAutorizar = (check as { reason: string }).reason !== 'revoked'
+    && !(rechazoPorAuto(check) && !resultado.vehicleInsuranceOverride)
+  const quienAuto = resultado.vehicle
+    // hoyISO de un instante da su día en Buenos Aires: cortar el ISO daría el de UTC.
+    ? `Lo cargó ${resultado.vehicle.updatedByName ?? 'la guardia'} el ${fechaCompleta(hoyISO(new Date(resultado.vehicle.updatedAt)))}` : null
+  const quienProv = resultado.provider?.insuranceSource === 'link' ? 'Lo cargó él desde su link'
+    : resultado.provider?.insuranceSource === 'garita' ? 'Lo cargó la guardia' : null
   const noCoincide = Boolean(editable && inv.guestDoc && soloDigitos(doc).length >= 7
     && soloDigitos(doc) !== soloDigitos(inv.guestDoc))
   const kbd = 'rounded border border-current/30 px-1.5 py-0.5 font-mono text-xs'
@@ -265,7 +380,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           derecha, para el guardia sentado. Solo cambia la grilla. */}
       <div className="mx-auto grid min-h-[calc(100dvh-3rem)] w-full max-w-2xl grid-rows-[auto_1fr] gap-8 sm:min-h-[calc(100dvh-5rem)] lg:max-w-7xl lg:grid-cols-[3fr_2fr] lg:grid-rows-1 lg:items-center lg:gap-16">
         <section className="min-w-0">
-          <motion.h1 initial={{ opacity: 0, scale: 1.12 }} animate={{ opacity: 1, scale: 1 }}
+          {/* Mientras se recalcula, la palabra es la de la patente o el DNI anterior: se atenúa. */}
+          <motion.h1 initial={{ opacity: 0, scale: 1.12 }} animate={{ opacity: alDia ? 1 : 0.5, scale: 1 }}
             transition={{ duration: 0.26, ease: [0.2, 0.9, 0.3, 1] }}
             className="font-display origin-left text-6xl font-extrabold leading-[0.9] tracking-[-0.035em] sm:text-8xl lg:text-9xl xl:text-[10rem]">
             {palabra}
@@ -280,6 +396,25 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
             </p>
           )}
           {detalle && <p className="mt-1 text-xl tabular opacity-80 sm:text-2xl lg:text-3xl">{detalle}</p>}
+          {vivo.isError && !alDia && (
+            <p role="alert" className="mt-2 text-xl font-semibold sm:text-2xl">
+              No se pudo recalcular ·{' '}
+              <button type="button" onClick={() => vivo.refetch()} disabled={vivo.isFetching}
+                className="min-h-11 underline underline-offset-4 disabled:opacity-80">
+                {vivo.isFetching ? 'Reintentando…' : 'Reintentar'}
+              </button>
+            </p>
+          )}
+          {avisoSeguro && resultado.provider?.insurance && (
+            <p className="mt-1 text-xl font-semibold tabular text-espera sm:text-2xl lg:text-3xl">
+              Seguro {textoVence(resultado.provider.insurance.expiresOn, hoy)}
+            </p>
+          )}
+          {avisoAuto && resultado.vehicle && (
+            <p className="mt-1 text-xl font-semibold tabular text-espera sm:text-2xl lg:text-3xl">
+              Seguro del auto {textoVence(resultado.vehicle.insurance.expiresOn, hoy)}
+            </p>
+          )}
 
           <p className={`mt-8 break-words border-t pt-5 text-3xl font-semibold leading-tight sm:text-4xl lg:text-6xl ${borde}`}>
             {inv.guestName}
@@ -287,69 +422,113 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
         </section>
 
         <section className={`flex min-w-0 flex-col justify-between gap-8 lg:justify-center lg:border-l lg:pl-12 ${borde}`}>
-          {/* Lo que el guardia compara con lo que tiene adelante: el documento y
-              el auto. Y el tipo, porque un proveedor no se trata como una visita. */}
-          <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-2.5 text-lg sm:text-xl">
-            {inv.note && <Dato etiqueta="Nota">{inv.note}</Dato>}
-            {editable ? (
-              <>
-                <dt className="self-start pt-2.5 opacity-70"><label htmlFor="doc-veredicto">Documento</label></dt>
-                <dd className="min-w-0">
-                  {/* El campo es claro en los dos temas: el dark:bg-input/30 del Input lo ensuciaría. */}
-                  <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
-                    aria-describedby={[docLeido && doc.trim() && 'doc-leido', noCoincide && 'doc-no-coincide', !doc.trim() && 'doc-falta'].filter(Boolean).join(' ') || undefined}
-                    onChange={(e) => { setDoc(e.target.value); setDocLeido(false) }}
-                    className="tabular h-12 border-control bg-card text-xl" />
-                  {docLeido && doc.trim() && <p id="doc-leido" className="mt-1 text-sm font-semibold">Leído del DNI</p>}
-                  {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo.
-                      Los dos números lado a lado: comparar es más rápido que leer una frase. */}
-                  {noCoincide && (
-                    <p id="doc-no-coincide" className="mt-1 text-base font-semibold tabular">
-                      No coincide · Invitación {inv.guestDoc} · {docLeido ? 'Leído' : 'Cargado'} {doc}
-                    </p>
-                  )}
-                  {/* Nadie entra sin documento: si la invitación no lo traía, se carga acá. */}
-                  {!doc.trim() && <p id="doc-falta" className="mt-1 text-sm font-semibold opacity-75">Hace falta para registrar el ingreso.</p>}
-                </dd>
-                <dt className="self-start pt-2.5 opacity-70"><label htmlFor="patente-veredicto">Patente</label></dt>
-                <dd className="min-w-0">
-                  <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                    className="tabular h-12 border-control bg-card text-xl uppercase" />
-                </dd>
-              </>
-            ) : (
-              <>
+          {/* Lo que el guardia compara con lo que tiene adelante: la persona y el
+              auto, cada uno con su seguro. Y la invitación, que en la barrera no cambia. */}
+          <div className="flex flex-col gap-7">
+            <SeccionSeguro titulo={esProveedor ? 'Proveedor' : 'Visitante'} idBase="seguro-proveedor"
+              estado={estadoProv} guardado={alDia ? resultado.provider?.insurance ?? null : null} quien={quienProv}
+              abierto={abiertoProv} valor={seguro} onCambio={(v) => { setSeguro(v); setFechaPasada(false) }}
+              fechaPasada={fechaPasada} requerido={exigeProv} buscando={!alDia}
+              onCorregir={activo && alDia ? () => {
+                const s = resultado.provider?.insurance
+                if (s) setSeguro({ ...s })
+                setCorrigiendo((c) => ({ ...c, proveedor: true }))
+              } : undefined}
+              onGuardar={corrigiendo.proveedor && normalizarDoc(doc) ? () => corregir.mutate(
+                { tipo: 'proveedor', doc, name: inv.guestName, insurance: datos(seguro) },
+                { onSuccess: () => setCorrigiendo((c) => ({ ...c, proveedor: false })) }) : undefined}
+              guardando={corregir.isPending}>
+              {inv.note && <Dato etiqueta="Nota">{inv.note}</Dato>}
+              {editable ? (
+                <>
+                  <dt className="self-start pt-2.5 opacity-80"><label htmlFor="doc-veredicto">Documento</label></dt>
+                  <dd className="min-w-0">
+                    {/* El campo es claro en los dos temas: el dark:bg-input/30 del Input lo ensuciaría. */}
+                    <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
+                      aria-describedby={[docLeido && doc.trim() && 'doc-leido', noCoincide && 'doc-no-coincide', !doc.trim() && 'doc-falta'].filter(Boolean).join(' ') || undefined}
+                      onChange={(e) => { setDoc(e.target.value); setDocLeido(false) }}
+                      className="tabular h-12 border-control bg-card text-xl" />
+                    {docLeido && doc.trim() && <p id="doc-leido" className="mt-1 text-sm font-semibold">Leído del DNI</p>}
+                    {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo.
+                        Los dos números lado a lado: comparar es más rápido que leer una frase. */}
+                    {noCoincide && (
+                      <p id="doc-no-coincide" className="mt-1 text-base font-semibold tabular">
+                        No coincide · Invitación {inv.guestDoc} · {docLeido ? 'Leído' : 'Cargado'} {doc}
+                      </p>
+                    )}
+                    {/* Nadie entra sin documento: si la invitación no lo traía, se carga acá. */}
+                    {!doc.trim() && <p id="doc-falta" className="mt-1 text-sm font-semibold opacity-80">Hace falta para registrar el ingreso.</p>}
+                  </dd>
+                </>
+              ) : (
                 <Dato etiqueta="Documento">{doc || inv.guestDoc || '—'}</Dato>
+              )}
+              <Dato etiqueta="Tipo">{KIND_LABEL[inv.kind]}{inv.tradeName && ` · ${inv.kind === 'frecuente' ? `${KIND_LABEL.proveedor} · ` : ''}${inv.tradeName}`}</Dato>
+            </SeccionSeguro>
+
+            <SeccionSeguro titulo="Vehículo" idBase="seguro-auto"
+              estado={estadoAuto} guardado={alDia ? resultado.vehicle?.insurance ?? null : null} quien={quienAuto}
+              abierto={abiertoAuto} valor={seguroAuto} onCambio={(v) => { setSeguroAuto(v); setFechaPasadaAuto(false) }}
+              fechaPasada={fechaPasadaAuto} requerido={exigeAuto} buscando={!alDia}
+              onCorregir={activo && pideAuto && alDia ? () => {
+                const s = resultado.vehicle?.insurance
+                if (s) setSeguroAuto({ ...s })
+                setCorrigiendo((c) => ({ ...c, auto: true }))
+              } : undefined}
+              onGuardar={corrigiendo.auto && normalizarDoc(plate) ? () => corregir.mutate(
+                { tipo: 'auto', plate, insurance: datos(seguroAuto) },
+                { onSuccess: () => setCorrigiendo((c) => ({ ...c, auto: false })) }) : undefined}
+              guardando={corregir.isPending}>
+              {editable ? (
+                <>
+                  <dt className="self-start pt-2.5 opacity-80"><label htmlFor="patente-veredicto">Patente</label></dt>
+                  <dd className="min-w-0">
+                    <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                      className="tabular h-12 border-control bg-card text-xl uppercase" />
+                    {/* Una sugerencia, no un vínculo: sale del último ingreso de este DNI. */}
+                    {resultado.lastPlate && !mismaPatente(resultado.lastPlate, plate) && (
+                      <button type="button" onClick={() => setPlate(resultado.lastPlate!)}
+                        className="mt-1 min-h-11 text-base font-semibold underline underline-offset-4">
+                        Última vez: {resultado.lastPlate}
+                      </button>
+                    )}
+                  </dd>
+                </>
+              ) : (
                 <Dato etiqueta="Patente">{plate || inv.plate || '—'}</Dato>
-              </>
-            )}
-            <Dato etiqueta="Tipo">{KIND_LABEL[inv.kind]}{inv.tradeName && ` · ${inv.kind === 'frecuente' ? `${KIND_LABEL.proveedor} · ` : ''}${inv.tradeName}`}</Dato>
-            <Dato etiqueta="Lote">{inv.unitLabel}</Dato>
-            <Dato etiqueta="Invita">{inv.inviterName}</Dato>
-            {!esEgreso && <Dato etiqueta="Vigencia">{vigencia(inv)}</Dato>}
-            {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}
-            {inv.capacity > 1 && inv.kind !== 'frecuente' && (
-              <Dato etiqueta="Cupo">{resultado.usedCount} de {inv.capacity} entraron</Dato>
-            )}
-            {entro && (
-              <Dato etiqueta="Entró">
-                <motion.span key={`e-${entro}`} initial={hecho && !hecho.esEgreso ? { opacity: 0, y: 6 } : false}
-                  animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: SALIDA }} className="inline-block">
-                  {horaODia(entro, hoyISO())}
-                  {/* Cuánto lleva adentro: alguien con dos días salta a la vista. */}
-                  {esEgreso && !hecho && <span className="font-normal opacity-75"> · adentro hace {tiempoDesde(entro)}</span>}
-                </motion.span>
-              </Dato>
-            )}
-            {salio && (
-              <Dato etiqueta="Salió">
-                <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, ease: SALIDA }} className="inline-block">
-                  {hora(salio)}
-                </motion.span>
-              </Dato>
-            )}
-          </dl>
+              )}
+            </SeccionSeguro>
+
+            <section aria-labelledby="seccion-invitacion" className="flex flex-col gap-2.5">
+              <h2 id="seccion-invitacion" className="text-sm font-bold uppercase tracking-[0.08em] opacity-80">Invitación</h2>
+              <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-2.5 text-lg sm:text-xl">
+                <Dato etiqueta="Lote">{inv.unitLabel} · {quienInvita(inv.inviterName)}</Dato>
+                {!esEgreso && <Dato etiqueta="Vigencia">{vigencia(inv)}</Dato>}
+                {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}
+                {inv.capacity > 1 && inv.kind !== 'frecuente' && (
+                  <Dato etiqueta="Cupo">{resultado.usedCount} de {inv.capacity} entraron</Dato>
+                )}
+                {entro && (
+                  <Dato etiqueta="Entró">
+                    <motion.span key={`e-${entro}`} initial={hecho && !hecho.esEgreso ? { opacity: 0, y: 6 } : false}
+                      animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: SALIDA }} className="inline-block">
+                      {horaODia(entro, hoyISO())}
+                      {/* Cuánto lleva adentro: alguien con dos días salta a la vista. */}
+                      {esEgreso && !hecho && <span className="font-normal opacity-75"> · adentro hace {tiempoDesde(entro)}</span>}
+                    </motion.span>
+                  </Dato>
+                )}
+                {salio && (
+                  <Dato etiqueta="Salió">
+                    <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, ease: SALIDA }} className="inline-block">
+                      {hora(salio)}
+                    </motion.span>
+                  </Dato>
+                )}
+              </dl>
+            </section>
+          </div>
 
           <motion.div layout transition={{ duration: 0.32, ease: SALIDA }} className="w-full">
             <AnimatePresence mode="popLayout" initial={false}>
@@ -364,10 +543,12 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 <motion.div key="pendiente" exit={{ opacity: 0, y: -8, transition: { duration: 0.16 } }}
                   className="flex flex-col gap-3">
                   {/* Los datos se cargan al entrar, no al salir: a la salida ya están. */}
-                  <button ref={accionRef} onClick={registrar} disabled={registrando || (!esEgreso && !doc.trim())}
+                  <button ref={fijarAccion} onClick={registrar}
+                    disabled={registrando || (!esEgreso && !doc.trim()) || !listoParaGuardar}
                     className="flex min-h-16 items-center justify-center gap-2 rounded bg-ink text-xl font-bold text-card transition-colors disabled:bg-ink/40">
                     {registrando && <Loader2 className="size-5 animate-spin" aria-hidden />}
-                    {registrando ? 'Registrando…' : esEgreso ? 'Registrar egreso' : 'Registrar ingreso'}
+                    {registrando ? 'Registrando…' : esEgreso ? 'Registrar egreso'
+                      : mandaProv || mandaAuto ? 'Guardar seguro y registrar ingreso' : 'Registrar ingreso'}
                   </button>
                   <p className="hidden text-sm opacity-70 lg:block"><kbd className={kbd}>Enter</kbd> registra · <kbd className={kbd}>Esc</kbd> vuelve</p>
                   <button onClick={salir} className="min-h-11 underline underline-offset-4 opacity-70">
@@ -382,12 +563,32 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 </motion.div>
               ) : (
                 <motion.div key="rechazo" className="flex flex-col gap-3">
-                  <button ref={accionRef} onClick={salir}
-                    className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
-                    Volver (Esc)
-                  </button>
+                  {cargaSeguro ? (
+                    <>
+                      <button ref={fijarAccion} onClick={registrar} disabled={registrando || !listoParaGuardar || !doc.trim()}
+                        className="flex min-h-16 w-full items-center justify-center gap-2 rounded bg-no-pasa-texto text-xl font-bold text-no-pasa disabled:opacity-40">
+                        {registrando && <Loader2 className="size-5 animate-spin" aria-hidden />}
+                        {registrando ? 'Registrando…' : 'Guardar seguro y registrar ingreso'}
+                      </button>
+                      {/* También si el rechazo es por el seguro del proveedor y al auto le falta el suyo. */}
+                      {(rechazoPorAuto(check) || (pideAuto && falta(estadoAuto))) && (
+                        <button onClick={() => { setPlate(''); setSeguroAuto(VACIO) }}
+                          className="min-h-14 w-full rounded border-2 border-current/40 text-lg font-bold">
+                          Viene a pie
+                        </button>
+                      )}
+                      <button onClick={salir} className="min-h-14 w-full rounded border-2 border-current/40 text-lg font-bold">
+                        Volver (Esc)
+                      </button>
+                    </>
+                  ) : (
+                    <button ref={fijarAccion} onClick={salir}
+                      className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
+                      Volver (Esc)
+                    </button>
+                  )}
                   {/* El vecino ya dijo que sí por teléfono. Una anulada no: ahí dijo que no. */}
-                  {(check as { reason: string }).reason !== 'revoked' && (
+                  {puedeAutorizar && (
                     <button onClick={(e) => { setDisparadorAlta(e.currentTarget); setAltaAbierta(true) }}
                       className="min-h-11 text-base font-semibold underline underline-offset-4 opacity-80">
                       Autorizar igual…
@@ -416,6 +617,9 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           guestDoc: doc || inv.guestDoc || '',
           plate: plate || inv.plate || '',
           unidad: { unitId: inv.unitId, unitLabel: inv.unitLabel, residentName: inv.inviterName },
+          // Un rubro que ya no está activo lo descarta el sheet: ahí elige el guardia.
+          kind: inv.kind === 'proveedor' || inv.frequentAs === 'proveedor' ? 'proveedor' : 'visita',
+          tradeId: inv.tradeId ?? '',
         }}
         // replace: "Volver" en el veredicto nuevo lleva a donde estaba el guardia antes del rechazo.
         onCreada={(nuevo) => router.replace(`/garita/invitacion/${nuevo}`)}
