@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
-import { contacts, neighborhoods, people, providers, trades, units, unitMembers } from '../src/db/schema.js'
+import { eq } from 'drizzle-orm'
+import { contacts, invitations, neighborhoods, people, providers, trades, units, unitMembers } from '../src/db/schema.js'
+import { todayInBuenosAires } from '../src/lib/dates.js'
 import { hashPassword } from '../src/lib/crypto.js'
 import { resetDb } from './helpers/db.js'
 import { violatedConstraint } from './helpers/constraint.js'
@@ -111,5 +113,71 @@ describe('contactos: API', () => {
 
   it('sin sesión, 401', async () => {
     await request(app).get('/contacts').expect(401)
+  })
+})
+
+describe('contactos: el DNI que llega después', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  const hoy = todayInBuenosAires()
+  const invitar = (s: string[], unitId: string, extra: object = {}) => request(app).post('/invitations').set('Cookie', s)
+    .send({ unitId, kind: 'visita', guestName: 'Rosa', validFrom: hoy, validTo: hoy, capacity: 1, ...extra })
+  const contactosDe = async (s: string[]) => (await request(app).get('/contacts').set('Cookie', s).expect(200)).body
+  async function conGuardia() {
+    const e = await escenario()
+    await db.insert(people).values({
+      neighborhoodId: e.n.id, email: 'guardia@example.com', name: 'Guardia', role: 'guard', status: 'active', passwordHash: await hashPassword(PASS),
+    })
+    const guardia = (await request(app).post('/auth/login').send({ email: 'guardia@example.com', password: PASS })).headers['set-cookie'] as unknown as string[]
+    return { ...e, guardia }
+  }
+
+  it('"guardar en contactos" crea el contacto vinculado; si la invitación falla, no crea nada', async () => {
+    const { l1, sAna } = await escenario()
+    const { body: inv } = await invitar(sAna, l1.id, { saveContact: true }).expect(201)
+    const [c] = await contactosDe(sAna)
+    expect(c).toMatchObject({ kind: 'visita', name: 'Rosa', doc: null })
+    expect(inv.contactId).toBe(c.id)
+
+    await invitar(sAna, l1.id, { saveContact: true, kind: 'frecuente', validTo: '2999-01-01', guestName: 'Otra' }).expect(400)
+    expect(await contactosDe(sAna)).toHaveLength(1)
+  })
+
+  it('un contacto de otra casa no se puede usar', async () => {
+    const { l2, sAna, sCarla } = await escenario()
+    const { body: c } = await request(app).post('/contacts').set('Cookie', sAna).send({ kind: 'visita', name: 'Rosa' }).expect(201)
+    const r = await invitar(sCarla, l2.id, { contactId: c.id }).expect(404)
+    expect(r.body.error).toBe('contact_not_found')
+  })
+
+  it('el DNI del link no llega al contacto hasta que la garita lo registra', async () => {
+    const { l1, sAna, guardia } = await conGuardia()
+    const { body: inv } = await invitar(sAna, l1.id, { saveContact: true }).expect(201)
+    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
+    await request(app).patch(`/invitations/public/${fila.token}`).send({ guestDoc: '28.443.120' }).expect(200)
+    expect((await contactosDe(sAna))[0].doc).toBeNull()
+
+    await request(app).post('/gate/entries').set('Cookie', guardia).send({ invitationId: inv.id, guestName: 'Rosa', guestDoc: '28.443.120', plate: '' }).expect(201)
+    expect((await contactosDe(sAna))[0].doc).toBe('28.443.120')
+  })
+
+  it('el DNI que carga la garita completa el contacto; uno ya escrito no se pisa', async () => {
+    const { l1, sAna, guardia } = await conGuardia()
+    const { body: sinDni } = await request(app).post('/contacts').set('Cookie', sAna).send({ kind: 'visita', name: 'Rosa' }).expect(201)
+    const { body: conDni } = await request(app).post('/contacts').set('Cookie', sAna).send({ kind: 'visita', name: 'Sara', doc: '1.111.111' }).expect(201)
+    const { body: a } = await invitar(sAna, l1.id, { contactId: sinDni.id }).expect(201)
+    const { body: b } = await invitar(sAna, l1.id, { contactId: conDni.id, guestName: 'Sara' }).expect(201)
+    await request(app).post('/gate/entries').set('Cookie', guardia).send({ invitationId: a.id, guestName: 'Rosa', guestDoc: '28443120', plate: '' }).expect(201)
+    await request(app).post('/gate/entries').set('Cookie', guardia).send({ invitationId: b.id, guestName: 'Sara', guestDoc: '22.222.222', plate: '' }).expect(201)
+    const docs = Object.fromEntries((await contactosDe(sAna)).map((c: { name: string; doc: string }) => [c.name, c.doc]))
+    expect(docs).toEqual({ Rosa: '28443120', Sara: '1.111.111' })
+  })
+
+  it('borrar el contacto deja la invitación sin vínculo', async () => {
+    const { l1, sAna } = await escenario()
+    const { body: inv } = await invitar(sAna, l1.id, { saveContact: true }).expect(201)
+    await request(app).delete(`/contacts/${inv.contactId}`).set('Cookie', sAna).expect(200)
+    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
+    expect(fila.contactId).toBeNull()
   })
 })

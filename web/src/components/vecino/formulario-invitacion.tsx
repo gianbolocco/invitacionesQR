@@ -13,7 +13,6 @@ import { DIAS, KIND_LABEL, type Invitation } from '@/lib/invitations'
 import { fechaCorta, hoyISO, unMesDespues } from '@/lib/fechas'
 import { ApiError } from '@/lib/api'
 import { useCrearInvitacion, useEditarInvitacion, useRubrosDelBarrio, type DatosInvitacion } from '@/lib/queries/invitaciones'
-import { useCrearContacto } from '@/lib/queries/contactos'
 import { lineaContacto, type Contacto } from '@/lib/contactos'
 import { diaDe, diasSinFranja, franjasDelRubro, nombreDiaPlural } from '@/lib/franjas'
 
@@ -55,7 +54,6 @@ export function FormularioInvitacion({ units, inicial, invitacion, contacto, onC
   const [tocado, setTocado] = useState<Record<string, boolean>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
   const [guardarContacto, setGuardarContacto] = useState(false)
-  const crearContacto = useCrearContacto()
 
   const frecuente = kind === 'frecuente'
   const { data: rubros } = useRubrosDelBarrio()
@@ -112,14 +110,8 @@ export function FormularioInvitacion({ units, inicial, invitacion, contacto, onC
     try {
       const inv = editando
         ? await editar.mutateAsync(datos)
-        : await crear.mutateAsync({ ...datos, unitId })
-      // La invitación ya está creada: si guardar el contacto falla, el toast avisa y se sigue.
-      if (!editando && !contacto && guardarContacto) {
-        await crearContacto.mutateAsync({
-          kind: comoProveedor ? 'proveedor' : 'visita', name: guestName.trim(),
-          doc: guestDoc.trim() || null, tradeId: pideRubro && rubro ? rubro : null, unitId,
-        }).catch(() => {})
-      }
+        // Vinculada al contacto: el DNI que cargue después la invitada o la garita lo completa.
+        : await crear.mutateAsync({ ...datos, unitId, ...(contacto ? { contactId: contacto.id } : guardarContacto ? { saveContact: true } : {}) })
       onListo(inv)
     } catch (e) {
       if (e instanceof ApiError && e.code === 'frecuente_mas_de_un_mes') {
@@ -284,9 +276,9 @@ export function FormularioInvitacion({ units, inicial, invitacion, contacto, onC
 
       {errorGeneral && <Nota tono="error">{errorGeneral}</Nota>}
 
-      <Button type="submit" size="lg" disabled={mutacion.isPending || crearContacto.isPending}>
-        {(mutacion.isPending || crearContacto.isPending) && <Loader2 className="animate-spin" aria-hidden />}
-        {mutacion.isPending || crearContacto.isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear invitación'}
+      <Button type="submit" size="lg" disabled={mutacion.isPending}>
+        {(mutacion.isPending) && <Loader2 className="animate-spin" aria-hidden />}
+        {mutacion.isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear invitación'}
       </Button>
     </form>
   )

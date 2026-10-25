@@ -118,6 +118,9 @@ export const invitations = pgTable('invitation', {
   // umbral de la alerta de permanencia y la marca en la garita.
   frequentAs: text('frequent_as'),
   tradeId: uuid('trade_id').references(() => trades.id),
+  // De qué contacto del vecino salió: el primer DNI que llega (link o garita)
+  // completa el contacto si no lo tenía. Borrar el contacto no toca la invitación.
+  contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
   guestName: text('guest_name').notNull(),
   guestDoc: text('guest_doc'),
   plate: text('plate'),

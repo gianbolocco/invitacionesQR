@@ -18,7 +18,10 @@ visita (la empleada, el profesor) o a trabajar (el jardinero): la de visita dura
 hasta un mes, y en la garita la otra se marca también como proveedor.
 Guarda a los que vienen seguido en **Contactos** (los ven todos los de la
 casa). *Nueva invitación* arranca por a quién: elegir un contacto deja solo la
-fecha. De un proveedor ve si su seguro está al día, nunca la póliza.
+fecha. De un proveedor ve si su seguro está al día, nunca la póliza. El DNI
+de un contacto lo escribe el vecino; si lo dejó vacío, lo completa la garita
+con el documento a la vista en el primer ingreso (el del link no cuenta), y
+nunca se pisa uno ya cargado.
 
 **El invitado** recibe un link. Ahí ve quién lo invita, a qué unidad y cómo
 llegar, carga su documento y su patente si quiere, y se queda con su QR.

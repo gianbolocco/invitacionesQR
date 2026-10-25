@@ -87,7 +87,8 @@ export function useHistorial(f: FiltrosHistorial) {
 export function useCrearInvitacion() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (d: DatosInvitacion & { unitId: string }) =>
+    // contactId: sale de un contacto guardado. saveContact: lo guarda como contacto nuevo.
+    mutationFn: (d: DatosInvitacion & { unitId: string; contactId?: string; saveContact?: boolean }) =>
       api<Invitation>('/invitations', {
         method: 'POST',
         // La API valida opcionales con `optional()`: undefined, nunca null.
@@ -99,7 +100,10 @@ export function useCrearInvitacion() {
           weekdays: d.weekdays ?? undefined,
         }),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: claves.todas }),
+    onSuccess: (_inv, d) => {
+      qc.invalidateQueries({ queryKey: claves.todas })
+      if (d.saveContact) qc.invalidateQueries({ queryKey: ['contactos'] })
+    },
   })
 }
 
