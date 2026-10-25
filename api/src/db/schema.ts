@@ -47,6 +47,11 @@ export const neighborhoods = pgTable('neighborhood', {
   providerWindows: jsonb('provider_windows').$type<Franja[]>().notNull().default([]),
   // Días de anticipación con que se avisa que un seguro está por vencer. NULL = no avisa.
   insuranceWarnDays: smallint('insurance_warn_days'),
+  // Seguro del auto. Arranca apagado: un barrio que se actualiza no empieza a
+  // frenar autos hasta que el admin lo decide.
+  vehicleInsuranceRequired: boolean('vehicle_insurance_required').notNull().default(false),
+  // Con el pedido prendido: si la portería puede autorizar igual un auto sin seguro.
+  vehicleInsuranceOverride: boolean('vehicle_insurance_override').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   check('neighborhood_insurance_warn_ck', sql`${t.insuranceWarnDays} between 1 and 90`),
@@ -179,10 +184,66 @@ export const entryLogs = pgTable('entry_log', {
   loadedBy: uuid('loaded_by').references(() => people.id),
   // Cuándo se cargó a mano. La hora del movimiento es la declarada; esta es la real.
   loadedAt: timestamp('loaded_at', { withTimezone: true }),
+  // El estado de cada seguro en el momento del ingreso. El padrón cambia (se
+  // renueva una póliza): la auditoría tiene que decir cómo estaba ese día.
+  // NULL = fila anterior al padrón, o carga manual (que no controla seguros).
+  providerInsurance: text('provider_insurance'),
+  vehicleInsurance: text('vehicle_insurance'),
 }, (t) => [
   index('entry_unit_idx').on(t.unitId, t.enteredAt),
   index('entry_invitation_idx').on(t.invitationId),
   check('entry_source_ck', sql`${t.source} in ('normal','manual')`),
+  check('entry_provider_insurance_ck', sql`${t.providerInsurance} in ('no_aplica','sin_cargar','vencido','por_vencer','vigente')`),
+  check('entry_vehicle_insurance_ck', sql`${t.vehicleInsurance} in ('no_aplica','sin_cargar','vencido','por_vencer','vigente')`),
+])
+
+/*
+ * El padrón del barrio. Sin FK desde la invitación: el DNI es opcional al
+ * invitar y la garita es la que lo ve. Se cruza por la clave normalizada
+ * (lib/padron.ts). Solo proveedores: de una visita no hay nada que recordar
+ * más allá de lo que trae la invitación.
+ */
+export const providers = pgTable('provider', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  neighborhoodId: uuid('neighborhood_id').notNull().references(() => neighborhoods.id),
+  doc: text('doc').notNull(),
+  // El último que registró la garita (o la invitación, si vino del link).
+  name: text('name').notNull(),
+  // El de su último ingreso como proveedor: es el rubro que muestra el listado.
+  tradeId: uuid('trade_id').references(() => trades.id),
+  insuranceCompany: text('insurance_company'),
+  insurancePolicy: text('insurance_policy'),
+  insuranceExpiresOn: date('insurance_expires_on'),
+  // 'garita' lo vio un guardia; 'link' lo declaró el proveedor.
+  insuranceSource: text('insurance_source'),
+  insuranceUpdatedBy: uuid('insurance_updated_by').references(() => people.id),
+  insuranceUpdatedAt: timestamp('insurance_updated_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('provider_doc_uq').on(t.neighborhoodId, t.doc),
+  check('provider_doc_ck', sql`${t.doc} ~ '^[0-9A-Z]+$'`),
+  check('provider_insurance_company_ck', sql`char_length(${t.insuranceCompany}) <= 80`),
+  check('provider_insurance_policy_ck', sql`char_length(${t.insurancePolicy}) <= 40`),
+  check('provider_insurance_all_or_none_ck', sql`(${t.insuranceCompany} is null) = (${t.insurancePolicy} is null)
+    and (${t.insurancePolicy} is null) = (${t.insuranceExpiresOn} is null)`),
+  check('provider_insurance_source_ck', sql`${t.insuranceSource} in ('garita','link')`),
+])
+
+/** Un auto existe en el padrón solo si tiene seguro cargado, y lo carga siempre un guardia. */
+export const vehicles = pgTable('vehicle', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  neighborhoodId: uuid('neighborhood_id').notNull().references(() => neighborhoods.id),
+  plate: text('plate').notNull(),
+  insuranceCompany: text('insurance_company').notNull(),
+  insurancePolicy: text('insurance_policy').notNull(),
+  insuranceExpiresOn: date('insurance_expires_on').notNull(),
+  insuranceUpdatedBy: uuid('insurance_updated_by').references(() => people.id),
+  insuranceUpdatedAt: timestamp('insurance_updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('vehicle_plate_uq').on(t.neighborhoodId, t.plate),
+  check('vehicle_plate_ck', sql`${t.plate} ~ '^[0-9A-Z]+$'`),
+  check('vehicle_insurance_company_ck', sql`char_length(${t.insuranceCompany}) <= 80`),
+  check('vehicle_insurance_policy_ck', sql`char_length(${t.insurancePolicy}) <= 40`),
 ])
 
 export const auditLogs = pgTable('audit_log', {
