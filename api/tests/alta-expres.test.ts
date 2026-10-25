@@ -260,6 +260,7 @@ describe('alta exprés de proveedor', () => {
     }).where(eq(neighborhoods.id, neighborhoodId))
     const creada = await request(app).post('/gate/invitations').set('Cookie', cookie)
       .send({ unitId: unit142.id, guestName: 'Plomero', kind: 'proveedor', tradeId: t.id }).expect(201).then((r) => r.body)
+    expect(creada).toMatchObject({ kind: 'proveedor', tradeId: t.id })
 
     const check = await request(app).get(`/gate/invitation/${creada.id}`).set('Cookie', cookie).expect(200)
     expect(check.body.check.ok).toBe(true)
