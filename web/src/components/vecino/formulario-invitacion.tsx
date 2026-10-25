@@ -27,7 +27,7 @@ const AYUDA_TIPO: Record<Kind, string> = {
 
 export function FormularioInvitacion({ units, inicial, invitacion, contacto, onCambiarContacto, onListo }: {
   units: { id: string; label: string }[]
-  inicial?: Partial<{ kind: Kind; guestName: string; guestDoc: string; plate: string; tradeId: string }>
+  inicial?: Partial<{ kind: Kind; guestName: string; guestDoc: string; plate: string; tradeId: string; unitId: string }>
   invitacion?: Invitation
   /** Con contacto, nombre y documento los trae él: en lugar de los campos va su tarjeta. */
   contacto?: Contacto
@@ -41,8 +41,8 @@ export function FormularioInvitacion({ units, inicial, invitacion, contacto, onC
   const mutacion = editando ? editar : crear
 
   const [kind, setKind] = useState<Kind>(invitacion?.kind ?? inicial?.kind ?? 'visita')
-  const [frecuenteComo, setFrecuenteComo] = useState<'visita' | 'proveedor'>(invitacion?.frequentAs ?? 'visita')
-  const [unitId, setUnitId] = useState(invitacion?.unitId ?? units[0]?.id ?? '')
+  const [frecuenteComo, setFrecuenteComo] = useState<'visita' | 'proveedor'>(invitacion?.frequentAs ?? (inicial?.kind === 'proveedor' ? 'proveedor' : 'visita'))
+  const [unitId, setUnitId] = useState(invitacion?.unitId ?? inicial?.unitId ?? units[0]?.id ?? '')
   const [guestName, setGuestName] = useState(invitacion?.guestName ?? inicial?.guestName ?? '')
   const [guestDoc, setGuestDoc] = useState(invitacion?.guestDoc ?? inicial?.guestDoc ?? '')
   const [plate, setPlate] = useState(invitacion?.plate ?? inicial?.plate ?? '')
@@ -117,7 +117,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, contacto, onC
       if (!editando && !contacto && guardarContacto) {
         await crearContacto.mutateAsync({
           kind: comoProveedor ? 'proveedor' : 'visita', name: guestName.trim(),
-          doc: guestDoc.trim() || null, tradeId: pideRubro && rubro ? rubro : null,
+          doc: guestDoc.trim() || null, tradeId: pideRubro && rubro ? rubro : null, unitId,
         }).catch(() => {})
       }
       onListo(inv)

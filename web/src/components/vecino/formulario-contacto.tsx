@@ -9,6 +9,7 @@ import { Campo } from '@/components/dominio/campo'
 import { Chips } from '@/components/dominio/chips'
 import { useRubrosDelBarrio } from '@/lib/queries/invitaciones'
 import { useBorrarContacto, useCrearContacto, useEditarContacto } from '@/lib/queries/contactos'
+import { useSesion } from '@/lib/sesion-contexto'
 import type { Contacto } from '@/lib/contactos'
 
 const SIN_RUBRO = '__sin_rubro__'
@@ -19,6 +20,8 @@ export function FormularioContacto({ contacto, onListo }: { contacto?: Contacto;
   const [name, setName] = useState(contacto?.name ?? '')
   const [doc, setDoc] = useState(contacto?.doc ?? '')
   const [rubro, setRubro] = useState(contacto?.tradeId ?? '')
+  const { units } = useSesion()
+  const [unitId, setUnitId] = useState(units[0]?.id ?? '')
   const [intento, setIntento] = useState(false)
   const [borrando, setBorrando] = useState(false)
   const { data: rubros } = useRubrosDelBarrio()
@@ -33,11 +36,14 @@ export function FormularioContacto({ contacto, onListo }: { contacto?: Contacto;
     e.preventDefault()
     setIntento(true)
     if (!name.trim()) return
-    const datos = { name: name.trim(), doc: doc.trim() || null, tradeId: kind === 'proveedor' && rubro ? rubro : null }
+    const tradeId = kind === 'proveedor' && rubro ? rubro : null
+    // Editando, el rubro solo viaja si cambió: uno archivado no debe frenar un cambio de nombre.
+    const datos = { name: name.trim(), doc: doc.trim() || null,
+      ...(contacto && tradeId === contacto.tradeId ? {} : { tradeId }) }
     // El toast del error ya sale de la mutación: acá solo se evita cerrar la hoja.
     try {
       if (contacto) await editar.mutateAsync({ id: contacto.id, ...datos })
-      else await crear.mutateAsync({ kind, ...datos })
+      else await crear.mutateAsync({ kind, tradeId, ...datos, unitId })
     } catch { return }
     onListo()
   }
@@ -48,6 +54,14 @@ export function FormularioContacto({ contacto, onListo }: { contacto?: Contacto;
         <Campo id="tipo-contacto" etiqueta="Tipo">
           <Chips etiqueta="Tipo de contacto" valor={kind} onCambio={setKind}
             opciones={[{ valor: 'visita', etiqueta: 'Visita' }, { valor: 'proveedor', etiqueta: 'Proveedor' }]} />
+        </Campo>
+      )}
+      {!contacto && units.length > 1 && (
+        <Campo id="unidad-contacto" etiqueta="Unidad">
+          <Select value={unitId} onValueChange={setUnitId}>
+            <SelectTrigger id="unidad-contacto" className="h-11! w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>{units.map((u) => <SelectItem key={u.id} value={u.id}>{u.label}</SelectItem>)}</SelectContent>
+          </Select>
         </Campo>
       )}
       <Campo id="nombre-contacto" etiqueta="Nombre" error={errorNombre}>

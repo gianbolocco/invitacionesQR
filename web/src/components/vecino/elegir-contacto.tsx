@@ -29,7 +29,7 @@ export function ElegirContacto({ abierto, onAbiertoChange }: { abierto: boolean;
   const cerrar = () => { onAbiertoChange(false); setBusca('') }
   return (
     <Sheet open={abierto} onOpenChange={(v) => (v ? onAbiertoChange(true) : cerrar())}>
-      <SheetContent>
+      <SheetContent onOpenAutoFocus={(e) => e.preventDefault()}>
         <SheetHeader>
           <SheetTitle>¿A quién invitás?</SheetTitle>
           <SheetDescription className="sr-only">Elegí un contacto o invitá a alguien nuevo.</SheetDescription>

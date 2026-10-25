@@ -31,6 +31,7 @@ export default function NuevaInvitacion({ searchParams }: {
     guestName: contacto.name,
     guestDoc: contacto.doc ?? undefined,
     tradeId: contacto.tradeId ?? undefined,
+    unitId: contacto.unitId,
   } : {
     kind: KINDS.includes(sp.kind as Invitation['kind']) ? (sp.kind as Invitation['kind']) : undefined,
     guestName: sp.guestName,

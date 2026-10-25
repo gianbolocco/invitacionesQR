@@ -6,7 +6,7 @@ import type { Contacto } from '@/lib/contactos'
 
 const CLAVE = ['contactos'] as const
 
-export type DatosContacto = { kind: 'visita' | 'proveedor'; name: string; doc: string | null; tradeId: string | null }
+export type DatosContacto = { kind: 'visita' | 'proveedor'; name: string; doc: string | null; tradeId: string | null; unitId?: string }
 
 export function useContactos() {
   return useQuery({ queryKey: CLAVE, queryFn: ({ signal }) => api<Contacto[]>('/contacts', { signal }) })
@@ -30,7 +30,7 @@ export function useCrearContacto() {
 export function useEditarContacto() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...d }: Omit<DatosContacto, 'kind'> & { id: string }) =>
+    mutationFn: ({ id, ...d }: Omit<DatosContacto, 'kind' | 'unitId' | 'tradeId'> & { id: string; tradeId?: string | null }) =>
       api<Contacto>(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(d) }),
     onError: (e) => toast.error(mensaje(e)),
     onSettled: () => qc.invalidateQueries({ queryKey: CLAVE }),

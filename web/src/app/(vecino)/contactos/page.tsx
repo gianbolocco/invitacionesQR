@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { BookUser, Plus } from 'lucide-react'
+import { BookUser, Home as Casa, Plus } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -12,6 +12,7 @@ import { Vacio } from '@/components/dominio/vacio'
 import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
 import { FormularioContacto } from '@/components/vecino/formulario-contacto'
+import { useSesion } from '@/lib/sesion-contexto'
 import { useContactos } from '@/lib/queries/contactos'
 import { filtrarContactos, lineaContacto, type Contacto } from '@/lib/contactos'
 import { cn } from '@/lib/utils'
@@ -20,6 +21,7 @@ type Tipo = 'todos' | 'visita' | 'proveedor'
 
 export default function ContactosPage() {
   const q = useContactos()
+  const me = useSesion()
   const [tipo, setTipo] = useState<Tipo>('todos')
   const [busca, setBusca] = useState('')
   // undefined = hoja cerrada; null = alta; un contacto = edición.
@@ -27,6 +29,14 @@ export default function ContactosPage() {
   const todos = q.data ?? []
   const lista = filtrarContactos(todos, busca, tipo)
   const cuenta = (t: Tipo) => filtrarContactos(todos, '', t).length
+
+  if (me.units.length === 0) return (
+    <div className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Contactos" />
+      <Vacio icono={Casa} titulo="Todavía no tenés una unidad"
+        detalle="Pedile a la administración que te asigne tu lote para poder invitar." />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-6 pb-24 sm:pb-0">

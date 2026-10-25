@@ -100,6 +100,15 @@ describe('contactos: API', () => {
     await request(app).post('/contacts').set('Cookie', sAna).send({ unitId: l2.id, kind: 'visita', name: 'Rosa' }).expect(403)
   })
 
+  it('un vecino con dos casas guarda el contacto en la que elige', async () => {
+    const { l2, ana, sAna, sBeto, sCarla } = await escenario()
+    await db.insert(unitMembers).values({ unitId: l2.id, personId: ana.id })
+    const r = await request(app).post('/contacts').set('Cookie', sAna).send({ unitId: l2.id, kind: 'visita', name: 'Rosa' }).expect(201)
+    expect(r.body.unitId).toBe(l2.id)
+    expect((await request(app).get('/contacts').set('Cookie', sCarla).expect(200)).body).toHaveLength(1)
+    expect((await request(app).get('/contacts').set('Cookie', sBeto).expect(200)).body).toHaveLength(0)
+  })
+
   it('sin sesión, 401', async () => {
     await request(app).get('/contacts').expect(401)
   })
