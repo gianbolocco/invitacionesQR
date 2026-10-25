@@ -237,7 +237,7 @@ export function useRegistrarIngreso() {
     // La fecha vencida del seguro se avisa en el campo, no en un toast.
     // Estos van bajo su campo, no en un toast.
     onError: (e) => {
-      if (!(e instanceof ApiError && ['insurance_expired', 'vehicle_insurance_expired', 'doc_required'].includes(e.code))) {
+      if (!(e instanceof ApiError && ['insurance_expired', 'vehicle_insurance_expired'].includes(e.code))) {
         toast.error('No se pudo registrar. Probá de nuevo.')
       }
     },

@@ -120,7 +120,6 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const [corrigiendo, setCorrigiendo] = useState<{ proveedor: boolean; auto: boolean }>({ proveedor: false, auto: false })
   const [fechaPasada, setFechaPasada] = useState(false)
   const [fechaPasadaAuto, setFechaPasadaAuto] = useState(false)
-  const [docInvalido, setDocInvalido] = useState(false)
   const corregir = useCorregirSeguro()
   // Todo lo que se muestra después de registrar sale de `hecho`, no del
   // veredicto: la mutación lo invalida al terminar y `adentro` pasa a decir
@@ -141,6 +140,18 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     setDocLeido(Boolean(leido))
     setPlate(q.data.invitation.plate ?? '')
     setSeguro(VACIO); setSeguroAuto(VACIO); setCorrigiendo({ proveedor: false, auto: false })
+  }
+
+  // Lo cargado o corregido es de ESA patente y de ESE documento: si cambian, se
+  // descarta, así una póliza precargada para un auto nunca se guarda en otro.
+  const [claves, setClaves] = useState({ doc: '', plate: '' })
+  if (normalizarDoc(plate) !== claves.plate) {
+    setClaves((c) => ({ ...c, plate: normalizarDoc(plate) }))
+    setSeguroAuto(VACIO); setFechaPasadaAuto(false); setCorrigiendo((c) => ({ ...c, auto: false }))
+  }
+  if (normalizarDoc(doc) !== claves.doc) {
+    setClaves((c) => ({ ...c, doc: normalizarDoc(doc) }))
+    setSeguro(VACIO); setFechaPasada(false); setCorrigiendo((c) => ({ ...c, proveedor: false }))
   }
 
   // El veredicto se recalcula en la API cuando el guardia cambia documento o
@@ -173,6 +184,16 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     if (!q.isPending) accionRef.current?.focus()
   }, [q.isPending])
+
+  // Si el veredicto en vivo da vuelta (NO PASA ↔ INGRESO, p. ej. tras "Viene a pie"),
+  // el foco vuelve a la acción para que Enter siga registrando. Escribiendo en un
+  // campo, no: sería robarle el cursor al guardia.
+  const vigente = (cambio && vivo.data) || q.data
+  const desenlace = vigente ? (vigente.check.ok ? 'ok' : vigente.check.reason) : ''
+  useEffect(() => {
+    const a = document.activeElement
+    if (!a || a === document.body || a instanceof HTMLButtonElement) accionRef.current?.focus()
+  }, [desenlace])
 
   // Escape siempre vuelve. En la barrera no hay tiempo de buscar un botón.
   // Con el alta abierta no escucha, y Radix hace preventDefault al cerrar el sheet: ese Esc no saca también del veredicto.
@@ -252,7 +273,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   }
 
   // El de la invitación hasta que el guardia cambia algo; después, el recalculado.
-  const resultado = (cambio && vivo.data) || q.data
+  const resultado = vigente ?? q.data
   const { invitation: inv, check, adentro } = resultado
   // Un egreso no se valida: si está adentro, sale. `check` es del ingreso.
   const esEgreso = hecho ? hecho.esEgreso : Boolean(adentro)
@@ -277,15 +298,20 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
 
   // NO PASA por seguro: el guardia carga lo que falta y el ingreso se registra en el mismo paso.
   const cargaSeguro = !ok && rechazoPorSeguro(check)
-  // Lo que falta tiene que estar completo; lo que se corrige, solo si se llenó.
-  const listoParaGuardar = (!abiertoProv || !falta(estadoProv) || completoProv)
-    && (!abiertoAuto || !falta(estadoAuto) || completoAuto)
+  // Completo es obligatorio solo en la sección que causa el rechazo. En el resto (y con
+  // check.ok, p. ej. un alta exprés, que no controla seguros) es opcional: vacío no
+  // traba, a medias sí, porque no se sabría qué se quiso cargar.
+  const parcial = (v: ValorSeguro) => estadoSeguroCargado(v) === 'parcial'
+  const exigeAuto = cargaSeguro && rechazoPorAuto(check)
+  const exigeProv = cargaSeguro && !rechazoPorAuto(check)
+  const listoParaGuardar = (!abiertoProv || (exigeProv ? completoProv : !parcial(seguro)))
+    && (!abiertoAuto || (exigeAuto ? completoAuto : !parcial(seguroAuto)))
   const mandaProv = abiertoProv && completoProv
   const mandaAuto = abiertoAuto && completoAuto
   const datos = (v: ValorSeguro) => ({ company: v.company.trim(), policy: v.policy.trim(), expiresOn: v.expiresOn })
 
   async function registrar() {
-    setFechaPasada(false); setFechaPasadaAuto(false); setDocInvalido(false)
+    setFechaPasada(false); setFechaPasadaAuto(false)
     try {
       const mov = esEgreso
         ? await egresar.mutateAsync(inv.id)
@@ -301,7 +327,6 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
       // El toast de error ya lo muestra la mutación, salvo estos: van bajo su campo.
       if (e instanceof ApiError && e.code === 'insurance_expired') setFechaPasada(true)
       if (e instanceof ApiError && e.code === 'vehicle_insurance_expired') setFechaPasadaAuto(true)
-      if (e instanceof ApiError && e.code === 'doc_required') setDocInvalido(true)
     }
   }
 
@@ -385,7 +410,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 if (s) setSeguro({ ...s })
                 setCorrigiendo((c) => ({ ...c, proveedor: true }))
               } : undefined}
-              onGuardar={corrigiendo.proveedor && doc.trim() ? () => corregir.mutate(
+              onGuardar={corrigiendo.proveedor && normalizarDoc(doc) ? () => corregir.mutate(
                 { tipo: 'proveedor', doc, name: inv.guestName, insurance: datos(seguro) },
                 { onSuccess: () => setCorrigiendo((c) => ({ ...c, proveedor: false })) }) : undefined}
               guardando={corregir.isPending}>
@@ -396,9 +421,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                   <dd className="min-w-0">
                     {/* El campo es claro en los dos temas: el dark:bg-input/30 del Input lo ensuciaría. */}
                     <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
-                      aria-invalid={docInvalido || undefined}
-                      aria-describedby={[docLeido && doc.trim() && 'doc-leido', noCoincide && 'doc-no-coincide', !doc.trim() && 'doc-falta', docInvalido && 'doc-invalido'].filter(Boolean).join(' ') || undefined}
-                      onChange={(e) => { setDoc(e.target.value); setDocLeido(false); setDocInvalido(false) }}
+                      aria-describedby={[docLeido && doc.trim() && 'doc-leido', noCoincide && 'doc-no-coincide', !doc.trim() && 'doc-falta'].filter(Boolean).join(' ') || undefined}
+                      onChange={(e) => { setDoc(e.target.value); setDocLeido(false) }}
                       className="tabular h-12 border-control bg-card text-xl" />
                     {docLeido && doc.trim() && <p id="doc-leido" className="mt-1 text-sm font-semibold">Leído del DNI</p>}
                     {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo.
@@ -410,7 +434,6 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                     )}
                     {/* Nadie entra sin documento: si la invitación no lo traía, se carga acá. */}
                     {!doc.trim() && <p id="doc-falta" className="mt-1 text-sm font-semibold opacity-80">Hace falta para registrar el ingreso.</p>}
-                    {docInvalido && <p id="doc-invalido" className="mt-1 text-base font-semibold">Cargá un documento válido.</p>}
                   </dd>
                 </>
               ) : (
@@ -428,7 +451,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 if (s) setSeguroAuto({ ...s })
                 setCorrigiendo((c) => ({ ...c, auto: true }))
               } : undefined}
-              onGuardar={corrigiendo.auto && plate.trim() ? () => corregir.mutate(
+              onGuardar={corrigiendo.auto && normalizarDoc(plate) ? () => corregir.mutate(
                 { tipo: 'auto', plate, insurance: datos(seguroAuto) },
                 { onSuccess: () => setCorrigiendo((c) => ({ ...c, auto: false })) }) : undefined}
               guardando={corregir.isPending}>
