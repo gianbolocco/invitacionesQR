@@ -22,6 +22,12 @@ export type Kpis = {
   staleInside: number
   entriesSameDayLastWeek: number
   invitedNeverLoggedIn: number
+  /** Autos y proveedores del padrón con el seguro vencido que entraron en el último mes. */
+  segurosVencidos: number
+  /** Seguros que vencen en los días de aviso del barrio (15 si no fijó ninguno). */
+  segurosPorVencer: number
+  /** Ingresos de los últimos 7 días por un alta exprés con algún seguro faltante. */
+  autorizadosSinSeguro: number
 }
 
 export async function dashboardKpis(neighborhoodId: string): Promise<Kpis> {
@@ -63,7 +69,34 @@ export async function dashboardKpis(neighborhoodId: string): Promise<Kpis> {
           and not exists (
             select 1 from auth_token t
             where t.person_id = p.id and t.purpose = 'invite' and t.used_at is null and t.expires_at > now()
-          ))::int as "invitedNeverLoggedIn"
+          ))::int as "invitedNeverLoggedIn",
+      -- Vencidos que siguen entrando: un auto o un proveedor con el seguro vencido y un ingreso en el mes.
+      ((select count(*) from vehicle v, local
+         where v.neighborhood_id = ${neighborhoodId} and v.insurance_expires_on < local.today
+           and exists (select 1 from entry_log e join unit u on u.id = e.unit_id
+             where u.neighborhood_id = v.neighborhood_id and e.entered_at > now() - interval '30 days'
+               and upper(regexp_replace(coalesce(e.plate, ''), '[^0-9A-Za-z]', '', 'g')) = v.plate))
+       + (select count(*) from provider p, local
+         where p.neighborhood_id = ${neighborhoodId} and p.insurance_expires_on < local.today
+           and exists (select 1 from entry_log e join unit u on u.id = e.unit_id
+             where u.neighborhood_id = p.neighborhood_id and e.entered_at > now() - interval '30 days'
+               and upper(regexp_replace(coalesce(e.guest_doc, ''), '[^0-9A-Za-z]', '', 'g')) = p.doc)))::int
+        as "segurosVencidos",
+      ((select count(*) from vehicle v, local, neighborhood n
+         where v.neighborhood_id = ${neighborhoodId} and n.id = v.neighborhood_id
+           and v.insurance_expires_on between local.today and local.today + coalesce(n.insurance_warn_days, 15))
+       + (select count(*) from provider p, local, neighborhood n
+         where p.neighborhood_id = ${neighborhoodId} and n.id = p.neighborhood_id
+           and p.insurance_expires_on between local.today and local.today + coalesce(n.insurance_warn_days, 15)))::int
+        as "segurosPorVencer",
+      (select count(*) from entry_log e
+         join unit u on u.id = e.unit_id
+         join invitation i on i.id = e.invitation_id
+         join person pi on pi.id = i.created_by
+        where u.neighborhood_id = ${neighborhoodId} and e.entered_at > now() - interval '7 days'
+          and pi.role = 'guard'
+          and (e.provider_insurance in ('sin_cargar','vencido') or e.vehicle_insurance in ('sin_cargar','vencido')))::int
+        as "autorizadosSinSeguro"
   `)
   return rows[0] as unknown as Kpis
 }

@@ -94,6 +94,23 @@ describe('seguros: listado de autos', () => {
   })
 })
 
+describe('seguros: tablero', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('cuenta vencidos que entraron, por vencer y autorizados sin seguro', async () => {
+    const { u, g, auto, admin } = await escenario()
+    await auto('VENC1', sumarDias(hoy, -3))
+    await auto('VENC2', sumarDias(hoy, -3)) // no entró en el mes: no cuenta
+    await auto('PORV1', sumarDias(hoy, 10))
+    const [inv] = await db.insert(invitations).values({
+      unitId: u.id, createdBy: g.id, kind: 'visita', guestName: 'X', validFrom: hoy, validTo: hoy, token: 'k1',
+    }).returning()
+    await db.insert(entryLogs).values({ invitationId: inv.id, unitId: u.id, guardId: g.id, guestName: 'X', plate: 'VENC1', vehicleInsurance: 'vencido' })
+    const r = await request(app).get('/reports/kpis').set('Cookie', admin).expect(200)
+    expect(r.body).toMatchObject({ segurosVencidos: 1, segurosPorVencer: 1, autorizadosSinSeguro: 1 })
+  })
+})
+
 describe('seguros: listado de proveedores', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
 
