@@ -13,10 +13,10 @@ export async function listTrades(nid: string, { incluirArchivados = false } = {}
     .orderBy(asc(sql`lower(${trades.name})`))
 }
 
-export async function createTrade(nid: string, actorId: string, name: string) {
+export async function createTrade(nid: string, actorId: string, name: string, requiresInsurance = false) {
   try {
-    const [t] = await db.insert(trades).values({ neighborhoodId: nid, name }).returning()
-    await audit(actorId, nid, 'trade.created', 'trade', t.id, { name })
+    const [t] = await db.insert(trades).values({ neighborhoodId: nid, name, requiresInsurance }).returning()
+    await audit(actorId, nid, 'trade.created', 'trade', t.id, { name, requiresInsurance })
     return t
   } catch (e) {
     // El índice único (barrio, lower(nombre)) es la fuente de verdad; no se pre-chequea.

@@ -131,8 +131,10 @@ adminRoutes.get('/trades', async (req, res) => {
 })
 
 adminRoutes.post('/trades', async (req, res) => {
-  const { name } = z.object({ name: z.string().trim().min(1).max(40) }).parse(req.body)
-  res.status(201).json(await createTrade(req.person!.neighborhoodId, req.person!.id, name))
+  const { name, requiresInsurance } = z.object({
+    name: z.string().trim().min(1).max(40), requiresInsurance: z.boolean().optional(),
+  }).parse(req.body)
+  res.status(201).json(await createTrade(req.person!.neighborhoodId, req.person!.id, name, requiresInsurance))
 })
 
 adminRoutes.patch('/trades/:id', async (req, res) => {

@@ -6,13 +6,13 @@ desvíos del plan con su motivo.
 | Fase | Estado |
 |---|---|
 | 1–4. Entender, inventario, auditoría y plan (Opus) | hecha y aprobada |
-| a. Fundaciones | hecha, a revisar |
-| b. Pase, vecino e invitado | pendiente |
-| c. Garita | pendiente |
-| d. Admin y auditoría | pendiente |
-| e. Estados, errores y acceso | pendiente |
-| f. Pulido de movimiento | pendiente |
-| 6. Verificación (Opus) | pendiente |
+| a. Fundaciones | hecha, revisada y mergeada a `dev` (`0a2ca6c`, 20/10) |
+| b–f y 6 | no se hicieron como fases |
+
+**Estado al 25/10:** después de la fase a el trabajo siguió por features (planilla, horarios, seguros,
+padrón), y cada una se diseñó ya con la identidad Pazzit. El plan sigue sirviendo de referencia de
+tokens, componentes y copy; las fases b–f quedan como lista de ideas, no como trabajo comprometido.
+Una decisión cambió respecto del plan original: el acento sigue al color del barrio (ver la segunda y la tercera ronda).
 
 ## Fases 1–4 (2026-10-17)
 
@@ -173,4 +173,4 @@ distingue, pero con poco contraste contra la tarjeta.
 
 ## Pendiente de decisión
 
-Nada. Siguiente paso: revisión del dueño de la fase a; después, fase b (Pase, vecino e invitado).
+Nada. La fase a quedó aprobada y mergeada; ver el estado al 25/10 arriba.

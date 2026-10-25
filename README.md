@@ -144,12 +144,51 @@ cd web && npm ci && npm run dev
 ### Tests
 
 ```bash
-cd api && npm test          # contra una base invitaciones_test aparte
-cd web && npm run check     # el chequeo de navegación (no hay runner de tests en el front)
+cd api && npm test          # vitest contra una base invitaciones_test aparte
+cd web && npm run check     # la lógica pura de web/src/lib (*.check.ts); no hay tests de componentes
+cd web && npm run e2e       # Playwright, con el stack levantado
 ```
 
-Los tests usan **otra base** (`invitaciones_test`), que se crea y migra sola.
-No tocan la de desarrollo.
+Los tests de la API usan **otra base** (`invitaciones_test`), que se crea y
+migra sola. No tocan la de desarrollo.
+
+El e2e sí escribe en la de desarrollo y no limpia. Antes de correr,
+[`web/e2e/preparar.ts`](web/e2e/preparar.ts) crea o reactiva tres cuentas con
+contraseña `e2e-contrasena-larga` —`e2e.admin@visitpass.test`,
+`e2e.vecino@visitpass.test` (Lote 900) y `e2e.guardia@visitpass.test`— y
+**deja el barrio en cero**: archiva todos los rubros, borra las franjas de
+proveedores y apaga las alertas y el seguro del auto. Lo que hayas configurado
+a mano en desarrollo se pierde. Si se pone lento o intermitente,
+`--workers=1`.
+
+## Flujo de trabajo
+
+| Rama | Para qué |
+|---|---|
+| `dev` | Donde se trabaja. Las features chicas van directo; las grandes, en una rama que se mergea a `dev`. |
+| `qa` | Lo que está desplegado en el ambiente de pruebas (qa.pazzit.com). Coolify la despliega sola con cada push. |
+| `main` | Reservada para producción. Hoy está desactualizada y no se despliega en ningún lado. |
+
+**Pasar `dev` a qa.** `qa` nunca lleva commits propios, así que se adelanta
+sin merge:
+
+```bash
+cd api && npm test && npx tsc --noEmit
+cd web && npm run check && npm run lint && npx tsc --noEmit && npm run e2e
+git push origin dev:qa      # falla si qa tiene algo que dev no: no forzar, mirar qué es
+```
+
+La API corre las migraciones pendientes al arrancar. Antes de un push con
+migraciones nuevas (`api/drizzle/`), un backup de la base de qa, y leerlas: una
+migración que borra columnas no se deshace volviendo atrás el código.
+Después del despliegue, `/api/health` y una pasada a mano por la garita.
+
+**Volver atrás.** `git push --force-with-lease origin <commit-anterior>:qa`
+revierte el código, no la base. Si la versión nueva migró, la vieja puede no
+andar con el esquema nuevo: restaurar el backup.
+
+**Producción.** Cuando haya un barrio en producción, `main` se adelanta desde
+`qa` de la misma forma (`git push origin qa:main`), después de probar en qa.
 
 ## Desplegar
 
@@ -202,7 +241,8 @@ la cubren y rehacer la app nunca toca los datos. Ver el encabezado de
 
 Para probar cambios antes de producción, usá una segunda aplicación Coolify con
 la rama `qa` y una base de datos de pruebas separada. El webhook despliega solo
-la rama configurada en cada aplicación; `main` queda como la versión estable.
+la rama configurada en cada aplicación. Cómo se pasa código de una rama a otra,
+en *Flujo de trabajo*.
 
 ### Datos de demo
 
@@ -261,13 +301,24 @@ se lean en escala de grises y con daltonismo.
 
 | Dónde | Qué hay |
 |---|---|
-| [`docs/superpowers/`](docs/superpowers/) | Specs de diseño y planes de cada feature, con fecha. |
+| [`docs/superpowers/`](docs/superpowers/) | Specs de diseño y planes de cada feature, con fecha. El [índice](docs/superpowers/README.md) dice cuáles siguen vigentes. |
 | [`docs/rediseno/`](docs/rediseno/) | Plan y progreso del rediseño con la identidad Pazzit, y el prototipo visual. |
+| [`docs/barrios/`](docs/barrios/) | El plano SVG de Alamo Alto, con los lotes como `lote-N`. |
 
 ## Pendiente
 
-- **Ley 25.326.** Falta decidir cuánto se guardan los ingresos con documento y
-  patente, y el job de anonimización.
+- **Ley 25.326.** Antes del primer barrio en producción:
+  1. Retención: `entry_log` y el padrón (`provider`, `vehicle`) guardan
+     documento, patente y seguro para siempre. Falta el job de anonimización.
+  2. Aviso a la visita: quién guarda sus datos, para qué, cuánto tiempo y a quién
+     reclamar.
+  3. La cláusula del contrato: el barrio es el responsable y Pazzit, el
+     encargado del tratamiento.
+- **Backups de Coolify.** Confirmar que el backup diario a S3 corre y hacer una
+  restauración de prueba en una base descartable.
+- **qa en buscadores.** `X-Robots-Tag: noindex` en el Caddyfile, solo para qa y
+  activado por variable de entorno. Basic auth no: se probó y se sacó.
 - **Aviso al vecino** cuando su invitado llega a la barrera.
+- **Ruta en el plano**, desde la entrada hasta el lote del invitado.
 - **Base propia para el e2e.** Hoy escribe en la de desarrollo y no limpia; con
   el tiempo la suite se vuelve lenta e intermitente.

@@ -17,6 +17,9 @@ cd web && npm run e2e               # Playwright; necesita el stack levantado (d
 No hay tests de componentes en el front: la lógica pura va en `web/src/lib/*.ts`
 con su `*.check.ts` al lado, que corre `npm run check`.
 
+Se trabaja en `dev`. Lo desplegado (ambiente de pruebas) es `qa`, que se adelanta
+desde `dev` sin merge; `main` está desactualizada. Ver *Flujo de trabajo* en el README.
+
 ## Reglas que el código no grita
 
 - **Un despliegue es un barrio.** Hay una sola fila en `neighborhood`. No agregar
