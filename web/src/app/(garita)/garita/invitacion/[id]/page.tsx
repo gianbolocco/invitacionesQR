@@ -1,13 +1,12 @@
 'use client'
-import { use, useEffect, useRef, useState } from 'react'
+import { use, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2 } from 'lucide-react'
 import { MOTIVO, detalleRechazo, hora, mensajeDeError, rechazoPorAuto, rechazoPorSeguro, type Movimiento } from '@/lib/gate'
-import { ApiError } from '@/lib/api'
 import { estadoDe, textoVence } from '@/lib/seguro'
-import { mismaPatente, normalizarDoc } from '@/lib/padron'
+import { mismaPatente, normalizarDoc, normalizarPatente } from '@/lib/padron'
 import { useDemora } from '@/lib/use-demora'
 import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
@@ -15,7 +14,7 @@ import { hoyISO, horaODia, tiempoDesde, fechaCompleta } from '@/lib/fechas'
 import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
 import {
   useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
-  useVeredictoEnVivo, useCorregirSeguro,
+  useVeredictoEnVivo, useCorregirSeguro, fechaPasadaDe,
 } from '@/lib/queries/garita'
 import { Input } from '@/components/ui/input'
 import { AltaExpres } from '@/components/garita/alta-expres'
@@ -126,6 +125,9 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   // lo contrario de lo que se acaba de registrar.
   const [hecho, setHecho] = useState<{ movimiento: Movimiento; esEgreso: boolean } | null>(null)
   const accionRef = useRef<HTMLButtonElement>(null)
+  // Nunca se limpia: al dar vuelta INGRESO ↔ NO PASA el botón que sale se desmonta
+  // después de su animación, cuando el nuevo ya tomó la ref, y la dejaría en null.
+  const fijarAccion = useCallback((el: HTMLButtonElement | null) => { if (el) accionRef.current = el }, [])
   const [altaAbierta, setAltaAbierta] = useState(false)
   const [disparadorAlta, setDisparadorAlta] = useState<HTMLButtonElement | null>(null)
   const [lecturaAlta, setLecturaAlta] = useState<LecturaDni | null>(null)
@@ -142,16 +144,17 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     setSeguro(VACIO); setSeguroAuto(VACIO); setCorrigiendo({ proveedor: false, auto: false })
   }
 
-  // Lo cargado o corregido es de ESA patente y de ESE documento: si cambian, se
-  // descarta, así una póliza precargada para un auto nunca se guarda en otro.
+  // Lo copiado con "Corregir" es de ESA patente y de ESE documento: si cambian, se
+  // descarta, así una póliza precargada para un auto nunca se guarda en otro. Lo
+  // que el guardia tipeó de cero queda: corregir una letra de la patente no lo borra.
   const [claves, setClaves] = useState({ doc: '', plate: '' })
-  if (normalizarDoc(plate) !== claves.plate) {
-    setClaves((c) => ({ ...c, plate: normalizarDoc(plate) }))
-    setSeguroAuto(VACIO); setFechaPasadaAuto(false); setCorrigiendo((c) => ({ ...c, auto: false }))
+  if (normalizarPatente(plate) !== claves.plate) {
+    setClaves((c) => ({ ...c, plate: normalizarPatente(plate) }))
+    if (corrigiendo.auto) { setSeguroAuto(VACIO); setFechaPasadaAuto(false); setCorrigiendo((c) => ({ ...c, auto: false })) }
   }
   if (normalizarDoc(doc) !== claves.doc) {
     setClaves((c) => ({ ...c, doc: normalizarDoc(doc) }))
-    setSeguro(VACIO); setFechaPasada(false); setCorrigiendo((c) => ({ ...c, proveedor: false }))
+    if (corrigiendo.proveedor) { setSeguro(VACIO); setFechaPasada(false); setCorrigiendo((c) => ({ ...c, proveedor: false })) }
   }
 
   // El veredicto se recalcula en la API cuando el guardia cambia documento o
@@ -166,6 +169,11 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   // sin mirar el valor actual, pediría (y mostraría) un veredicto sin documento ni patente.
   const cambio = distinto(doc, plate) && distinto(docDemorado, plateDemorada)
   const vivo = useVeredictoEnVivo(id, cambio ? { doc: docDemorado, plate: plateDemorada } : null)
+  // El veredicto mostrado es de lo que está tipeado. Si no (la demora, la consulta en
+  // curso con keepPreviousData, o un error), sus seguros son de otra clave: no se
+  // muestran ni se copian. Registrar sigue habilitado: lo decide la API.
+  const alDia = !distinto(doc, plate) || Boolean(vivo.data && !vivo.isPlaceholderData && !vivo.isError
+    && normalizarDoc(docDemorado) === normalizarDoc(doc) && mismaPatente(plateDemorada, plate))
 
   // Vuelve a donde estaba: el escáner, la búsqueda, la agenda o el alta
   // exprés. Una sola vez: el contador, Deshacer y Escape pueden coincidir, y
@@ -283,7 +291,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const warn = resultado.insuranceWarnDays
   const esProveedor = inv.kind === 'proveedor' || inv.frequentAs === 'proveedor'
   const estadoProv = estadoDe(resultado.provider?.insurance ?? null, inv.requiresInsurance, hoy, warn)
-  const pideAuto = resultado.vehicleInsuranceRequired && plate.trim() !== ''
+  const pideAuto = resultado.vehicleInsuranceRequired && normalizarPatente(plate) !== ''
   const estadoAuto = estadoDe(resultado.vehicle?.insurance ?? null, pideAuto, hoy, warn)
   const falta = (e: string) => e === 'sin_cargar' || e === 'vencido'
 
@@ -313,27 +321,28 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
 
   async function registrar() {
     setFechaPasada(false); setFechaPasadaAuto(false)
+    const vars = {
+      invitationId: inv.id, guestName: inv.guestName,
+      // plate va siempre, '' incluido: sin la clave la API usa la de la invitación, y "Viene a pie" la tiene que pisar.
+      guestDoc: doc || undefined, plate,
+      insurance: mandaProv ? datos(seguro) : undefined,
+      vehicleInsurance: mandaAuto ? datos(seguroAuto) : undefined,
+    }
     try {
-      const mov = esEgreso
-        ? await egresar.mutateAsync(inv.id)
-        : await ingresar.mutateAsync({
-          invitationId: inv.id, guestName: inv.guestName,
-          // plate va siempre, '' incluido: sin la clave la API usa la de la invitación, y "Viene a pie" la tiene que pisar.
-          guestDoc: doc || undefined, plate,
-          insurance: mandaProv ? datos(seguro) : undefined,
-          vehicleInsurance: mandaAuto ? datos(seguroAuto) : undefined,
-        })
+      const mov = esEgreso ? await egresar.mutateAsync(inv.id) : await ingresar.mutateAsync(vars)
       setHecho({ movimiento: mov, esEgreso })
     } catch (e) {
-      // El toast de error ya lo muestra la mutación, salvo estos: van bajo su campo.
-      if (e instanceof ApiError && e.code === 'insurance_expired') setFechaPasada(true)
-      if (e instanceof ApiError && e.code === 'vehicle_insurance_expired') setFechaPasadaAuto(true)
+      // El toast de error ya lo muestra la mutación, salvo la fecha pasada de un seguro mandado: va bajo su campo.
+      if (esEgreso) return
+      const cual = fechaPasadaDe(e, vars)
+      if (cual === 'proveedor') setFechaPasada(true)
+      if (cual === 'auto') setFechaPasadaAuto(true)
     }
   }
 
   const motivo = !ok ? MOTIVO[(check as { reason: string }).reason] ?? 'Rechazado' : ''
   const detalle = !ok ? detalleRechazo((check as { reason: string }).reason, inv,
-    { franjas: resultado.franjas, tradeName: inv.tradeName, plate, vehicle: resultado.vehicle }) : null
+    { franjas: resultado.franjas, tradeName: inv.tradeName, plate, vehicle: alDia ? resultado.vehicle : null }) : null
   const sinCupo = !ok && (check as { reason: string }).reason === 'no_capacity'
   const palabra = esEgreso ? 'EGRESO' : ok ? 'INGRESO' : 'NO PASA'
   const registrando = ingresar.isPending || egresar.isPending
@@ -345,8 +354,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
 
   const editable = (ok && !esEgreso && !hecho) || cargaSeguro
   const borde = ok ? 'border-ink/15' : 'border-current/20'
-  const avisoSeguro = ok && !esEgreso && estadoProv === 'por_vencer'
-  const avisoAuto = ok && !esEgreso && estadoAuto === 'por_vencer'
+  const avisoSeguro = alDia && ok && !esEgreso && estadoProv === 'por_vencer'
+  const avisoAuto = alDia && ok && !esEgreso && estadoAuto === 'por_vencer'
   // "Autorizar igual" no sirve para un auto sin seguro si el barrio no lo permite.
   const puedeAutorizar = (check as { reason: string }).reason !== 'revoked'
     && !(rechazoPorAuto(check) && !resultado.vehicleInsuranceOverride)
@@ -382,6 +391,15 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
             </p>
           )}
           {detalle && <p className="mt-1 text-xl tabular opacity-80 sm:text-2xl lg:text-3xl">{detalle}</p>}
+          {vivo.isError && !alDia && (
+            <p role="alert" className="mt-2 text-xl font-semibold sm:text-2xl">
+              No se pudo recalcular ·{' '}
+              <button type="button" onClick={() => vivo.refetch()} disabled={vivo.isFetching}
+                className="min-h-11 underline underline-offset-4 disabled:opacity-80">
+                {vivo.isFetching ? 'Reintentando…' : 'Reintentar'}
+              </button>
+            </p>
+          )}
           {avisoSeguro && resultado.provider?.insurance && (
             <p className="mt-1 text-xl font-semibold tabular text-espera sm:text-2xl lg:text-3xl">
               Seguro {textoVence(resultado.provider.insurance.expiresOn, hoy)}
@@ -403,10 +421,10 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               auto, cada uno con su seguro. Y la invitación, que en la barrera no cambia. */}
           <div className="flex flex-col gap-7">
             <SeccionSeguro titulo={esProveedor ? 'Proveedor' : 'Visitante'} idBase="seguro-proveedor"
-              estado={estadoProv} guardado={resultado.provider?.insurance ?? null} quien={quienProv}
+              estado={estadoProv} guardado={alDia ? resultado.provider?.insurance ?? null : null} quien={quienProv}
               abierto={abiertoProv} valor={seguro} onCambio={(v) => { setSeguro(v); setFechaPasada(false) }}
-              fechaPasada={fechaPasada}
-              onCorregir={activo ? () => {
+              fechaPasada={fechaPasada} requerido={exigeProv} buscando={!alDia}
+              onCorregir={activo && alDia ? () => {
                 const s = resultado.provider?.insurance
                 if (s) setSeguro({ ...s })
                 setCorrigiendo((c) => ({ ...c, proveedor: true }))
@@ -444,10 +462,10 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
             </SeccionSeguro>
 
             <SeccionSeguro titulo="Vehículo" idBase="seguro-auto"
-              estado={estadoAuto} guardado={resultado.vehicle?.insurance ?? null} quien={quienAuto}
+              estado={estadoAuto} guardado={alDia ? resultado.vehicle?.insurance ?? null : null} quien={quienAuto}
               abierto={abiertoAuto} valor={seguroAuto} onCambio={(v) => { setSeguroAuto(v); setFechaPasadaAuto(false) }}
-              fechaPasada={fechaPasadaAuto}
-              onCorregir={activo && pideAuto ? () => {
+              fechaPasada={fechaPasadaAuto} requerido={exigeAuto} buscando={!alDia}
+              onCorregir={activo && pideAuto && alDia ? () => {
                 const s = resultado.vehicle?.insurance
                 if (s) setSeguroAuto({ ...s })
                 setCorrigiendo((c) => ({ ...c, auto: true }))
@@ -520,7 +538,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 <motion.div key="pendiente" exit={{ opacity: 0, y: -8, transition: { duration: 0.16 } }}
                   className="flex flex-col gap-3">
                   {/* Los datos se cargan al entrar, no al salir: a la salida ya están. */}
-                  <button ref={accionRef} onClick={registrar}
+                  <button ref={fijarAccion} onClick={registrar}
                     disabled={registrando || (!esEgreso && !doc.trim()) || !listoParaGuardar}
                     className="flex min-h-16 items-center justify-center gap-2 rounded bg-ink text-xl font-bold text-card transition-colors disabled:bg-ink/40">
                     {registrando && <Loader2 className="size-5 animate-spin" aria-hidden />}
@@ -542,12 +560,13 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                 <motion.div key="rechazo" className="flex flex-col gap-3">
                   {cargaSeguro ? (
                     <>
-                      <button ref={accionRef} onClick={registrar} disabled={registrando || !listoParaGuardar || !doc.trim()}
+                      <button ref={fijarAccion} onClick={registrar} disabled={registrando || !listoParaGuardar || !doc.trim()}
                         className="flex min-h-16 w-full items-center justify-center gap-2 rounded bg-no-pasa-texto text-xl font-bold text-no-pasa disabled:opacity-40">
                         {registrando && <Loader2 className="size-5 animate-spin" aria-hidden />}
                         {registrando ? 'Registrando…' : 'Guardar seguro y registrar ingreso'}
                       </button>
-                      {rechazoPorAuto(check) && (
+                      {/* También si el rechazo es por el seguro del proveedor y al auto le falta el suyo. */}
+                      {(rechazoPorAuto(check) || (pideAuto && falta(estadoAuto))) && (
                         <button onClick={() => { setPlate(''); setSeguroAuto(VACIO) }}
                           className="min-h-14 w-full rounded border-2 border-current/40 text-lg font-bold">
                           Viene a pie
@@ -558,7 +577,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                       </button>
                     </>
                   ) : (
-                    <button ref={accionRef} onClick={salir}
+                    <button ref={fijarAccion} onClick={salir}
                       className="min-h-16 w-full rounded bg-no-pasa-texto text-xl font-bold text-no-pasa">
                       Volver (Esc)
                     </button>

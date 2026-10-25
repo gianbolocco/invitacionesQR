@@ -6,8 +6,10 @@ import { CampoFecha } from '@/components/dominio/campo-fecha'
 export type ValorSeguro = { company: string; policy: string; expiresOn: string }
 
 /** Los tres datos del seguro. No sabe nada de la API ni de cuándo se exigen. */
-export function CamposSeguro({ valor, onCambio, onBlur, errores, idBase }: {
+export function CamposSeguro({ valor, onCambio, onBlur, errores, idBase, min }: {
   valor: ValorSeguro
+  /** Primer día elegible del vencimiento. */
+  min?: string
   onCambio: (v: ValorSeguro) => void
   /** Al salir de cualquiera de los tres campos. */
   onBlur?: () => void
@@ -29,7 +31,7 @@ export function CamposSeguro({ valor, onCambio, onBlur, errores, idBase }: {
             onChange={(e) => set('policy')(e.target.value)} />
         </Campo>
         <Campo id={`${idBase}-vence`} etiqueta="Vence" error={errores?.expiresOn}>
-          <CampoFecha id={`${idBase}-vence`} valor={valor.expiresOn} onCambio={set('expiresOn')} />
+          <CampoFecha id={`${idBase}-vence`} valor={valor.expiresOn} onCambio={set('expiresOn')} min={min} desplegable />
         </Campo>
       </div>
     </div>

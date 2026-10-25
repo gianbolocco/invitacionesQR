@@ -10,7 +10,7 @@ import { fechaCompleta, hoyISO } from '@/lib/fechas'
  * venció o el guardia lo está corrigiendo.
  */
 export function SeccionSeguro({
-  titulo, estado, guardado, quien, abierto, valor, onCambio, onCorregir, onGuardar, guardando, idBase, fechaPasada, children,
+  titulo, estado, guardado, quien, abierto, valor, onCambio, onCorregir, onGuardar, guardando, idBase, fechaPasada, requerido, buscando, children,
 }: {
   titulo: string
   estado: EstadoSeguro
@@ -24,9 +24,13 @@ export function SeccionSeguro({
   guardando?: boolean
   idBase: string
   fechaPasada?: boolean
+  /** Si falta, frena el ingreso. Si no (p. ej. lo autorizó la portería), cargarlo es opcional. */
+  requerido?: boolean
+  /** El veredicto todavía es de otro documento o patente: el estado no vale. */
+  buscando?: boolean
   children?: React.ReactNode
 }) {
-  const texto = textoEstado(estado, guardado?.expiresOn ?? null, hoyISO())
+  const texto = estado === 'no_aplica' ? '' : buscando ? 'Buscando…' : textoEstado(estado, guardado?.expiresOn ?? null, hoyISO())
   const mal = estado === 'sin_cargar' || estado === 'vencido'
   return (
     <section aria-labelledby={`${idBase}-titulo`} className="flex flex-col gap-2.5">
@@ -34,12 +38,12 @@ export function SeccionSeguro({
         <h2 id={`${idBase}-titulo`} className="text-sm font-bold uppercase tracking-[0.08em] opacity-80">{titulo}</h2>
         {texto && (
           // El estado lleva palabra y borde, no solo color: se lee igual sobre NO PASA y sobre INGRESO.
-          <span className={`rounded-full border px-2.5 py-0.5 text-sm font-semibold ${mal ? 'border-current' : 'border-current/40'}`}>
+          <span className={`rounded-full border px-2.5 py-0.5 text-sm font-semibold ${mal && !buscando ? 'border-current' : 'border-current/40'}`}>
             {texto}
           </span>
         )}
         {onCorregir && !abierto && guardado && estado !== 'no_aplica' && (
-          <button type="button" onClick={onCorregir} className="ml-auto min-h-11 text-sm font-semibold underline underline-offset-4">
+          <button type="button" onClick={onCorregir} aria-label={`Corregir seguro · ${titulo}`} className="ml-auto min-h-11 text-sm font-semibold underline underline-offset-4">
             Corregir
           </button>
         )}
@@ -61,8 +65,8 @@ export function SeccionSeguro({
       {estado !== 'no_aplica' && abierto && (
         // Las etiquetas de Campo son text-ink: sobre NO PASA no se leerían. Acá toman el color del veredicto.
         <div className="flex flex-col gap-3 [&_label]:text-current">
-          {mal && !guardado && <p className="text-base font-semibold">Pedile el certificado y cargalo.</p>}
-          <CamposSeguro idBase={idBase} valor={valor} onCambio={onCambio} />
+          {mal && !guardado && <p className="text-base font-semibold">{requerido ? 'Pedile el certificado y cargalo.' : 'Opcional: si lo tiene, cargalo.'}</p>}
+          <CamposSeguro idBase={idBase} valor={valor} onCambio={onCambio} min={hoyISO()} />
           {fechaPasada && <p className="text-base font-semibold">La fecha cargada ya pasó.</p>}
           {onGuardar && (
             <button type="button" onClick={onGuardar} disabled={guardando || estadoSeguroCargado(valor) !== 'completo'}

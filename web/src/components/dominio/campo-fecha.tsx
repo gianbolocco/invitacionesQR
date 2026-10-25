@@ -5,7 +5,7 @@ import { CalendarDays } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
-import { aFecha, aISO } from '@/lib/fechas'
+import { aFecha, aISO, hoyISO } from '@/lib/fechas'
 
 export function textoFecha(iso: string): string {
   const d = iso ? aFecha(iso) : null
@@ -21,8 +21,10 @@ export function textoFecha(iso: string): string {
  * Reemplaza a `<input type=date>`, que se ve distinto en cada navegador y en
  * algunos celulares no se puede usar con una mano.
  */
-export function CampoFecha({ id, valor, onCambio, min, max, className }: {
+export function CampoFecha({ id, valor, onCambio, min, max, desplegable, className }: {
   id?: string
+  /** Mes y año en desplegables: para fechas lejanas (un vencimiento a un año son 12 clics de flecha). */
+  desplegable?: boolean
   valor: string
   onCambio: (iso: string) => void
   min?: string
@@ -45,6 +47,13 @@ export function CampoFecha({ id, valor, onCambio, min, max, className }: {
         <Calendar mode="single" locale={es} weekStartsOn={1}
           selected={valor ? aFecha(valor) : undefined}
           defaultMonth={valor ? aFecha(valor) : undefined}
+          {...(desplegable && {
+            captionLayout: 'dropdown' as const,
+            // Sin tope, react-day-picker corta los años en el actual.
+            startMonth: min ? aFecha(min) : undefined,
+            endMonth: aFecha(max ?? `${Number(hoyISO().slice(0, 4)) + 10}-12-31`),
+            formatters: { formatMonthDropdown: (d: Date) => d.toLocaleString('es-AR', { month: 'short' }) },
+          })}
           disabled={[...(min ? [{ before: aFecha(min) }] : []), ...(max ? [{ after: aFecha(max) }] : [])]}
           onSelect={(d) => { if (d) { onCambio(aISO(d)); setAbierto(false) } }} />
       </PopoverContent>

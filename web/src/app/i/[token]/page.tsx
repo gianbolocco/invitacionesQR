@@ -70,7 +70,10 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
     onError: (e) => {
       setVencido(e instanceof ApiError && e.code === 'seguro_vencido')
       setFaltaDocSeguro(e instanceof ApiError && e.code === 'doc_required')
-      setVerificado(e instanceof ApiError && e.code === 'seguro_verificado')
+      const yaVerificado = e instanceof ApiError && e.code === 'seguro_verificado'
+      setVerificado(yaVerificado)
+      // La vista de "ya verificado" sale de la pública: hay que volver a pedirla.
+      if (yaVerificado) qc.invalidateQueries({ queryKey: ['publica', token] })
     },
   })
 
@@ -141,7 +144,8 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
           )}
         </div>
       )}
-      {guardar.isError && <Nota tono="error">{vencido ? 'Esa fecha ya pasó: cargá el vencimiento de la póliza vigente.' : verificado && venceSeguro ? `La guardia ya verificó tu seguro: vence el ${fechaCompleta(venceSeguro)}.` : 'No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.'}</Nota>}
+      {/* Sin documento el error ya va bajo su campo. */}
+      {guardar.isError && !faltaDocSeguro && <Nota tono="error">{vencido ? 'Esa fecha ya pasó: cargá el vencimiento de la póliza vigente.' : verificado && venceSeguro ? `La guardia ya verificó tu seguro: vence el ${fechaCompleta(venceSeguro)}.` : 'No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.'}</Nota>}
       <Button type="submit" disabled={guardar.isPending}>
         {guardar.isPending && <Loader2 className="animate-spin" aria-hidden />}
         Guardar

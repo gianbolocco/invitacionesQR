@@ -72,7 +72,8 @@ El veredicto de la garita se ordena en tres secciones —**Visitante/Proveedor**
 
 El alta exprés de la garita (**Autorizar sin invitación**) puede ser visita o
 proveedor, con su rubro; los seguros se cargan en el veredicto que abre después.
-A un proveedor que autoriza la portería no se le controla horario ni seguro.
+A un proveedor que autoriza la portería no se le controla horario ni el seguro
+del proveedor (el del auto, solo si el admin lo permite).
 
 **El admin** da de alta vecinos y guardias, corrige lotes, edita los datos del
 barrio (las horas de la alerta de permanencia, los rubros y los horarios de

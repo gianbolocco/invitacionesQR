@@ -8,7 +8,7 @@ import { hoyISO } from '@/lib/fechas'
 import {
   porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres, mensajeAltaExpres,
   cargarManual, mensajeCargaManual, anularPorPorteria, mensajeAnulacion, veredictoCon, corregirSeguroProveedor,
-  corregirSeguroAuto, type Resultado,
+  corregirSeguroAuto, MOTIVO, type Resultado,
 } from '@/lib/gate'
 import type { SeguroDatos } from '@/lib/seguro'
 import type { LecturaDni } from '@/lib/lectora'
@@ -230,16 +230,23 @@ function invalidarGarita(qc: QueryClient): Promise<void> {
   return qc.invalidateQueries({ queryKey: ['garita'] })
 }
 
+/** Qué seguro mandado tenía la fecha pasada. Si no se mandó, el rechazo es por el guardado y va como motivo. */
+export function fechaPasadaDe(e: unknown, vars: { insurance?: unknown; vehicleInsurance?: unknown }) {
+  if (!(e instanceof ApiError)) return null
+  if (e.code === 'insurance_expired' && vars.insurance) return 'proveedor'
+  if (e.code === 'vehicle_insurance_expired' && vars.vehicleInsurance) return 'auto'
+  return null
+}
+
 export function useRegistrarIngreso() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: registrarIngreso,
-    // La fecha vencida del seguro se avisa en el campo, no en un toast.
-    // Estos van bajo su campo, no en un toast.
-    onError: (e) => {
-      if (!(e instanceof ApiError && ['insurance_expired', 'vehicle_insurance_expired'].includes(e.code))) {
-        toast.error('No se pudo registrar. Probá de nuevo.')
-      }
+    onError: (e, vars) => {
+      // La fecha vencida de un seguro recién cargado se avisa bajo su campo, no en un toast.
+      if (fechaPasadaDe(e, vars)) return
+      // Otro 409 (cupo, horario, ya vencida) dice el motivo real: "Probá de nuevo" daría lo mismo.
+      toast.error((e instanceof ApiError && MOTIVO[e.code]) || 'No se pudo registrar. Probá de nuevo.')
     },
     onSettled: () => invalidarGarita(qc),
   })

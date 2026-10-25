@@ -4,12 +4,17 @@ import { entrar, expect, test } from './sesion'
 const API = process.env.E2E_API_URL ?? 'http://localhost:8080'
 
 test('un auto sin seguro no pasa; el guardia lo carga y la segunda vez pasa sin pedirlo', async ({ page, browser }) => {
+  // Los dos proyectos corren en paralelo: si ambos tocaran el switch, uno lo apagaría en medio del otro.
+  test.skip(test.info().project.name === 'celular', 'cambia un switch global del barrio')
   const sufijo = String(Date.now()).slice(-6)
   // Patente única por corrida: un auto de una corrida anterior ya tendría seguro.
   const patente = `E2E${sufijo}`
   const nombre = `Visita en auto E2E ${sufijo}`
 
   await entrar(page, 'admin')
+  const antes = await page.request.get(`${API}/admin/neighborhood`)
+  expect(antes.ok()).toBe(true)
+  const { vehicleInsuranceRequired: estaba } = await antes.json()
   const prender = await page.request.patch(`${API}/admin/neighborhood`, { data: { vehicleInsuranceRequired: true } })
   expect(prender.ok()).toBe(true)
   try {
@@ -49,6 +54,8 @@ test('un auto sin seguro no pasa; el guardia lo carga y la segunda vez pasa sin 
     await expect(g.getByRole('region', { name: 'Vehículo' }).getByText('Seguro vigente')).toBeVisible()
     await guardia.close()
   } finally {
-    await page.request.patch(`${API}/admin/neighborhood`, { data: { vehicleInsuranceRequired: false } })
+    // La conexión del admin quedó ociosa todo el test: la API puede haberla cerrado (ECONNRESET). Un reintento alcanza.
+    const restaurar = () => page.request.patch(`${API}/admin/neighborhood`, { data: { vehicleInsuranceRequired: estaba } })
+    await restaurar().catch(restaurar)
   }
 })
