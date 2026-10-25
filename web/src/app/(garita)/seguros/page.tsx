@@ -57,7 +57,8 @@ export default function SegurosPage({ searchParams }: { searchParams: Promise<{ 
   // Desde el tablero ("vencidos") puede que solo haya proveedores: si la pestaña
   // de autos viene vacía y la otra no, se abre la otra una vez.
   const [ajustado, setAjustado] = useState(false)
-  if (!ajustado && estadoUrl && !sp.tab && autos.data && provs.data) {
+  // Solo si el usuario todavía no tocó nada: si ya cambió el filtro o buscó, no se le mueve la pestaña.
+  if (!ajustado && estadoUrl && !sp.tab && estado === estadoUrl && !q && autos.data && provs.data) {
     setAjustado(true)
     const deAutos = (autos.data.counts as Partial<Record<EstadoListado, number>>)[estadoUrl] ?? 0
     if (tab === 'autos' && deAutos === 0 && (provs.data.counts[estadoUrl] ?? 0) > 0) setTab('proveedores')
