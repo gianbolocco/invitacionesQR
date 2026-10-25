@@ -199,15 +199,18 @@ export function HoyProveedores({ franjas, rubros }: { franjas: Franja[]; rubros:
   const proximo = (dow: number) => sumarDias(hoy, ((dow - diaDe(hoy) + 6) % 7) + 1)
 
   function lineas(iso: string): { quien: string; horas: string }[] {
-    return franjas.filter((f) => temporadaRige(f.season, iso.slice(5)) && f.days.includes(diaDe(iso))).map((f) => ({
-      quien: f.trades === null ? 'Todos los rubros' : f.trades.map((id) => rubros.find((r) => r.id === id)?.name ?? 'Rubro').join(', '),
-      horas: `${horaCorta(f.from)} a ${horaCorta(f.to)}`,
-    }))
+    return franjas.filter((f) => temporadaRige(f.season, iso.slice(5)) && f.days.includes(diaDe(iso)))
+      // Por hora de entrada: el día se lee de la mañana a la noche.
+      .sort((a, b) => a.from.localeCompare(b.from))
+      .map((f) => ({
+        quien: f.trades === null ? 'Todos los rubros' : f.trades.map((id) => rubros.find((r) => r.id === id)?.name ?? 'Rubro').join(', '),
+        horas: horaCorta(f.from) === '0' && horaCorta(f.to) === '24' ? 'Todo el día' : `${horaCorta(f.from)} a ${horaCorta(f.to)} h`,
+      }))
   }
   const dias = [
-    { titulo: null, iso: hoy },
-    { titulo: `Sábado ${diaMes(proximo(6))}`, iso: proximo(6) },
-    { titulo: `Domingo ${diaMes(proximo(0))}`, iso: proximo(0) },
+    { titulo: 'Hoy', fecha: `${NOMBRES[diaDe(hoy)]} ${diaMes(hoy)}`, iso: hoy },
+    { titulo: 'Sábado', fecha: diaMes(proximo(6)), iso: proximo(6) },
+    { titulo: 'Domingo', fecha: diaMes(proximo(0)), iso: proximo(0) },
   ]
   // La primera franja con temporada que arranca en los próximos 30 días.
   let desde: { mmdd: string; f: Franja } | null = null
@@ -219,16 +222,28 @@ export function HoyProveedores({ franjas, rubros }: { franjas: Franja[]; rubros:
 
   return (
     <aside className="rounded-md border border-line bg-card p-5" aria-labelledby="hoy-titulo">
-      <h3 id="hoy-titulo" className="font-semibold">Hoy, {NOMBRES[diaDe(hoy)]} {diaMes(hoy)}</h3>
-      <p className="text-sm text-ink-soft">Así ve la garita a los proveedores, con lo guardado.</p>
-      <ul className="mt-3 flex flex-col gap-3 text-sm tabular">
-        {dias.map(({ titulo, iso }) => {
+      <h3 id="hoy-titulo" className="font-semibold">Cómo entran los proveedores</h3>
+      <p className="text-sm text-ink-soft">Lo que ve la garita, con lo guardado.</p>
+      <ul className="mt-4 flex flex-col text-sm">
+        {dias.map(({ titulo, fecha, iso }) => {
           const ls = lineas(iso)
           return (
-            <li key={iso} className="flex flex-col gap-0.5">
-              {titulo && <span className="text-ink-soft">{titulo}</span>}
-              {ls.length === 0 ? <b className="font-semibold text-ink-soft">Cerrado</b>
-                : ls.map((l, j) => <span key={j} className="flex justify-between gap-3"><span>{l.quien}</span><b className="font-semibold">{l.horas}</b></span>)}
+            <li key={iso} className="flex flex-col gap-2 border-t border-line py-3 first:border-t-0 first:pt-0 last:pb-0">
+              <p className="flex items-baseline justify-between gap-3">
+                <span className="font-semibold">{titulo}</span>
+                <span className="text-ink-soft tabular">{fecha}</span>
+              </p>
+              {ls.length === 0 ? <p className="text-ink-soft">Cerrado</p> : (
+                // La hora en una columna fija: los rubros pueden ocupar dos renglones sin correrla.
+                <dl className="grid grid-cols-[minmax(5.5rem,max-content)_minmax(0,1fr)] gap-x-3 gap-y-1.5">
+                  {ls.map((l, j) => (
+                    <div key={j} className="contents">
+                      <dt className="whitespace-nowrap font-semibold tabular">{l.horas}</dt>
+                      <dd className="text-ink-soft">{l.quien}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </li>
           )
         })}
