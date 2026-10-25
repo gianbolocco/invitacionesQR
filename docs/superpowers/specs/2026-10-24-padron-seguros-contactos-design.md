@@ -95,8 +95,6 @@ contact
 entry_log  (+)
   provider_insurance      text null check in ('no_aplica','sin_cargar','vencido','por_vencer','vigente')
   vehicle_insurance       text null check in ('no_aplica','sin_cargar','vencido','por_vencer','vigente')
-  override_by             uuid null fk person -- autorizado igual: quién
-  override_reason         text null
 
 neighborhood  (+)
   vehicle_insurance_required   boolean not null default false
@@ -113,10 +111,10 @@ invitation  (−)
   vuelve a pedir.
 - **Filas viejas de `entry_log`:** las columnas nuevas quedan `null`. La
   auditoría muestra "—" (no había foto).
-- **Override.** Hoy "Autorizar igual" crea un alta exprés. `override_by` y
-  `override_reason` se llenan cuando el ingreso pasó por encima de un seguro
-  que faltaba, para que el tablero y el Excel lo encuentren sin parsear
-  `audit_log`.
+- **Autorizado sin seguro** no lleva columna: "Autorizar igual" ya es un alta
+  exprés, así que se deriva de la foto. Es una invitación de portería con
+  algún seguro `sin_cargar` o `vencido`. Quién fue es el guardia del ingreso, y
+  el motivo es la nota del alta exprés.
 
 ## Normalización
 
@@ -166,12 +164,17 @@ invitation  (−)
 
 ## API
 
-- **`GET /gate/padron?doc=&plate=`** (garita). Devuelve
-  `{ provider: { name, insurance } | null, vehicle: { insurance, updatedBy,
-  updatedAt } | null, lastPlate: string | null }`. La garita lo llama al
-  cambiar el documento o la patente, con 300 ms de espera después de la última
-  tecla, y recalcula el veredicto en el front con el mismo `canEnter`. El
-  servidor revalida todo al registrar.
+- **Check de la garita.** `GET /gate/invitation/:id` y `GET /gate/check/:token`
+  (los de hoy) usan el DNI y la patente de la invitación. Lo nuevo es
+  **`POST /gate/invitation/:id/verdict`** con `{ doc?, plate? }` en el body
+  (POST porque un DNI en la URL queda en los logs de cada proxy, igual que
+  `/gate/search`). Las tres respuestas suman `provider: { insurance,
+  insuranceSource, updatedAt } | null`, `vehicle: { insurance, updatedByName,
+  updatedAt } | null`, `lastPlate` (la última patente con la que entró ese DNI)
+  y `vehicleInsuranceRequired`/`vehicleInsuranceOverride`. El `check` se
+  calcula con eso. La garita vuelve a pedirlo al cambiar el documento o la
+  patente, con 300 ms de espera después de la última tecla. Un solo
+  `canEnter`, en el servidor, que revalida todo al registrar.
 - **Registrar ingreso** (endpoint de hoy): acepta `insurance` (proveedor) y
   `vehicleInsurance` opcionales. Dentro de la transacción, después del `FOR
   UPDATE` y antes de `canEnter`:
@@ -183,10 +186,12 @@ invitation  (−)
   - si `canEnter` rechaza, el throw revierte el padrón y su auditoría.
 
   Después del ingreso se escribe la foto en `entry_log`.
-- **`PUT /gate/padron/vehicle/:plate`** y **`PUT /gate/padron/provider/:doc`**:
+- **`PUT /gate/vehicles/insurance`** (`{ plate, insurance }`) y
+  **`PUT /gate/providers/insurance`** (`{ doc, name, insurance }`):
   "Corregir" sin registrar (el guardia corrige y aprieta Volver). Se auditan
   igual. Los usa también la pantalla Seguros.
-- **Alta exprés:** acepta `plate` y `vehicleInsurance` con la misma regla.
+- **Alta exprés:** deja de aceptar `insurance`. Crea la invitación y abre el
+  veredicto, que es donde se cargan los dos seguros, con la misma regla.
 - **Link público** (`PATCH /invitations/public/:token`): el proveedor manda
   `doc` + `insurance`.
   - Sin `doc`, responde `400 doc_required`.
@@ -197,7 +202,8 @@ invitation  (−)
     `provider`, **nunca compañía ni póliza**. Si la invitación no tiene DNI,
     devuelve `sin_cargar`. No hay búsqueda por un DNI arbitrario.
 - **Invitaciones del vecino:** `POST`/`PATCH /invitations` ya no aceptan
-  `insurance`. Mandarlo responde 400 genérico (zod `strict`).
+  `insurance`. Zod lo descarta como cualquier clave desconocida, y el
+  formulario deja de mandarlo en la fase 2.
 - **Contactos** (vecino, de su UF):
   - `GET /contacts` devuelve los contactos con `insuranceState` y
     `insuranceExpiresOn` si es proveedor y su rubro lo pide. Se cruzan por
@@ -218,14 +224,14 @@ invitation  (−)
 - **Barrio:** `GET/PATCH /admin/neighborhood` suma los dos switches.
 - **Tablero:** `dashboardKpis` suma `segurosVencidos` (padrón con vencido y un
   ingreso en los últimos 30 días), `segurosPorVencer` (en `insurance_warn_days`,
-  o 15 si es null) y `autorizadosSinSeguro` (`entry_log.override_by` no null en
-  los últimos 7 días).
+  o 15 si es null) y `autorizadosSinSeguro` (ingresos de los últimos 7 días
+  con invitación de portería y algún seguro `sin_cargar` o `vencido` en la foto).
 - **Auditoría y Excel:** `entriesLog` suma la foto (`provider_insurance`,
-  `vehicle_insurance`), el seguro actual del auto y `override_by` y
-  `override_reason`.
+  `vehicle_insurance`), el seguro actual del auto y `autorizadoSinSeguro`
+  (derivado).
 
 **Errores nuevos:** `no_vehicle_insurance` y `vehicle_insurance_expired` (409),
-`override_not_allowed` (403), `contact_not_found` (404) y `doc_required` (400).
+`contact_not_found` (404) y `doc_required` (400).
 
 ## Pantallas
 
@@ -273,7 +279,8 @@ Mockups en `.superpowers/brainstorm/8-1792885331/content/`:
   ingreso" si hay algo para guardar. Enter registra, como hoy.
 - NO PASA por el auto: "Viene a pie" (borra la patente y recalcula) y
   "Autorizar igual…", solo si el switch lo permite.
-- Alta exprés: suma patente y seguro del auto.
+- Alta exprés: pierde el bloque del seguro. El veredicto que abre después
+  tiene las secciones Proveedor y Vehículo.
 - Nav: Garita · Auditoría · **Seguros**.
 
 **Seguros** (garita y admin)
@@ -297,8 +304,8 @@ Mockups en `.superpowers/brainstorm/8-1792885331/content/`:
     estado al ingresar) y el estado del seguro al ingresar en Proveedor.
   - Filtro nuevo: "Autorizados sin seguro".
 - Excel de auditoría: columnas *Seguro auto*, *Vence auto*, *Estado seguro
-  auto (al ingresar)*, *Estado seguro proveedor (al ingresar)*, *Autorizado
-  igual por* y *Motivo*.
+  auto (al ingresar)*, *Estado seguro proveedor (al ingresar)* y *Autorizó
+  sin seguro* (el guardia, si fue un alta exprés con algún seguro faltante).
 
 Los textos van en voseo y los colores salen de los tokens de `globals.css`.
 Los títulos de sección sobre NO PASA y PASA tienen que cumplir contraste AA:
@@ -308,9 +315,9 @@ en el mockup, con `opacity: .7`, no llegan.
 
 | # | Fase | Despliegue |
 |---|---|---|
-| 1 | API del padrón: tablas, migración, normalización, `canEnter`, `/gate/padron`, registrar con upsert y foto, link público, switches | junto con la 2 |
-| 2 | Web de la garita: secciones, Corregir, búsqueda en vivo, alta exprés, link del proveedor, switches en Barrio | junto con la 1 |
-| 3 | Contactos: API y web (hoja + pestaña), formulario sin seguro | sola |
+| 1 | API del padrón: tablas, migración, normalización, `canEnter`, check con `?doc=&plate=`, registrar con upsert y foto, link público, switches | junto con la 2 |
+| 2 | Web de la garita: secciones, Corregir, búsqueda en vivo, alta exprés y formulario del vecino sin seguro, link del proveedor, switches en Barrio | junto con la 1 |
+| 3 | Contactos: API y web (hoja + pestaña) | sola |
 | 4 | Seguros y reportes: pantalla Seguros, tablero, auditoría, Excel | sola |
 
 "Pedir seguro del auto" arranca apagado. Un barrio que se actualiza no
@@ -344,7 +351,6 @@ Un plan por fase, de menos de 300 líneas cada uno.
   - el GET público no devuelve compañía ni póliza;
   - `doc_required`;
   - una UF no ve ni edita los contactos de otra;
-  - `override_not_allowed`;
   - el orden y los filtros de `/insurance/*`;
   - los KPIs nuevos.
 - **E2E:**
