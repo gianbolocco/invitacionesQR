@@ -211,12 +211,19 @@ describe('seguro del proveedor: barrera', () => {
     const { guardia, invitar, rubro, admin } = await conGuardia()
     await request(app).patch('/admin/neighborhood').set('Cookie', admin).send({ insuranceWarnDays: 30 }).expect(200)
     const alba = await rubro('Albañil', true)
-    const { body: inv } = await invitar({ tradeId: alba, guestName: 'Con seguro', insurance: seguro, note: 'Gol rojo', weekdays: [1, 3, 5] }).expect(201)
-    await invitar({ tradeId: alba, guestName: 'Sin seguro' }).expect(201)
-    await invitar({ tradeId: alba, guestName: 'Por vencer', insurance: { ...seguro, expiresOn: hoy } }).expect(201)
+    const [n] = await db.select().from(neighborhoods)
+    const enPadron = (doc: string, expiresOn: string) => db.insert(providers).values({
+      neighborhoodId: n.id, doc, name: doc, insuranceCompany: 'La Segunda', insurancePolicy: 'AP-123',
+      insuranceExpiresOn: expiresOn, insuranceSource: 'link',
+    })
+    await enPadron('1', '2999-01-01')
+    await enPadron('3', hoy)
+    await invitar({ tradeId: alba, guestName: 'Con seguro', guestDoc: '1', note: 'Gol rojo', weekdays: [1, 3, 5] }).expect(201)
+    await invitar({ tradeId: alba, guestName: 'Sin seguro', guestDoc: '2' }).expect(201)
+    await invitar({ tradeId: alba, guestName: 'Por vencer', guestDoc: '3' }).expect(201)
     await invitar({ tradeId: await rubro('Agua'), guestName: 'No aplica' }).expect(201)
-    const { body: entra } = await invitar({ tradeId: alba, guestName: 'Entra', insurance: seguro }).expect(201)
-    await request(app).post('/gate/entries').set('Cookie', guardia).send(entrada(entra.id)).expect(201)
+    const { body: entra } = await invitar({ tradeId: alba, guestName: 'Entra', guestDoc: '1' }).expect(201)
+    await request(app).post('/gate/entries').set('Cookie', guardia).send(entrada(entra.id, { guestDoc: '1' })).expect(201)
 
     const r = await request(app).get('/gate/audit').set('Cookie', guardia).expect(200)
     expect(r.body.insuranceWarnDays).toBe(30)

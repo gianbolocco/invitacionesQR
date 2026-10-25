@@ -134,11 +134,6 @@ export const invitations = pgTable('invitation', {
   // Distinto de null = la anuló un guardia; '' es "sin motivo", porque el motivo
   // es opcional. Es lo que el vecino lee después: "anulada por portería".
   revokedReason: text('revoked_reason'),
-  // Seguro declarado del proveedor. Los tres o ninguno: un seguro a medias no se
-  // puede verificar en la barrera.
-  insuranceCompany: text('insurance_company'),
-  insurancePolicy: text('insurance_policy'),
-  insuranceExpiresOn: date('insurance_expires_on'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex('invitation_token_uq').on(t.token),
@@ -155,10 +150,6 @@ export const invitations = pgTable('invitation', {
   check('invitation_window_ck', sql`${t.validTo} >= ${t.validFrom}`),
   check('invitation_capacity_ck', sql`${t.capacity} >= 1`),
   check('invitation_note_ck', sql`char_length(${t.note}) <= 140`),
-  check('invitation_insurance_company_ck', sql`char_length(${t.insuranceCompany}) <= 80`),
-  check('invitation_insurance_policy_ck', sql`char_length(${t.insurancePolicy}) <= 40`),
-  check('invitation_insurance_all_or_none_ck', sql`(${t.insuranceCompany} is null) = (${t.insurancePolicy} is null)
-    and (${t.insurancePolicy} is null) = (${t.insuranceExpiresOn} is null)`),
 ])
 
 export const entryLogs = pgTable('entry_log', {

@@ -148,6 +148,13 @@
       "when": 1792889475248,
       "tag": "0020_padron",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792892243417,
+      "tag": "0021_seguro_al_padron",
+      "breakpoints": true
     }
   ]
 }

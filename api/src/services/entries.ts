@@ -883,9 +883,9 @@ async function auditRows(
       i.weekdays,
       i.note,
       (p.role = 'guard')          as porteria,
-      i.insurance_company         as "insuranceCompany",
-      i.insurance_policy          as "insurancePolicy",
-      i.insurance_expires_on::text as "insuranceExpiresOn",
+      pv.insurance_company         as "insuranceCompany",
+      pv.insurance_policy          as "insurancePolicy",
+      pv.insurance_expires_on::text as "insuranceExpiresOn",
       u.label                     as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.valid_from                as "validFrom",
@@ -909,6 +909,9 @@ async function auditRows(
     join unit u on u.id = i.unit_id
     join person p on p.id = i.created_by
     left join trade t on t.id = i.trade_id
+    -- El seguro del proveedor vive en el padrón, por DNI normalizado (lib/padron.ts).
+    left join provider pv on pv.neighborhood_id = u.neighborhood_id
+      and pv.doc = upper(regexp_replace(coalesce(i.guest_doc, ''), '[^0-9A-Za-z]', '', 'g'))
     left join uso on uso.invitation_id = i.id
     left join ultimo on ultimo.invitation_id = i.id
     where ${filtrosAuditoria(neighborhoodId, f)}
