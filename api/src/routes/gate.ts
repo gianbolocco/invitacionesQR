@@ -111,8 +111,9 @@ gateRoutes.post('/exits', async (req, res) => {
  * Corregir un seguro sin registrar el ingreso: el guardia corrige y aprieta
  * Volver, y el dato bueno no se pierde. Lo usan también el veredicto y la
  * pantalla Seguros. El DNI y la patente van en el body, nunca en la URL.
+ * El admin mira los seguros, no los carga: el que ve el certificado es el guardia.
  */
-gateRoutes.put('/providers/insurance', async (req, res) => {
+gateRoutes.put('/providers/insurance', requireRole('guard'), async (req, res) => {
   const body = z.object({
     doc: z.string().trim().min(1).max(40),
     name: z.string().trim().min(1).max(120),
@@ -125,7 +126,7 @@ gateRoutes.put('/providers/insurance', async (req, res) => {
   res.json({ ok: true })
 })
 
-gateRoutes.put('/vehicles/insurance', async (req, res) => {
+gateRoutes.put('/vehicles/insurance', requireRole('guard'), async (req, res) => {
   const body = z.object({
     plate: z.string().trim().max(20).refine((p) => normalizarPatente(p) !== ''),
     insurance: zSeguro.unwrap(),
