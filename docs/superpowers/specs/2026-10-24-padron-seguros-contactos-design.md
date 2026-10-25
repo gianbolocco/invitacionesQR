@@ -86,7 +86,7 @@ contact
   unit_id                 uuid fk
   kind                    text not null check in ('visita','proveedor')
   name                    text not null check <= 80
-  doc                     text null           -- normalizado
+  doc                     text null  check <= 40  -- como lo escribió el vecino ("28.443.120"); se compara normalizado
   trade_id                uuid null fk trade  -- solo proveedor (check)
   created_by              uuid fk person
   created_at              timestamptz
@@ -211,7 +211,6 @@ invitation  (−)
   - `POST /contacts`, `PATCH /contacts/:id`, `DELETE /contacts/:id` (borrado
     real). Si el contacto no es de la UF del vecino, responde `404
     contact_not_found`.
-  - `POST /invitations` acepta `contactId` opcional, solo para la auditoría.
 - **Seguros** (admin y garita): `GET /insurance/vehicles` y
   `GET /insurance/providers`.
   - Filtros: `estado` (vencido, por_vencer, vigente; en proveedores, también
