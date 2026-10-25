@@ -16,6 +16,8 @@ begin;
 -- ---------- Limpieza (todo menos el barrio) ----------
 delete from audit_log;
 delete from entry_log;
+delete from vehicle;
+delete from provider;
 delete from invitation;
 delete from trade;
 delete from unit_member;
@@ -55,6 +57,8 @@ begin
   -- Piden seguro vigente: Albañil, Gasista, Electricista y Techista; aviso a 15 días.
   update trade set requires_insurance = true where name in ('Albañil','Gasista','Electricista','Techista');
   update neighborhood set insurance_warn_days = 15 where id = nid;
+  -- El seguro del auto se pide, y la portería puede autorizar igual.
+  update neighborhood set vehicle_insurance_required = true, vehicle_insurance_override = true where id = nid;
   update neighborhood set provider_windows = jsonb_build_array(
     jsonb_build_object('days', jsonb_build_array(1,2,3,4,5), 'from', '08:00', 'to', '17:00',
       'season', jsonb_build_object('from', '04-01', 'to', '10-31'), 'trades', null),
@@ -173,22 +177,38 @@ begin
   -- Seguros: albañil con la póliza vencida hace 9 días (la barrera lo rechaza),
   -- gasista frecuente que vence en 5 días (cae en el aviso de 15) y electricista sin seguro.
   insert into invitation (unit_id, created_by, kind, guest_name, guest_doc, plate,
-    valid_from, valid_to, capacity, token, created_at, trade_id,
-    insurance_company, insurance_policy, insurance_expires_on)
+    valid_from, valid_to, capacity, token, created_at, trade_id)
   values (l27, martin, 'proveedor', 'Ramiro Peralta', '27.345.901', 'AD 301 MN',
-    hoy, hoy, 1, md5(random()::text), ahora - interval '1 day', (select id from trade where name = 'Albañil'),
-    'La Segunda', 'AP-4471823', hoy - 9);
+    hoy, hoy, 1, md5(random()::text), ahora - interval '1 day', (select id from trade where name = 'Albañil'));
   insert into invitation (unit_id, created_by, kind, frequent_as, guest_name, guest_doc,
-    valid_from, valid_to, weekdays, capacity, token, created_at, trade_id,
-    insurance_company, insurance_policy, insurance_expires_on)
+    valid_from, valid_to, weekdays, capacity, token, created_at, trade_id)
   values (l34, sofia, 'frecuente', 'proveedor', 'Osvaldo Benavídez', '22.870.134',
     hoy - 30, hoy + 60, null, 999, md5(random()::text), ahora - interval '30 days',
-    (select id from trade where name = 'Gasista'),
-    'Sancor Seguros', '0082-559310', hoy + 5);
+    (select id from trade where name = 'Gasista'));
   insert into invitation (unit_id, created_by, kind, guest_name, guest_doc,
     valid_from, valid_to, capacity, token, created_at, trade_id)
   values (l55, pablo, 'proveedor', 'Gustavo Lescano', '29.654.312',
     hoy, hoy, 1, md5(random()::text), ahora - interval '1 day', (select id from trade where name = 'Electricista'));
+
+  -- Sus seguros, en el padrón: el del albañil vencido hace 9 días, el del gasista vence en 5.
+  insert into provider (neighborhood_id, doc, name, trade_id, insurance_company, insurance_policy,
+    insurance_expires_on, insurance_source, insurance_updated_by, insurance_updated_at)
+  values
+    (nid, '27345901', 'Ramiro Peralta', (select id from trade where name = 'Albañil'),
+      'La Segunda', 'AP-4471823', hoy - 9, 'garita', ramon, ahora - interval '40 days'),
+    (nid, '22870134', 'Osvaldo Benavídez', (select id from trade where name = 'Gasista'),
+      'Sancor Seguros', '0082-559310', hoy + 5, 'link', null, ahora - interval '20 days'),
+    (nid, '29654312', 'Gustavo Lescano', (select id from trade where name = 'Electricista'),
+      null, null, null, null, null, null);
+
+  -- Autos: AC 915 PR vigente, AD 301 MN por vencer, AE 482 KL vencido (el de Hugo Ríos,
+  -- que está adentro). AB 123 CD no está cargado: la barrera lo va a pedir.
+  insert into vehicle (neighborhood_id, plate, insurance_company, insurance_policy,
+    insurance_expires_on, insurance_updated_by, insurance_updated_at)
+  values
+    (nid, 'AC915PR', 'Rivadavia', '0012-883', hoy + 200, julio, ahora - interval '25 days'),
+    (nid, 'AD301MN', 'La Caja', '4410-2231', hoy + 5, julio, ahora - interval '60 days'),
+    (nid, 'AE482KL', 'Federación Patronal', '77-110293', hoy - 14, ramon, ahora - interval '190 days');
 
   -- Visita de ayer que nunca registró la salida: la garita la marca en amarillo.
   insert into invitation (unit_id, created_by, kind, guest_name, guest_doc, plate,
