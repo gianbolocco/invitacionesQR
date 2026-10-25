@@ -155,6 +155,13 @@
       "when": 1792892243417,
       "tag": "0021_seguro_al_padron",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792905607605,
+      "tag": "0022_contactos",
+      "breakpoints": true
     }
   ]
 }

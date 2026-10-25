@@ -237,7 +237,30 @@ export const vehicles = pgTable('vehicle', {
   check('vehicle_insurance_policy_ck', sql`char_length(${t.insurancePolicy}) <= 40`),
 ])
 
-export const auditLogs = pgTable('audit_log', {
+/*
+ * La agenda de una casa: la ven y la editan todos los que viven en la UF,
+ * igual que las invitaciones. No se vincula al padrón: el estado del seguro
+ * de un proveedor se cruza al leer, por el DNI normalizado.
+ */
+export const contacts = pgTable('contact', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  unitId: uuid('unit_id').notNull().references(() => units.id),
+  kind: text('kind').notNull(),
+  name: text('name').notNull(),
+  // Como lo escribió el vecino ("28.443.120"): se compara normalizado.
+  doc: text('doc'),
+  tradeId: uuid('trade_id').references(() => trades.id),
+  createdBy: uuid('created_by').notNull().references(() => people.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('contact_unit_idx').on(t.unitId, t.name),
+  check('contact_kind_ck', sql`${t.kind} in ('visita','proveedor')`),
+  check('contact_name_ck', sql`char_length(${t.name}) between 1 and 80`),
+  check('contact_doc_ck', sql`char_length(${t.doc}) <= 40`),
+  check('contact_trade_ck', sql`${t.tradeId} is null or ${t.kind} = 'proveedor'`),
+])
+
+export const auditLogs =pgTable('audit_log', {
   id: uuid('id').primaryKey().defaultRandom(),
   neighborhoodId: uuid('neighborhood_id').notNull().references(() => neighborhoods.id),
   actorId: uuid('actor_id').references(() => people.id),
