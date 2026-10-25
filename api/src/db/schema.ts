@@ -260,7 +260,7 @@ export const contacts = pgTable('contact', {
   check('contact_trade_ck', sql`${t.tradeId} is null or ${t.kind} = 'proveedor'`),
 ])
 
-export const auditLogs =pgTable('audit_log', {
+export const auditLogs = pgTable('audit_log', {
   id: uuid('id').primaryKey().defaultRandom(),
   neighborhoodId: uuid('neighborhood_id').notNull().references(() => neighborhoods.id),
   actorId: uuid('actor_id').references(() => people.id),
