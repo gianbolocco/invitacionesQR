@@ -816,7 +816,9 @@ git commit -m "feat: el vecino ya no carga el seguro del proveedor"
 
 - [ ] **Step 1: Cambiar el formulario**
 
-En el tipo `Publica`, después de `insuranceState`: `insuranceExpiresOn: string | null`.
+En el tipo `Publica`, después de `insuranceState`: `insuranceExpiresOn: string | null` e `insuranceVerified: boolean`.
+
+**Seguro verificado por la guardia** (regla agregada después del plan 1, commit `90a2afb`): si `insuranceVerified` es true, la API rechaza la carga desde el link con `409 seguro_verificado`. En ese caso el bloque "Tu seguro" **no muestra los campos**, solo `La guardia ya verificó tu seguro: vence el {fechaCompleta(venceSeguro)}.` en `text-verde`. Y si el rubro pide seguro, la invitación no tiene DNI faltante ni patente faltante y el seguro está verificado, `FormularioDatos` no se muestra (no hay nada para cargar). `FormularioDatos` suma la prop `seguroVerificado: boolean`. En `onError`, `seguro_verificado` muestra la misma frase en el `Nota` de error.
 
 `FormularioDatos` suma la prop `venceSeguro: string | null` y el estado `const [faltaDocSeguro, setFaltaDocSeguro] = useState(false)`. En `onError`:
 
