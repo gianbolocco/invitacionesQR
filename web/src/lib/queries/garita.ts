@@ -7,8 +7,10 @@ import { api, apiBase, ApiError } from '@/lib/api'
 import { hoyISO } from '@/lib/fechas'
 import {
   porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres, mensajeAltaExpres,
-  cargarManual, mensajeCargaManual, anularPorPorteria, mensajeAnulacion, type Resultado,
+  cargarManual, mensajeCargaManual, anularPorPorteria, mensajeAnulacion, veredictoCon, corregirSeguroProveedor,
+  corregirSeguroAuto, type Resultado,
 } from '@/lib/gate'
+import type { SeguroDatos } from '@/lib/seguro'
 import type { LecturaDni } from '@/lib/lectora'
 
 export type AgendaRow = {
@@ -103,6 +105,38 @@ export function useVeredicto(id: string) {
   return useQuery({
     queryKey: claves.veredicto(id),
     queryFn: () => porId(id),
+  })
+}
+
+/**
+ * El veredicto recalculado con el documento y la patente que tiene tipeados el
+ * guardia: el único canEnter vive en la API. `datos` null = todavía son los de
+ * la invitación y alcanza con el veredicto inicial. Mientras llega uno nuevo
+ * queda el anterior: el NO PASA no parpadea con cada tecla.
+ */
+export function useVeredictoEnVivo(id: string, datos: { doc: string; plate: string } | null) {
+  return useQuery({
+    queryKey: [...claves.veredicto(id), 'vivo', datos?.doc ?? '', datos?.plate ?? ''] as const,
+    queryFn: ({ signal }) => veredictoCon(id, datos!, signal),
+    enabled: datos !== null,
+    placeholderData: keepPreviousData,
+  })
+}
+
+export type Correccion =
+  | { tipo: 'proveedor'; doc: string; name: string; insurance: SeguroDatos }
+  | { tipo: 'auto'; plate: string; insurance: SeguroDatos }
+
+/** "Corregir" sin registrar: queda en el padrón aunque el guardia apriete Volver. */
+export function useCorregirSeguro() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ tipo, ...datos }: Correccion) => tipo === 'auto'
+      ? corregirSeguroAuto(datos as { plate: string; insurance: SeguroDatos })
+      : corregirSeguroProveedor(datos as { doc: string; name: string; insurance: SeguroDatos }),
+    onSuccess: () => toast.success('Seguro actualizado.'),
+    onError: () => toast.error('No se pudo guardar el seguro. Probá de nuevo.'),
+    onSettled: () => invalidarGarita(qc),
   })
 }
 
