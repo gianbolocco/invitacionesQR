@@ -76,7 +76,6 @@ const createSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).optional(),
   capacity: z.number().int().min(1),
   tradeId: z.string().uuid().nullable().optional(),
-  insurance: zSeguro.optional(),
 }).refine((v) => v.validTo >= v.validFrom, { message: 'La ventana está invertida', path: ['validTo'] })
 
 invitationRoutes.post('/', async (req, res) => {
@@ -138,7 +137,6 @@ const editSchema = z.object({
   capacity: z.number().int().min(1).optional(),
   frequentAs: z.enum(['visita', 'proveedor']).optional(),
   tradeId: z.string().uuid().nullable().optional(),
-  insurance: zSeguro.optional(),
 })
 
 invitationRoutes.patch('/:id', async (req, res) => {

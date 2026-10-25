@@ -7,7 +7,8 @@ import { todayInBuenosAires, unMesDespues } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { PORTERIA } from '../lib/porteria.js'
 import { aplicaFranjas, type Franja } from '../lib/franjas.js'
-import { pideSeguro, seguroCompleto, seguroVigente, type Seguro } from '../lib/seguro.js'
+import { pideSeguro, seguroVigente, type Seguro } from '../lib/seguro.js'
+import { buscarProveedor, guardarProveedor } from './padron.js'
 
 export type CreateInvitationInput = {
   unitId: string
@@ -24,8 +25,6 @@ export type CreateInvitationInput = {
   weekdays?: number[]
   capacity: number
   tradeId?: string | null
-  /** undefined: sin tocar; null: sin seguro. */
-  insurance?: Seguro | null
   neighborhoodId: string
 }
 
@@ -57,7 +56,6 @@ export type CreateExpressInvitationInput = {
   neighborhoodId: string
   kind?: 'visita' | 'proveedor'
   tradeId?: string | null
-  insurance?: Seguro | null
 }
 
 /**
@@ -74,7 +72,6 @@ export type CreateExpressInvitationInput = {
 export async function createExpressInvitation(input: CreateExpressInvitationInput) {
   await assertUnitInNeighborhood(input.unitId, input.neighborhoodId)
   await assertRubro(input.neighborhoodId, input.kind ?? 'visita', null, input.tradeId)
-  await assertSeguro(input.kind ?? 'visita', null, input.tradeId, input.insurance)
 
   const [inv] = await db.insert(invitations)
     .values(valoresDePorteria(input, todayInBuenosAires()))
@@ -90,7 +87,6 @@ export function valoresDePorteria(input: CreateExpressInvitationInput, dia: stri
     createdBy: input.createdBy,
     kind: input.kind ?? 'visita',
     tradeId: input.tradeId ?? null,
-    ...(input.insurance ? columnasSeguro(input.insurance) : {}),
     guestName: input.guestName.trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
@@ -143,12 +139,6 @@ export async function assertSeguro(
   if (!pideSeguro(kind, frequentAs, await rubroPideSeguro(tradeId))) throw new AppError(400, 'seguro_no_aplica')
 }
 
-const columnasSeguro = (i: Seguro | null) => ({
-  insuranceCompany: i?.company.trim() ?? null,
-  insurancePolicy: i?.policy.trim() ?? null,
-  insuranceExpiresOn: i?.expiresOn ?? null,
-})
-
 /** Las franjas que le tocan a un rubro: las de todos los rubros y las que lo nombran. */
 export function franjasDelRubro(franjas: Franja[], kind: string, frequentAs: string | null, tradeId: string | null): Franja[] {
   if (!aplicaFranjas(kind, frequentAs)) return []
@@ -160,7 +150,6 @@ export async function createInvitation(input: CreateInvitationInput) {
   assertRangoDeFrecuente(input.kind, input.frequentAs, input.validFrom, input.validTo)
   const frequentAs = input.kind === 'frecuente' ? (input.frequentAs ?? 'visita') : null
   await assertRubro(input.neighborhoodId, input.kind, frequentAs, input.tradeId)
-  await assertSeguro(input.kind, frequentAs, input.tradeId, input.insurance)
 
   const [inv] = await db.insert(invitations).values({
     unitId: input.unitId,
@@ -176,7 +165,6 @@ export async function createInvitation(input: CreateInvitationInput) {
     validTo: input.validTo,
     weekdays: input.weekdays?.length ? input.weekdays : null,
     capacity: input.capacity,
-    ...(input.insurance ? columnasSeguro(input.insurance) : {}),
     token: randomToken(16),
   }).returning()
 
@@ -219,9 +207,6 @@ const columnas = {
   tradeId: invitations.tradeId,
   tradeName: trades.name,
   requiresInsurance: trades.requiresInsurance,
-  insuranceCompany: invitations.insuranceCompany,
-  insurancePolicy: invitations.insurancePolicy,
-  insuranceExpiresOn: invitations.insuranceExpiresOn,
   creatorName: nombreOEtiquetaSql,
   unitId: invitations.unitId,
   unitLabel: units.label,
@@ -422,9 +407,7 @@ export async function findPublicByToken(token: string) {
     tradeId: invitations.tradeId,
     tradeName: trades.name,
     tradeRequiresInsurance: trades.requiresInsurance,
-    insuranceCompany: invitations.insuranceCompany,
-    insurancePolicy: invitations.insurancePolicy,
-    insuranceExpiresOn: invitations.insuranceExpiresOn,
+    neighborhoodId: neighborhoods.id,
     providerWindows: neighborhoods.providerWindows,
     validFrom: invitations.validFrom,
     validTo: invitations.validTo,
@@ -445,9 +428,9 @@ export async function findPublicByToken(token: string) {
 
   if (!row) return null
 
-  const completo = seguroCompleto(row.insuranceCompany, row.insurancePolicy, row.insuranceExpiresOn)
-  const insuranceState = !completo ? 'sin_cargar'
-    : !seguroVigente(row.insuranceExpiresOn!, new Date()) ? 'vencido' : 'vigente'
+  const proveedor = row.guestDoc ? await buscarProveedor(row.neighborhoodId, row.guestDoc) : null
+  const s = proveedor?.insurance ?? null
+  const insuranceState = !s ? 'sin_cargar' : !seguroVigente(s.expiresOn, new Date()) ? 'vencido' : 'vigente'
 
   return {
     guestName: row.guestName,
@@ -456,6 +439,8 @@ export async function findPublicByToken(token: string) {
     // Solo el estado: el link puede estar en manos de cualquiera, los datos no salen.
     requiresInsurance: pideSeguro(row.kind, row.frequentAs, row.tradeRequiresInsurance),
     insuranceState,
+    // El vencimiento sí ("tu seguro vence el 12/03"): compañía y póliza nunca.
+    insuranceExpiresOn: s?.expiresOn ?? null,
     franjas: franjasDelRubro(row.providerWindows, row.kind, row.frequentAs, row.tradeId),
     validFrom: row.validFrom,
     validTo: row.validTo,
@@ -486,11 +471,13 @@ async function entriesOf(invitationId: string): Promise<number> {
  */
 export async function fillGuestDetails(
   token: string,
-  data: { guestDoc?: string; plate?: string; insurance?: Seguro | null },
+  data: { guestDoc?: string; plate?: string; insurance?: Seguro },
 ): Promise<void> {
-  const [inv] = await db.select().from(invitations)
+  const [fila] = await db.select({ inv: invitations, nid: units.neighborhoodId }).from(invitations)
+    .innerJoin(units, eq(units.id, invitations.unitId))
     .where(eq(invitations.token, token)).limit(1)
-  if (!inv) throw new AppError(404, 'not_found')
+  if (!fila) throw new AppError(404, 'not_found')
+  const { inv, nid } = fila
   if (inv.revokedAt) throw new AppError(409, 'revoked')
 
   // Una vez que entró, entry_log ya guardó su copia: documento y patente no se
@@ -500,18 +487,26 @@ export async function fillGuestDetails(
   }
   // El link lo tiene cualquiera: no puede cargar una póliza que ya venció.
   if (data.insurance && data.insurance.expiresOn < todayInBuenosAires()) throw new AppError(400, 'seguro_vencido')
-
   await assertSeguro(inv.kind, inv.frequentAs, inv.tradeId, data.insurance)
 
-  const patch: { guestDoc?: string; plate?: string } & Partial<ReturnType<typeof columnasSeguro>> = {}
+  const patch: { guestDoc?: string; plate?: string } = {}
   if (!inv.guestDoc && data.guestDoc?.trim()) patch.guestDoc = data.guestDoc.trim()
   if (!inv.plate && data.plate?.trim()) patch.plate = data.plate.trim().toUpperCase()
 
-  if (data.insurance !== undefined) Object.assign(patch, columnasSeguro(data.insurance))
+  // El seguro vive en el padrón, por DNI: sin DNI no hay a quién asignarlo.
+  // Vale el de la invitación; si no tenía, el que manda el proveedor ahora.
+  const doc = inv.guestDoc ?? patch.guestDoc
+  if (data.insurance && !doc) throw new AppError(400, 'doc_required')
 
-  if (Object.keys(patch).length) {
-    await db.update(invitations).set(patch).where(eq(invitations.id, inv.id))
-  }
+  await db.transaction(async (tx) => {
+    if (Object.keys(patch).length) await tx.update(invitations).set(patch).where(eq(invitations.id, inv.id))
+    if (data.insurance) {
+      await guardarProveedor(tx, {
+        neighborhoodId: nid, doc: doc!, name: inv.guestName, tradeId: inv.tradeId,
+        insurance: data.insurance, source: 'link', actorId: null,
+      })
+    }
+  })
 }
 
 /** Deshacer una anulación. */
@@ -540,7 +535,6 @@ export type EditInvitationInput = {
   capacity?: number
   frequentAs?: 'visita' | 'proveedor'
   tradeId?: string | null
-  insurance?: Seguro | null
 }
 
 /**
@@ -591,15 +585,7 @@ export async function editInvitation(
     await assertRubro(neighborhoodId, inv.kind, frequentAs, input.tradeId === undefined ? inv.tradeId : input.tradeId)
   }
 
-  // Sin seguro nuevo, el viejo se borra si lo nuevo ya no lo pide (a visita, o a un rubro que no lo exige).
-  let seguro = input.insurance
-  if (seguro !== undefined) await assertSeguro(inv.kind, frequentAs, tradeId === undefined ? inv.tradeId : tradeId, seguro)
-  else if (tradeId !== undefined || input.frequentAs !== undefined) {
-    if (!pideSeguro(inv.kind, frequentAs, await rubroPideSeguro(tradeId === undefined ? inv.tradeId : tradeId))) seguro = null
-  }
-
   const [actualizada] = await db.update(invitations).set({
-    ...(seguro !== undefined ? columnasSeguro(seguro) : {}),
     ...(tradeId !== undefined ? { tradeId } : {}),
     ...(input.guestName !== undefined ? { guestName: input.guestName.trim() } : {}),
     ...(input.guestDoc !== undefined ? { guestDoc: input.guestDoc?.trim() || null } : {}),

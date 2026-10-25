@@ -71,75 +71,58 @@ describe('seguro del proveedor: configuración', () => {
 describe('seguro del proveedor: carga en la invitación', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
 
-  it('el alta con seguro completo lo guarda', async () => {
-    const { invitar, rubro } = await escenario()
-    const r = await invitar({ tradeId: await rubro('Albañil', true), insurance: seguro }).expect(201)
-    expect(r.body).toMatchObject({
-      insuranceCompany: 'La Segunda', insurancePolicy: 'AP-123', insuranceExpiresOn: '2999-01-01',
-    })
-  })
-
-  it('el seguro a medias lo rechaza zod', async () => {
-    const { invitar, rubro } = await escenario()
-    const tradeId = await rubro('Albañil', true)
-    await invitar({ tradeId, insurance: { company: 'La Segunda' } }).expect(400)
-  })
-
-  it('seguro en un rubro que no lo pide: seguro_no_aplica', async () => {
-    const { invitar, rubro } = await escenario()
-    const r = await invitar({ tradeId: await rubro('Agua'), insurance: seguro }).expect(400)
-    expect(r.body.error).toBe('seguro_no_aplica')
-  })
-
-  it('el invitado lo carga por el link y la página pública no filtra los datos', async () => {
+  it('el invitado lo carga por el link al padrón y la página pública no filtra los datos', async () => {
     const { invitar, rubro } = await escenario()
     const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
     const antes = await request(app).get(`/invitations/public/${inv.token}`).expect(200)
-    expect(antes.body).toMatchObject({ requiresInsurance: true, insuranceState: 'sin_cargar' })
+    expect(antes.body).toMatchObject({ requiresInsurance: true, insuranceState: 'sin_cargar', insuranceExpiresOn: null })
 
-    await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(200)
+    const r0 = await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(400)
+    expect(r0.body.error).toBe('doc_required')
+
+    await request(app).patch(`/invitations/public/${inv.token}`).send({ guestDoc: '30.111.222', insurance: seguro }).expect(200)
     const r = await request(app).get(`/invitations/public/${inv.token}`).expect(200)
-    expect(r.body).toMatchObject({ requiresInsurance: true, insuranceState: 'vigente' })
+    expect(r.body).toMatchObject({ requiresInsurance: true, insuranceState: 'vigente', insuranceExpiresOn: '2999-01-01' })
     expect(JSON.stringify(r.body)).not.toMatch(/La Segunda|AP-123|insuranceCompany|insurancePolicy/)
+    const [p] = await db.select().from(providers)
+    expect(p).toMatchObject({ doc: '30111222', name: 'Pedro', insuranceSource: 'link', insuranceUpdatedBy: null })
 
-    await db.update(invitations).set({ insuranceExpiresOn: '2000-01-01' }).where(eq(invitations.id, inv.id))
+    await db.update(providers).set({ insuranceExpiresOn: '2000-01-01' })
     const v = await request(app).get(`/invitations/public/${inv.token}`).expect(200)
     expect(v.body.insuranceState).toBe('vencido')
   })
 
-  it('editar a visita borra el seguro', async () => {
-    const { invitar, rubro, vecino } = await escenario()
-    const { body: inv } = await invitar({
-      kind: 'frecuente', frequentAs: 'proveedor', tradeId: await rubro('Albañil', true), insurance: seguro,
-    }).expect(201)
-    await request(app).patch(`/invitations/${inv.id}`).set('Cookie', vecino).send({ frequentAs: 'visita' }).expect(200)
-    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
-    expect([fila.insuranceCompany, fila.insurancePolicy, fila.insuranceExpiresOn]).toEqual([null, null, null])
+  it('otra invitación del mismo DNI, de otro lote, ya ve el seguro vigente', async () => {
+    const { invitar, rubro } = await escenario()
+    const tradeId = await rubro('Albañil', true)
+    const { body: a } = await invitar({ tradeId, guestDoc: '30.111.222' }).expect(201)
+    await request(app).patch(`/invitations/public/${a.token}`).send({ insurance: seguro }).expect(200)
+    const { body: b } = await invitar({ tradeId, guestDoc: '30111222' }).expect(201)
+    expect((await request(app).get(`/invitations/public/${b.token}`).expect(200)).body.insuranceState).toBe('vigente')
   })
 
-  it('editar a un rubro que no lo pide borra el seguro', async () => {
-    const { invitar, rubro, vecino } = await escenario()
-    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true), insurance: seguro }).expect(201)
-    await request(app).patch(`/invitations/${inv.id}`).set('Cookie', vecino).send({ tradeId: await rubro('Agua') }).expect(200)
-    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
-    expect([fila.insuranceCompany, fila.insurancePolicy, fila.insuranceExpiresOn]).toEqual([null, null, null])
+  it('el vecino ya no carga el seguro: la clave se ignora', async () => {
+    const { invitar, rubro } = await escenario()
+    await invitar({ tradeId: await rubro('Albañil', true), guestDoc: '1', insurance: seguro }).expect(201)
+    expect(await db.select().from(providers)).toHaveLength(0)
   })
 
   it('el link público no puede borrar el seguro (null da 400)', async () => {
     const { invitar, rubro } = await escenario()
-    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true), insurance: seguro }).expect(201)
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true), guestDoc: '30111222' }).expect(201)
+    await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(200)
     await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: null }).expect(400)
-    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
-    expect(fila.insurancePolicy).toBe('AP-123')
+    const [p] = await db.select().from(providers)
+    expect(p.insurancePolicy).toBe('AP-123')
   })
 
   it('después de entrar el link renueva el seguro pero no el documento', async () => {
     const { invitar, rubro, u } = await escenario()
-    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true), guestDoc: '30111222' }).expect(201)
     await db.insert(entryLogs).values({ invitationId: inv.id, unitId: u.id, guestName: 'Pedro' })
     await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(200)
-    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
-    expect(fila.insurancePolicy).toBe('AP-123')
+    const [p] = await db.select().from(providers)
+    expect(p.insurancePolicy).toBe('AP-123')
     const r = await request(app).patch(`/invitations/public/${inv.token}`).send({ guestDoc: '111', insurance: seguro }).expect(409)
     expect(r.body.error).toBe('already_entered')
   })
@@ -157,16 +140,6 @@ describe('seguro del proveedor: carga en la invitación', () => {
     const { body: inv } = await invitar({ kind: 'visita' }).expect(201)
     const r = await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(400)
     expect(r.body.error).toBe('seguro_no_aplica')
-  })
-
-  it('una fecha inexistente da 400', async () => {
-    const { invitar, rubro } = await escenario()
-    await invitar({ tradeId: await rubro('Albañil', true), insurance: { ...seguro, expiresOn: '2026-02-30' } }).expect(400)
-  })
-
-  it('una fecha de mes 13 da 400 y no 500', async () => {
-    const { invitar, rubro } = await escenario()
-    await invitar({ tradeId: await rubro('Albañil', true), insurance: { ...seguro, expiresOn: '2026-13-45' } }).expect(400)
   })
 })
 

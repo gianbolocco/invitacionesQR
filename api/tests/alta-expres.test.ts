@@ -244,34 +244,12 @@ describe('alta exprés de proveedor', () => {
   const rubro = async (neighborhoodId: string, requiresInsurance = false) =>
     (await db.insert(trades).values({ neighborhoodId, name: 'Electricista', requiresInsurance }).returning())[0]
 
-  it('crea un proveedor con rubro y seguro', async () => {
-    const { cookie, unit142, neighborhoodId } = await escenario()
-    const t = await rubro(neighborhoodId, true)
-    const seguro = { company: 'La Segunda', policy: 'P-1', expiresOn: '2099-01-01' }
-    const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Plomero', kind: 'proveedor', tradeId: t.id, insurance: seguro }).expect(201)
-    expect(res.body.kind).toBe('proveedor')
-    expect(res.body.tradeId).toBe(t.id)
-    expect(res.body.insuranceCompany).toBe('La Segunda')
-    expect(res.body.insurancePolicy).toBe('P-1')
-    expect(res.body.insuranceExpiresOn).toBe('2099-01-01')
-  })
-
   it('con rubros cargados exige el rubro', async () => {
     const { cookie, unit142, neighborhoodId } = await escenario()
     await rubro(neighborhoodId)
     const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
       .send({ unitId: unit142.id, guestName: 'Plomero', kind: 'proveedor' }).expect(400)
     expect(res.body.error).toBe('rubro_requerido')
-  })
-
-  it('rechaza seguro en un rubro que no lo pide', async () => {
-    const { cookie, unit142, neighborhoodId } = await escenario()
-    const t = await rubro(neighborhoodId, false)
-    const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Plomero', kind: 'proveedor', tradeId: t.id,
-        insurance: { company: 'X', policy: 'Y', expiresOn: '2099-01-01' } }).expect(400)
-    expect(res.body.error).toBe('seguro_no_aplica')
   })
 
   it('un proveedor de portería entra fuera de franja y sin seguro', async () => {
