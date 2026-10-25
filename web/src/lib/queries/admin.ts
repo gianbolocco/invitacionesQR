@@ -181,6 +181,10 @@ export type Barrio = {
   overstayHours: HorasPermanencia
   /** Días antes del vencimiento del seguro para avisar; null = no avisa. */
   insuranceWarnDays: number | null
+  /** La garita frena el auto que entra sin seguro vigente cargado. */
+  vehicleInsuranceRequired: boolean
+  /** Si está apagado, ese auto no entra ni con autorización (la persona puede entrar a pie). */
+  vehicleInsuranceOverride: boolean
   paleta: string[]
   providerWindows: Franja[]
 }
@@ -194,7 +198,7 @@ export function useBarrio() {
 export function useGuardarBarrio() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (datos: { name?: string; address: string; mapUrl: string; brandColor?: string; overstayHours?: HorasPermanencia; insuranceWarnDays?: number | null }) =>
+    mutationFn: (datos: { name?: string; address: string; mapUrl: string; brandColor?: string; overstayHours?: HorasPermanencia; insuranceWarnDays?: number | null; vehicleInsuranceRequired?: boolean; vehicleInsuranceOverride?: boolean }) =>
       api<Barrio>('/admin/neighborhood', { method: 'PATCH', body: JSON.stringify(datos) }),
     onSuccess: (b) => {
       qc.setQueryData(claves.barrio, b)

@@ -54,6 +54,8 @@ export default function BarrioPage() {
   const [alertas, setAlertas] = useState<Record<TipoAlerta, string | null>>({ visita: null, proveedor: null })
   // Mismo criterio para el seguro: null = no avisa.
   const [diasSeguro, setDiasSeguro] = useState<string | null>(null)
+  const [pideAuto, setPideAuto] = useState(false)
+  const [excepcionAuto, setExcepcionAuto] = useState(true)
   const [cargado, setCargado] = useState(false)
   const inputArchivo = useRef<HTMLInputElement>(null)
   const [arrastrandoPlano, setArrastrandoPlano] = useState(false)
@@ -73,6 +75,8 @@ export default function BarrioPage() {
     const h = barrio.data.overstayHours
     setAlertas({ visita: h.visita?.toString() ?? null, proveedor: h.proveedor?.toString() ?? null })
     setDiasSeguro(barrio.data.insuranceWarnDays?.toString() ?? null)
+    setPideAuto(barrio.data.vehicleInsuranceRequired)
+    setExcepcionAuto(barrio.data.vehicleInsuranceOverride)
   }
 
   const diasInvalidos = diasSeguro !== null && diasValidos(diasSeguro) === undefined
@@ -88,6 +92,7 @@ export default function BarrioPage() {
       name: nombre.trim(), address, mapUrl, ...(color ? { brandColor: color } : {}),
       overstayHours: { visita: horas('visita'), proveedor: horas('proveedor') },
       insuranceWarnDays: diasSeguro === null ? null : diasValidos(diasSeguro)!,
+      vehicleInsuranceRequired: pideAuto, vehicleInsuranceOverride: excepcionAuto,
     })
   }
 
@@ -210,8 +215,19 @@ export default function BarrioPage() {
               </div>
               {diasInvalidos && <p id="dias-seguro-nota" role="alert" className="text-sm text-alto">Poné entre 1 y 90 días.</p>}
             </div>
+            <div className="flex flex-col gap-2">
+              <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
+                <Switch checked={pideAuto} onCheckedChange={setPideAuto} aria-label="Pedir seguro del auto" />
+                Pedir seguro del auto
+              </label>
+              <label className={`flex min-h-11 items-center gap-3 pl-12 text-sm ${pideAuto ? '' : 'text-ink-soft'}`}>
+                <Switch checked={excepcionAuto} disabled={!pideAuto} onCheckedChange={setExcepcionAuto}
+                  aria-label="Permitir autorizar igual sin seguro del auto" />
+                Permitir autorizar igual sin seguro del auto
+              </label>
+            </div>
             <p className="text-sm text-ink-soft">
-              La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Una frecuente usa las horas de lo que es: visita o proveedor. El seguro por vencer avisa en el tablero y en la garita esos días antes del vencimiento.
+              La garita avisa cuando alguien lleva más que esto adentro sin que se registre su salida. Una frecuente usa las horas de lo que es: visita o proveedor. El seguro por vencer avisa en el tablero y en la garita esos días antes del vencimiento. Con el seguro del auto pedido, la garita frena a todo el que entra en auto sin un seguro vigente cargado; si no permitís autorizar igual, ese auto no entra (la persona puede entrar a pie).
             </p>
           </fieldset>
 
