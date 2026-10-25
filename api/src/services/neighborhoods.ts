@@ -16,6 +16,8 @@ export async function getNeighborhood(id: string) {
     proveedor: neighborhoods.overstayHoursProveedor,
     providerWindows: neighborhoods.providerWindows,
     insuranceWarnDays: neighborhoods.insuranceWarnDays,
+    vehicleInsuranceRequired: neighborhoods.vehicleInsuranceRequired,
+    vehicleInsuranceOverride: neighborhoods.vehicleInsuranceOverride,
   }).from(neighborhoods).where(eq(neighborhoods.id, id)).limit(1)
   if (!row) throw new AppError(404, 'not_found')
   const { visita, proveedor, ...barrio } = row
@@ -32,6 +34,7 @@ export async function updateNeighborhood(
     overstayHours?: { visita?: number | null; proveedor?: number | null }
     providerWindows?: Franja[]
     insuranceWarnDays?: number | null
+    vehicleInsuranceRequired?: boolean; vehicleInsuranceOverride?: boolean
   },
 ) {
   if (data.brandColor !== undefined && !esColorDeLaPaleta(data.brandColor)) {
@@ -58,6 +61,8 @@ export async function updateNeighborhood(
     ...(data.overstayHours?.visita !== undefined ? { overstayHoursVisita: data.overstayHours.visita } : {}),
     ...(data.overstayHours?.proveedor !== undefined ? { overstayHoursProveedor: data.overstayHours.proveedor } : {}),
     ...(data.insuranceWarnDays !== undefined ? { insuranceWarnDays: data.insuranceWarnDays } : {}),
+    ...(data.vehicleInsuranceRequired !== undefined ? { vehicleInsuranceRequired: data.vehicleInsuranceRequired } : {}),
+    ...(data.vehicleInsuranceOverride !== undefined ? { vehicleInsuranceOverride: data.vehicleInsuranceOverride } : {}),
     ...(data.providerWindows !== undefined ? { providerWindows: data.providerWindows } : {}),
   }).where(eq(neighborhoods.id, id))
 

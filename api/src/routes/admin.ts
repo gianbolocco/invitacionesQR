@@ -160,6 +160,8 @@ adminRoutes.patch('/neighborhood', async (req, res) => {
       proveedor: z.number().int().min(1).max(72).nullable().optional(),
     }).optional(),
     insuranceWarnDays: z.number().int().min(1).max(90).nullable().optional(),
+    vehicleInsuranceRequired: z.boolean().optional(),
+    vehicleInsuranceOverride: z.boolean().optional(),
   }).parse({ ...req.body, providerWindows: undefined })
 
   res.json(await updateNeighborhood(req.person!.neighborhoodId, req.person!.id,

@@ -230,3 +230,16 @@ describe('padrón: corregir sin registrar', () => {
     await request(app).put('/gate/vehicles/insurance').set('Cookie', vecino).send({ plate: 'AB123CD', insurance: seguro }).expect(403)
   })
 })
+
+describe('padrón: switches del barrio', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('el admin prende el pedido del seguro del auto y apaga la excepción', async () => {
+    const { admin } = await escenario()
+    const antes = await request(app).get('/admin/neighborhood').set('Cookie', admin).expect(200)
+    expect(antes.body).toMatchObject({ vehicleInsuranceRequired: false, vehicleInsuranceOverride: true })
+    const r = await request(app).patch('/admin/neighborhood').set('Cookie', admin)
+      .send({ vehicleInsuranceRequired: true, vehicleInsuranceOverride: false }).expect(200)
+    expect(r.body).toMatchObject({ vehicleInsuranceRequired: true, vehicleInsuranceOverride: false })
+  })
+})
