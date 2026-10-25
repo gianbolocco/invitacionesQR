@@ -560,7 +560,8 @@ Reemplazar desde `// NO PASA por seguro: el guardia carga la póliza…` hasta `
         ? await egresar.mutateAsync(inv.id)
         : await ingresar.mutateAsync({
           invitationId: inv.id, guestName: inv.guestName,
-          guestDoc: doc || undefined, plate: plate || undefined,
+          // plate va siempre, '' incluido: sin la clave la API usa la de la invitación, y "Viene a pie" la tiene que pisar.
+          guestDoc: doc || undefined, plate,
           insurance: mandaProv ? datos(seguro) : undefined,
           vehicleInsurance: mandaAuto ? datos(seguroAuto) : undefined,
         })
