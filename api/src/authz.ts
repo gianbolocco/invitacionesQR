@@ -16,9 +16,16 @@ export type InvitationLike = {
   insuranceExpiresOn: string | null
   /** La creó la portería (alta exprés): el guardia ya decidió horario y seguro. */
   porteria: boolean
+  /** El barrio pide el seguro del auto y vino en auto (hay patente). */
+  vehicleRequiresInsurance: boolean
+  /** Vencimiento del seguro del auto en el padrón; null = no está cargado. */
+  vehicleInsuranceExpiresOn: string | null
+  /** El barrio permite que la portería autorice un auto sin seguro. */
+  vehicleOverride: boolean
 }
 
 export type EntryReason = 'revoked' | 'not_yet' | 'expired' | 'wrong_weekday' | 'outside_hours' | 'no_capacity' | 'no_insurance' | 'insurance_expired'
+  | 'no_vehicle_insurance' | 'vehicle_insurance_expired'
 
 export type EntryCheck =
   | { ok: true }
@@ -27,7 +34,8 @@ export type EntryCheck =
 /**
  * Única pieza no trivial del sistema. Función pura: sin base, sin reloj interno.
  * El orden de los rechazos importa y está testeado: revocada gana sobre todo,
- * después la ventana, después el día, después el horario del proveedor, y al final el cupo y el seguro: el seguro es lo único que se arregla en la barrera.
+ * después la ventana, después el día, después el horario del proveedor, y al final el cupo y los seguros
+ * (primero el de la persona, después el del auto): los seguros son lo único que se arregla en la barrera.
  */
 export function canEnter(inv: InvitationLike, now: Date, usedCount: number, franjas: Franja[] = []): EntryCheck {
   if (inv.revokedAt) return { ok: false, reason: 'revoked' }
@@ -52,6 +60,13 @@ export function canEnter(inv: InvitationLike, now: Date, usedCount: number, fran
   if (inv.requiresInsurance && !inv.porteria) {
     if (!inv.insuranceComplete || !inv.insuranceExpiresOn) return { ok: false, reason: 'no_insurance' }
     if (!seguroVigente(inv.insuranceExpiresOn, now)) return { ok: false, reason: 'insurance_expired' }
+  }
+
+  // La portería saltea el auto solo si el barrio lo permite: sin el switch, el
+  // alta exprés tampoco hace entrar un auto sin seguro (la persona entra a pie).
+  if (inv.vehicleRequiresInsurance && !(inv.porteria && inv.vehicleOverride)) {
+    if (!inv.vehicleInsuranceExpiresOn) return { ok: false, reason: 'no_vehicle_insurance' }
+    if (!seguroVigente(inv.vehicleInsuranceExpiresOn, now)) return { ok: false, reason: 'vehicle_insurance_expired' }
   }
 
   return { ok: true }

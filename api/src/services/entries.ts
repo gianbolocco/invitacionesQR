@@ -67,6 +67,7 @@ function aLike<T extends {
     porteria: row.creatorRole === 'guard',
     requiresInsurance: pideSeguro(row.kind, row.frequentAs, row.requiresInsurance),
     insuranceComplete: seguroCompleto(row.insuranceCompany, row.insurancePolicy, row.insuranceExpiresOn),
+    vehicleRequiresInsurance: false, vehicleInsuranceExpiresOn: null, vehicleOverride: true,
   }
 }
 
