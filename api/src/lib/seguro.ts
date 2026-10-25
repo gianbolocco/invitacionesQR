@@ -17,15 +17,34 @@ export function seguroVigente(expiresOn: string, now: Date): boolean {
   return expiresOn >= todayInBuenosAires(now)
 }
 
+export type ClaveSeguro = 'no_aplica' | 'sin_cargar' | 'vencido' | 'por_vencer' | 'vigente'
+
+/**
+ * El estado de un seguro, para el proveedor y para el auto. Es lo que se
+ * congela en entry_log al ingresar: el padrón cambia, la auditoría no.
+ */
+export function claveSeguro(pide: boolean, s: Seguro | null, warnDays: number | null, now: Date = new Date()): ClaveSeguro {
+  if (!pide) return 'no_aplica'
+  if (!s) return 'sin_cargar'
+  if (!seguroVigente(s.expiresOn, now)) return 'vencido'
+  const dias = (Date.parse(s.expiresOn) - Date.parse(todayInBuenosAires(now))) / 86_400_000
+  return warnDays && dias <= warnDays ? 'por_vencer' : 'vigente'
+}
+
+const ETIQUETA_SEGURO: Record<ClaveSeguro, 'No aplica' | 'Sin cargar' | 'Vencido' | 'Por vencer' | 'Vigente'> = {
+  no_aplica: 'No aplica', sin_cargar: 'Sin cargar', vencido: 'Vencido', por_vencer: 'Por vencer', vigente: 'Vigente',
+}
+
 /** Lo que se lee en una planilla. Mismas reglas que estadoSeguro del front. */
 export function estadoSeguro(
   r: { requiresInsurance: boolean; company: string | null; policy: string | null; expiresOn: string | null },
   warnDays: number | null,
   now: Date = new Date(),
-): 'No aplica' | 'Sin cargar' | 'Vencido' | 'Por vencer' | 'Vigente' {
-  if (!r.requiresInsurance) return 'No aplica'
-  if (!seguroCompleto(r.company, r.policy, r.expiresOn)) return 'Sin cargar'
-  if (!seguroVigente(r.expiresOn!, now)) return 'Vencido'
-  const dias = (Date.parse(r.expiresOn!) - Date.parse(todayInBuenosAires(now))) / 86_400_000
-  return warnDays && dias <= warnDays ? 'Por vencer' : 'Vigente'
+) {
+  const s = seguroCompleto(r.company, r.policy, r.expiresOn)
+    ? { company: r.company!, policy: r.policy!, expiresOn: r.expiresOn! } : null
+  return ETIQUETA_SEGURO[claveSeguro(r.requiresInsurance, s, warnDays, now)]
 }
+
+/** Etiqueta de una clave congelada en entry_log; null (filas viejas o carga manual) es '—'. */
+export const etiquetaClave = (c: string | null) => (c ? ETIQUETA_SEGURO[c as ClaveSeguro] : '—')
