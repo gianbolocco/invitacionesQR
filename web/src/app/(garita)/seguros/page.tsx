@@ -45,14 +45,23 @@ function Tag({ e, vence }: { e: EstadoListado; vence: string | null }) {
 export default function SegurosPage({ searchParams }: { searchParams: Promise<{ tab?: string; estado?: string }> }) {
   const sp = use(searchParams)
   const me = useMe()
-  const [tab, setTab] = useState<Tab>(sp.tab === 'proveedores' ? 'proveedores' : 'autos')
-  const [estado, setEstado] = useState<Estado>(ESTADOS.find((e) => e === sp.estado) ?? 'todos')
+  const estadoUrl = ESTADOS.find((e) => e === sp.estado)
+  // "Sin cargar" solo existe en proveedores: un auto sin seguro no está en el padrón.
+  const [tab, setTab] = useState<Tab>(sp.tab === 'proveedores' || estadoUrl === 'sin_cargar' ? 'proveedores' : 'autos')
+  const [estado, setEstado] = useState<Estado>(estadoUrl ?? 'todos')
   const [texto, setTexto] = useState('')
   const q = useDemora(texto)
-  // Un auto no tiene "sin cargar": sin seguro no está en el padrón.
-  const filtro = { estado: tab === 'autos' && estado === 'sin_cargar' ? 'todos' as const : estado, q }
-  const autos = useSegurosAutos(filtro)
-  const provs = useSegurosProveedores(filtro)
+  const filtro = { estado, q }
+  const autos = useSegurosAutos(filtro, Boolean(me))
+  const provs = useSegurosProveedores(filtro, Boolean(me))
+  // Desde el tablero ("vencidos") puede que solo haya proveedores: si la pestaña
+  // de autos viene vacía y la otra no, se abre la otra una vez.
+  const [ajustado, setAjustado] = useState(false)
+  if (!ajustado && estadoUrl && !sp.tab && autos.data && provs.data) {
+    setAjustado(true)
+    const deAutos = (autos.data.counts as Partial<Record<EstadoListado, number>>)[estadoUrl] ?? 0
+    if (tab === 'autos' && deAutos === 0 && (provs.data.counts[estadoUrl] ?? 0) > 0) setTab('proveedores')
+  }
   const consulta = tab === 'autos' ? autos : provs
   const corregir = useCorregirSeguro()
   const [editando, setEditando] = useState<{ titulo: string; base: Destino } | null>(null)
@@ -79,12 +88,14 @@ export default function SegurosPage({ searchParams }: { searchParams: Promise<{ 
   const filas = consulta.data?.rows ?? []
   return (
     <Chrome>
-      <div className="mx-auto flex max-w-[1440px] flex-col gap-5 px-4 py-6 md:px-6 xl:px-8">
+      <div className="flex flex-col gap-5">
         <EncabezadoPagina titulo="Seguros" acciones={
           <a href={`${apiBase}/insurance/${tab === 'autos' ? 'vehicles' : 'providers'}.xlsx?${paramsSeguros(filtro)}`}
             className={buttonVariants({ variant: 'outline' })}><Download aria-hidden />Exportar a Excel</a>} />
 
-        <Chips etiqueta="Qué seguros" valor={tab} onCambio={(t) => { setTab(t); setEstado('todos') }}
+        {/* El filtro de estado se conserva al cambiar de pestaña, salvo "sin cargar", que los autos no tienen. */}
+        <Chips etiqueta="Qué seguros" valor={tab}
+          onCambio={(t) => { setTab(t); if (t === 'autos' && estado === 'sin_cargar') setEstado('todos') }}
           opciones={[
             { valor: 'autos', etiqueta: 'Vehículos', contador: autos.data ? total(autos.data.counts) : undefined },
             { valor: 'proveedores', etiqueta: 'Proveedores', contador: provs.data ? total(provs.data.counts) : undefined },
@@ -171,7 +182,8 @@ function TablaAutos({ filas, onCorregir }: { filas: FilaVehiculo[]; onCorregir?:
         ))}</tbody>
       </table>
       <ul className="md:hidden">{filas.map((r) => (
-        <li key={r.id}><Fila densa titulo={r.plate} meta={`${r.company} · vence ${fechaCompleta(r.expiresOn)}`}
+        <li key={r.id}><Fila densa titulo={r.plate}
+          meta={`${r.company} · vence ${fechaCompleta(r.expiresOn)}${r.ultimoIngreso?.sinSeguro ? ' · autorizado sin seguro' : ''}`}
           extremo={<Tag e={r.estado} vence={r.expiresOn} />} onClick={onCorregir ? () => onCorregir(r) : undefined} /></li>
       ))}</ul>
     </>
@@ -203,7 +215,7 @@ function TablaProveedores({ filas, onCorregir }: { filas: FilaProveedor[]; onCor
       </table>
       <ul className="md:hidden">{filas.map((r) => (
         <li key={r.id}><Fila densa titulo={r.name}
-          meta={[r.tradeName, r.expiresOn && `vence ${fechaCompleta(r.expiresOn)}`].filter(Boolean).join(' · ')}
+          meta={[r.tradeName, r.expiresOn && `vence ${fechaCompleta(r.expiresOn)}`, r.ultimoIngreso?.sinSeguro && 'autorizado sin seguro'].filter(Boolean).join(' · ')}
           extremo={<Tag e={r.estado} vence={r.expiresOn} />} onClick={onCorregir ? () => onCorregir(r) : undefined} /></li>
       ))}</ul>
     </>

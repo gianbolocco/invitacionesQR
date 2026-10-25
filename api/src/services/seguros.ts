@@ -27,10 +27,16 @@ const HOY = sql`(select (now() at time zone ${TZ})::date as d) hoy`
 const SIN_SEGURO = (foto: 'provider_insurance' | 'vehicle_insurance') =>
   sql.raw(`(p_inv.role = 'guard' and e.${foto} in ('sin_cargar','vencido'))`)
 
+/** % y _ son comodines de LIKE: se escapan, igual que en la auditoría. */
+const comoTexto = (s: string) => `%${s.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+
 // ponytail: filtro de estado en memoria; con miles de autos, pasarlo al WHERE y contar con un count(*) filter aparte.
+// ponytail: el último ingreso y los lotes se buscan con regexp sobre entry_log/invitation sin índice (un scan por fila
+// del padrón). Con un año de ingresos va a pesar: índice de expresión sobre la patente y el DNI normalizados.
 export async function listarVehiculos(neighborhoodId: string, f: FiltroSeguros) {
-  const q = f.q?.trim() ? `%${normalizarPatente(f.q)}%` : null
-  const qTexto = f.q?.trim() ? `%${f.q.trim()}%` : null
+  const patente = f.q ? normalizarPatente(f.q) : ''
+  const q = patente ? `%${patente}%` : null
+  const qTexto = f.q?.trim() ? comoTexto(f.q.trim()) : null
   const { rows } = await db.execute(sql`
     select v.id, v.plate, v.insurance_company as company, v.insurance_policy as policy,
            v.insurance_expires_on::text as "expiresOn", ${ESTADO('v.insurance_expires_on')} as estado,
@@ -52,7 +58,7 @@ export async function listarVehiculos(neighborhoodId: string, f: FiltroSeguros) 
       order by e.entered_at desc limit 1
     ) ult on true
     where v.neighborhood_id = ${neighborhoodId}
-      and (${q}::text is null or v.plate like ${q}::text
+      and (${qTexto}::text is null or v.plate like ${q}::text
         or v.insurance_company ilike ${qTexto}::text or v.insurance_policy ilike ${qTexto}::text)
     order by v.insurance_expires_on asc, v.plate
   `)
@@ -63,7 +69,7 @@ export async function listarVehiculos(neighborhoodId: string, f: FiltroSeguros) 
 }
 
 export async function listarProveedores(neighborhoodId: string, f: FiltroSeguros) {
-  const qTexto = f.q?.trim() ? `%${f.q.trim()}%` : null
+  const qTexto = f.q?.trim() ? comoTexto(f.q.trim()) : null
   const digitos = f.q?.replace(/\D/g, '') ?? ''
   const qDoc = digitos ? `%${digitos}%` : null
   const { rows } = await db.execute(sql`

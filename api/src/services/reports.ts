@@ -24,7 +24,7 @@ export type Kpis = {
   invitedNeverLoggedIn: number
   /** Autos y proveedores del padrón con el seguro vencido que entraron en el último mes. */
   segurosVencidos: number
-  /** Seguros que vencen en los días de aviso del barrio (15 si no fijó ninguno). */
+  /** Seguros que vencen dentro de los días de aviso del barrio; 0 si no fijó ninguno. */
   segurosPorVencer: number
   /** Ingresos de los últimos 7 días por un alta exprés con algún seguro faltante. */
   autorizadosSinSeguro: number
@@ -82,12 +82,13 @@ export async function dashboardKpis(neighborhoodId: string): Promise<Kpis> {
              where u.neighborhood_id = p.neighborhood_id and e.entered_at > now() - interval '30 days'
                and upper(regexp_replace(coalesce(e.guest_doc, ''), '[^0-9A-Za-z]', '', 'g')) = p.doc)))::int
         as "segurosVencidos",
+      -- Misma regla que el listado (y que claveSeguro): sin días de aviso no hay "por vencer".
       ((select count(*) from vehicle v, local, neighborhood n
-         where v.neighborhood_id = ${neighborhoodId} and n.id = v.neighborhood_id
-           and v.insurance_expires_on between local.today and local.today + coalesce(n.insurance_warn_days, 15))
+         where v.neighborhood_id = ${neighborhoodId} and n.id = v.neighborhood_id and n.insurance_warn_days is not null
+           and v.insurance_expires_on between local.today and local.today + n.insurance_warn_days)
        + (select count(*) from provider p, local, neighborhood n
-         where p.neighborhood_id = ${neighborhoodId} and n.id = p.neighborhood_id
-           and p.insurance_expires_on between local.today and local.today + coalesce(n.insurance_warn_days, 15)))::int
+         where p.neighborhood_id = ${neighborhoodId} and n.id = p.neighborhood_id and n.insurance_warn_days is not null
+           and p.insurance_expires_on between local.today and local.today + n.insurance_warn_days))::int
         as "segurosPorVencer",
       (select count(*) from entry_log e
          join unit u on u.id = e.unit_id

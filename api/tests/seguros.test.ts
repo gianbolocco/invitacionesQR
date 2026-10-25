@@ -49,6 +49,9 @@ describe('seguros: listado de autos', () => {
     expect(f.body.counts.vigente).toBe(1) // los conteos no miran el filtro de estado
     const b = await request(app).get('/insurance/vehicles?q=ccc 333').set('Cookie', admin).expect(200)
     expect(b.body.rows.map((x: { plate: string }) => x.plate)).toEqual(['CCC333'])
+    // Un % no es un comodín: no trae todo.
+    const c = await request(app).get('/insurance/vehicles?q=%25').set('Cookie', admin).expect(200)
+    expect(c.body.rows).toHaveLength(0)
   })
 
   it('vence hoy vale (por vencer), venció ayer no; sin días de aviso nunca es por vencer', async () => {
@@ -79,11 +82,17 @@ describe('seguros: listado de autos', () => {
     await request(app).get('/insurance/vehicles').set('Cookie', vecino).expect(403)
   })
 
-  it('el admin no puede corregir, el guardia sí', async () => {
-    const { admin, guardia } = await escenario()
+  it('el admin no puede corregir ni cargar un seguro al registrar, el guardia sí', async () => {
+    const { u, v, admin, guardia } = await escenario()
     const seguro = { company: 'X', policy: 'Y', expiresOn: '2999-01-01' }
     await request(app).put('/gate/vehicles/insurance').set('Cookie', admin).send({ plate: 'AB123CD', insurance: seguro }).expect(403)
+    await request(app).put('/gate/providers/insurance').set('Cookie', admin).send({ doc: '1', name: 'P', insurance: seguro }).expect(403)
     await request(app).put('/gate/vehicles/insurance').set('Cookie', guardia).send({ plate: 'AB123CD', insurance: seguro }).expect(200)
+    const [inv] = await db.insert(invitations).values({
+      unitId: u.id, createdBy: v.id, kind: 'visita', guestName: 'X', validFrom: hoy, validTo: hoy, token: 'z1',
+    }).returning()
+    await request(app).post('/gate/entries').set('Cookie', admin)
+      .send({ invitationId: inv.id, guestName: 'X', guestDoc: '1', plate: 'ZZ1', vehicleInsurance: seguro }).expect(403)
   })
 
   it('exporta el Excel', async () => {
@@ -108,6 +117,22 @@ describe('seguros: tablero', () => {
     await db.insert(entryLogs).values({ invitationId: inv.id, unitId: u.id, guardId: g.id, guestName: 'X', plate: 'VENC1', vehicleInsurance: 'vencido' })
     const r = await request(app).get('/reports/kpis').set('Cookie', admin).expect(200)
     expect(r.body).toMatchObject({ segurosVencidos: 1, segurosPorVencer: 1, autorizadosSinSeguro: 1 })
+  })
+
+  it('cuenta proveedores vencidos que entraron, y sin días de aviso no hay por vencer', async () => {
+    const { n, u, g, auto, admin } = await escenario()
+    await auto('PORV1', sumarDias(hoy, 10))
+    await db.insert(providers).values({
+      neighborhoodId: n.id, doc: '9', name: 'P', insuranceCompany: 'X', insurancePolicy: 'Y',
+      insuranceExpiresOn: sumarDias(hoy, -2), insuranceSource: 'link',
+    })
+    const [inv] = await db.insert(invitations).values({
+      unitId: u.id, createdBy: g.id, kind: 'visita', guestName: 'P', validFrom: hoy, validTo: hoy, token: 'k2',
+    }).returning()
+    await db.insert(entryLogs).values({ invitationId: inv.id, unitId: u.id, guardId: g.id, guestName: 'P', guestDoc: '9' })
+    await db.update(neighborhoods).set({ insuranceWarnDays: null }).where(eq(neighborhoods.id, n.id))
+    const r = await request(app).get('/reports/kpis').set('Cookie', admin).expect(200)
+    expect(r.body).toMatchObject({ segurosVencidos: 1, segurosPorVencer: 0 })
   })
 })
 

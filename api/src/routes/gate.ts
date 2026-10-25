@@ -21,6 +21,7 @@ import { normalizarPatente } from '../lib/padron.js'
 import { guardarProveedor, guardarVehiculo } from '../services/padron.js'
 import { db } from '../db/index.js'
 import { zSeguro } from './invitations.js'
+import { AppError } from '../lib/errors.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
@@ -95,6 +96,8 @@ gateRoutes.post('/entries', async (req, res) => {
   }).refine((b) => !b.vehicleInsurance || normalizarPatente(b.plate ?? '') !== '', {
     message: 'El seguro del auto va con su patente', path: ['plate'],
   }).parse(req.body)
+  // Como en los PUT de corrección: el admin registra ingresos pero no carga seguros.
+  if ((body.insurance || body.vehicleInsurance) && req.person!.role !== 'guard') throw new AppError(403, 'forbidden')
 
   // El guardia sale de la sesión, no del body: un dato de auditoría no puede
   // depender de lo que mande el cliente ni de que alguien elija bien.
@@ -239,12 +242,14 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
   const f = auditFilters.parse(req.query)
   const nid = req.person!.neighborhoodId
 
-  const [auditoria, ingresos, barrio, unidades] = await Promise.all([
+  const [auditoria, todosLosIngresos, barrio, unidades] = await Promise.all([
     auditAll(nid, f),
     entriesLog(nid, { from: f.from, to: f.to, unitId: f.unitId }),
     getNeighborhood(nid),
     listUnits(nid),
   ])
+  // Con "solo autorizados sin seguro", la hoja de ingresos trae solo esos: la portada lo dice.
+  const ingresos = f.sinSeguro ? todosLosIngresos.filter((e) => e.autorizadoSinSeguro) : todosLosIngresos
 
   const porEstado = (s: string) => auditoria.filter((r) => r.status === s).length
   const ahora = new Intl.DateTimeFormat('es-AR', {

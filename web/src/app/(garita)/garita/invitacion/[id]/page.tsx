@@ -1,5 +1,6 @@
 'use client'
 import { use, useCallback, useEffect, useRef, useState } from 'react'
+import { useSesion } from '@/lib/sesion-contexto'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'motion/react'
@@ -101,6 +102,7 @@ function AccionesRegistrado({ onListo, onDeshacer, deshaciendo }: {
 export default function VeredictoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const cargaGuardia = useSesion().role === 'guard'
   const q = useVeredicto(id)
   const ingresar = useRegistrarIngreso()
   const egresar = useRegistrarEgreso()
@@ -298,14 +300,16 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   // Campos abiertos: lo que falta o venció, y lo que el guardia está corrigiendo.
   // Con alguien adentro (egreso), ya registrado o rechazado por otra cosa (horario,
   // vencida), nada se abre: no habría con qué guardarlo.
-  const activo = !hecho && !esEgreso && (check.ok || rechazoPorSeguro(check))
+  // El admin también abre el veredicto, pero los seguros los carga solo el guardia
+  // (la API rechaza al admin): para él no hay campos ni "Corregir".
+  const activo = cargaGuardia && !hecho && !esEgreso && (check.ok || rechazoPorSeguro(check))
   const abiertoProv = activo && (falta(estadoProv) || corrigiendo.proveedor)
   const abiertoAuto = activo && (falta(estadoAuto) || corrigiendo.auto)
   const completoProv = estadoSeguroCargado(seguro) === 'completo'
   const completoAuto = estadoSeguroCargado(seguroAuto) === 'completo'
 
   // NO PASA por seguro: el guardia carga lo que falta y el ingreso se registra en el mismo paso.
-  const cargaSeguro = !ok && rechazoPorSeguro(check)
+  const cargaSeguro = cargaGuardia && !ok && rechazoPorSeguro(check)
   // Completo es obligatorio en la sección que causa el rechazo, y en el auto si también
   // le falta: canEnter frena en el primer motivo, y la API rechazaría el ingreso por el
   // segundo. Con check.ok (p. ej. un alta exprés, que no controla seguros) es opcional:
