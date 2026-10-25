@@ -46,9 +46,9 @@ export function ChromeAdmin({ children }: { children: React.ReactNode }) {
       <header className={HEADER}>
         <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-6 px-4 md:px-6 xl:px-8">
           <Link href="/admin" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
+            {/* Sin "· Administración" al lado: con seis pestañas y un logo ancho se
+                pisaba con "Tablero", y la página ya lo dice arriba del título. */}
             <Marca conPazzit sobreColor />
-            {/* Con seis pestañas no entra al lado hasta 2xl: se pisaba con "Tablero". */}
-            <span className="hidden shrink-0 font-semibold text-white/80 2xl:inline">· Administración</span>
           </Link>
 
           {/* Seis pestañas no entran en una tablet: hasta 1024px sigue la barra de abajo. */}
