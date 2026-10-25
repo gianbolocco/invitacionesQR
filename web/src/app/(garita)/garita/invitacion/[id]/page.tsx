@@ -376,7 +376,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           derecha, para el guardia sentado. Solo cambia la grilla. */}
       <div className="mx-auto grid min-h-[calc(100dvh-3rem)] w-full max-w-2xl grid-rows-[auto_1fr] gap-8 sm:min-h-[calc(100dvh-5rem)] lg:max-w-7xl lg:grid-cols-[3fr_2fr] lg:grid-rows-1 lg:items-center lg:gap-16">
         <section className="min-w-0">
-          <motion.h1 initial={{ opacity: 0, scale: 1.12 }} animate={{ opacity: 1, scale: 1 }}
+          {/* Mientras se recalcula, la palabra es la de la patente o el DNI anterior: se atenúa. */}
+          <motion.h1 initial={{ opacity: 0, scale: 1.12 }} animate={{ opacity: alDia ? 1 : 0.5, scale: 1 }}
             transition={{ duration: 0.26, ease: [0.2, 0.9, 0.3, 1] }}
             className="font-display origin-left text-6xl font-extrabold leading-[0.9] tracking-[-0.035em] sm:text-8xl lg:text-9xl xl:text-[10rem]">
             {palabra}

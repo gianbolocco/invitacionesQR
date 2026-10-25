@@ -120,6 +120,8 @@ export function useVeredictoEnVivo(id: string, datos: { doc: string; plate: stri
     queryFn: ({ signal }) => veredictoCon(id, datos!, signal),
     enabled: datos !== null,
     placeholderData: keepPreviousData,
+    // Un reintento y no tres: con la red caída, "No se pudo recalcular" tiene que aparecer enseguida.
+    retry: 1,
   })
 }
 

@@ -138,7 +138,7 @@ function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSegu
                 </p>
               )}
               {estadoSeguro === 'vencido' && <p className="text-sm font-semibold text-alto">Tu seguro está vencido. Cargá el nuevo.</p>}
-              <CamposSeguro idBase="seguro" valor={seguro} onCambio={(v) => { setSeguro(v); setErrorSeguro(false) }}
+              <CamposSeguro idBase="seguro" min={hoyISO()} valor={seguro} onCambio={(v) => { setSeguro(v); setErrorSeguro(false) }}
                 errores={errorSeguro ? erroresSeguro(seguro) : undefined} />
             </>
           )}
