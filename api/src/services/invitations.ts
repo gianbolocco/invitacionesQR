@@ -441,6 +441,7 @@ export async function findPublicByToken(token: string) {
     insuranceState,
     // El vencimiento sí ("tu seguro vence el 12/03"): compañía y póliza nunca.
     insuranceExpiresOn: s?.expiresOn ?? null,
+    insuranceVerified: seguroVerificado(proveedor),
     franjas: franjasDelRubro(row.providerWindows, row.kind, row.frequentAs, row.tradeId),
     validFrom: row.validFrom,
     validTo: row.validTo,
@@ -454,6 +455,10 @@ export async function findPublicByToken(token: string) {
     hasPlate: Boolean(row.plate),
     frozen: (await entriesOf(row.id)) > 0,
   }
+}
+
+function seguroVerificado(p: Awaited<ReturnType<typeof buscarProveedor>>): boolean {
+  return p?.insuranceSource === 'garita' && !!p.insurance && seguroVigente(p.insurance.expiresOn, new Date())
 }
 
 async function entriesOf(invitationId: string): Promise<number> {
@@ -497,6 +502,10 @@ export async function fillGuestDetails(
   // Vale el de la invitación; si no tenía, el que manda el proveedor ahora.
   const doc = inv.guestDoc ?? patch.guestDoc
   if (data.insurance && !doc) throw new AppError(400, 'doc_required')
+
+  // Lo que verificó la guardia (con la póliza a la vista) no lo pisa un link que
+  // tiene cualquiera; recién cuando vence el link puede cargar uno nuevo.
+  if (data.insurance && seguroVerificado(await buscarProveedor(nid, doc!))) throw new AppError(409, 'seguro_verificado')
 
   await db.transaction(async (tx) => {
     if (Object.keys(patch).length) await tx.update(invitations).set(patch).where(eq(invitations.id, inv.id))

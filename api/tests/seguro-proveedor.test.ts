@@ -135,6 +135,34 @@ describe('seguro del proveedor: carga en la invitación', () => {
     expect(r.body.error).toBe('seguro_vencido')
   })
 
+  it('el link no pisa un seguro vigente que verificó la guardia', async () => {
+    const { invitar, rubro } = await escenario()
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true), guestDoc: '30111222' }).expect(201)
+    await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(200)
+    await db.update(providers).set({ insuranceSource: 'garita' })
+
+    const r = await request(app).patch(`/invitations/public/${inv.token}`)
+      .send({ insurance: { ...seguro, policy: 'OTRA-9' } }).expect(409)
+    expect(r.body.error).toBe('seguro_verificado')
+    const [p] = await db.select().from(providers)
+    expect(p).toMatchObject({ insurancePolicy: 'AP-123', insuranceSource: 'garita' })
+    const g = await request(app).get(`/invitations/public/${inv.token}`).expect(200)
+    expect(g.body.insuranceVerified).toBe(true)
+    expect(JSON.stringify(g.body)).not.toMatch(/La Segunda|AP-123/)
+  })
+
+  it('si el seguro de la guardia venció, el link lo puede reemplazar', async () => {
+    const { invitar, rubro } = await escenario()
+    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true), guestDoc: '30111222' }).expect(201)
+    await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(200)
+    await db.update(providers).set({ insuranceSource: 'garita', insuranceExpiresOn: '2000-01-01' })
+    expect((await request(app).get(`/invitations/public/${inv.token}`).expect(200)).body.insuranceVerified).toBe(false)
+
+    await request(app).patch(`/invitations/public/${inv.token}`).send({ insurance: seguro }).expect(200)
+    const [p] = await db.select().from(providers)
+    expect(p).toMatchObject({ insuranceSource: 'link', insuranceExpiresOn: '2999-01-01' })
+  })
+
   it('el link público con seguro en una visita da seguro_no_aplica', async () => {
     const { invitar } = await escenario()
     const { body: inv } = await invitar({ kind: 'visita' }).expect(201)
