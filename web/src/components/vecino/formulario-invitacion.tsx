@@ -9,7 +9,6 @@ import { Chips, ChipsMultiples } from '@/components/dominio/chips'
 import { CampoFecha } from '@/components/dominio/campo-fecha'
 import { Nota } from '@/components/dominio/nota'
 import { HorarioRubro } from '@/components/dominio/horario-rubro'
-import { CamposSeguro, erroresSeguro, estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
 import { DIAS, KIND_LABEL, type Invitation } from '@/lib/invitations'
 import { fechaCorta, hoyISO, unMesDespues } from '@/lib/fechas'
 import { ApiError } from '@/lib/api'
@@ -26,7 +25,7 @@ const AYUDA_TIPO: Record<Kind, string> = {
 
 export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   units: { id: string; label: string }[]
-  inicial?: Partial<{ kind: Kind; guestName: string; guestDoc: string; plate: string; seguro: ValorSeguro }>
+  inicial?: Partial<{ kind: Kind; guestName: string; guestDoc: string; plate: string }>
   invitacion?: Invitation
   onListo: (inv: Invitation) => void
 }) {
@@ -48,10 +47,6 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   const [validTo, setValidTo] = useState(invitacion?.validTo ?? unMesDespues(hoy))
   const [dias, setDias] = useState<string[]>((invitacion?.weekdays ?? []).map(String))
   const [rubro, setRubro] = useState(invitacion?.tradeId ?? '')
-  const [seguro, setSeguro] = useState<ValorSeguro>(
-    invitacion?.insuranceExpiresOn
-      ? { company: invitacion.insuranceCompany ?? '', policy: invitacion.insurancePolicy ?? '', expiresOn: invitacion.insuranceExpiresOn }
-      : inicial?.seguro ?? { company: '', policy: '', expiresOn: '' })
   const [tocado, setTocado] = useState<Record<string, boolean>>({})
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null)
 
@@ -76,7 +71,6 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
   const errores = {
     guestName: guestName.trim() ? null : 'Escribí el nombre de quien viene.',
     rubro: pideRubro && !rubro ? 'Elegí el rubro.' : null,
-    seguro: pideSeguro && estadoSeguroCargado(seguro) === 'parcial' ? 'Completá los tres datos del seguro o dejalos vacíos.' : null,
     validFrom: !editando && validFrom < hoy ? 'No se puede invitar para un día que ya pasó.' : null,
     validTo: frecuente && validTo < validFrom ? 'La fecha de fin tiene que ser igual o posterior al inicio.'
       : tope && validTo > tope ? `Una visita frecuente dura hasta un mes: elegí hasta el ${fechaCorta(tope)}.`
@@ -87,7 +81,7 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    setTocado({ guestName: true, rubro: true, seguro: true, validFrom: true, validTo: true })
+    setTocado({ guestName: true, rubro: true, validFrom: true, validTo: true })
     if (Object.values(errores).some(Boolean)) return
     setErrorGeneral(null)
 
@@ -106,10 +100,6 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       // Si el rubro no cambió no se manda (puede estar archivado); si ya no es proveedor, se limpia.
       ...(pideRubro ? (rubro !== (invitacion?.tradeId ?? '') ? { tradeId: rubro } : {})
         : listaRubros.length ? { tradeId: null } : {}),
-      // Completo se manda; vaciado editando borra; nunca tocado, nada.
-      ...(pideSeguro ? (estadoSeguroCargado(seguro) === 'completo'
-        ? { insurance: { company: seguro.company.trim(), policy: seguro.policy.trim(), expiresOn: seguro.expiresOn } }
-        : invitacion?.insuranceExpiresOn ? { insurance: null } : {}) : {}),
     }
 
     try {
@@ -124,10 +114,6 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       }
       if (e instanceof ApiError && e.code === 'rubro_requerido') {
         setErrorGeneral('Elegí el rubro.')
-        return
-      }
-      if (e instanceof ApiError && e.code === 'seguro_no_aplica') {
-        setErrorGeneral('Este rubro no pide seguro.')
         return
       }
       if (e instanceof ApiError && e.code === 'rubro_invalido') {
@@ -145,7 +131,6 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       <Campo id="rubro" etiqueta="Rubro" error={mostrar('rubro')}>
         <Select value={rubro} onValueChange={(v) => {
           setRubro(v); tocar('rubro')
-          if (!listaRubros.find((t) => t.id === v)?.requiresInsurance) setSeguro({ company: '', policy: '', expiresOn: '' })
         }}>
           <SelectTrigger id="rubro" className="h-11! w-full" aria-invalid={Boolean(mostrar('rubro')) || undefined}>
             <SelectValue placeholder="Elegí el rubro" />
@@ -160,16 +145,9 @@ export function FormularioInvitacion({ units, inicial, invitacion, onListo }: {
       </Campo>
       <HorarioRubro titulo="Puede entrar" franjas={franjasRubro} />
       {pideSeguro && (
-        <section className="flex flex-col gap-4 rounded-md bg-surface-sunk/70 p-4 sm:p-5">
-          <div>
-            <p className="font-semibold">Seguro (opcional)</p>
-            <p className="text-sm text-ink-soft">
-              El rubro {nombreRubro} necesita seguro para entrar. Si no lo tenés, lo puede cargar el proveedor desde su link.
-            </p>
-          </div>
-          <CamposSeguro idBase="seguro" valor={seguro} onCambio={setSeguro} onBlur={() => tocar('seguro')}
-            errores={tocado.seguro ? erroresSeguro(seguro) : undefined} />
-        </section>
+        <p role="status" className="rounded-md bg-surface-sunk/70 p-3 text-sm text-ink-soft">
+          El rubro {nombreRubro} necesita seguro para entrar. Lo carga él desde su link o la guardia en la entrada.
+        </p>
       )}
       {choques.length > 0 && (
         <p role="status" className="rounded-md bg-espera-tint p-3 text-sm font-semibold text-espera">

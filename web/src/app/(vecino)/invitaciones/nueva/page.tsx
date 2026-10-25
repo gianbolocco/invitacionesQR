@@ -13,7 +13,7 @@ import { FormularioInvitacion } from '@/components/vecino/formulario-invitacion'
 const KINDS: Invitation['kind'][] = ['visita', 'frecuente', 'proveedor']
 
 export default function NuevaInvitacion({ searchParams }: {
-  searchParams: Promise<{ kind?: string; guestName?: string; guestDoc?: string; plate?: string; insCompany?: string; insPolicy?: string; insExpires?: string }>
+  searchParams: Promise<{ kind?: string; guestName?: string; guestDoc?: string; plate?: string }>
 }) {
   const sp = use(searchParams)
   const me = useSesion()
@@ -25,8 +25,6 @@ export default function NuevaInvitacion({ searchParams }: {
     guestName: sp.guestName,
     guestDoc: sp.guestDoc,
     plate: sp.plate,
-    seguro: sp.insCompany && sp.insPolicy && sp.insExpires
-      ? { company: sp.insCompany, policy: sp.insPolicy, expiresOn: sp.insExpires } : undefined,
   }
 
   return (

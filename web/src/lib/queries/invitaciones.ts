@@ -28,8 +28,6 @@ export type DatosInvitacion = {
   capacity: number
   /** Solo proveedores; null = sin rubro. Si no se manda, no cambia. */
   tradeId?: string | null
-  /** null = borrar el seguro; si no se manda, no cambia. */
-  insurance?: { company: string; policy: string; expiresOn: string } | null
 }
 
 type PaginaHistorial = { rows: Invitation[]; total: number; page: number; pageSize: number }
