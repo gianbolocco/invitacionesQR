@@ -29,7 +29,7 @@ export default function ContactosPage() {
   const cuenta = (t: Tipo) => filtrarContactos(todos, '', t).length
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-24 sm:pb-0">
       <EncabezadoPagina titulo="Contactos"
         acciones={<Button size="lg" className="hidden sm:inline-flex" onClick={() => setHoja(null)}><Plus aria-hidden />Agregar contacto</Button>} />
 
@@ -57,7 +57,7 @@ export default function ContactosPage() {
               </li>
             ))}
           </ul>
-          {lista.length === 0 && <p className="text-sm text-ink-soft">Nadie coincide con “{busca}”.</p>}
+          {lista.length === 0 && <p className="text-sm text-ink-soft">{busca.trim() ? `Nadie coincide con “${busca.trim()}”.` : 'No hay contactos de este tipo.'}</p>}
         </>
       )}
 

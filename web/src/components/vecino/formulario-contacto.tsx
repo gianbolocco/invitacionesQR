@@ -11,6 +11,8 @@ import { useRubrosDelBarrio } from '@/lib/queries/invitaciones'
 import { useBorrarContacto, useCrearContacto, useEditarContacto } from '@/lib/queries/contactos'
 import type { Contacto } from '@/lib/contactos'
 
+const SIN_RUBRO = '__sin_rubro__'
+
 /** Alta o edición de un contacto. Una visita es nombre y DNI; un proveedor suma el rubro. */
 export function FormularioContacto({ contacto, onListo }: { contacto?: Contacto; onListo: () => void }) {
   const [kind, setKind] = useState<Contacto['kind']>(contacto?.kind ?? 'visita')
@@ -32,8 +34,11 @@ export function FormularioContacto({ contacto, onListo }: { contacto?: Contacto;
     setIntento(true)
     if (!name.trim()) return
     const datos = { name: name.trim(), doc: doc.trim() || null, tradeId: kind === 'proveedor' && rubro ? rubro : null }
-    if (contacto) await editar.mutateAsync({ id: contacto.id, ...datos })
-    else await crear.mutateAsync({ kind, ...datos })
+    // El toast del error ya sale de la mutación: acá solo se evita cerrar la hoja.
+    try {
+      if (contacto) await editar.mutateAsync({ id: contacto.id, ...datos })
+      else await crear.mutateAsync({ kind, ...datos })
+    } catch { return }
     onListo()
   }
 
@@ -55,9 +60,9 @@ export function FormularioContacto({ contacto, onListo }: { contacto?: Contacto;
       </Campo>
       {kind === 'proveedor' && lista.length > 0 && (
         <Campo id="rubro-contacto" etiqueta="Rubro (opcional)">
-          <Select value={rubro} onValueChange={setRubro}>
+          <Select value={rubro || SIN_RUBRO} onValueChange={(v) => setRubro(v === SIN_RUBRO ? '' : v)}>
             <SelectTrigger id="rubro-contacto" className="h-11! w-full"><SelectValue placeholder="Elegí el rubro" /></SelectTrigger>
-            <SelectContent>{lista.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+            <SelectContent><SelectItem value={SIN_RUBRO}>Sin rubro</SelectItem>{lista.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
           </Select>
         </Campo>
       )}
@@ -77,7 +82,7 @@ export function FormularioContacto({ contacto, onListo }: { contacto?: Contacto;
             <DialogDescription>Sale de los contactos de tu casa. Las invitaciones que ya le hiciste quedan.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setBorrando(false)}>Cancelar</Button>
+            <Button type="button" variant="ghost" onClick={() => setBorrando(false)}>Cancelar</Button>
             <Button variant="destructive" disabled={borrar.isPending}
               onClick={() => contacto && borrar.mutate(contacto.id, { onSuccess: () => { setBorrando(false); onListo() } })}>
               Borrar
