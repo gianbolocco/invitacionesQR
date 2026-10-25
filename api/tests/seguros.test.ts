@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
+import { eq } from 'drizzle-orm'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
 import { entryLogs, invitations, neighborhoods, people, providers, trades, units, vehicles } from '../src/db/schema.js'
@@ -48,6 +49,18 @@ describe('seguros: listado de autos', () => {
     expect(f.body.counts.vigente).toBe(1) // los conteos no miran el filtro de estado
     const b = await request(app).get('/insurance/vehicles?q=ccc 333').set('Cookie', admin).expect(200)
     expect(b.body.rows.map((x: { plate: string }) => x.plate)).toEqual(['CCC333'])
+  })
+
+  it('vence hoy vale (por vencer), venció ayer no; sin días de aviso nunca es por vencer', async () => {
+    const { n, admin, auto } = await escenario()
+    await auto('HOY111', hoy)
+    await auto('AYER22', sumarDias(hoy, -1))
+    const r = await request(app).get('/insurance/vehicles').set('Cookie', admin).expect(200)
+    expect(r.body.rows.map((x: { plate: string; estado: string }) => [x.plate, x.estado]))
+      .toEqual([['AYER22', 'vencido'], ['HOY111', 'por_vencer']])
+    await db.update(neighborhoods).set({ insuranceWarnDays: null }).where(eq(neighborhoods.id, n.id))
+    const s = await request(app).get('/insurance/vehicles').set('Cookie', admin).expect(200)
+    expect(s.body.rows.find((x: { plate: string }) => x.plate === 'HOY111').estado).toBe('vigente')
   })
 
   it('trae el último ingreso y marca si entró autorizado sin seguro', async () => {
@@ -102,5 +115,24 @@ describe('seguros: listado de proveedores', () => {
       .toEqual([['Con seguro', 'por_vencer'], ['Sin cargar', 'sin_cargar']])
     expect(r.body.rows[0]).toMatchObject({ tradeName: 'Gasista', lotes: ['Lote 48'], source: 'link' })
     expect(r.body.counts).toEqual({ vencido: 0, por_vencer: 1, vigente: 0, sin_cargar: 1 })
+    const b = await request(app).get('/insurance/providers?q=sin car').set('Cookie', admin).expect(200)
+    expect(b.body.rows.map((x: { name: string }) => x.name)).toEqual(['Sin cargar'])
+    const x = await request(app).get('/insurance/providers.xlsx').set('Cookie', admin).expect(200)
+    expect(x.headers['content-type']).toMatch(/spreadsheetml/)
+  })
+
+  it('el proveedor marca autorizado sin seguro por SU seguro, no por el del auto', async () => {
+    const { n, u, g, admin } = await escenario()
+    const [pide] = await db.insert(trades).values({ neighborhoodId: n.id, name: 'Gasista', requiresInsurance: true }).returning()
+    await db.insert(providers).values({ neighborhoodId: n.id, doc: '7', name: 'Pedro', tradeId: pide.id })
+    const [inv] = await db.insert(invitations).values({
+      unitId: u.id, createdBy: g.id, kind: 'proveedor', tradeId: pide.id, guestName: 'Pedro', validFrom: hoy, validTo: hoy, token: 't3',
+    }).returning()
+    await db.insert(entryLogs).values({
+      invitationId: inv.id, unitId: u.id, guardId: g.id, guestName: 'Pedro', guestDoc: '7',
+      providerInsurance: 'vigente', vehicleInsurance: 'sin_cargar',
+    })
+    const r = await request(app).get('/insurance/providers').set('Cookie', admin).expect(200)
+    expect(r.body.rows[0].ultimoIngreso).toMatchObject({ unitLabel: 'Lote 48', sinSeguro: false })
   })
 })

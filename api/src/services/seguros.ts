@@ -19,9 +19,13 @@ const ESTADO = (col: string) => sql.raw(`case
 
 const HOY = sql`(select (now() at time zone ${TZ})::date as d) hoy`
 
-/** "Autorizó sin seguro": un alta exprés (la creó un guardia) con algún seguro faltante en la foto. */
-const SIN_SEGURO = sql.raw(`(p_inv.role = 'guard' and (e.provider_insurance in ('sin_cargar','vencido')
-  or e.vehicle_insurance in ('sin_cargar','vencido')))`)
+/**
+ * "Autorizó sin seguro": un alta exprés (la creó un guardia) con el seguro de
+ * ESTE listado faltante en la foto. Cada listado mira el suyo: que el auto del
+ * proveedor no tuviera seguro no es un problema del seguro del proveedor.
+ */
+const SIN_SEGURO = (foto: 'provider_insurance' | 'vehicle_insurance') =>
+  sql.raw(`(p_inv.role = 'guard' and e.${foto} in ('sin_cargar','vencido'))`)
 
 // ponytail: filtro de estado en memoria; con miles de autos, pasarlo al WHERE y contar con un count(*) filter aparte.
 export async function listarVehiculos(neighborhoodId: string, f: FiltroSeguros) {
@@ -38,7 +42,7 @@ export async function listarVehiculos(neighborhoodId: string, f: FiltroSeguros) 
     left join person g on g.id = v.insurance_updated_by
     left join lateral (
       select json_build_object('at', e.entered_at, 'guestName', e.guest_name, 'unitLabel', u.label,
-                               'sinSeguro', ${SIN_SEGURO}) as ingreso
+                               'sinSeguro', ${SIN_SEGURO('vehicle_insurance')}) as ingreso
       from entry_log e
       join unit u on u.id = e.unit_id
       join invitation i on i.id = e.invitation_id
@@ -80,7 +84,7 @@ export async function listarProveedores(neighborhoodId: string, f: FiltroSeguros
     left join trade t on t.id = pr.trade_id
     left join person g on g.id = pr.insurance_updated_by
     left join lateral (
-      select json_build_object('at', e.entered_at, 'unitLabel', u.label, 'sinSeguro', ${SIN_SEGURO}) as ingreso
+      select json_build_object('at', e.entered_at, 'unitLabel', u.label, 'sinSeguro', ${SIN_SEGURO('provider_insurance')}) as ingreso
       from entry_log e
       join unit u on u.id = e.unit_id
       join invitation i on i.id = e.invitation_id
