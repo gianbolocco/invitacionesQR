@@ -15,7 +15,7 @@ que viven en la misma casa ven y gestionan las invitaciones de esa casa. Hay
 tres tipos —visita, frecuente y proveedor— y son todos la misma tabla, con
 distinta ventana de validez y distinto cupo. Una frecuente dice si viene de
 visita (la empleada, el profesor) o a trabajar (el jardinero): la de visita dura
-hasta un mes, y en la garita la otra se marca también como proveedor.
+hasta un mes, y en la garita la otra se marca también como proveedor. Guarda a los que vienen seguido en **Contactos** (los ven todos los de la casa). *Nueva invitación* arranca por a quién: elegir un contacto deja solo la fecha. De un proveedor ve si su seguro está al día, nunca la póliza.
 
 **El invitado** recibe un link. Ahí ve quién lo invita, a qué unidad y cómo
 llegar, carga su documento y su patente si quiere, y se queda con su QR.
