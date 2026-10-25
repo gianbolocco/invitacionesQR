@@ -76,7 +76,10 @@ const createSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).optional(),
   capacity: z.number().int().min(1),
   tradeId: z.string().uuid().nullable().optional(),
+  contactId: z.string().uuid().optional(),
+  saveContact: z.boolean().optional(),
 }).refine((v) => v.validTo >= v.validFrom, { message: 'La ventana está invertida', path: ['validTo'] })
+  .refine((v) => !(v.contactId && v.saveContact), { message: 'O un contacto o uno nuevo', path: ['saveContact'] })
 
 invitationRoutes.post('/', async (req, res) => {
   const body = createSchema.parse(req.body)

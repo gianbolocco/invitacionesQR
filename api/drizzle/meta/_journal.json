@@ -162,6 +162,13 @@
       "when": 1792905607605,
       "tag": "0022_contactos",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792951923670,
+      "tag": "0023_invitacion_contacto",
+      "breakpoints": true
     }
   ]
 }

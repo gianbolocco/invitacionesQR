@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
-import { invitations, entryLogs, people, units, unitMembers, neighborhoods, trades } from '../db/schema.js'
+import { invitations, entryLogs, people, units, unitMembers, neighborhoods, trades, contacts } from '../db/schema.js'
 import { randomToken } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
 import { todayInBuenosAires, unMesDespues } from '../lib/dates.js'
@@ -8,7 +8,7 @@ import { AppError } from '../lib/errors.js'
 import { PORTERIA } from '../lib/porteria.js'
 import { aplicaFranjas, type Franja } from '../lib/franjas.js'
 import { pideSeguro, seguroVigente, type Seguro } from '../lib/seguro.js'
-import { buscarProveedor, guardarProveedor } from './padron.js'
+import { buscarProveedor, guardarProveedor, type Executor } from './padron.js'
 
 export type CreateInvitationInput = {
   unitId: string
@@ -26,6 +26,10 @@ export type CreateInvitationInput = {
   capacity: number
   tradeId?: string | null
   neighborhoodId: string
+  /** El contacto del que sale; tiene que ser de la misma UF. */
+  contactId?: string
+  /** Guarda a quien se invita como contacto nuevo, vinculado a la invitación. */
+  saveContact?: boolean
 }
 
 export async function assertMemberOfUnit(personId: string, unitId: string): Promise<void> {
@@ -150,25 +154,53 @@ export async function createInvitation(input: CreateInvitationInput) {
   assertRangoDeFrecuente(input.kind, input.frequentAs, input.validFrom, input.validTo)
   const frequentAs = input.kind === 'frecuente' ? (input.frequentAs ?? 'visita') : null
   await assertRubro(input.neighborhoodId, input.kind, frequentAs, input.tradeId)
+  if (input.contactId) {
+    const [c] = await db.select({ id: contacts.id }).from(contacts)
+      .where(and(eq(contacts.id, input.contactId), eq(contacts.unitId, input.unitId))).limit(1)
+    if (!c) throw new AppError(404, 'contact_not_found')
+  }
 
-  const [inv] = await db.insert(invitations).values({
-    unitId: input.unitId,
-    createdBy: input.createdBy,
-    kind: input.kind,
-    frequentAs,
-    tradeId: input.tradeId ?? null,
-    guestName: input.guestName.trim(),
-    guestDoc: input.guestDoc?.trim() || null,
-    plate: input.plate?.trim().toUpperCase() || null,
-    note: input.note?.trim() || null,
-    validFrom: input.validFrom,
-    validTo: input.validTo,
-    weekdays: input.weekdays?.length ? input.weekdays : null,
-    capacity: input.capacity,
-    token: randomToken(16),
-  }).returning()
+  // Contacto e invitación juntos: si la invitación falla, no queda un contacto suelto.
+  return db.transaction(async (tx) => {
+    let contactId = input.contactId ?? null
+    if (input.saveContact && !contactId) {
+      const kind = input.kind === 'proveedor' || frequentAs === 'proveedor' ? 'proveedor' : 'visita'
+      const [c] = await tx.insert(contacts).values({
+        unitId: input.unitId, kind, name: input.guestName.trim(), doc: input.guestDoc?.trim() || null,
+        tradeId: kind === 'proveedor' ? input.tradeId ?? null : null, createdBy: input.createdBy,
+      }).returning({ id: contacts.id })
+      contactId = c.id
+    }
 
-  return inv
+    const [inv] = await tx.insert(invitations).values({
+      unitId: input.unitId,
+      createdBy: input.createdBy,
+      kind: input.kind,
+      frequentAs,
+      tradeId: input.tradeId ?? null,
+      contactId,
+      guestName: input.guestName.trim(),
+      guestDoc: input.guestDoc?.trim() || null,
+      plate: input.plate?.trim().toUpperCase() || null,
+      note: input.note?.trim() || null,
+      validFrom: input.validFrom,
+      validTo: input.validTo,
+      weekdays: input.weekdays?.length ? input.weekdays : null,
+      capacity: input.capacity,
+      token: randomToken(16),
+    }).returning()
+    return inv
+  })
+}
+
+/**
+ * El DNI que la garita registra completa el contacto del que salió la
+ * invitación, si no tenía. Nunca pisa uno ya cargado: si no coincide, puede
+ * ser otra persona, y eso lo corrige el vecino, que sabe quién es.
+ */
+export async function completarDocContacto(tx: Executor, contactId: string | null, doc: string): Promise<void> {
+  if (!contactId || !doc.trim()) return
+  await tx.update(contacts).set({ doc: doc.trim() }).where(and(eq(contacts.id, contactId), isNull(contacts.doc)))
 }
 
 /*
@@ -508,6 +540,8 @@ export async function fillGuestDetails(
   if (data.insurance && seguroVerificado(await buscarProveedor(nid, doc!))) throw new AppError(409, 'seguro_verificado')
 
   await db.transaction(async (tx) => {
+    // El contacto no se completa desde acá: el link lo tiene cualquiera. Lo
+    // completa la garita, que ve el documento (completarDocContacto).
     if (Object.keys(patch).length) await tx.update(invitations).set(patch).where(eq(invitations.id, inv.id))
     if (data.insurance) {
       await guardarProveedor(tx, {

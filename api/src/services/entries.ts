@@ -10,7 +10,7 @@ import { aplicaFranjas } from '../lib/franjas.js'
 import { normalizarDoc, normalizarPatente } from '../lib/padron.js'
 import { PORTERIA } from '../lib/porteria.js'
 import { buscarProveedor, buscarVehiculo, guardarProveedor, guardarVehiculo, ultimaPatente, type ProveedorPadron, type VehiculoPadron } from './padron.js'
-import { assertUnitInNeighborhood, valoresDePorteria, franjasDelRubro } from './invitations.js'
+import { assertUnitInNeighborhood, completarDocContacto, valoresDePorteria, franjasDelRubro } from './invitations.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
 type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -244,6 +244,8 @@ export async function registerEntry(
     if (!target.guestDoc && doc) {
       await tx.update(invitations).set({ guestDoc: doc }).where(eq(invitations.id, invitationId))
     }
+    // Aunque la invitación ya tuviera DNI (del link): el del contacto es el que vio la garita.
+    await completarDocContacto(tx, target.contactId, doc)
 
     return entry
   })
@@ -342,7 +344,7 @@ async function cargarUna(
     invitationId = it.invitationId!
     const [encontrada] = await tx.select({
       unitId: invitations.unitId, guestName: invitations.guestName,
-      guestDoc: invitations.guestDoc, plate: invitations.plate,
+      guestDoc: invitations.guestDoc, plate: invitations.plate, contactId: invitations.contactId,
     }).from(invitations)
       .innerJoin(units, eq(units.id, invitations.unitId))
       .where(and(eq(invitations.id, invitationId), eq(units.neighborhoodId, neighborhoodId)))
@@ -366,6 +368,7 @@ async function cargarUna(
     if (!target.guestDoc) {
       await tx.update(invitations).set({ guestDoc }).where(eq(invitations.id, invitationId))
     }
+    await completarDocContacto(tx, encontrada.contactId, guestDoc)
   }
 
   const [fila] = await tx.insert(entryLogs).values({
