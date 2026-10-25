@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { History, Settings2, Ticket, UserRound } from 'lucide-react'
+import { BookUser, History, Settings2, Ticket, UserRound } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { Marca } from '@/components/dominio/marca'
 import { BarraSeccion, HEADER, claseTab, type ItemBarra } from '@/components/dominio/barra-seccion'
@@ -23,6 +23,7 @@ export function ChromeVecino({ children }: { children: React.ReactNode }) {
   const items: ItemBarra[] = [
     { href: '/', etiqueta: 'Invitaciones', icono: Ticket,
       activo: path === '/' || path.startsWith('/invitaciones') },
+    { href: '/contactos', etiqueta: 'Contactos', icono: BookUser, activo: path.startsWith('/contactos') },
     { href: '/historial', etiqueta: 'Historial', icono: History, activo: path.startsWith('/historial') },
     { href: '/perfil', etiqueta: 'Perfil', icono: UserRound, activo: path.startsWith('/perfil') },
     ...(me.role === 'admin'
