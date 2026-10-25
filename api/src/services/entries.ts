@@ -691,6 +691,12 @@ export type AuditRow = {
   insuranceCompany: string | null
   insurancePolicy: string | null
   insuranceExpiresOn: string | null
+  /** El seguro del auto HOY, por la patente de la invitación. El de cada ingreso está en sus movimientos. */
+  vehicleCompany: string | null
+  vehiclePolicy: string | null
+  vehicleExpiresOn: string | null
+  /** Algún ingreso fue un alta exprés con un seguro faltante: "Autorizar igual". */
+  autorizadoSinSeguro: boolean
   unitLabel: string
   inviterName: string
   validFrom: string
@@ -723,6 +729,8 @@ export type AuditFilters = {
   kind?: 'visita' | 'frecuente' | 'proveedor'
   /** Texto libre: nombre, documento, patente, unidad o quién invita. */
   q?: string
+  /** Solo las que entraron por un alta exprés con algún seguro faltante. */
+  sinSeguro?: boolean
   page?: number
   pageSize?: number
 }
@@ -801,6 +809,9 @@ function filtrosAuditoria(neighborhoodId: string, f: AuditFilters) {
       or u.label ilike ${patron}::text
       or p.name ilike ${patron}::text
       or regexp_replace(coalesce(i.guest_doc, ''), '\\D', '', 'g') like ${patronDoc}::text)
+    and (not ${f.sinSeguro ?? false}::boolean or (p.role = 'guard' and exists (
+      select 1 from entry_log es where es.invitation_id = i.id
+        and (es.provider_insurance in ('sin_cargar','vencido') or es.vehicle_insurance in ('sin_cargar','vencido')))))
   `
 }
 
@@ -887,6 +898,12 @@ async function auditRows(
       pv.insurance_company         as "insuranceCompany",
       pv.insurance_policy          as "insurancePolicy",
       pv.insurance_expires_on::text as "insuranceExpiresOn",
+      ve.insurance_company        as "vehicleCompany",
+      ve.insurance_policy         as "vehiclePolicy",
+      ve.insurance_expires_on::text as "vehicleExpiresOn",
+      (p.role = 'guard' and exists (select 1 from entry_log es where es.invitation_id = i.id
+        and (es.provider_insurance in ('sin_cargar','vencido') or es.vehicle_insurance in ('sin_cargar','vencido'))))
+                                  as "autorizadoSinSeguro",
       u.label                     as "unitLabel",
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.valid_from                as "validFrom",
@@ -913,6 +930,8 @@ async function auditRows(
     -- El seguro del proveedor vive en el padrón, por DNI normalizado (lib/padron.ts).
     left join provider pv on pv.neighborhood_id = u.neighborhood_id
       and pv.doc = upper(regexp_replace(coalesce(i.guest_doc, ''), '[^0-9A-Za-z]', '', 'g'))
+    left join vehicle ve on ve.neighborhood_id = u.neighborhood_id
+      and ve.plate = upper(regexp_replace(coalesce(i.plate, ''), '[^0-9A-Za-z]', '', 'g'))
     left join uso on uso.invitation_id = i.id
     left join ultimo on ultimo.invitation_id = i.id
     where ${filtrosAuditoria(neighborhoodId, f)}

@@ -168,6 +168,11 @@ export type EntryRow = {
   tradeName: string | null
   loadedAt: string | null
   loaderName: string | null
+  /** Cómo estaban los seguros al ingresar; null = fila anterior al padrón o carga manual. */
+  providerInsurance: string | null
+  vehicleInsurance: string | null
+  /** Un alta exprés con algún seguro faltante: el guardia del ingreso autorizó igual. */
+  autorizadoSinSeguro: boolean
 }
 
 export async function entriesLog(neighborhoodId: string, f: EntryFilters): Promise<EntryRow[]> {
@@ -178,10 +183,14 @@ export async function entriesLog(neighborhoodId: string, f: EntryFilters): Promi
            g.name as "guardName", gs.name as "exitGuardName",
            (e.source = 'manual') as manual,
            e.note, i.note as "invitationNote", t.name as "tradeName",
-           e.loaded_at as "loadedAt", lp.name as "loaderName"
+           e.loaded_at as "loadedAt", lp.name as "loaderName",
+           e.provider_insurance as "providerInsurance", e.vehicle_insurance as "vehicleInsurance",
+           (pi.role = 'guard' and (e.provider_insurance in ('sin_cargar','vencido')
+             or e.vehicle_insurance in ('sin_cargar','vencido'))) as "autorizadoSinSeguro"
     from entry_log e
     join unit u on u.id = e.unit_id
     join invitation i on i.id = e.invitation_id
+    join person pi on pi.id = i.created_by
     left join trade t on t.id = i.trade_id
     left join person g on g.id = e.guard_id
     left join person gs on gs.id = e.exit_guard_id

@@ -111,6 +111,34 @@ describe('seguros: tablero', () => {
   })
 })
 
+describe('seguros: auditoría', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('trae el seguro del auto, la foto de cada ingreso y filtra los autorizados sin seguro', async () => {
+    const { u, g, v, auto, guardia } = await escenario()
+    await auto('AE482KL', '2026-10-10')
+    const [alta] = await db.insert(invitations).values({
+      unitId: u.id, createdBy: g.id, kind: 'visita', guestName: 'Hugo', plate: 'AE 482 KL', validFrom: hoy, validTo: hoy, token: 'a1',
+    }).returning()
+    const [comun] = await db.insert(invitations).values({
+      unitId: u.id, createdBy: v.id, kind: 'visita', guestName: 'Ana', validFrom: hoy, validTo: hoy, token: 'a2',
+    }).returning()
+    await db.insert(entryLogs).values([
+      { invitationId: alta.id, unitId: u.id, guardId: g.id, guestName: 'Hugo', plate: 'AE 482 KL', providerInsurance: 'no_aplica', vehicleInsurance: 'vencido' },
+      { invitationId: comun.id, unitId: u.id, guardId: g.id, guestName: 'Ana', providerInsurance: 'no_aplica', vehicleInsurance: 'no_aplica' },
+    ])
+    const r = await request(app).get('/gate/audit').set('Cookie', guardia).expect(200)
+    const hugo = r.body.rows.find((x: { guestName: string }) => x.guestName === 'Hugo')
+    expect(hugo).toMatchObject({ vehicleCompany: 'La Caja', vehicleExpiresOn: '2026-10-10', autorizadoSinSeguro: true })
+    expect(r.body.rows.find((x: { guestName: string }) => x.guestName === 'Ana')).toMatchObject({ autorizadoSinSeguro: false })
+    const f = await request(app).get('/gate/audit?sinSeguro=true').set('Cookie', guardia).expect(200)
+    expect(f.body.rows.map((x: { guestName: string }) => x.guestName)).toEqual(['Hugo'])
+    expect(f.body.total).toBe(1)
+    const m = await request(app).get(`/gate/audit/${alta.id}/entries`).set('Cookie', guardia).expect(200)
+    expect(m.body[0]).toMatchObject({ vehicleInsurance: 'vencido', autorizadoSinSeguro: true })
+  })
+})
+
 describe('seguros: listado de proveedores', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
 

@@ -11,7 +11,7 @@ import { searchUnits, listUnits } from '../services/units.js'
 import { createExpressInvitation, revokeByGuard } from '../services/invitations.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { slug } from '../lib/slug.js'
-import { estadoSeguro } from '../lib/seguro.js'
+import { estadoSeguro, etiquetaClave } from '../lib/seguro.js'
 import { buildWorkbook, diaExcel, fechaExcel, XLSX_MIME } from '../lib/excel.js'
 import { COLOR_DEFAULT } from '../lib/marca.js'
 import { entriesLog } from '../services/reports.js'
@@ -195,6 +195,8 @@ const auditFilters = z.object({
   status: z.enum(['adentro', 'concluida', 'esperando', 'vencida', 'anulada']).optional(),
   kind: z.enum(['visita', 'frecuente', 'proveedor']).optional(),
   q: z.string().trim().max(80).optional(),
+  // Llega como string desde la query: z.coerce.boolean() daría true con 'false'.
+  sinSeguro: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 })
@@ -262,6 +264,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
             ['Período', f.from || f.to ? `${f.from ? dd(f.from) : 'el inicio'} al ${f.to ? dd(f.to) : 'hoy'}` : 'Todo'],
             ['Estado', f.status ? ESTADO_EXCEL[f.status] : 'Todos'],
             ['Unidad', f.unitId ? (unidades.find((u) => u.id === f.unitId)?.label ?? '—') : 'Todas'],
+            ['Autorizados sin seguro', f.sinSeguro ? 'Solo esos' : 'Todos'],
           ],
         },
         {
@@ -301,6 +304,8 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Póliza', key: 'poliza', width: 16 },
           { header: 'Vence seguro', key: 'venceSeguro', formato: 'fecha' },
           { header: 'Estado seguro', key: 'estadoSeguro', width: 16 },
+          { header: 'Seguro auto', key: 'seguroAuto', width: 24 },
+          { header: 'Vence seguro auto', key: 'venceAuto', formato: 'fecha' },
           { header: 'Unidad', key: 'unidad' },
           { header: 'Invitó', key: 'invito', width: 24 },
           { header: 'Desde', key: 'desde', formato: 'fecha' },
@@ -312,6 +317,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Guardia salida', key: 'guardiaSalida', width: 20 },
           { header: 'Carga manual', key: 'manual' },
           { header: 'Nota del vecino', key: 'notaVecino', width: 30 },
+          { header: 'Autorizó sin seguro', key: 'sinSeguro', width: 18 },
           { header: 'Autorizó portería', key: 'porteria', width: 18 },
         ],
         filas: auditoria.map((r) => ({
@@ -329,6 +335,8 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
             { requiresInsurance: r.requiresInsurance, company: r.insuranceCompany, policy: r.insurancePolicy, expiresOn: r.insuranceExpiresOn },
             barrio.insuranceWarnDays,
           ),
+          seguroAuto: r.vehicleCompany ? `${r.vehicleCompany} · ${r.vehiclePolicy}` : '',
+          venceAuto: r.vehicleExpiresOn ? diaExcel(r.vehicleExpiresOn) : '',
           unidad: r.unitLabel,
           invito: r.inviterName,
           desde: diaExcel(r.validFrom),
@@ -340,6 +348,7 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           guardiaSalida: guardia(r.exitGuardName, r.manual),
           manual: r.manual ? 'Sí' : 'No',
           notaVecino: r.note ?? '',
+          sinSeguro: r.autorizadoSinSeguro ? 'Sí' : '',
           porteria: r.porteria ? 'Sí' : '',
         })),
       },
@@ -353,6 +362,9 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           { header: 'Invitado', key: 'invitado', width: 26 },
           { header: 'DNI', key: 'dni' },
           { header: 'Patente', key: 'patente' },
+          { header: 'Seguro proveedor (al ingresar)', key: 'fotoProv', width: 18 },
+          { header: 'Seguro auto (al ingresar)', key: 'fotoAuto', width: 18 },
+          { header: 'Autorizó sin seguro', key: 'sinSeguro', width: 20 },
           { header: 'Rubro', key: 'rubro' },
           { header: 'Unidad', key: 'unidad' },
           { header: 'Origen', key: 'origen' },
@@ -368,6 +380,10 @@ gateRoutes.get('/audit.xlsx', async (req, res) => {
           invitado: e.guestName,
           dni: e.guestDoc ?? '',
           patente: e.plate ?? '',
+          fotoProv: etiquetaClave(e.providerInsurance),
+          fotoAuto: etiquetaClave(e.vehicleInsurance),
+          // Quién: el guardia del ingreso.
+          sinSeguro: e.autorizadoSinSeguro ? (e.guardName ?? 'Sí') : '',
           rubro: e.tradeName ?? '',
           unidad: e.unitLabel,
           origen: e.manual ? 'Carga manual' : 'Escaneo',
