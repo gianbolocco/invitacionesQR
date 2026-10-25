@@ -59,7 +59,8 @@ export function SeccionSeguro({
       </dl>
 
       {estado !== 'no_aplica' && abierto && (
-        <div className="flex flex-col gap-3">
+        // Las etiquetas de Campo son text-ink: sobre NO PASA no se leerían. Acá toman el color del veredicto.
+        <div className="flex flex-col gap-3 [&_label]:text-current">
           {mal && !guardado && <p className="text-base font-semibold">Pedile el certificado y cargalo.</p>}
           <CamposSeguro idBase={idBase} valor={valor} onCambio={onCambio} />
           {fechaPasada && <p className="text-base font-semibold">La fecha cargada ya pasó.</p>}
