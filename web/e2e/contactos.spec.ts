@@ -33,8 +33,9 @@ test('el vecino guarda un contacto al invitar y la próxima vez lo invita desde 
 
     // Recargar para comprobar contra el servidor y no contra la caché.
     await page.reload()
-    await page.getByLabel('Buscar contacto').fill(nombre)
-    await expect(page.getByText(/Nadie coincide/)).toBeVisible()
+    await page.waitForLoadState('networkidle')
+    // Sin más contactos la página muestra el vacío y no el buscador: no se puede esperar "Nadie coincide".
+    await expect(page.getByRole('button', { name: exacto })).toHaveCount(0)
   } finally {
     // La base de desarrollo no se limpia sola: si el test falló a mitad, se borra igual.
     const lista: { id: string; name: string }[] = await (await page.request.get(`${API}/contacts`)).json()
