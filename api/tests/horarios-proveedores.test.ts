@@ -38,6 +38,13 @@ describe('rubros y franjas de proveedores', () => {
     expect(r.body.error).toBe('rubro_duplicado')
   })
 
+  it('un rubro se puede crear pidiendo seguro; sin decirlo, no lo pide', async () => {
+    const { admin } = await escenario()
+    const gasista = await request(app).post('/admin/trades').set('Cookie', admin).send({ name: 'Gasista', requiresInsurance: true }).expect(201)
+    const flete = await request(app).post('/admin/trades').set('Cookie', admin).send({ name: 'Flete' }).expect(201)
+    expect([gasista.body.requiresInsurance, flete.body.requiresInsurance]).toEqual([true, false])
+  })
+
   it('un rubro archivado sale de la lista del vecino pero sigue en la del admin', async () => {
     const { admin, vecino } = await escenario()
     const { body: t } = await request(app).post('/admin/trades').set('Cookie', admin).send({ name: 'Plomero' }).expect(201)

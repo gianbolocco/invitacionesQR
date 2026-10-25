@@ -59,6 +59,7 @@ export function Rubros() {
   const rubros = useRubros()
   const crear = useCrearRubro()
   const [nuevo, setNuevo] = useState('')
+  const [pideSeguro, setPideSeguro] = useState(false)
   const [verArchivados, setVerArchivados] = useState(false)
   const activos = (rubros.data ?? []).filter((r) => !r.archivedAt)
   const archivados = (rubros.data ?? []).filter((r) => r.archivedAt)
@@ -66,7 +67,7 @@ export function Rubros() {
   function agregar(e: React.FormEvent) {
     e.preventDefault()
     const n = nuevo.trim()
-    if (n) crear.mutate(n, { onSuccess: () => setNuevo('') })
+    if (n) crear.mutate({ name: n, requiresInsurance: pideSeguro }, { onSuccess: () => { setNuevo(''); setPideSeguro(false) } })
   }
 
   return (
@@ -83,10 +84,17 @@ export function Rubros() {
           {verArchivados ? 'Ocultar archivados' : `Ver archivados (${archivados.length})`}
         </button>
       )}
-      <form onSubmit={agregar} className="flex gap-2">
-        <Input value={nuevo} onChange={(e) => setNuevo(e.target.value)} placeholder="Nuevo rubro" maxLength={40}
-          aria-label="Nuevo rubro" className="max-w-64" />
-        <Button type="submit" variant="outline" disabled={crear.isPending || !nuevo.trim()}>Agregar</Button>
+      <form onSubmit={agregar} className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex min-w-0 gap-2">
+          <Input value={nuevo} onChange={(e) => setNuevo(e.target.value)} placeholder="Nuevo rubro" maxLength={40}
+            aria-label="Nuevo rubro" className="max-w-64" />
+          <Button type="submit" variant="outline" disabled={crear.isPending || !nuevo.trim()}>Agregar</Button>
+        </div>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+          <input type="checkbox" className="size-5 accent-azul" checked={pideSeguro}
+            onChange={(e) => setPideSeguro(e.target.checked)} />
+          Pide seguro
+        </label>
       </form>
       <p className="text-sm text-ink-soft">
         Archivar un rubro lo saca de la lista del vecino. Las invitaciones que ya lo usan siguen valiendo.

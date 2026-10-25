@@ -314,7 +314,7 @@ const ERRORES_RUBRO: Record<string, string> = { rubro_duplicado: 'Ya hay un rubr
 export function useCrearRubro() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (name: string) => api<Rubro>('/admin/trades', { method: 'POST', body: JSON.stringify({ name }) }),
+    mutationFn: (d: { name: string; requiresInsurance: boolean }) => api<Rubro>('/admin/trades', { method: 'POST', body: JSON.stringify(d) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: claveRubros }),
     onError: (e) => toast.error(ERRORES_RUBRO[(e as ApiError).code] ?? 'No se pudo guardar el rubro. Probá de nuevo.'),
   })
