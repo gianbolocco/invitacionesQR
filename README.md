@@ -73,6 +73,14 @@ El veredicto de la garita se ordena en tres secciones —**Visitante/Proveedor**
 **Vehículo** e **Invitación**— con el estado de cada seguro al lado del título y
 "Corregir" para actualizarlo. Se recalcula al cambiar el documento o la patente.
 
+**Seguros.** La pantalla *Seguros* (garita y admin) lista los autos y los
+proveedores ordenados por vencimiento, con filtros (vencidos, por vencer,
+vigentes, sin cargar), buscador y Excel. El guardia corrige desde ahí; el admin
+solo mira. El tablero avisa los vencidos que siguen entrando, los que vencen
+pronto y los ingresos autorizados sin seguro, y lleva a donde se resuelven. La
+auditoría y su Excel muestran el seguro del auto y cómo estaba cada seguro **el
+día del ingreso**.
+
 El alta exprés de la garita (**Autorizar sin invitación**) puede ser visita o
 proveedor, con su rubro; los seguros se cargan en el veredicto que abre después.
 A un proveedor que autoriza la portería no se le controla horario ni el seguro
