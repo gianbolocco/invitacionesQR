@@ -481,7 +481,6 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           // Un rubro que ya no está activo lo descarta el sheet: ahí elige el guardia.
           kind: inv.kind === 'proveedor' || inv.frequentAs === 'proveedor' ? 'proveedor' : 'visita',
           tradeId: inv.tradeId ?? '',
-          seguro: { company: inv.insuranceCompany ?? '', policy: inv.insurancePolicy ?? '', expiresOn: inv.insuranceExpiresOn ?? '' },
         }}
         // replace: "Volver" en el veredicto nuevo lleva a donde estaba el guardia antes del rechazo.
         onCreada={(nuevo) => router.replace(`/garita/invitacion/${nuevo}`)}
