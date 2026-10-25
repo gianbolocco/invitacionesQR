@@ -191,3 +191,42 @@ describe('padrón: el ingreso', () => {
     await entrar(guardia, alta.id, { plate: '' }).expect(201)
   })
 })
+
+describe('padrón: corregir sin registrar', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('el guardia corrige el seguro de un auto y queda auditado con el antes', async () => {
+    const { guardia, guardiaId } = await escenario()
+    await request(app).put('/gate/vehicles/insurance').set('Cookie', guardia).send({ plate: 'AB 123 CD', insurance: vencido }).expect(200)
+    await request(app).put('/gate/vehicles/insurance').set('Cookie', guardia).send({ plate: 'ab123cd', insurance: seguro }).expect(200)
+    const [v] = await db.select().from(vehicles)
+    expect(v).toMatchObject({ plate: 'AB123CD', insuranceExpiresOn: seguro.expiresOn, insuranceUpdatedBy: guardiaId })
+    const logs = await db.select().from(auditLogs)
+      .where(eq(auditLogs.action, 'vehicle.insurance_updated'))
+      .orderBy(auditLogs.at)
+    expect(logs.map((l) => l.meta)).toEqual([
+      { plate: 'AB123CD', antes: null, despues: vencido },
+      { plate: 'AB123CD', antes: vencido, despues: seguro },
+    ])
+  })
+
+  it('el guardia corrige el seguro de un proveedor', async () => {
+    const { guardia } = await escenario()
+    await request(app).put('/gate/providers/insurance').set('Cookie', guardia)
+      .send({ doc: '30.123.456', name: 'Carlos', insurance: seguro }).expect(200)
+    const [p] = await db.select().from(providers)
+    expect(p).toMatchObject({ doc: '30123456', insuranceSource: 'garita' })
+  })
+
+  it('una patente o un DNI vacíos dan 400', async () => {
+    const { guardia } = await escenario()
+    await request(app).put('/gate/vehicles/insurance').set('Cookie', guardia).send({ plate: ' - ', insurance: seguro }).expect(400)
+    const r = await request(app).put('/gate/providers/insurance').set('Cookie', guardia).send({ doc: '..', name: 'C', insurance: seguro }).expect(400)
+    expect(r.body.error).toBe('doc_required')
+  })
+
+  it('un vecino no puede corregir', async () => {
+    const { vecino } = await escenario()
+    await request(app).put('/gate/vehicles/insurance').set('Cookie', vecino).send({ plate: 'AB123CD', insurance: seguro }).expect(403)
+  })
+})

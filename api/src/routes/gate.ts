@@ -18,6 +18,8 @@ import { entriesLog } from '../services/reports.js'
 import { getNeighborhood } from '../services/neighborhoods.js'
 import { escucharAvisos } from '../lib/avisos.js'
 import { normalizarPatente } from '../lib/padron.js'
+import { guardarProveedor, guardarVehiculo } from '../services/padron.js'
+import { db } from '../db/index.js'
 import { zSeguro } from './invitations.js'
 
 export const gateRoutes = Router()
@@ -104,6 +106,35 @@ gateRoutes.post('/entries', async (req, res) => {
 gateRoutes.post('/exits', async (req, res) => {
   const body = z.object({ invitationId: z.string().uuid() }).parse(req.body)
   res.status(201).json(await registerExit(body.invitationId, req.person!.id))
+})
+
+/**
+ * Corregir un seguro sin registrar el ingreso: el guardia corrige y aprieta
+ * Volver, y el dato bueno no se pierde. Lo usan también el veredicto y la
+ * pantalla Seguros. El DNI y la patente van en el body, nunca en la URL.
+ */
+gateRoutes.put('/providers/insurance', async (req, res) => {
+  const body = z.object({
+    doc: z.string().trim().min(1).max(40),
+    name: z.string().trim().min(1).max(120),
+    insurance: zSeguro.unwrap(),
+  }).parse(req.body)
+  await db.transaction((tx) => guardarProveedor(tx, {
+    neighborhoodId: req.person!.neighborhoodId, doc: body.doc, name: body.name,
+    insurance: body.insurance, source: 'garita', actorId: req.person!.id,
+  }))
+  res.json({ ok: true })
+})
+
+gateRoutes.put('/vehicles/insurance', async (req, res) => {
+  const body = z.object({
+    plate: z.string().trim().max(20).refine((p) => normalizarPatente(p) !== ''),
+    insurance: zSeguro.unwrap(),
+  }).parse(req.body)
+  await db.transaction((tx) => guardarVehiculo(tx, {
+    neighborhoodId: req.person!.neighborhoodId, plate: body.plate, insurance: body.insurance, actorId: req.person!.id,
+  }))
+  res.json({ ok: true })
 })
 
 /**
