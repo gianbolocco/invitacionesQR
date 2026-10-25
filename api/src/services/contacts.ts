@@ -89,11 +89,13 @@ export async function editContact(id: string, unitIds: string[], data: {
     if (c.kind !== 'proveedor') throw new AppError(400, 'rubro_invalido')
     await assertRubroDelBarrio(data.tradeId, c.unitId)
   }
-  await db.update(contacts).set({
+  const cambios = {
     ...(data.name !== undefined ? { name: data.name.trim() } : {}),
     ...(data.doc !== undefined ? { doc: data.doc?.trim() || null } : {}),
     ...(data.tradeId !== undefined ? { tradeId: data.tradeId } : {}),
-  }).where(eq(contacts.id, id))
+  }
+  // Drizzle tira "No values to set" con un set vacío: sin cambios, no se toca nada.
+  if (Object.keys(cambios).length) await db.update(contacts).set(cambios).where(eq(contacts.id, id))
   return (await listContacts([c.unitId], id))[0]
 }
 

@@ -70,6 +70,8 @@ describe('contactos: API', () => {
       .toEqual([['Carlos', 'vigente'], ['Hugo', 'sin_cargar']])
     expect(body[0]).toMatchObject({ tradeName: 'Jardinero', insuranceExpiresOn: '2999-03-12' })
     expect(JSON.stringify(body)).not.toMatch(/Sancor/)
+    expect(body[0]).not.toHaveProperty('insuranceCompany')
+    expect(body[0]).not.toHaveProperty('insurancePolicy')
   })
 
   it('edita y borra', async () => {
@@ -77,6 +79,8 @@ describe('contactos: API', () => {
     const { body: c } = await request(app).post('/contacts').set('Cookie', sAna).send({ kind: 'visita', name: 'Rosa' }).expect(201)
     const r = await request(app).patch(`/contacts/${c.id}`).set('Cookie', sAna).send({ name: 'Rosa B.', doc: '1' }).expect(200)
     expect(r.body).toMatchObject({ name: 'Rosa B.', doc: '1' })
+    const sinCambios = await request(app).patch(`/contacts/${c.id}`).set('Cookie', sAna).send({}).expect(200)
+    expect(sinCambios.body).toEqual(r.body)
     await request(app).delete(`/contacts/${c.id}`).set('Cookie', sAna).expect(200)
     expect(await db.select().from(contacts)).toHaveLength(0)
   })
