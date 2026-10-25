@@ -29,3 +29,25 @@ export function textoVence(expiresOn: string, hoy: string): string {
   if (dias === 1) return `vence mañana (${fechaNumerica(expiresOn)})`
   return `vence en ${dias} días (${fechaNumerica(expiresOn)})`
 }
+
+export type SeguroDatos = { company: string; policy: string; expiresOn: string }
+
+/** El estado de un seguro suelto (el del padrón: proveedor o auto). Mismas reglas que estadoSeguro. */
+export function estadoDe(s: SeguroDatos | null, pide: boolean, hoy: string, warnDays: number | null): EstadoSeguro {
+  return estadoSeguro({
+    requiresInsurance: pide,
+    insuranceCompany: s?.company ?? null, insurancePolicy: s?.policy ?? null, insuranceExpiresOn: s?.expiresOn ?? null,
+  }, hoy, warnDays)
+}
+
+/** Lo que va al lado del título de la sección en el veredicto. */
+export function textoEstado(e: EstadoSeguro, expiresOn: string | null, hoy: string): string {
+  if (e === 'vigente') return 'Seguro vigente'
+  if (e === 'vencido') return 'Seguro vencido'
+  if (e === 'sin_cargar') return 'Falta el seguro'
+  if (e === 'por_vencer' && expiresOn) {
+    const dias = diasHasta(expiresOn, hoy)
+    return dias === 0 ? 'Vence hoy' : dias === 1 ? 'Vence mañana' : `Vence en ${dias} días`
+  }
+  return ''
+}

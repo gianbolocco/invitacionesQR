@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "e2e": "playwright test",
-    "check": "node src/lib/fechas.check.ts && node src/lib/estado-invitacion.check.ts && node src/lib/ultimos-movimientos.check.ts && node src/lib/lectora.check.ts && node src/lib/tablero.check.ts && node src/lib/carga-manual.check.ts && node src/lib/lotes.check.ts && node src/lib/admin.check.ts && node src/lib/permanencia.check.ts && node src/lib/franjas.check.ts && node src/lib/seguro.check.ts && node src/lib/plano.check.ts && node scripts/colores.check.mjs"
+    "check": "node src/lib/fechas.check.ts && node src/lib/estado-invitacion.check.ts && node src/lib/ultimos-movimientos.check.ts && node src/lib/lectora.check.ts && node src/lib/tablero.check.ts && node src/lib/carga-manual.check.ts && node src/lib/lotes.check.ts && node src/lib/admin.check.ts && node src/lib/permanencia.check.ts && node src/lib/franjas.check.ts && node src/lib/seguro.check.ts && node src/lib/padron.check.ts && node src/lib/plano.check.ts && node scripts/colores.check.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",
