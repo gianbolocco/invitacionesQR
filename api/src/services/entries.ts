@@ -5,8 +5,9 @@ import { canEnter, type EntryCheck } from '../authz.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { audit } from '../lib/audit.js'
-import { pideSeguro, seguroCompleto, type Seguro } from '../lib/seguro.js'
+import { pideSeguro, type Seguro } from '../lib/seguro.js'
 import { PORTERIA } from '../lib/porteria.js'
+import { buscarProveedor, buscarVehiculo, ultimaPatente, type ProveedorPadron, type VehiculoPadron } from './padron.js'
 import { assertUnitInNeighborhood, valoresDePorteria, franjasDelRubro } from './invitations.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
@@ -27,9 +28,9 @@ async function loadForCheck(where: SQL) {
     providerWindows: neighborhoods.providerWindows,
     insuranceWarnDays: neighborhoods.insuranceWarnDays,
     requiresInsurance: trades.requiresInsurance,
-    insuranceCompany: invitations.insuranceCompany,
-    insurancePolicy: invitations.insurancePolicy,
-    insuranceExpiresOn: invitations.insuranceExpiresOn,
+    neighborhoodId: neighborhoods.id,
+    vehicleInsuranceRequired: neighborhoods.vehicleInsuranceRequired,
+    vehicleInsuranceOverride: neighborhoods.vehicleInsuranceOverride,
     guestName: invitations.guestName,
     guestDoc: invitations.guestDoc,
     plate: invitations.plate,
@@ -56,25 +57,53 @@ async function loadForCheck(where: SQL) {
 
 type LoadedInvitation = NonNullable<Awaited<ReturnType<typeof loadForCheck>>>
 
-/** Lo que canEnter necesita del seguro, a partir de las columnas crudas (el rubro puede ser null). */
-function aLike<T extends {
+/** Lo que el check necesita del padrón: los dos seguros y los switches del barrio. */
+export type Padron = {
+  provider: ProveedorPadron | null
+  vehicle: VehiculoPadron | null
+  /** Vino en auto: hay una patente cargada (la de la invitación o la que tipeó el guardia). */
+  hayPatente: boolean
+  vehicleInsuranceRequired: boolean
+  vehicleInsuranceOverride: boolean
+}
+
+/** Lo que canEnter necesita, a partir de las columnas crudas (el rubro puede ser null) y del padrón. */
+export function aLike<T extends {
   creatorRole: string
   kind: string; frequentAs: string | null; requiresInsurance: boolean | null
-  insuranceCompany: string | null; insurancePolicy: string | null; insuranceExpiresOn: string | null
-}>(row: T) {
+}>(row: T, padron: Padron) {
+  const s = padron.provider?.insurance ?? null
   return {
     ...row,
     porteria: row.creatorRole === 'guard',
     requiresInsurance: pideSeguro(row.kind, row.frequentAs, row.requiresInsurance),
-    insuranceComplete: seguroCompleto(row.insuranceCompany, row.insurancePolicy, row.insuranceExpiresOn),
-    vehicleRequiresInsurance: false, vehicleInsuranceExpiresOn: null, vehicleOverride: true,
+    // Los mismos tres campos planos de antes, ahora del padrón: la web los sigue leyendo así.
+    insuranceCompany: s?.company ?? null,
+    insurancePolicy: s?.policy ?? null,
+    insuranceExpiresOn: s?.expiresOn ?? null,
+    insuranceComplete: s !== null,
+    vehicleRequiresInsurance: padron.vehicleInsuranceRequired && padron.hayPatente,
+    vehicleInsuranceExpiresOn: padron.vehicle?.insurance.expiresOn ?? null,
+    vehicleOverride: padron.vehicleInsuranceOverride,
   }
 }
 
-async function buildCheck(invitation: LoadedInvitation) {
+/**
+ * `datos` es lo que el guardia tiene tipeado en el veredicto. Sin él, vale lo
+ * de la invitación. El veredicto se recalcula acá, con el único canEnter, cada
+ * vez que el guardia cambia el documento o la patente.
+ */
+async function buildCheck(invitation: LoadedInvitation, datos: { doc?: string; plate?: string } = {}) {
   const { usedCount, lastEntryAt } = await usage(invitation.id)
-  const { providerWindows, insuranceWarnDays, ...crudo } = invitation
-  const inv = aLike(crudo)
+  const { providerWindows, insuranceWarnDays, neighborhoodId, vehicleInsuranceRequired, vehicleInsuranceOverride, ...crudo } = invitation
+  const doc = datos.doc ?? invitation.guestDoc ?? ''
+  const plate = datos.plate ?? invitation.plate ?? ''
+  const [provider, vehicle, lastPlate] = await Promise.all([
+    buscarProveedor(neighborhoodId, doc),
+    buscarVehiculo(neighborhoodId, plate),
+    ultimaPatente(neighborhoodId, doc),
+  ])
+  const inv = aLike(crudo, { provider, vehicle, hayPatente: plate.trim() !== '', vehicleInsuranceRequired, vehicleInsuranceOverride })
   const check: EntryCheck = canEnter(inv, new Date(), usedCount, providerWindows)
   const abierta = await openEntry(invitation.id)
 
@@ -86,6 +115,11 @@ async function buildCheck(invitation: LoadedInvitation) {
     check,
     usedCount,
     lastEntryAt,
+    provider: provider && { insurance: provider.insurance, insuranceSource: provider.insuranceSource, updatedAt: provider.updatedAt },
+    vehicle: vehicle && { plate: vehicle.plate, insurance: vehicle.insurance, updatedByName: vehicle.updatedByName, updatedAt: vehicle.updatedAt },
+    lastPlate,
+    vehicleInsuranceRequired,
+    vehicleInsuranceOverride,
     /*
      * Si viene, el próximo movimiento es un egreso y `check` no aplica: un
      * egreso no se valida. El cliente decide a qué endpoint pegar con esto, y
@@ -126,10 +160,10 @@ export async function checkByToken(token: string) {
   return buildCheck(invitation)
 }
 
-export async function checkById(id: string) {
+export async function checkById(id: string, datos?: { doc?: string; plate?: string }) {
   const invitation = await loadForCheck(eq(invitations.id, id))
   if (!invitation) throw new AppError(404, 'not_found')
-  return buildCheck(invitation)
+  return buildCheck(invitation, datos)
 }
 
 /**
@@ -170,7 +204,9 @@ export async function registerEntry(
       await audit(guardId, nid, 'invitation.insurance_updated', 'invitation', invitationId, data.insurance, tx)
     }
 
-    const check = canEnter(aLike({ ...target, creatorRole, ...seguro, requiresInsurance: rubro?.requiresInsurance ?? null }), new Date(), usedCount, providerWindows)
+    const check = canEnter(aLike({ ...target, creatorRole, requiresInsurance: rubro?.requiresInsurance ?? null },
+      { provider: null, vehicle: null, hayPatente: false, vehicleInsuranceRequired: false, vehicleInsuranceOverride: true }),
+      new Date(), usedCount, providerWindows)
     if (!check.ok) throw new AppError(409, check.reason)
 
     const [entry] = await tx.insert(entryLogs).values({

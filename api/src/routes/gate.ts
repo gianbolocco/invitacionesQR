@@ -31,6 +31,17 @@ gateRoutes.get('/invitation/:id', async (req, res) => {
   res.json(await checkById(req.params.id))
 })
 
+/**
+ * El veredicto con lo que el guardia tiene tipeado (documento y patente). POST
+ * y no GET por lo mismo que /search: el DNI en la query queda en los logs de
+ * cada proxy. Es una lectura: no avisa a las otras garitas.
+ */
+gateRoutes.post('/invitation/:id/verdict', async (req, res) => {
+  res.locals.soloLectura = true
+  const datos = z.object({ doc: z.string().max(40).optional(), plate: z.string().max(20).optional() }).parse(req.body)
+  res.json(await checkById(req.params.id, datos))
+})
+
 // POST y no GET: el DNI en la query queda en los logs de acceso de cada proxy.
 gateRoutes.post('/search', async (req, res) => {
   res.locals.soloLectura = true
