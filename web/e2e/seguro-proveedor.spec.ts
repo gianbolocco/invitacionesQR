@@ -1,3 +1,4 @@
+import { elegirVence } from './elegir-fecha'
 import { entrar, expect, test } from './sesion'
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:8080'
@@ -36,11 +37,14 @@ test('un proveedor sin seguro no pasa, y el guardia lo carga y lo registra', asy
     await expect(g.getByRole('heading', { name: 'NO PASA', exact: true })).toBeVisible()
     await expect(g.getByText('Sin seguro')).toBeVisible()
 
-    const vence = new Date(Date.now() + 365 * 86400_000).toISOString().slice(0, 10)
-    await g.getByLabel('Documento').fill('30111222')
-    await g.getByLabel('Compañía').fill('Seguros E2E')
-    await g.getByLabel('Póliza').fill('POL-123')
-    await g.getByLabel('Vence').fill(vence)
+    // Único por corrida: con el padrón, un DNI de una corrida anterior ya tiene seguro.
+    const dni = String(Date.now()).slice(-8)
+    await g.getByLabel('Documento').fill(dni)
+    await expect(g.getByText('Falta el seguro')).toBeVisible()
+    const prov = g.getByRole('region', { name: 'Proveedor' })
+    await prov.getByLabel('Compañía').fill('Seguros E2E')
+    await prov.getByLabel('Número de póliza').fill('POL-123')
+    await elegirVence(g, prov)
     await g.getByRole('button', { name: 'Guardar seguro y registrar ingreso' }).click()
     await expect(g.getByRole('status').filter({ hasText: 'Registrado' })).toBeVisible()
     await guardia.close()
