@@ -12,7 +12,7 @@ import { useDemora } from '@/lib/use-demora'
 import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
 import { hoyISO, horaODia, tiempoDesde, fechaCompleta } from '@/lib/fechas'
-import { KIND_LABEL, vigencia } from '@/lib/invitations'
+import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
 import {
   useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
   useVeredictoEnVivo, useCorregirSeguro,
@@ -298,11 +298,12 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
 
   // NO PASA por seguro: el guardia carga lo que falta y el ingreso se registra en el mismo paso.
   const cargaSeguro = !ok && rechazoPorSeguro(check)
-  // Completo es obligatorio solo en la sección que causa el rechazo. En el resto (y con
-  // check.ok, p. ej. un alta exprés, que no controla seguros) es opcional: vacío no
-  // traba, a medias sí, porque no se sabría qué se quiso cargar.
+  // Completo es obligatorio en la sección que causa el rechazo, y en el auto si también
+  // le falta: canEnter frena en el primer motivo, y la API rechazaría el ingreso por el
+  // segundo. Con check.ok (p. ej. un alta exprés, que no controla seguros) es opcional:
+  // vacío no traba, a medias sí, porque no se sabría qué se quiso cargar.
   const parcial = (v: ValorSeguro) => estadoSeguroCargado(v) === 'parcial'
-  const exigeAuto = cargaSeguro && rechazoPorAuto(check)
+  const exigeAuto = cargaSeguro && (rechazoPorAuto(check) || falta(estadoAuto))
   const exigeProv = cargaSeguro && !rechazoPorAuto(check)
   const listoParaGuardar = (!abiertoProv || (exigeProv ? completoProv : !parcial(seguro)))
     && (!abiertoAuto || (exigeAuto ? completoAuto : !parcial(seguroAuto)))
@@ -478,7 +479,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
             <section aria-labelledby="seccion-invitacion" className="flex flex-col gap-2.5">
               <h2 id="seccion-invitacion" className="text-sm font-bold uppercase tracking-[0.08em] opacity-80">Invitación</h2>
               <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-2.5 text-lg sm:text-xl">
-                <Dato etiqueta="Lote">{inv.unitLabel} · invita {inv.inviterName}</Dato>
+                <Dato etiqueta="Lote">{inv.unitLabel} · {quienInvita(inv.inviterName)}</Dato>
                 {!esEgreso && <Dato etiqueta="Vigencia">{vigencia(inv)}</Dato>}
                 {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}
                 {inv.capacity > 1 && inv.kind !== 'frecuente' && (
