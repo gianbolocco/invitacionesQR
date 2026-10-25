@@ -41,6 +41,11 @@ export type Kpis = {
   staleInside: number
   entriesSameDayLastWeek: number
   invitedNeverLoggedIn: number
+  /** Autos y proveedores con el seguro vencido que entraron en el último mes. */
+  segurosVencidos: number
+  segurosPorVencer: number
+  /** Ingresos de los últimos 7 días por un alta exprés con algún seguro faltante. */
+  autorizadosSinSeguro: number
 }
 export type PorDia = { day: string; total: number }
 export type PorHora = { hour: number; total: number }

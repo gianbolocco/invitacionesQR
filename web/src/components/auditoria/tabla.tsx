@@ -65,7 +65,7 @@ export function NombreFila({ r, warnDays, onAbrir }: { r: AuditRow; warnDays: nu
         )}
         {r.manual && <TagManual />}
       </div>
-      {(rubro || aviso || docs) && (
+      {(rubro || aviso || r.autorizadoSinSeguro || docs) && (
         <p className="mt-0.5 break-words text-xs text-ink-soft tabular">
           {rubro}
           {aviso && (
@@ -73,7 +73,10 @@ export function NombreFila({ r, warnDays, onAbrir }: { r: AuditRow; warnDays: nu
               {rubro && ' · '}{aviso}
             </span>
           )}
-          {(rubro || aviso) && docs && ' · '}
+          {r.autorizadoSinSeguro && (
+            <span className="font-semibold text-alto">{(rubro || aviso) && ' · '}autorizado sin seguro</span>
+          )}
+          {(rubro || aviso || r.autorizadoSinSeguro) && docs && ' · '}
           {docs}
         </p>
       )}

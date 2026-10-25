@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { use, useState } from 'react'
 import { Download, Inbox, LayoutGrid, Search, SearchX, Table2, X } from 'lucide-react'
 import { apiBase } from '@/lib/api'
 import { useMe } from '@/lib/session'
@@ -51,8 +51,16 @@ function rangoActivo(from: string, to: string): Rango {
   return 'otro'
 }
 
-export default function AuditoriaPage() {
+const SEGUROS: { valor: 'todos' | 'sinSeguro'; etiqueta: string }[] = [
+  { valor: 'todos', etiqueta: 'Todos' },
+  { valor: 'sinSeguro', etiqueta: 'Autorizados sin seguro' },
+]
+
+/** `?sinSeguro=1` llega desde el aviso del tablero. */
+export default function AuditoriaPage({ searchParams }: { searchParams: Promise<{ sinSeguro?: string }> }) {
+  const sp = use(searchParams)
   const me = useMe()
+  const [sinSeguro, setSinSeguro] = useState(sp.sinSeguro === '1')
   const [from, setFrom] = useState(sumarDias(hoyISO(), -7))
   const [to, setTo] = useState(hoyISO())
   const [estado, setEstado] = useState<FiltrosAuditoria['estado']>('todos')
@@ -68,7 +76,7 @@ export default function AuditoriaPage() {
 
   // El buscador espera a que se deje de tipear: "martin" son seis teclas, no seis consultas.
   const q = useDemora(texto)
-  const filtros: FiltrosAuditoria = { from, to, estado, tipo, q }
+  const filtros: FiltrosAuditoria = { from, to, estado, tipo, q, sinSeguro }
   const consulta = useAuditoria(filtros, page, PAGE_SIZE, Boolean(me))
 
   /** Cada cambio de filtro vuelve a la primera página: la 3 de otra búsqueda no existe. */
@@ -90,7 +98,10 @@ export default function AuditoriaPage() {
   if (tipo !== 'todos') aplicados.push({
     clave: 'tipo', etiqueta: TIPOS.find((t) => t.valor === tipo)!.etiqueta, quitar: () => cambiar(setTipo)('todos'),
   })
-  function limpiarPanel() { setTipo('todos'); aplicarRango('7') }
+  if (sinSeguro) aplicados.push({
+    clave: 'sinSeguro', etiqueta: 'Autorizados sin seguro', quitar: () => cambiar(setSinSeguro)(false),
+  })
+  function limpiarPanel() { setTipo('todos'); setSinSeguro(false); aplicarRango('7') }
 
   const hayFiltros = texto !== '' || estado !== 'todos' || aplicados.length > 0
   function limpiar() { setTexto(''); setEstado('todos'); limpiarPanel() }
@@ -152,6 +163,10 @@ export default function AuditoriaPage() {
               </SeccionFiltro>
               <SeccionFiltro titulo="Tipo de invitación">
                 <Chips etiqueta="Tipo de invitación" valor={tipo} onCambio={cambiar(setTipo)} opciones={TIPOS} />
+              </SeccionFiltro>
+              <SeccionFiltro titulo="Seguros">
+                <Chips etiqueta="Seguros" valor={sinSeguro ? 'sinSeguro' : 'todos'}
+                  onCambio={(v) => cambiar(setSinSeguro)(v === 'sinSeguro')} opciones={SEGUROS} />
               </SeccionFiltro>
             </HojaFiltros>
           </div>

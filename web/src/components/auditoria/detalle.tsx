@@ -84,6 +84,17 @@ export function Detalle({ fila: abierta, warnDays, onCerrar }: { fila: AuditRow 
             </SheetHeader>
             <div className="flex flex-col gap-3 px-4 pb-6">
               {esProveedor(fila) && <Proveedor r={fila} warnDays={warnDays} />}
+              {fila.plate && (
+                <Bloque titulo="Vehículo">
+                  <dl>
+                    <Dato etiqueta="Patente">{fila.plate}</Dato>
+                    <Dato etiqueta="Seguro">{fila.vehicleCompany ? `${fila.vehicleCompany} · ${fila.vehiclePolicy}` : 'Sin cargar'}</Dato>
+                    <Dato etiqueta="Vence">{fila.vehicleExpiresOn ? fechaCompleta(fila.vehicleExpiresOn) : '—'}</Dato>
+                  </dl>
+                  {/* El de hoy: cómo estaba en cada ingreso lo dicen los movimientos. */}
+                  <p className="mt-2 text-xs text-ink-soft">El estado en cada ingreso está en Movimientos.</p>
+                </Bloque>
+              )}
               <Bloque titulo="Invitación">
                 <dl>
                   <Dato etiqueta="Tipo">{tipo}</Dato>

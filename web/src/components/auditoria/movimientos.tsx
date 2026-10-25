@@ -5,6 +5,9 @@ import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { fechaHora } from '@/lib/fechas'
 import { useMovimientos } from '@/lib/queries/auditoria'
 
+/** La foto del seguro al ingresar; 'no_aplica' no se muestra. */
+const FOTO: Record<string, string> = { sin_cargar: 'Sin cargar', vencido: 'Vencido', por_vencer: 'Por vencer', vigente: 'Vigente' }
+
 const guardia = (manual: boolean, nombre: string | null) =>
   manual && nombre ? `Carga manual · ${nombre}` : nombre ?? 'guardia sin registrar'
 
@@ -33,6 +36,13 @@ export function Movimientos({ id }: { id: string }) {
           {(m.guestName || m.guestDoc || m.plate) && (
             <p className="text-ink-soft sm:col-span-2">
               {[m.guestName, m.guestDoc && `DNI ${m.guestDoc}`, m.plate].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          {(FOTO[m.providerInsurance ?? ''] || FOTO[m.vehicleInsurance ?? ''] || m.autorizadoSinSeguro) && (
+            <p className="text-ink-soft sm:col-span-2">
+              {[FOTO[m.providerInsurance ?? ''] && `Seguro al ingresar: ${FOTO[m.providerInsurance!]}`,
+                FOTO[m.vehicleInsurance ?? ''] && `Auto: ${FOTO[m.vehicleInsurance!]}`].filter(Boolean).join(' · ')}
+              {m.autorizadoSinSeguro && <span className="font-semibold text-alto"> · autorizó igual {m.guardName ?? 'la guardia'}</span>}
             </p>
           )}
           {m.manual && (m.loadedAt || m.note) && (
