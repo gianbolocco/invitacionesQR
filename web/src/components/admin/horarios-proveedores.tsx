@@ -103,7 +103,7 @@ export function HorariosProveedores({ inicial, rubros }: { inicial: Franja[]; ru
         Un proveedor entra si alguna franja incluye su rubro, el día y la hora. Fuera de eso, la garita lo rechaza y puede usar &quot;Autorizar igual&quot;.
       </p>
 
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[56rem] border-collapse text-sm tabular">
           <thead>
             <tr className="border-b border-line text-left text-[13px] font-semibold text-ink-soft">

@@ -29,8 +29,7 @@ test('el admin cambia el color del barrio y lo ve sin recargar', async ({ page }
   // para verlo, así que alcanza con que el swatch quede marcado.
   await expect(otro).toHaveAttribute('aria-pressed', 'true')
 
-  // Por teclado: en el celular el scroll automático de Playwright deja el botón tapado por el header sticky.
-  await page.getByRole('button', { name: 'Guardar', exact: true }).press('Enter')
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click()
   await expect(page.getByText('Guardado.')).toBeVisible()
 
   // Sin recargar: la banda del propio admin ya tiene que reflejar el color.

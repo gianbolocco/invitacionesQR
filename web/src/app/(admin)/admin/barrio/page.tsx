@@ -128,7 +128,7 @@ export default function BarrioPage() {
   if (barrio.isPending) return <p className="text-ink-soft">Cargando…</p>
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="flex flex-col gap-6">
         <EncabezadoPagina titulo={barrio.data?.name ?? 'Barrio'}
           subtitulo="Esto aparece en el link que recibe el invitado, abajo de quién lo invitó." />
@@ -327,7 +327,7 @@ export default function BarrioPage() {
         <section aria-labelledby="proveedores" className="flex flex-col gap-3">
           <h2 id="proveedores" className="text-[13px] font-semibold text-ink-soft">Proveedores</h2>
           {barrio.data && (
-            <div className="grid items-start gap-4 xl:grid-cols-[1fr_17rem]">
+            <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
               <div className="flex flex-col gap-4">
                 <HorariosProveedores inicial={barrio.data.providerWindows} rubros={rubros.data ?? []} />
                 <Rubros />
