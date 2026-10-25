@@ -374,12 +374,15 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
 
   return (
     <main aria-live="assertive"
-      className={`min-h-dvh overflow-x-hidden p-6 sm:p-10 lg:px-14 ${ok ? 'bg-verde-tint text-ink' : 'bg-no-pasa text-no-pasa-texto'}`}>
+      className={`isolate min-h-dvh overflow-clip p-6 sm:p-10 lg:px-14 dark:bg-surface dark:text-ink ${ok ? 'bg-verde-tint text-ink' : 'bg-no-pasa text-no-pasa-texto'}`}>
       {/* Un solo árbol. Mobile: una columna, la acción al pie. Desde lg: lo que
           decide a la izquierda, para leer de lejos; la ficha y la acción a la
           derecha, para el guardia sentado. Solo cambia la grilla. */}
       <div className="mx-auto grid min-h-[calc(100dvh-3rem)] w-full max-w-2xl grid-rows-[auto_1fr] gap-8 sm:min-h-[calc(100dvh-5rem)] lg:max-w-7xl lg:grid-cols-[3fr_2fr] lg:grid-rows-1 lg:items-center lg:gap-16">
-        <section className="min-w-0">
+        {/* De noche el color de pantalla entera encandila: en oscuro lo lleva
+            solo este panel, que se estira hasta el borde de la pantalla y, en
+            escritorio, hasta la línea de la ficha (el gap-16). */}
+        <section className={`relative min-w-0 dark:before:absolute dark:before:-inset-x-[100vw] dark:before:-top-[100vh] dark:before:-bottom-4 dark:before:-z-10 dark:before:content-[''] lg:dark:before:-right-16 lg:dark:before:-bottom-[100vh] ${ok ? 'dark:before:bg-verde-tint' : 'dark:text-no-pasa-texto dark:before:bg-no-pasa'}`}>
           {/* Mientras se recalcula, la palabra es la de la patente o el DNI anterior: se atenúa. */}
           <motion.h1 initial={{ opacity: 0, scale: 1.12 }} animate={{ opacity: alDia ? 1 : 0.5, scale: 1 }}
             transition={{ duration: 0.26, ease: [0.2, 0.9, 0.3, 1] }}

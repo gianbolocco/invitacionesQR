@@ -146,8 +146,9 @@
   --talon-fondo: #ffffff;
   --talon-qr: #0b1640;
 
-  /* El campo de "No pasa": bordó con texto casi blanco, igual en los dos temas
-     (decisión del dueño). Se lee a dos metros y no se confunde con el ingreso. */
+  /* El campo de "No pasa": bordó con texto casi blanco (decisión del dueño).
+     Se lee a dos metros y no se confunde con el ingreso. En oscuro se apaga y
+     pinta solo el panel de la palabra, no la pantalla entera. */
   --no-pasa: #7a1420;
   --no-pasa-texto: #fff1f0;
 
@@ -191,6 +192,7 @@
   --espera-tint: #2e2410;
   --alto: #ff8a7a;
   --alto-tint: #3a1620;
+  --no-pasa: #4a111a;
   --focus: #ffc933;
   --sombra-pase: drop-shadow(0 14px 16px rgb(0 0 0 / 0.35));
   --sombra-flotante: 0 18px 40px -16px rgb(0 0 0 / 0.6);
@@ -214,6 +216,7 @@
     --espera-tint: #2e2410;
     --alto: #ff8a7a;
     --alto-tint: #3a1620;
+    --no-pasa: #4a111a;
     --focus: #ffc933;
     --sombra-pase: drop-shadow(0 14px 16px rgb(0 0 0 / 0.35));
     --sombra-flotante: 0 18px 40px -16px rgb(0 0 0 / 0.6);
