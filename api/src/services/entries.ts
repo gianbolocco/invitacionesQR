@@ -98,8 +98,11 @@ export function aLike<T extends {
 async function buildCheck(invitation: LoadedInvitation, datos: { doc?: string; plate?: string } = {}) {
   const { usedCount, lastEntryAt } = await usage(invitation.id)
   const { providerWindows, insuranceWarnDays, neighborhoodId, vehicleInsuranceRequired, vehicleInsuranceOverride, ...crudo } = invitation
-  const doc = datos.doc ?? invitation.guestDoc ?? ''
-  const plate = datos.plate ?? invitation.plate ?? ''
+  // Si está adentro, lo que vale es con qué entró: la patente que tipeó la
+  // garita queda solo en entry_log, no en la invitación.
+  const abierta = await openEntry(invitation.id)
+  const doc = datos.doc ?? (abierta ? abierta.guestDoc : invitation.guestDoc) ?? ''
+  const plate = datos.plate ?? (abierta ? abierta.plate : invitation.plate) ?? ''
   const [provider, vehicle, lastPlate] = await Promise.all([
     buscarProveedor(neighborhoodId, doc),
     buscarVehiculo(neighborhoodId, plate),
@@ -107,7 +110,6 @@ async function buildCheck(invitation: LoadedInvitation, datos: { doc?: string; p
   ])
   const inv = aLike(crudo, { provider, vehicle, hayPatente: normalizarPatente(plate) !== '', vehicleInsuranceRequired, vehicleInsuranceOverride })
   const check: EntryCheck = canEnter(inv, new Date(), usedCount, providerWindows)
-  const abierta = await openEntry(invitation.id)
 
   return {
     invitation: inv,
@@ -127,7 +129,7 @@ async function buildCheck(invitation: LoadedInvitation, datos: { doc?: string; p
      * egreso no se valida. El cliente decide a qué endpoint pegar con esto, y
      * el servidor valida igual por si el dato quedó viejo.
      */
-    adentro: abierta ? { entryId: abierta.id, enteredAt: abierta.enteredAt } : null,
+    adentro: abierta ? { entryId: abierta.id, enteredAt: abierta.enteredAt, guestDoc: abierta.guestDoc, plate: abierta.plate } : null,
   }
 }
 
@@ -148,7 +150,7 @@ async function usage(invitationId: string, tx: Executor = db) {
  * salida, que es la verdad: no sabemos a qué hora se fue.
  */
 async function openEntry(invitationId: string, tx: Executor = db) {
-  const [row] = await tx.select({ id: entryLogs.id, enteredAt: entryLogs.enteredAt })
+  const [row] = await tx.select({ id: entryLogs.id, enteredAt: entryLogs.enteredAt, guestDoc: entryLogs.guestDoc, plate: entryLogs.plate })
     .from(entryLogs)
     .where(and(eq(entryLogs.invitationId, invitationId), isNull(entryLogs.exitedAt)))
     .orderBy(desc(entryLogs.enteredAt))

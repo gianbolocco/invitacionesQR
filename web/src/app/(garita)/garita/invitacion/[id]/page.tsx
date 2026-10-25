@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2 } from 'lucide-react'
-import { MOTIVO, detalleRechazo, hora, mensajeDeError, rechazoPorAuto, rechazoPorSeguro, type Movimiento } from '@/lib/gate'
+import { MOTIVO, detalleRechazo, hora, inicial, mensajeDeError, rechazoPorAuto, rechazoPorSeguro, type Movimiento } from '@/lib/gate'
 import { estadoDe, textoVence } from '@/lib/seguro'
 import { mismaPatente, normalizarDoc, normalizarPatente } from '@/lib/padron'
 import { useDemora } from '@/lib/use-demora'
@@ -140,9 +140,9 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   if (q.data && q.data.invitation.id !== idCargado) {
     setIdCargado(q.data.invitation.id)
     const leido = documentoLeido.ver(q.data.invitation.id)
-    setDoc(leido ?? q.data.invitation.guestDoc ?? '')
+    setDoc(leido ?? inicial(q.data).doc)
     setDocLeido(Boolean(leido))
-    setPlate(q.data.invitation.plate ?? '')
+    setPlate(inicial(q.data).plate)
     setSeguro(VACIO); setSeguroAuto(VACIO); setCorrigiendo({ proveedor: false, auto: false })
   }
 
@@ -165,8 +165,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const docDemorado = useDemora(doc)
   const plateDemorada = useDemora(plate)
   const base = q.data
-  const distinto = (d: string, p: string) => Boolean(base) && (normalizarDoc(d) !== normalizarDoc(base?.invitation.guestDoc ?? '')
-    || !mismaPatente(p, base?.invitation.plate ?? null))
+  const distinto = (d: string, p: string) => Boolean(base) && (normalizarDoc(d) !== normalizarDoc(base ? inicial(base).doc : '')
+    || !mismaPatente(p, base ? inicial(base).plate : null))
   // Los dos: al cargar, la demora arranca en '' y tarda 300 ms en alcanzar la precarga;
   // sin mirar el valor actual, pediría (y mostraría) un veredicto sin documento ni patente.
   const cambio = distinto(doc, plate) && distinto(docDemorado, plateDemorada)

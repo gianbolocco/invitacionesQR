@@ -112,6 +112,16 @@ describe('padrón: el ingreso', () => {
   const entrar = (guardia: string[], invitationId: string, extra: object = {}) =>
     request(app).post('/gate/entries').set('Cookie', guardia).send({ invitationId, guestName: 'Carlos', guestDoc: '30.123.456', ...extra })
 
+  it('el egreso muestra la patente con la que entró, aunque la invitación no la tuviera', async () => {
+    const { guardia, invitar, pedirAuto } = await escenario()
+    await pedirAuto()
+    const inv = await invitar()
+    await entrar(guardia, inv.id, { plate: 'AB 123 CD', vehicleInsurance: seguro }).expect(201)
+    const r = await request(app).get(`/gate/invitation/${inv.id}`).set('Cookie', guardia).expect(200)
+    expect(r.body.adentro).toMatchObject({ plate: 'AB 123 CD', guestDoc: '30.123.456' })
+    expect(r.body.vehicle?.plate).toBe('AB123CD')
+  })
+
   it('el guardia carga el seguro del auto, entra, y la segunda vez el auto pasa sin pedirlo', async () => {
     const { n, guardia, invitar, pedirAuto, veredicto } = await escenario()
     await pedirAuto()

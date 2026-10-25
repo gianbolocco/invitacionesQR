@@ -8,7 +8,8 @@ import type { SeguroDatos } from './seguro'
 
 export type Check = { ok: true } | { ok: false; reason: string }
 
-export type Adentro = { entryId: string; enteredAt: string } | null
+/** Con qué documento y patente entró: puede no ser lo de la invitación. */
+export type Adentro = { entryId: string; enteredAt: string; guestDoc: string | null; plate: string | null } | null
 
 export type Resultado = {
   invitation: {
@@ -146,6 +147,12 @@ export function mensajeDeError(error: unknown): string {
 }
 
 export const porId = (id: string) => api<Resultado>(`/gate/invitation/${id}`)
+
+/** Lo que el veredicto precarga: si está adentro, con qué entró; si no, lo de la invitación. */
+export function inicial(r: Pick<Resultado, 'invitation' | 'adentro'>): { doc: string; plate: string } {
+  const de = r.adentro ?? r.invitation
+  return { doc: de.guestDoc ?? '', plate: de.plate ?? '' }
+}
 
 /** El veredicto con lo que el guardia tiene tipeado. POST: el DNI no va en la URL. */
 export const veredictoCon = (id: string, datos: { doc: string; plate: string }, signal?: AbortSignal) =>
