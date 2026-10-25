@@ -5,9 +5,11 @@ import { canEnter, type EntryCheck } from '../authz.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
 import { audit } from '../lib/audit.js'
-import { pideSeguro, type Seguro } from '../lib/seguro.js'
+import { pideSeguro, claveSeguro, type Seguro } from '../lib/seguro.js'
+import { aplicaFranjas } from '../lib/franjas.js'
+import { normalizarPatente } from '../lib/padron.js'
 import { PORTERIA } from '../lib/porteria.js'
-import { buscarProveedor, buscarVehiculo, ultimaPatente, type ProveedorPadron, type VehiculoPadron } from './padron.js'
+import { buscarProveedor, buscarVehiculo, guardarProveedor, guardarVehiculo, ultimaPatente, type ProveedorPadron, type VehiculoPadron } from './padron.js'
 import { assertUnitInNeighborhood, valoresDePorteria, franjasDelRubro } from './invitations.js'
 
 /** db o una transacción: las queries de lectura sirven para las dos. */
@@ -175,7 +177,7 @@ export async function checkById(id: string, datos?: { doc?: string; plate?: stri
 export async function registerEntry(
   invitationId: string,
   guardId: string | null,
-  data: { guestName: string; guestDoc?: string; plate?: string; note?: string; insurance?: Seguro },
+  data: { guestName: string; guestDoc?: string; plate?: string; note?: string; insurance?: Seguro; vehicleInsurance?: Seguro },
 ) {
   return db.transaction(async (tx) => {
     const [target] = await tx.select().from(invitations)
@@ -187,26 +189,38 @@ export async function registerEntry(
     const [{ creatorRole }] = await tx.select({ creatorRole: people.role }).from(people).where(eq(people.id, target.createdBy))
 
     // Después del FOR UPDATE de arriba, que sigue siendo lo que serializa el cupo.
-    const [{ providerWindows, nid }] = await tx.select({ providerWindows: neighborhoods.providerWindows, nid: neighborhoods.id })
-      .from(units).innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
+    const [barrio] = await tx.select({
+      providerWindows: neighborhoods.providerWindows, nid: neighborhoods.id, warnDays: neighborhoods.insuranceWarnDays,
+      vehicleInsuranceRequired: neighborhoods.vehicleInsuranceRequired, vehicleInsuranceOverride: neighborhoods.vehicleInsuranceOverride,
+    }).from(units).innerJoin(neighborhoods, eq(neighborhoods.id, units.neighborhoodId))
       .where(eq(units.id, target.unitId)).limit(1)
     const [rubro] = target.tradeId
       ? await tx.select({ requiresInsurance: trades.requiresInsurance }).from(trades).where(eq(trades.id, target.tradeId))
       : []
     const pide = pideSeguro(target.kind, target.frequentAs, rubro?.requiresInsurance ?? null)
+    const doc = data.guestDoc?.trim() ?? ''
+    const plate = data.plate?.trim() ?? ''
 
-    // El seguro que trae el guardia se guarda ANTES de canEnter y en esta misma
-    // transacción: si canEnter rechaza, el throw lo revierte junto con su auditoría.
-    let seguro = { insuranceCompany: target.insuranceCompany, insurancePolicy: target.insurancePolicy, insuranceExpiresOn: target.insuranceExpiresOn }
-    if (data.insurance && pide) {
-      seguro = { insuranceCompany: data.insurance.company, insurancePolicy: data.insurance.policy, insuranceExpiresOn: data.insurance.expiresOn }
-      await tx.update(invitations).set(seguro).where(eq(invitations.id, invitationId))
-      await audit(guardId, nid, 'invitation.insurance_updated', 'invitation', invitationId, data.insurance, tx)
+    // El padrón se escribe ANTES de canEnter y en esta misma transacción: si
+    // canEnter rechaza, el throw lo revierte junto con su auditoría.
+    if (aplicaFranjas(target.kind, target.frequentAs) && doc) {
+      await guardarProveedor(tx, {
+        neighborhoodId: barrio.nid, doc, name: data.guestName, tradeId: target.tradeId,
+        insurance: pide ? data.insurance : undefined, actorId: guardId,
+      })
+    }
+    if (data.vehicleInsurance) {
+      await guardarVehiculo(tx, { neighborhoodId: barrio.nid, plate, insurance: data.vehicleInsurance, actorId: guardId })
     }
 
-    const check = canEnter(aLike({ ...target, creatorRole, requiresInsurance: rubro?.requiresInsurance ?? null },
-      { provider: null, vehicle: null, hayPatente: false, vehicleInsuranceRequired: false, vehicleInsuranceOverride: true }),
-      new Date(), usedCount, providerWindows)
+    const provider = await buscarProveedor(barrio.nid, doc, tx)
+    const vehicle = await buscarVehiculo(barrio.nid, plate, tx)
+    const inv = aLike({ ...target, creatorRole, requiresInsurance: rubro?.requiresInsurance ?? null }, {
+      provider, vehicle, hayPatente: normalizarPatente(plate) !== '',
+      vehicleInsuranceRequired: barrio.vehicleInsuranceRequired, vehicleInsuranceOverride: barrio.vehicleInsuranceOverride,
+    })
+    const ahora = new Date()
+    const check = canEnter(inv, ahora, usedCount, barrio.providerWindows)
     if (!check.ok) throw new AppError(409, check.reason)
 
     const [entry] = await tx.insert(entryLogs).values({
@@ -214,17 +228,20 @@ export async function registerEntry(
       unitId: target.unitId,
       guardId,
       guestName: data.guestName.trim(),
-      guestDoc: data.guestDoc?.trim() || null,
-      plate: data.plate?.trim().toUpperCase() || null,
+      guestDoc: doc || null,
+      plate: plate.toUpperCase() || null,
       note: data.note?.trim() || null,
+      // La foto de los seguros en este momento: el padrón cambia, la auditoría no.
+      // Se calcula sin las excepciones de la portería: así se ve lo que se autorizó igual.
+      providerInsurance: claveSeguro(pide, provider?.insurance ?? null, barrio.warnDays, ahora),
+      vehicleInsurance: claveSeguro(inv.vehicleRequiresInsurance, vehicle?.insurance ?? null, barrio.warnDays, ahora),
     }).returning()
 
     // Si la invitación no tenía documento, el que se tipeó en la puerta
     // queda ahí: la próxima vez (frecuente, proveedor) ya viene precargado.
     // La fila de la invitación ya está bloqueada por el FOR UPDATE de arriba.
-    if (!target.guestDoc && data.guestDoc?.trim()) {
-      await tx.update(invitations).set({ guestDoc: data.guestDoc.trim() })
-        .where(eq(invitations.id, invitationId))
+    if (!target.guestDoc && doc) {
+      await tx.update(invitations).set({ guestDoc: doc }).where(eq(invitations.id, invitationId))
     }
 
     return entry

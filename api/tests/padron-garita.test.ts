@@ -106,3 +106,88 @@ describe('padrón: el check de la garita', () => {
     expect(await db.select().from(auditLogs)).toHaveLength(0)
   })
 })
+
+describe('padrón: el ingreso', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+  const entrar = (guardia: string[], invitationId: string, extra: object = {}) =>
+    request(app).post('/gate/entries').set('Cookie', guardia).send({ invitationId, guestName: 'Carlos', guestDoc: '30.123.456', ...extra })
+
+  it('el guardia carga el seguro del auto, entra, y la segunda vez el auto pasa sin pedirlo', async () => {
+    const { n, guardia, invitar, pedirAuto, veredicto } = await escenario()
+    await pedirAuto()
+    const primera = await invitar({ plate: 'AB 123 CD' })
+    await entrar(guardia, primera.id, { plate: 'AB 123 CD' }).expect(409)
+    const r = await entrar(guardia, primera.id, { plate: 'AB 123 CD', vehicleInsurance: seguro }).expect(201)
+    expect(r.body.vehicleInsurance).toBe('vigente')
+    const [v] = await db.select().from(vehicles).where(eq(vehicles.neighborhoodId, n.id))
+    expect(v.plate).toBe('AB123CD')
+
+    const segunda = await invitar({ plate: 'ab123cd' })
+    expect((await veredicto(segunda.id, {}).expect(200)).body.check).toEqual({ ok: true })
+  })
+
+  it('un seguro del auto vencido no entra y no deja nada guardado', async () => {
+    const { guardia, invitar, pedirAuto } = await escenario()
+    await pedirAuto()
+    const inv = await invitar({ plate: 'AB 123 CD' })
+    const r = await entrar(guardia, inv.id, { plate: 'AB 123 CD', vehicleInsurance: vencido }).expect(409)
+    expect(r.body.error).toBe('vehicle_insurance_expired')
+    expect(await db.select().from(vehicles)).toHaveLength(0)
+    expect(await db.select().from(auditLogs).where(eq(auditLogs.action, 'vehicle.insurance_updated'))).toHaveLength(0)
+  })
+
+  it('vehicleInsurance sin patente da 400', async () => {
+    const { guardia, invitar } = await escenario()
+    const inv = await invitar()
+    await entrar(guardia, inv.id, { vehicleInsurance: seguro }).expect(400)
+  })
+
+  it('el ingreso de un proveedor lo deja en el padrón con su nombre, rubro y seguro', async () => {
+    const { guardia, invitar, rubro, guardiaId } = await escenario()
+    const tradeId = await rubro('Albañil', true)
+    const inv = await invitar({ kind: 'proveedor', tradeId })
+    const r = await entrar(guardia, inv.id, { guestName: 'Carlos Gómez', insurance: seguro }).expect(201)
+    expect(r.body.providerInsurance).toBe('vigente')
+    const [p] = await db.select().from(providers)
+    expect(p).toMatchObject({ doc: '30123456', name: 'Carlos Gómez', tradeId, insurancePolicy: '4410-2231', insuranceSource: 'garita', insuranceUpdatedBy: guardiaId })
+  })
+
+  it('una visita no entra al padrón', async () => {
+    const { guardia, invitar } = await escenario()
+    const inv = await invitar()
+    const r = await entrar(guardia, inv.id).expect(201)
+    expect(r.body).toMatchObject({ providerInsurance: 'no_aplica', vehicleInsurance: 'no_aplica' })
+    expect(await db.select().from(providers)).toHaveLength(0)
+  })
+
+  it('la foto del ingreso no cambia cuando el padrón se renueva', async () => {
+    const { n, guardia, invitar, pedirAuto, admin } = await escenario()
+    await request(app).patch('/admin/neighborhood').set('Cookie', admin).send({ insuranceWarnDays: 90 }).expect(200)
+    await pedirAuto()
+    const casiVence = { ...seguro, expiresOn: hoy }
+    const inv = await invitar({ plate: 'AB 123 CD' })
+    const { body: fila } = await entrar(guardia, inv.id, { plate: 'AB 123 CD', vehicleInsurance: casiVence }).expect(201)
+    expect(fila.vehicleInsurance).toBe('por_vencer')
+    await db.update(vehicles).set({ insuranceExpiresOn: '2999-01-01' }).where(eq(vehicles.neighborhoodId, n.id))
+    const [despues] = await db.select().from(entryLogs).where(eq(entryLogs.id, fila.id))
+    expect(despues.vehicleInsurance).toBe('por_vencer')
+  })
+
+  it('un alta exprés deja entrar un auto sin seguro si el barrio lo permite, y queda marcado', async () => {
+    const { u, guardia, pedirAuto } = await escenario()
+    await pedirAuto(true)
+    const { body: alta } = await request(app).post('/gate/invitations').set('Cookie', guardia)
+      .send({ unitId: u.id, guestName: 'Carlos', plate: 'AB 123 CD' }).expect(201)
+    const r = await entrar(guardia, alta.id, { plate: 'AB 123 CD' }).expect(201)
+    expect(r.body.vehicleInsurance).toBe('sin_cargar')
+  })
+
+  it('un alta exprés no deja entrar un auto sin seguro si el barrio no lo permite', async () => {
+    const { u, guardia, pedirAuto } = await escenario()
+    await pedirAuto(false)
+    const { body: alta } = await request(app).post('/gate/invitations').set('Cookie', guardia)
+      .send({ unitId: u.id, guestName: 'Carlos', plate: 'AB 123 CD' }).expect(201)
+    expect((await entrar(guardia, alta.id, { plate: 'AB 123 CD' }).expect(409)).body.error).toBe('no_vehicle_insurance')
+    await entrar(guardia, alta.id, { plate: '' }).expect(201)
+  })
+})

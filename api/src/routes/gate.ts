@@ -17,6 +17,7 @@ import { COLOR_DEFAULT } from '../lib/marca.js'
 import { entriesLog } from '../services/reports.js'
 import { getNeighborhood } from '../services/neighborhoods.js'
 import { escucharAvisos } from '../lib/avisos.js'
+import { normalizarPatente } from '../lib/padron.js'
 import { zSeguro } from './invitations.js'
 
 export const gateRoutes = Router()
@@ -87,8 +88,11 @@ gateRoutes.post('/entries', async (req, res) => {
     guestDoc: z.string().trim().min(1),
     plate: z.string().optional(),
     note: z.string().optional(),
-    // Sin null: la barrera carga o renueva el seguro, no lo borra.
+    // Sin null: la barrera carga o renueva un seguro, no lo borra.
     insurance: zSeguro.unwrap().optional(),
+    vehicleInsurance: zSeguro.unwrap().optional(),
+  }).refine((b) => !b.vehicleInsurance || normalizarPatente(b.plate ?? '') !== '', {
+    message: 'El seguro del auto va con su patente', path: ['plate'],
   }).parse(req.body)
 
   // El guardia sale de la sesión, no del body: un dato de auditoría no puede

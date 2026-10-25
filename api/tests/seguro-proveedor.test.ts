@@ -4,7 +4,7 @@ import ExcelJS from 'exceljs'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
 import { eq } from 'drizzle-orm'
-import { auditLogs, entryLogs, invitations, neighborhoods, people, units, unitMembers } from '../src/db/schema.js'
+import { auditLogs, entryLogs, invitations, neighborhoods, people, providers, units, unitMembers } from '../src/db/schema.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
 import { hashPassword } from '../src/lib/crypto.js'
 import { resetDb } from './helpers/db.js'
@@ -204,16 +204,16 @@ describe('seguro del proveedor: barrera', () => {
     expect(r.body.error).toBe('no_insurance')
   })
 
-  it('con insurance vigente entra, la invitación guarda el seguro y queda auditado', async () => {
+  it('con insurance vigente entra, el padrón guarda el seguro y queda auditado', async () => {
     const { guardia, invitar, rubro } = await conGuardia()
-    const { body: inv } = await invitar({ tradeId: await rubro('Albañil', true) }).expect(201)
-    await request(app).post('/gate/entries').set('Cookie', guardia).send(entrada(inv.id, { insurance: seguro })).expect(201)
-    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
-    expect(fila.insurancePolicy).toBe('AP-123')
+    await invitar({ tradeId: await rubro('Albañil', true) }).expect(201).then(({ body: inv }) =>
+      request(app).post('/gate/entries').set('Cookie', guardia).send(entrada(inv.id, { insurance: seguro })).expect(201))
+    const [p] = await db.select().from(providers)
+    expect(p.insurancePolicy).toBe('AP-123')
     const [g] = await db.select().from(people).where(eq(people.email, 'guardia@example.com'))
-    const logs = await db.select().from(auditLogs).where(eq(auditLogs.action, 'invitation.insurance_updated'))
+    const logs = await db.select().from(auditLogs).where(eq(auditLogs.action, 'provider.insurance_updated'))
     expect(logs).toHaveLength(1)
-    expect(logs[0]).toMatchObject({ actorId: g.id, entityId: inv.id })
+    expect(logs[0]).toMatchObject({ actorId: g.id, entityId: p.id })
   })
 
   it('con insurance vencido da 409 insurance_expired y no deja nada guardado', async () => {
@@ -222,17 +222,16 @@ describe('seguro del proveedor: barrera', () => {
     const r = await request(app).post('/gate/entries').set('Cookie', guardia)
       .send(entrada(inv.id, { insurance: { ...seguro, expiresOn: '2000-01-01' } })).expect(409)
     expect(r.body.error).toBe('insurance_expired')
-    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
-    expect(fila.insurancePolicy).toBeNull()
-    expect(await db.select().from(auditLogs).where(eq(auditLogs.action, 'invitation.insurance_updated'))).toHaveLength(0)
+    expect(await db.select().from(providers)).toHaveLength(0)
+    expect(await db.select().from(auditLogs).where(eq(auditLogs.action, 'provider.insurance_updated'))).toHaveLength(0)
   })
 
   it('insurance en un rubro que no lo pide no se guarda', async () => {
     const { guardia, invitar, rubro } = await conGuardia()
     const { body: inv } = await invitar({ tradeId: await rubro('Agua') }).expect(201)
     await request(app).post('/gate/entries').set('Cookie', guardia).send(entrada(inv.id, { insurance: seguro })).expect(201)
-    const [fila] = await db.select().from(invitations).where(eq(invitations.id, inv.id))
-    expect(fila.insurancePolicy).toBeNull()
+    const [p] = await db.select().from(providers)
+    expect(p.insurancePolicy).toBeNull()
   })
 
   it('la auditoría y el Excel traen el detalle del proveedor', async () => {
