@@ -3,7 +3,7 @@ import request from 'supertest'
 import { eq } from 'drizzle-orm'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
-import { auditLogs, entryLogs, neighborhoods, people, providers, units, unitMembers, vehicles } from '../src/db/schema.js'
+import { auditLogs, entryLogs, invitations, neighborhoods, people, providers, units, unitMembers, vehicles } from '../src/db/schema.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
 import { hashPassword } from '../src/lib/crypto.js'
 import { resetDb } from './helpers/db.js'
@@ -171,6 +171,42 @@ describe('padrón: el ingreso', () => {
     await db.update(vehicles).set({ insuranceExpiresOn: '2999-01-01' }).where(eq(vehicles.neighborhoodId, n.id))
     const [despues] = await db.select().from(entryLogs).where(eq(entryLogs.id, fila.id))
     expect(despues.vehicleInsurance).toBe('por_vencer')
+  })
+
+  it('la patente de la invitación rige el veredicto y el ingreso igual, y plate vacío es a pie', async () => {
+    const { n, guardia, guardiaId, invitar, pedirAuto, veredicto } = await escenario()
+    await pedirAuto()
+    await db.insert(vehicles).values({
+      neighborhoodId: n.id, plate: 'AB123CD', insuranceCompany: 'La Caja', insurancePolicy: '4410-2231',
+      insuranceExpiresOn: '2000-01-01', insuranceUpdatedBy: guardiaId,
+    })
+    const inv = await invitar({ plate: 'AB 123 CD' })
+    expect((await veredicto(inv.id, {}).expect(200)).body.check).toEqual({ ok: false, reason: 'vehicle_insurance_expired' })
+    expect((await entrar(guardia, inv.id).expect(409)).body.error).toBe('vehicle_insurance_expired')
+    const r = await entrar(guardia, inv.id, { plate: '' }).expect(201)
+    expect(r.body).toMatchObject({ vehicleInsurance: 'no_aplica', plate: null })
+  })
+
+  it('una patente de "-" es no tener auto, en el veredicto y en el ingreso', async () => {
+    const { guardia, invitar, pedirAuto, veredicto } = await escenario()
+    await pedirAuto()
+    const inv = await invitar()
+    expect((await veredicto(inv.id, { plate: '-' }).expect(200)).body.check).toEqual({ ok: true })
+    const r = await entrar(guardia, inv.id, { plate: '-' }).expect(201)
+    expect(r.body.vehicleInsurance).toBe('no_aplica')
+  })
+
+  it('un ingreso por una invitación sin rubro no borra el rubro del padrón', async () => {
+    const { n, u, guardia, rubro } = await escenario()
+    const tradeId = await rubro('Albañil')
+    await db.insert(providers).values({ neighborhoodId: n.id, doc: '30123456', name: 'Carlos', tradeId })
+    const [v] = await db.select().from(people).where(eq(people.email, 'vecino@example.com'))
+    const [inv] = await db.insert(invitations).values({
+      unitId: u.id, createdBy: v.id, kind: 'proveedor', guestName: 'Carlos', validFrom: hoy, validTo: hoy, token: 'tok-sin-rubro',
+    }).returning()
+    await entrar(guardia, inv.id).expect(201)
+    const [p] = await db.select().from(providers)
+    expect(p.tradeId).toBe(tradeId)
   })
 
   it('un alta exprés deja entrar un auto sin seguro si el barrio lo permite, y queda marcado', async () => {

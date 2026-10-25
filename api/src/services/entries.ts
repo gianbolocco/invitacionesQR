@@ -7,7 +7,7 @@ import { AppError } from '../lib/errors.js'
 import { audit } from '../lib/audit.js'
 import { pideSeguro, claveSeguro, type Seguro } from '../lib/seguro.js'
 import { aplicaFranjas } from '../lib/franjas.js'
-import { normalizarPatente } from '../lib/padron.js'
+import { normalizarDoc, normalizarPatente } from '../lib/padron.js'
 import { PORTERIA } from '../lib/porteria.js'
 import { buscarProveedor, buscarVehiculo, guardarProveedor, guardarVehiculo, ultimaPatente, type ProveedorPadron, type VehiculoPadron } from './padron.js'
 import { assertUnitInNeighborhood, valoresDePorteria, franjasDelRubro } from './invitations.js'
@@ -105,7 +105,7 @@ async function buildCheck(invitation: LoadedInvitation, datos: { doc?: string; p
     buscarVehiculo(neighborhoodId, plate),
     ultimaPatente(neighborhoodId, doc),
   ])
-  const inv = aLike(crudo, { provider, vehicle, hayPatente: plate.trim() !== '', vehicleInsuranceRequired, vehicleInsuranceOverride })
+  const inv = aLike(crudo, { provider, vehicle, hayPatente: normalizarPatente(plate) !== '', vehicleInsuranceRequired, vehicleInsuranceOverride })
   const check: EntryCheck = canEnter(inv, new Date(), usedCount, providerWindows)
   const abierta = await openEntry(invitation.id)
 
@@ -199,13 +199,14 @@ export async function registerEntry(
       : []
     const pide = pideSeguro(target.kind, target.frequentAs, rubro?.requiresInsurance ?? null)
     const doc = data.guestDoc?.trim() ?? ''
-    const plate = data.plate?.trim() ?? ''
+    // Misma regla que buildCheck: lo tipeado manda, si no la de la invitación; '' es a pie.
+    const plate = (data.plate ?? target.plate ?? '').trim()
 
     // El padrón se escribe ANTES de canEnter y en esta misma transacción: si
     // canEnter rechaza, el throw lo revierte junto con su auditoría.
-    if (aplicaFranjas(target.kind, target.frequentAs) && doc) {
+    if (aplicaFranjas(target.kind, target.frequentAs) && normalizarDoc(doc) !== '') {
       await guardarProveedor(tx, {
-        neighborhoodId: barrio.nid, doc, name: data.guestName, tradeId: target.tradeId,
+        neighborhoodId: barrio.nid, doc, name: data.guestName, tradeId: target.tradeId ?? undefined,
         insurance: pide ? data.insurance : undefined, actorId: guardId,
       })
     }

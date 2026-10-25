@@ -4,7 +4,8 @@ import { db } from '../src/db/index.js'
 import { auditLogs, entryLogs, invitations, neighborhoods, people, providers, units, vehicles } from '../src/db/schema.js'
 import { resetDb } from './helpers/db.js'
 import { violatedConstraint } from './helpers/constraint.js'
-import { normalizarDoc, normalizarPatente } from '../src/lib/padron.js'
+import { sql } from 'drizzle-orm'
+import { docSql, normalizarDoc, normalizarPatente } from '../src/lib/padron.js'
 import { buscarProveedor, buscarVehiculo, guardarProveedor, guardarVehiculo, ultimaPatente } from '../src/services/padron.js'
 import { AppError } from '../src/lib/errors.js'
 
@@ -23,6 +24,15 @@ describe('normalización del padrón', () => {
   it('lo que no tiene letras ni dígitos queda vacío', () => {
     expect(normalizarDoc(' .-. ')).toBe('')
     expect(normalizarPatente('')).toBe('')
+  })
+})
+
+describe('docSql', () => {
+  it('normaliza en SQL igual que normalizarDoc', async () => {
+    for (const input of ['30.123.456', 'aaa 123-456', ' - ', 'ab-12 cd']) {
+      const r = await db.execute(sql`select ${docSql(sql`${input}`)} as v`)
+      expect((r.rows ?? r)[0].v).toBe(normalizarDoc(input))
+    }
   })
 })
 
