@@ -20,6 +20,7 @@ delete from vehicle;
 delete from provider;
 delete from invitation;
 delete from trade;
+delete from contact;
 delete from unit_member;
 delete from session;
 delete from auth_token;
@@ -247,6 +248,12 @@ begin
     valid_from, valid_to, capacity, token, revoked_at, created_at)
   values (l12, laura, 'visita', 'Marcos Quiroga', '31.777.888', hoy, hoy, 1, md5(random()::text),
     ahora - interval '2 hours', ahora - interval '1 day');
+
+  -- Contactos de la casa de Laura: dos visitas y el jardinero (con seguro en el padrón).
+  insert into contact (unit_id, kind, name, doc, trade_id, created_by) values
+    (l12, 'visita', 'Rosa Benítez', '28.443.120', null, laura),
+    (l12, 'visita', 'Mamá', '12.334.556', null, laura),
+    (l12, 'proveedor', 'Osvaldo Benavídez', '22.870.134', (select id from trade where name = 'Gasista'), laura);
 end $$;
 
 -- Cuentas de demo activas con contraseña "pass123" (afuera del DO: los "$" del
