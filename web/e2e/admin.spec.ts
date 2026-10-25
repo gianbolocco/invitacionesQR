@@ -30,7 +30,7 @@ test('el admin cambia el color del barrio y lo ve sin recargar', async ({ page }
   await expect(otro).toHaveAttribute('aria-pressed', 'true')
 
   await page.getByRole('button', { name: 'Guardar', exact: true }).click()
-  await expect(page.getByText('Guardado.')).toBeVisible()
+  await expect(page.getByText('Guardado.', { exact: true })).toBeVisible()
 
   // Sin recargar: la banda del propio admin ya tiene que reflejar el color.
   await page.goto('/admin')

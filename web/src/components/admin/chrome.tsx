@@ -16,7 +16,7 @@ const PESTANAS = [
   { href: '/admin', etiqueta: 'Tablero' },
   { href: '/admin/vecinos', etiqueta: 'Vecinos' },
   { href: '/admin/guardias', etiqueta: 'Guardias' },
-  { href: '/admin/barrio', etiqueta: 'Barrio' },
+  { href: '/admin/barrio', etiqueta: 'Configuración' },
   { href: '/auditoria', etiqueta: 'Auditoría' },
   { href: '/seguros', etiqueta: 'Seguros' },
 ]
@@ -47,7 +47,8 @@ export function ChromeAdmin({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-6 px-4 md:px-6 xl:px-8">
           <Link href="/admin" aria-label="Inicio" className="flex min-w-0 items-center gap-2.5">
             <Marca conPazzit sobreColor />
-            <span className="hidden shrink-0 font-semibold text-white/80 lg:inline">· Administración</span>
+            {/* Con seis pestañas no entra al lado hasta 2xl: se pisaba con "Tablero". */}
+            <span className="hidden shrink-0 font-semibold text-white/80 2xl:inline">· Administración</span>
           </Link>
 
           {/* Seis pestañas no entran en una tablet: hasta 1024px sigue la barra de abajo. */}
@@ -91,7 +92,7 @@ export function ChromeAdmin({ children }: { children: React.ReactNode }) {
           <nav className="flex flex-col gap-1 px-4 pb-8">
             <Link href="/admin/barrio" onClick={() => setMasAbierto(false)}
               className="flex min-h-14 items-center gap-3 rounded-sm px-3 text-base font-semibold hover-fino:bg-azul-tint">
-              <Palette className="size-5 text-ink-soft" aria-hidden />Barrio
+              <Palette className="size-5 text-ink-soft" aria-hidden />Configuración
             </Link>
             <Link href="/seguros" onClick={() => setMasAbierto(false)}
               className="flex min-h-14 items-center gap-3 rounded-sm px-3 text-base font-semibold hover-fino:bg-azul-tint">

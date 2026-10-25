@@ -10,7 +10,7 @@ test('fuera del horario del rubro, la garita rechaza al proveedor y deja autoriz
   await entrar(page, 'admin')
   try {
     // El panel: el rubro nuevo aparece en la lista.
-    await page.goto('/admin/barrio')
+    await page.goto('/admin/barrio?tab=garita')
     await page.getByLabel('Nuevo rubro').fill(rubro)
     await page.getByLabel('Nuevo rubro').press('Enter') // Enter: en el celular el clic en "Agregar" no llega (se queda esperando)
     await expect(page.getByText(rubro, { exact: true })).toBeVisible()

@@ -103,25 +103,20 @@ export function HorariosProveedores({ inicial, rubros }: { inicial: Franja[]; ru
         Un proveedor entra si alguna franja incluye su rubro, el día y la hora. Fuera de eso, la garita lo rechaza y puede usar &quot;Autorizar igual&quot;.
       </p>
 
-      <div className="relative overflow-x-auto">
-        <table className="w-full min-w-[56rem] border-collapse text-sm tabular">
-          <thead>
-            <tr className="border-b border-line text-left text-[13px] font-semibold text-ink-soft">
-              <th className="px-2 pb-2">Días</th><th className="px-2 pb-2">Horario</th>
-              <th className="px-2 pb-2">Temporada</th><th className="px-2 pb-2">Rubros</th>
-              <th className="px-2 pb-2"><span className="sr-only">Quitar</span></th>
-            </tr>
-          </thead>
-          <tbody>
+      {/* Una tarjeta por franja y no una tabla: con cuatro columnas de controles la
+          tabla pedía ~900px y en la columna del panel quedaba con scroll lateral. */}
+      <ul className="flex flex-col gap-3 text-sm tabular">
             {franjas.length === 0 && (
-              <tr><td colSpan={5} className="px-2 py-4 text-ink-soft">Sin franjas: los proveedores entran a cualquier hora. Agregá una para restringir.</td></tr>
+              <li className="py-2 text-ink-soft">Sin franjas: los proveedores entran a cualquier hora. Agregá una para restringir.</li>
             )}
             {franjas.map((f, i) => {
               const rige = rigenHoy.includes(f) && f.days.includes(diaHoy)
               return (
-                <tr key={i} className="border-b border-line align-top last:border-0">
-                  <td className="px-2 py-3">
-                    <div className="flex gap-1">
+                <li key={i} className="flex flex-col gap-4 rounded-md border border-line p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-1.5">
+                    <p className="text-[13px] font-semibold text-ink-soft">Días</p>
+                    <div className="flex flex-wrap gap-1">
                       {DIAS.map(({ n, l }) => {
                         const on = f.days.includes(n)
                         return (
@@ -133,10 +128,16 @@ export function HorariosProveedores({ inicial, rubros }: { inicial: Franja[]; ru
                         )
                       })}
                     </div>
-                    {rige && <span className="mt-2 inline-block rounded-sm bg-verde-tint px-2 py-0.5 text-[11.5px] font-bold uppercase tracking-wide text-verde">Hoy</span>}
-                  </td>
-                  <td className="px-2 py-3">
-                    <div className="flex items-center gap-2">
+                    {rige && <span className="inline-block self-start rounded-sm bg-verde-tint px-2 py-0.5 text-[11.5px] font-bold uppercase tracking-wide text-verde">Hoy</span>}
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setFranjas((fs) => fs.filter((_, j) => j !== i))}>
+                      <X aria-hidden />Quitar
+                    </Button>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-[13px] font-semibold text-ink-soft">Horario</p>
+                    <div className="flex flex-wrap items-center gap-2">
                       <Input type="time" aria-label="Desde" className="h-10 w-28 tabular" value={f.from} required
                         onChange={(e) => cambiar(i, { from: e.target.value })} />
                       a
@@ -145,41 +146,38 @@ export function HorariosProveedores({ inicial, rubros }: { inicial: Franja[]; ru
                         : <Input type="time" aria-label="Hasta" className="h-10 w-28 tabular" value={f.to} required
                             onChange={(e) => cambiar(i, { to: e.target.value })} />}
                     </div>
-                    <label className="mt-1 flex min-h-8 items-center gap-2 text-ink-soft">
+                    <label className="flex min-h-8 items-center gap-2 text-ink-soft">
                       <input type="checkbox" className={checkCls} checked={f.to === '24:00'}
                         onChange={(e) => cambiar(i, { to: e.target.checked ? '24:00' : '17:00' })} />
                       hasta medianoche
                     </label>
-                  </td>
-                  <td className="px-2 py-3">
-                    <label className="flex min-h-10 items-center gap-2 whitespace-nowrap">
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-[13px] font-semibold text-ink-soft">Temporada</p>
+                    <label className="flex min-h-10 items-center gap-2">
                       <input type="checkbox" className={checkCls} checked={f.season === null}
                         onChange={(e) => cambiar(i, { season: e.target.checked ? null : { from: '04-01', to: '10-31' } })} />
                       Todo el año
                     </label>
                     {f.season && (
-                      <div className="mt-1 flex flex-col gap-1.5">
+                      // "desde" y "hasta" en un renglón; en el celular se parten en dos.
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5">
                         <div className="flex items-center gap-2"><span className="w-12 text-ink-soft">desde</span>
                           <SelectorFecha etiqueta="Desde" valor={f.season.from} onChange={(v) => cambiar(i, { season: { ...f.season!, from: v } })} /></div>
                         <div className="flex items-center gap-2"><span className="w-12 text-ink-soft">hasta</span>
                           <SelectorFecha etiqueta="Hasta" valor={f.season.to} onChange={(v) => cambiar(i, { season: { ...f.season!, to: v } })} /></div>
                       </div>
                     )}
-                  </td>
-                  <td className="px-2 py-3">
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-[13px] font-semibold text-ink-soft">Rubros</p>
                     <SelectorRubros franja={f} rubros={rubros} onChange={(trades) => cambiar(i, { trades })} />
-                  </td>
-                  <td className="px-2 py-3 text-right">
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setFranjas((fs) => fs.filter((_, j) => j !== i))}>
-                      <X aria-hidden />Quitar
-                    </Button>
-                  </td>
-                </tr>
+                  </div>
+                  </div>
+                </li>
               )
             })}
-          </tbody>
-        </table>
-      </div>
+      </ul>
 
       {guardar.isSuccess && !guardar.isPending && <Nota tono="exito">Guardado.</Nota>}
       {sinRubros && <p className="text-sm text-alto">Hay una franja sin rubros elegidos.</p>}
