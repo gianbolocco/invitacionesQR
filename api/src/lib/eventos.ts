@@ -4,7 +4,9 @@ import type { Response } from 'express'
 const conexiones = new Map<string, Set<Response>>()
 
 export function suscribir(personId: string, res: Response) {
-  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' })
+  // Escribir en un socket reseteado emite 'error'; sin manejador tumbaría el proceso.
+  res.on('error', () => {})
   res.write(': hola\n\n')
   const set = conexiones.get(personId) ?? new Set()
   set.add(res); conexiones.set(personId, set)
@@ -20,4 +22,4 @@ export function emitir(personId: string, evento: string, datos: unknown) {
 export const conexionesDe = (personId: string) => conexiones.get(personId)?.size ?? 0
 
 /** Al apagar: sin esto `server.close` espera a que el navegador corte. */
-export function cerrarTodo() { for (const set of conexiones.values()) for (const res of set) res.end() }
+export function cerrarTodo() { for (const set of conexiones.values()) for (const res of set) res.end(); conexiones.clear() }
