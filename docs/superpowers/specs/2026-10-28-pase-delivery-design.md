@@ -87,7 +87,9 @@ Una migración de Drizzle con las tres columnas y los checks.
 
 ## Vecino (mobile)
 
-- **Inicio**: botón secundario "Espero un pedido" debajo de "Nueva invitación".
+- **Inicio**: botón secundario "Espero un pedido" junto a "Nueva invitación":
+  en el celular, arriba de él (el principal queda al alcance del pulgar); en
+  escritorio, a su izquierda.
   Abre una hoja: "¿De dónde viene?", cuatro chips en grilla 2×2, campo de texto
   si es Otro, selector de lote solo si tiene más de uno, botón primario "Avisar
   a la garita". Debajo del título: "La garita lo deja pasar las próximas 2 horas."

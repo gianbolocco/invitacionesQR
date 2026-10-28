@@ -31,6 +31,15 @@ llegar, carga su documento y su patente si quiere, y se queda con su QR.
 invitación, su QR y su fila en la lista del día, y eso es justamente lo que da
 la trazabilidad de quién entró y quién no.
 
+**Delivery.** El vecino avisa que espera un pedido con dos toques: elige la app
+(PedidosYa, Rappi, Mercado Libre u otra) y listo. Se crea un pase de una sola
+entrada que vale 2 horas y que puede anular. En la garita, el pase se busca por
+lote como cualquier otro y se carga el documento del repartidor al ingreso, más
+la patente si viene en vehículo; el seguro del vehículo se exige como a cualquier
+visita. La alerta de permanencia se mide en minutos (Barrio → Alertas/Garita,
+30 por defecto). El alta exprés también puede ser Delivery y ahora siempre pide
+el documento.
+
 **El guardia** tiene su propia cuenta —cada movimiento queda a nombre de quien
 estaba logueado, que es lo que hace auditable el "¿quién lo dejó pasar?"—, la
 lista del día, el escáner y la auditoría exportable a Excel (cada fila abre su detalle en un panel: proveedor, invitación y movimientos). El buscador de la
