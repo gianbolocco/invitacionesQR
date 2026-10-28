@@ -13,7 +13,7 @@ import { resetRateLimits } from '../src/middleware/rateLimit.js'
 vi.mock('web-push', () => ({ default: { sendNotification: vi.fn() } }))
 
 const PASS = 'una-contrasena-larga'
-const sub = { endpoint: 'https://push.example.com/abc', keys: { p256dh: 'pk', auth: 'au' } }
+const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'pk', auth: 'au' } }
 
 async function vecino(email: string, nId: string) {
   const [p] = await db.insert(people).values({
@@ -68,8 +68,26 @@ describe('push', () => {
 
     await request(app).post('/push/subscriptions').set('cookie', cBea).send({ endpoint: 'no-url', keys: sub.keys }).expect(400)
 
+    // Otra persona no puede borrarla.
+    await request(app).delete('/push/subscriptions').set('cookie', cAna).send({ endpoint: sub.endpoint }).expect(200)
+    expect(await db.select().from(pushSubscriptions)).toHaveLength(1)
+
     await request(app).delete('/push/subscriptions').set('cookie', cBea).send({ endpoint: sub.endpoint }).expect(200)
     expect(await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint))).toHaveLength(0)
+  })
+
+  it('endpoints: solo https y servicios de push conocidos', async () => {
+    const app = buildApp()
+    const [n] = await db.insert(neighborhoods).values({ name: 'Los Robles' }).returning()
+    await vecino('ana@example.com', n.id)
+    const c = await sesion(app, 'ana@example.com')
+    for (const endpoint of ['http://fcm.googleapis.com/x', 'https://api:8080/x', 'https://169.254.169.254/', 'https://fcm.googleapis.com.evil.com/x', 'basura']) {
+      const r = await request(app).post('/push/subscriptions').set('cookie', c).send({ endpoint, keys: sub.keys }).expect(400)
+      expect(r.body.error).toBe('endpoint_invalido')
+    }
+    for (const endpoint of ['https://fcm.googleapis.com/fcm/send/abc', 'https://web.push.apple.com/xyz']) {
+      await request(app).post('/push/subscriptions').set('cookie', c).send({ endpoint, keys: sub.keys }).expect(201)
+    }
   })
 
   describe('enviarPush', () => {

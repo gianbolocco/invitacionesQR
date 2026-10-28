@@ -14,6 +14,19 @@ if (
   throw new Error('En producción hacen falta VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY y VAPID_SUBJECT')
 }
 
+/*
+ * El servidor hace POST al endpoint que manda el cliente: aceptar cualquier URL
+ * es un SSRF contra la red interna. Solo se admiten los servicios de push de
+ * los navegadores (Chrome/Edge/Android, Safari, Firefox, Windows).
+ */
+const HOSTS_PUSH = ['fcm.googleapis.com', 'push.apple.com', 'push.services.mozilla.com', 'notify.windows.com']
+
+export function endpointPermitido(url: string): boolean {
+  let u: URL
+  try { u = new URL(url) } catch { return false }
+  return u.protocol === 'https:' && HOSTS_PUSH.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`))
+}
+
 /** La clave pública que el navegador necesita para suscribirse; null si no hay. */
 export function clavePublica(): string | null {
   return process.env.VAPID_PUBLIC_KEY || null
