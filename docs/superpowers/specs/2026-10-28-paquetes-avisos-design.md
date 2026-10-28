@@ -116,7 +116,7 @@ avisarPaquete(packageId)
 
 - `push`: si hay alguna ventana de la app visible (`clients.matchAll`), no
   muestra la notificación del sistema (el SSE ya mostró el toast), salvo en
-  iPhone, donde siempre la muestra (Apple revoca la suscripción si un push no
+  dispositivos Apple (iPhone, iPad, Safari en Mac), donde siempre la muestra (Apple revoca la suscripción si un push no
   muestra nada). Si no,
   `showNotification` con el ícono del barrio.
 - `notificationclick`: enfoca una ventana abierta o abre `url`.
