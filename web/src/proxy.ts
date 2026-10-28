@@ -25,6 +25,7 @@ export function proxy(request: NextRequest) {
     `img-src 'self' blob: data:${api}`,
     `connect-src 'self'${api}`,
     "font-src 'self'",
+    "worker-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -42,8 +43,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      // Los estáticos y los prefetch de <Link> no son documentos: no necesitan CSP.
-      source: '/((?!_next/static|_next/image|favicon.ico|brand/).*)',
+      // Los estáticos (incluido el service worker, que se sirve tal cual) y los prefetch de <Link> no son documentos: no necesitan CSP.
+      source: '/((?!_next/static|_next/image|favicon.ico|sw.js|brand/).*)',
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' },
