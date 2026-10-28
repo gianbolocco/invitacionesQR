@@ -52,3 +52,8 @@ export function sePuedeEditar(
 ): boolean {
   return estadoInvitacion(inv, hoy, ahora) === 'esperando' && inv.usedCount === 0
 }
+
+/** Un pase de delivery que todavía espera: va arriba de la lista y no lleva al detalle. */
+export function esDeliveryVigente(inv: Parameters<typeof estadoInvitacion>[0], hoy: string): boolean {
+  return inv.kind === 'delivery' && estadoInvitacion(inv, hoy) === 'esperando'
+}

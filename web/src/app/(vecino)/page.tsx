@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'motion/react'
-import { Home as Casa, Plus, Ticket } from 'lucide-react'
+import { Bike, Home as Casa, Plus, Ticket } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { useInvitaciones } from '@/lib/queries/invitaciones'
 import { buttonVariants } from '@/components/ui/button'
@@ -12,6 +12,9 @@ import { SkeletonFilas } from '@/components/dominio/skeleton-filas'
 import { Vacio } from '@/components/dominio/vacio'
 import { FilaInvitacion } from '@/components/vecino/fila-invitacion'
 import { ElegirContacto } from '@/components/vecino/elegir-contacto'
+import { EsperoPedido } from '@/components/vecino/espero-pedido'
+import { esDeliveryVigente } from '@/lib/estado-invitacion'
+import { hoyISO } from '@/lib/fechas'
 import { useContactos } from '@/lib/queries/contactos'
 import { cn } from '@/lib/utils'
 
@@ -24,6 +27,7 @@ export default function InicioVecino() {
   const sinUnidad = me.units.length === 0
   const contactos = useContactos()
   const [eligiendo, setEligiendo] = useState(false)
+  const [esperando, setEsperando] = useState(false)
   // Sin contactos no hay nada que elegir: directo al formulario, como antes.
   const hayContactos = (contactos.data?.length ?? 0) > 0
   const nueva = (className: string) => hayContactos ? (
@@ -36,12 +40,26 @@ export default function InicioVecino() {
     </Link>
   )
 
+  // Los pases de delivery vigentes van arriba (sort estable: el resto conserva su orden).
+  const hoy = hoyISO()
+  const lista = q.data && [...q.data].sort((a, b) => Number(esDeliveryVigente(b, hoy)) - Number(esDeliveryVigente(a, hoy)))
+  const pedido = (className: string) => (
+    <button type="button" onClick={() => setEsperando(true)} className={className}>
+      <Bike aria-hidden />Espero un pedido
+    </button>
+  )
+
   return (
-    <div className="flex flex-col gap-7 pb-24 sm:pb-0">
+    <div className="flex flex-col gap-7 pb-40 sm:pb-0">
       <EncabezadoPagina
         antetitulo={me.units[0]?.label ?? 'Tu casa'}
         titulo={<>Hola, <em>{me.name.split(' ')[0]}.</em></>}
-        acciones={!sinUnidad && nueva(cn(buttonVariants({ size: 'lg' }), 'hidden sm:inline-flex'))} />
+        acciones={!sinUnidad && (
+          <>
+            {pedido(cn(buttonVariants({ size: 'lg', variant: 'outline' }), 'hidden sm:inline-flex'))}
+            {nueva(cn(buttonVariants({ size: 'lg' }), 'hidden sm:inline-flex'))}
+          </>
+        )} />
 
       {sinUnidad ? (
         <Vacio icono={Casa} titulo="Todavía no tenés una unidad"
@@ -65,7 +83,7 @@ export default function InicioVecino() {
           <motion.ul initial="oculto" animate="visible"
             variants={{ visible: { transition: { staggerChildren: 0.04 } } }}>
             <AnimatePresence initial={false}>
-              {q.data.map((inv) => (
+              {lista!.map((inv) => (
                 <motion.li key={inv.id} layout
                   variants={{ oculto: { opacity: 0, y: 6 }, visible: { opacity: 1, y: 0 } }}
                   exit={{ opacity: 0, x: -24, transition: { duration: 0.2 } }}>
@@ -78,8 +96,13 @@ export default function InicioVecino() {
         </section>
       )}
 
-      {!sinUnidad && nueva(cn(buttonVariants({ size: 'lg' }),
-        'fixed inset-x-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] z-20 shadow-(--sombra-flotante) sm:hidden'))}
+      {!sinUnidad && (
+        <div className="fixed inset-x-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] z-20 flex flex-col gap-2 sm:hidden">
+          {pedido(cn(buttonVariants({ size: 'lg', variant: 'outline' }), 'bg-card shadow-(--sombra-flotante)'))}
+          {nueva(cn(buttonVariants({ size: 'lg' }), 'shadow-(--sombra-flotante)'))}
+        </div>
+      )}
+      <EsperoPedido abierto={esperando} onAbiertoChange={setEsperando} units={me.units} />
       <ElegirContacto abierto={eligiendo} onAbiertoChange={setEligiendo} />
     </div>
   )

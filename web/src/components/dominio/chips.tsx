@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils'
 
 type Opcion<T extends string> = { valor: T; etiqueta: string; contador?: number }
 
-function Pastilla({ activa, children, onClick, grupo }: {
+function Pastilla({ activa, children, onClick, grupo, ancha }: {
+  ancha?: boolean
   activa: boolean
   children: React.ReactNode
   onClick: () => void
@@ -15,6 +16,7 @@ function Pastilla({ activa, children, onClick, grupo }: {
     <button type="button" onClick={onClick} aria-pressed={activa}
       className={cn(
         'relative inline-flex h-11 shrink-0 items-center gap-1.5 rounded-sm px-4 text-[15px] font-semibold',
+        ancha && 'w-full justify-center',
         activa ? 'text-card' : 'text-ink',
       )}>
       {/* El fondo activo se desliza de una opción a otra en vez de saltar. */}
@@ -33,21 +35,23 @@ function Pastilla({ activa, children, onClick, grupo }: {
  * Selector de una opción en chips (radio 8, no pastilla). Uno solo para filtros, tipo de
  * invitación y estados: antes había cuatro copias con estilos distintos.
  */
-export function Chips<T extends string>({ opciones, valor, onCambio, etiqueta, desplaza }: {
+export function Chips<T extends string>({ opciones, valor, onCambio, etiqueta, desplaza, rejilla }: {
   opciones: Opcion<T>[]
   valor: T
   onCambio: (v: T) => void
   etiqueta: string
   /** En el celular, una sola fila que se desliza en vez de varias que se apilan. */
   desplaza?: boolean
+  /** Dos columnas de igual ancho en vez de pastillas sueltas. */
+  rejilla?: boolean
 }) {
   const grupo = useId()
   return (
     <div role="group" aria-label={etiqueta}
-      className={cn('flex flex-wrap gap-1.5', desplaza &&
+      className={cn(rejilla ? 'grid grid-cols-2 gap-2' : 'flex flex-wrap gap-1.5', desplaza &&
         'max-sm:-mx-4 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-4 max-sm:[scrollbar-width:none]')}>
       {opciones.map((o) => (
-        <Pastilla key={o.valor} grupo={grupo} activa={o.valor === valor} onClick={() => onCambio(o.valor)}>
+        <Pastilla key={o.valor} grupo={grupo} ancha={rejilla} activa={o.valor === valor} onClick={() => onCambio(o.valor)}>
           {o.etiqueta}
           {/* ml-1 y no gap: etiqueta y contador son nodos sueltos dentro del
               mismo span, no items flex — el gap del botón no los separa. */}
