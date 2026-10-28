@@ -2,9 +2,10 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import {
-  createInvitation, listForUnits, revokeInvitation, findPublicByToken,
+  createInvitation, createDeliveryPass, listForUnits, revokeInvitation, findPublicByToken,
   fillGuestDetails, editInvitation, restoreInvitation, searchInvitations, getInvitation,
 } from '../services/invitations.js'
+import { APPS } from '../lib/delivery.js'
 import { listTrades } from '../services/trades.js'
 import { getNeighborhood } from '../services/neighborhoods.js'
 import { unitsOfPerson } from '../services/units.js'
@@ -86,6 +87,11 @@ invitationRoutes.post('/', async (req, res) => {
   res.status(201).json(await createInvitation({ ...body, createdBy: req.person!.id, neighborhoodId: req.person!.neighborhoodId }))
 })
 
+invitationRoutes.post('/delivery', async (req, res) => {
+  const body = z.object({ unitId: z.string().uuid(), app: z.enum(APPS), otro: z.string().trim().max(40).optional() }).parse(req.body)
+  res.status(201).json(await createDeliveryPass({ ...body, createdBy: req.person!.id }))
+})
+
 invitationRoutes.get('/', async (req, res) => {
   const units = await unitsOfPerson(req.person!.id)
   res.json(await listForUnits(units.map((u) => u.id)))
@@ -93,7 +99,7 @@ invitationRoutes.get('/', async (req, res) => {
 
 const historySchema = z.object({
   q: z.string().trim().max(80).optional(),
-  kind: z.enum(['visita', 'frecuente', 'proveedor']).optional(),
+  kind: z.enum(['visita', 'frecuente', 'proveedor', 'delivery']).optional(),
   estado: z.enum(['entro', 'no_entro', 'anulada']).optional(),
   // Llega como string desde la query. z.coerce.boolean() no sirve acá:
   // Boolean('false') es true.

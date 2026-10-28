@@ -5,6 +5,7 @@ import { randomToken } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
 import { todayInBuenosAires, unMesDespues } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
+import { valoresDeDelivery, type App } from '../lib/delivery.js'
 import { PORTERIA } from '../lib/porteria.js'
 import { aplicaFranjas, type Franja } from '../lib/franjas.js'
 import { pideSeguro, seguroVigente, type Seguro } from '../lib/seguro.js'
@@ -37,6 +38,16 @@ export async function assertMemberOfUnit(personId: string, unitId: string): Prom
     .where(and(eq(unitMembers.personId, personId), eq(unitMembers.unitId, unitId)))
     .limit(1)
   if (!row) throw new AppError(403, 'not_your_unit')
+}
+
+/** El pase de delivery: lo crea el vecino, dura 2 horas y es para una sola entrada. */
+export async function createDeliveryPass(input: { unitId: string; app: App; otro?: string; createdBy: string }) {
+  await assertMemberOfUnit(input.createdBy, input.unitId)
+  const [inv] = await db.insert(invitations).values({
+    unitId: input.unitId, createdBy: input.createdBy,
+    ...valoresDeDelivery(input.app, input.otro, new Date()), token: randomToken(16),
+  }).returning()
+  return inv
 }
 
 export async function assertUnitInNeighborhood(
@@ -289,7 +300,7 @@ export async function listForUnits(unitIds: string[]) {
 
 export type HistoryFilters = {
   q?: string
-  kind?: 'visita' | 'frecuente' | 'proveedor'
+  kind?: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   estado?: 'entro' | 'no_entro' | 'anulada'
   /** Id del vecino, para el filtro "solo las mías". */
   createdBy?: string
