@@ -45,13 +45,13 @@ function AvisosEnDispositivo() {
         await desactivarPush()
         setActivo(false)
       }
-    } catch {
-      toast.error('No se pudo cambiar el aviso. Probá de nuevo.')
+    } catch (err) {
+      toast.error(err instanceof Error && err.message === 'push_sin_clave' ? 'Los avisos todavía no están disponibles.' : 'No se pudo cambiar el aviso. Probá de nuevo.')
     } finally { setTrabajando(false) }
   }
-  const ayuda = e.permiso === 'denied'
-    ? 'Los avisos están bloqueados. Habilitalos desde los ajustes del navegador para este sitio.'
-    : !e.soportaPush ? 'Este navegador no permite avisos. En iPhone, agregá Pazzit a la pantalla de inicio y abrila desde el ícono.'
+  // Sin soporte primero: en Safari de iPhone el permiso figura denegado aunque la causa sea que falta instalar.
+  const ayuda = !e.soportaPush ? 'Este navegador no permite avisos. En iPhone, agregá Pazzit a la pantalla de inicio y abrila desde el ícono.'
+    : e.permiso === 'denied' ? 'Los avisos están bloqueados. Habilitalos desde los ajustes del navegador para este sitio.'
     : 'Te avisamos cuando llega un paquete.'
 
   return (

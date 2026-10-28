@@ -26,10 +26,10 @@ export function BannerAvisos() {
     setTrabajando(true)
     try {
       const permiso = await activarPush()
-      if (permiso === 'granted') setEstado('oculto')
-      else if (permiso === 'denied') setEstado('oculto')
-    } catch {
-      toast.error('No se pudieron activar los avisos. Probá de nuevo.')
+      // Concedido o denegado, el banner ya no tiene nada que ofrecer.
+      if (permiso !== 'default') setEstado('oculto')
+    } catch (err) {
+      toast.error(err instanceof Error && err.message === 'push_sin_clave' ? 'Los avisos todavía no están disponibles.' : 'No se pudieron activar los avisos. Probá de nuevo.')
     } finally { setTrabajando(false) }
   }
 
@@ -53,7 +53,7 @@ export function BannerAvisos() {
       )}
       <div className="mt-3 flex gap-2">
         {estado === 'activar' && <Button onClick={activar} disabled={trabajando}>Activar avisos</Button>}
-        <Button variant="ghost" onClick={ahoraNo}>Ahora no</Button>
+        <Button variant="ghost" onClick={ahoraNo} className={estado === 'instalar' ? '-ml-5' : undefined}>Ahora no</Button>
       </div>
     </section>
   )

@@ -1,7 +1,9 @@
 'use client'
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Package } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, Package } from 'lucide-react'
+import { buttonVariants } from '@/components/ui/button'
 import { api } from '@/lib/api'
 import { EncabezadoPagina } from '@/components/dominio/encabezado-pagina'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
@@ -21,6 +23,9 @@ export default function PaquetesPage() {
 
   return (
     <div className="flex flex-col gap-7">
+      <Link href="/" className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'self-start -ml-2' })}>
+        <ArrowLeft aria-hidden />Invitaciones
+      </Link>
       <EncabezadoPagina antetitulo="Últimos 30 días" titulo="Paquetes" />
       {q.isPending ? <SkeletonFilas />
         : q.isError ? <ErrorConReintento onReintentar={() => q.refetch()} reintentando={q.isFetching} />

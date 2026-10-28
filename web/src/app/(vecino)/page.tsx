@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'motion/react'
-import { Bike, Home as Casa, Plus, Ticket } from 'lucide-react'
+import { Bike, Home as Casa, Package, Plus, Ticket } from 'lucide-react'
 import { useSesion } from '@/lib/sesion-contexto'
 import { useInvitaciones } from '@/lib/queries/invitaciones'
 import { buttonVariants } from '@/components/ui/button'
@@ -68,6 +68,12 @@ export default function InicioVecino() {
         )} />
 
       {paquetes && sinVer > 0 && <TarjetaPaquete ultimo={paquetes.find((p) => p.sinVer)!} cantidad={sinVer} />}
+      {/* Ya vistos, /paquetes no tiene otra entrada: queda un acceso discreto mientras haya algo en los 30 días. */}
+      {paquetes && sinVer === 0 && paquetes.length > 0 && (
+        <Link href="/paquetes" className="flex items-center gap-2 text-sm font-semibold text-azul-text">
+          <Package className="size-4" aria-hidden />Ver paquetes ({paquetes.length})
+        </Link>
+      )}
       <BannerAvisos />
 
       {sinUnidad ? (
