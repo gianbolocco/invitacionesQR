@@ -89,6 +89,7 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
   const [diasSeguro, setDiasSeguro] = useState<string | null>(null)
   const [pideAuto, setPideAuto] = useState(false)
   const [excepcionAuto, setExcepcionAuto] = useState(true)
+  const [paquetes, setPaquetes] = useState(true)
   const [cargado, setCargado] = useState(false)
   const inputArchivo = useRef<HTMLInputElement>(null)
   const [arrastrandoPlano, setArrastrandoPlano] = useState(false)
@@ -111,6 +112,7 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
     setDiasSeguro(barrio.data.insuranceWarnDays?.toString() ?? null)
     setPideAuto(barrio.data.vehicleInsuranceRequired)
     setExcepcionAuto(barrio.data.vehicleInsuranceOverride)
+    setPaquetes(barrio.data.packagesEnabled)
   }
 
   const diasInvalidos = diasSeguro !== null && diasValidos(diasSeguro) === undefined
@@ -138,6 +140,7 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
     guardarGarita.mutate({
       overstayHours: { visita: horas('visita'), proveedor: horas('proveedor') },
       overstayMinutes: { delivery: minDelivery.trim() === '' ? null : minutosValidos(minDelivery)! },
+      packagesEnabled: paquetes,
     })
   }
 
@@ -388,6 +391,14 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
                       </span>
                     </div>
                     {minInvalidos && <p id="minutos-delivery-nota" role="alert" className="text-sm text-alto">Poné entre 5 y 240 minutos, o dejalo vacío para no alertar.</p>}
+                  </div>
+                  <div className="flex flex-col gap-1 border-t border-line pt-5">
+                    <p className={TITULO}>Paquetes</p>
+                    <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
+                      <Switch checked={paquetes} onCheckedChange={setPaquetes} aria-label="Paquetes" />
+                      Paquetes
+                    </label>
+                    <p className="pl-12 text-sm text-ink-soft">La garita avisa al vecino cuando llega un paquete.</p>
                   </div>
                   {guardarGarita.isError && <Nota tono="error">No se pudo guardar. Probá de nuevo.</Nota>}
                   {guardarGarita.isSuccess && <Nota tono="exito">Guardado.</Nota>}

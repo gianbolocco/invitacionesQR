@@ -192,6 +192,8 @@ export type Barrio = {
   vehicleInsuranceRequired: boolean
   /** Si está apagado, ese auto no entra ni con autorización (la persona puede entrar a pie). */
   vehicleInsuranceOverride: boolean
+  /** La garita puede avisar paquetes. */
+  packagesEnabled: boolean
   paleta: string[]
   providerWindows: Franja[]
 }
@@ -206,7 +208,7 @@ export function useGuardarBarrio() {
   const qc = useQueryClient()
   return useMutation({
     // Todo opcional: cada pestaña de Configuración guarda solo lo suyo.
-    mutationFn: (datos: { name?: string; address?: string; mapUrl?: string; brandColor?: string; overstayHours?: HorasPermanencia; overstayMinutes?: { delivery: number | null }; insuranceWarnDays?: number | null; vehicleInsuranceRequired?: boolean; vehicleInsuranceOverride?: boolean }) =>
+    mutationFn: (datos: { name?: string; address?: string; mapUrl?: string; brandColor?: string; overstayHours?: HorasPermanencia; overstayMinutes?: { delivery: number | null }; insuranceWarnDays?: number | null; vehicleInsuranceRequired?: boolean; vehicleInsuranceOverride?: boolean; packagesEnabled?: boolean }) =>
       api<Barrio>('/admin/neighborhood', { method: 'PATCH', body: JSON.stringify(datos) }),
     onSuccess: (b) => {
       qc.setQueryData(claves.barrio, b)
