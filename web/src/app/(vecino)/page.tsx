@@ -17,6 +17,10 @@ import { esDeliveryVigente } from '@/lib/estado-invitacion'
 import { hoyISO } from '@/lib/fechas'
 import { useContactos } from '@/lib/queries/contactos'
 import { cn } from '@/lib/utils'
+import { sinVerCount } from '@/lib/avisos'
+import { usePaquetes } from '@/lib/queries/paquetes'
+import { BannerAvisos } from '@/components/vecino/banner-avisos'
+import { TarjetaPaquete } from '@/components/vecino/tarjeta-paquete'
 
 const NUEVA = '/invitaciones/nueva'
 
@@ -26,6 +30,8 @@ export default function InicioVecino() {
   const variasUnidades = me.units.length > 1
   const sinUnidad = me.units.length === 0
   const contactos = useContactos()
+  const paquetes = usePaquetes().data
+  const sinVer = paquetes ? sinVerCount(paquetes) : 0
   const [eligiendo, setEligiendo] = useState(false)
   const [esperando, setEsperando] = useState(false)
   // Sin contactos no hay nada que elegir: directo al formulario, como antes.
@@ -60,6 +66,9 @@ export default function InicioVecino() {
             {nueva(cn(buttonVariants({ size: 'lg' }), 'hidden sm:inline-flex'))}
           </>
         )} />
+
+      {paquetes && sinVer > 0 && <TarjetaPaquete ultimo={paquetes.find((p) => p.sinVer)!} cantidad={sinVer} />}
+      <BannerAvisos />
 
       {sinUnidad ? (
         <Vacio icono={Casa} titulo="Todavía no tenés una unidad"

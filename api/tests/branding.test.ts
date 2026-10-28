@@ -47,6 +47,11 @@ describe('la marca pública', () => {
     expect(res.body.nombre).toBe('Los Aromos')
   })
 
+  it('informa si el barrio tiene paquetes activos', async () => {
+    await barrio({ packagesEnabled: false })
+    expect((await request(app).get('/branding').expect(200)).body.packagesEnabled).toBe(false)
+  })
+
   it('sin color propio devuelve el del producto, ya resuelto', async () => {
     await barrio()
     const res = await request(app).get('/branding').expect(200)
