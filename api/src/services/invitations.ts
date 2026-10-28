@@ -63,13 +63,16 @@ export async function assertUnitInNeighborhood(
 
 export type CreateExpressInvitationInput = {
   unitId: string
-  guestName: string
+  /** Obligatorio salvo en delivery, donde el nombre es la app. */
+  guestName?: string
   guestDoc?: string
   plate?: string
   note?: string
   createdBy: string
   neighborhoodId: string
-  kind?: 'visita' | 'proveedor'
+  kind?: 'visita' | 'proveedor' | 'delivery'
+  app?: App
+  otro?: string
   tradeId?: string | null
 }
 
@@ -80,9 +83,8 @@ export type CreateExpressInvitationInput = {
  * mismo barrio.
  *
  * Nada de lo que normalmente se elige: es de hoy, una vez, una persona —
- * los mismos defaults que ya tendría una visita de un solo día. El
- * documento es opcional acá: si no lo carga ahora, el veredicto lo va a
- * exigir igual antes de poder registrar el ingreso.
+ * los mismos defaults que ya tendría una visita de un solo día. La ruta
+ * exige el documento siempre; el delivery, además, dura 2 horas.
  */
 export async function createExpressInvitation(input: CreateExpressInvitationInput) {
   await assertUnitInNeighborhood(input.unitId, input.neighborhoodId)
@@ -97,12 +99,12 @@ export async function createExpressInvitation(input: CreateExpressInvitationInpu
 
 /** Los valores de una invitación de portería: de un día, una vez, una persona. */
 export function valoresDePorteria(input: CreateExpressInvitationInput, dia: string) {
-  return {
+  const base = {
     unitId: input.unitId,
     createdBy: input.createdBy,
     kind: input.kind ?? 'visita',
     tradeId: input.tradeId ?? null,
-    guestName: input.guestName.trim(),
+    guestName: (input.guestName ?? '').trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
     note: input.note?.trim() || null,
@@ -111,6 +113,7 @@ export function valoresDePorteria(input: CreateExpressInvitationInput, dia: stri
     capacity: 1,
     token: randomToken(16),
   }
+  return input.kind === 'delivery' ? { ...base, ...valoresDeDelivery(input.app!, input.otro, new Date()) } : base
 }
 
 /**

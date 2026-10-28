@@ -10,6 +10,7 @@ import {
 import { searchUnits, listUnits } from '../services/units.js'
 import { createExpressInvitation, revokeByGuard } from '../services/invitations.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
+import { APPS } from '../lib/delivery.js'
 import { slug } from '../lib/slug.js'
 import { estadoSeguro, etiquetaClave } from '../lib/seguro.js'
 import { buildWorkbook, diaExcel, fechaExcel, XLSX_MIME } from '../lib/excel.js'
@@ -59,17 +60,19 @@ gateRoutes.get('/units', async (req, res) => {
   res.json(await searchUnits(req.person!.neighborhoodId, q))
 })
 
-/** El alta exprés: nombre + lote, el resto fijo. Ver createExpressInvitation. */
+/** El alta exprés: nombre (o app, si es delivery), documento y lote; el resto fijo. Ver createExpressInvitation. */
 gateRoutes.post('/invitations', async (req, res) => {
   const body = z.object({
     unitId: z.string().uuid(),
-    guestName: z.string().min(1),
-    guestDoc: z.string().optional(),
+    guestName: z.string().optional(),
+    guestDoc: z.string().trim().min(1),
     plate: z.string().optional(),
     note: z.string().trim().max(140).optional(),
-    kind: z.enum(['visita', 'proveedor']).optional(),
+    kind: z.enum(['visita', 'proveedor', 'delivery']).optional(),
+    app: z.enum(APPS).optional(),
+    otro: z.string().trim().max(40).optional(),
     tradeId: z.string().uuid().nullable().optional(),
-  }).parse(req.body)
+  }).refine((v) => v.kind === 'delivery' ? !!v.app : !!v.guestName?.trim(), { path: ['guestName'] }).parse(req.body)
 
   res.status(201).json(await createExpressInvitation({
     ...body, createdBy: req.person!.id, neighborhoodId: req.person!.neighborhoodId,

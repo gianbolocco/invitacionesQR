@@ -89,7 +89,7 @@ describe('nota de la invitación', () => {
     const v = await resident('martin@example.com', 'Lote 142')
     const g = await guardia()
     const res = await request(app).post('/gate/invitations').set('Cookie', g.cookie)
-      .send({ unitId: v.unitId, guestName: 'Flete', note: 'Va al fondo' })
+      .send({ unitId: v.unitId, guestName: 'Flete', guestDoc: '30123456', note: 'Va al fondo' })
     expect(res.body.note).toBe('Va al fondo')
   })
 })
