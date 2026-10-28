@@ -70,7 +70,7 @@ Una migración de Drizzle con las tres columnas y los checks.
 
 - `POST /invitations/delivery` `{ unitId, app, otro? }` → crea el pase con
   `expires_at = now + 2 h`. Valida que el vecino pertenezca a la unidad, igual
-  que la creación normal. Errores: `app_invalida`, `falta_detalle` (Otro vacío).
+  que la creación normal. Errores: `falta_detalle` (Otro vacío).
 - `kind: 'delivery'` **no** entra por `POST /invitations`: ese schema sigue con
   los tres tipos. Un solo camino de alta por tipo.
 - Anular: el endpoint actual de revocar, sin cambios.
@@ -125,7 +125,6 @@ visita y proveedor. Vacío = sin alerta.
 | Código | Texto |
 |---|---|
 | `falta_detalle` | Contanos de dónde viene el pedido. |
-| `app_invalida` | Elegí de dónde viene el pedido. |
 
 ## Tests
 

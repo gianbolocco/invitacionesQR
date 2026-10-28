@@ -224,6 +224,7 @@ const KIND_EXCEL: Record<string, string> = {
   visita: 'Visita',
   frecuente: 'Frecuente',
   proveedor: 'Proveedor',
+  delivery: 'Delivery',
 }
 
 const guardia = (nombre: string | null, manual: boolean) =>

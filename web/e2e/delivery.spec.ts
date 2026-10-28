@@ -20,6 +20,7 @@ test('el vecino avisa un pedido y la garita registra el ingreso y el egreso del 
     await g.getByRole('option', { name: new RegExp(pedido) }).click()
     await expect(g.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
 
+    await expect(g.getByRole('button', { name: 'Registrar ingreso' })).toBeDisabled()
     await g.getByLabel('Documento del repartidor').fill('30555444')
     await g.getByRole('button', { name: 'Registrar ingreso' }).click()
     await expect(g.getByRole('button', { name: /^Siguiente/ })).toBeVisible()

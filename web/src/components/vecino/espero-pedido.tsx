@@ -31,6 +31,7 @@ export function EsperoPedido({ abierto, onAbiertoChange, units }: {
       onAbiertoChange(false)
       setApp('pedidosya')
       setOtro('')
+      setErrorOtro(null)
     } catch (e) {
       if (e instanceof ApiError && e.code === 'falta_detalle') setErrorOtro('Contanos de dónde viene el pedido.')
     }
@@ -49,7 +50,7 @@ export function EsperoPedido({ abierto, onAbiertoChange, units }: {
           {app === 'otro' && (
             <Campo id="delivery-otro" etiqueta="¿Qué esperás?" error={errorOtro}>
               <Input id="delivery-otro" value={otro} maxLength={40} autoComplete="off" autoFocus
-                aria-invalid={Boolean(errorOtro) || undefined} aria-describedby="delivery-otro-nota"
+                aria-invalid={Boolean(errorOtro) || undefined} aria-describedby={errorOtro ? 'delivery-otro-nota' : undefined}
                 placeholder="Farmacia, supermercado…" onChange={(e) => { setOtro(e.target.value); setErrorOtro(null) }} />
             </Campo>
           )}
