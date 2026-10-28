@@ -299,7 +299,8 @@ export async function listForUnits(unitIds: string[]) {
     // El cupo se mide sobre el count de ingresos, así que va en HAVING. Quien
     // está adentro sigue en la home aunque haya agotado el cupo: es justo lo
     // que el vecino quiere ver ("ya llegó").
-    .having(sql`count(${entryLogs.id}) < ${invitations.capacity} or ${adentroSql}`)
+    // El delivery vencido sin entrar sale de la lista; si sigue adentro, se queda.
+    .having(sql`(count(${entryLogs.id}) < ${invitations.capacity} and (${invitations.expiresAt} is null or ${invitations.expiresAt} > now())) or ${adentroSql}`)
     .orderBy(desc(invitations.createdAt))
 }
 
@@ -617,6 +618,7 @@ export async function editInvitation(
   if (!inv) throw new AppError(404, 'not_found')
   await assertMemberOfUnit(personId, inv.unitId)
 
+  if (inv.kind === 'delivery') throw new AppError(409, 'no_editable')
   if (inv.revokedAt) throw new AppError(409, 'revoked')
   if ((await entriesOf(inv.id)) > 0) throw new AppError(409, 'ya_usada')
   if (inv.validTo < todayInBuenosAires()) throw new AppError(409, 'vencida')

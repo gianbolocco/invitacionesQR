@@ -44,8 +44,9 @@ export function FilaInvitacion({ inv, mostrarUnidad = false, mostrarCreador = fa
     )
   }
 
+  // Tampoco los demás estados del delivery llevan al detalle: no hay QR que ver.
   return (
-    <Fila href={`/invitaciones/${inv.id}`} titulo={inv.guestName} meta={textoMeta} aviso={aviso}
+    <Fila href={inv.kind === 'delivery' ? undefined : `/invitaciones/${inv.id}`} titulo={inv.guestName} meta={textoMeta} aviso={aviso}
       extremo={<EstadoTag estado={estado}
         detalle={estado === 'adentro' && inv.ultimoIngreso ? hora(inv.ultimoIngreso) : undefined} />} />
   )

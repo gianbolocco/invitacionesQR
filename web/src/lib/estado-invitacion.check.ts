@@ -20,6 +20,7 @@ assert.equal(estadoInvitacion({ ...base, validTo: '2026-10-01', usedCount: 1 }, 
 assert.equal(sePuedeEditar(base, HOY), true)
 assert.equal(sePuedeEditar({ ...base, kind: 'frecuente', usedCount: 5 }, HOY), false)
 assert.equal(sePuedeEditar({ ...base, adentro: true, usedCount: 1 }, HOY), false)
+assert.equal(sePuedeEditar({ ...base, kind: 'delivery' }, HOY), false)
 assert.equal(sePuedeEditar({ ...base, validTo: '2026-10-10' }, HOY), false)
 
 // Agenda: la visita de ayer que no vino venció, no está pendiente.

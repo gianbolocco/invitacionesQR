@@ -50,7 +50,7 @@ export function sePuedeEditar(
   hoy: string,
   ahora: Date = new Date(),
 ): boolean {
-  return estadoInvitacion(inv, hoy, ahora) === 'esperando' && inv.usedCount === 0
+  return inv.kind !== 'delivery' && estadoInvitacion(inv, hoy, ahora) === 'esperando' && inv.usedCount === 0
 }
 
 /** Un pase de delivery que todavía espera: va arriba de la lista y no lleva al detalle. */

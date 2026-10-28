@@ -3,7 +3,7 @@ import request from 'supertest'
 import { eq } from 'drizzle-orm'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
-import { neighborhoods, units, people, unitMembers } from '../src/db/schema.js'
+import { neighborhoods, units, people, unitMembers, invitations } from '../src/db/schema.js'
 import { hashPassword } from '../src/lib/crypto.js'
 import { todayInBuenosAires } from '../src/lib/dates.js'
 import { AppError } from '../src/lib/errors.js'
@@ -74,6 +74,29 @@ describe('pase de delivery: alta por el vecino', () => {
     const { body } = await request(app).post('/invitations/delivery').set('Cookie', cookie)
       .send({ unitId: u1.id, app: 'rappi' }).expect(201)
     await request(app).post(`/invitations/${body.id}/revoke`).set('Cookie', cookie).expect(200)
+  })
+
+  it('un delivery no se edita', async () => {
+    const { cookie, u1 } = await escenario()
+    const { body } = await request(app).post('/invitations/delivery').set('Cookie', cookie)
+      .send({ unitId: u1.id, app: 'rappi' }).expect(201)
+    const res = await request(app).patch(`/invitations/${body.id}`).set('Cookie', cookie)
+      .send({ capacity: 50 }).expect(409)
+    expect(res.body.error).toBe('no_editable')
+  })
+
+  it('vencido sin usar sale de vigentes; adentro se queda', async () => {
+    const { cookie, u1, guardia } = await escenario()
+    const a = await request(app).post('/invitations/delivery').set('Cookie', cookie).send({ unitId: u1.id, app: 'rappi' }).expect(201)
+    const b = await request(app).post('/invitations/delivery').set('Cookie', cookie).send({ unitId: u1.id, app: 'pedidosya' }).expect(201)
+    const c = await request(app).post('/invitations/delivery').set('Cookie', cookie).send({ unitId: u1.id, app: 'rappi' }).expect(201)
+    await registerEntry(b.body.id, guardia.id, { guestName: 'PedidosYa', guestDoc: '30111222' })
+    for (const x of [a, b]) await db.update(invitations).set({ expiresAt: new Date(Date.now() - 60_000) }).where(eq(invitations.id, x.body.id))
+    const lista = await request(app).get('/invitations').set('Cookie', cookie).expect(200)
+    const ids = lista.body.map((i: { id: string }) => i.id)
+    expect(ids).not.toContain(a.body.id)
+    expect(ids).toContain(b.body.id)
+    expect(ids).toContain(c.body.id)
   })
 
   it('pasadas las 2 horas el ingreso se rechaza por vencido', async () => {

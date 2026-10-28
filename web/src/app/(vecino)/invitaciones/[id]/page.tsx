@@ -7,8 +7,9 @@ import { ArrowLeft, Loader2, SearchX } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import { useAnularInvitacion, useInvitacion, useRestaurarInvitacion } from '@/lib/queries/invitaciones'
 import { estadoInvitacion } from '@/lib/estado-invitacion'
-import { datosPase, urlPublica } from '@/lib/invitations'
-import { cupoTexto, hoyISO } from '@/lib/fechas'
+import { datosPase, KIND_LABEL, urlPublica } from '@/lib/invitations'
+import { cupoTexto, hora, hoyISO } from '@/lib/fechas'
+import { EstadoTag } from '@/components/dominio/estado-tag'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -69,6 +70,23 @@ export default function DetalleInvitacion({ params, searchParams }: {
   const sello = estado === 'anulada' || estado === 'vencida' ? SELLO[estado] : undefined
   const url = urlPublica(inv.token)
   const cupo = cupoTexto(inv)
+
+  // El delivery no tiene pase ni link: un resumen y nada más (se anula desde la lista).
+  if (inv.kind === 'delivery') {
+    return (
+      <div className="flex flex-col items-center gap-6">
+        {volver}
+        <dl className="flex w-full max-w-sm flex-col gap-3 text-sm">
+          <div className="flex justify-between gap-4"><dt className="text-ink-soft">Tipo</dt><dd>{KIND_LABEL[inv.kind]}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-ink-soft">App</dt><dd className="font-semibold">{inv.guestName}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-ink-soft">Lote</dt><dd>{inv.unitLabel}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-ink-soft">Estado</dt><dd><EstadoTag estado={estado}
+            detalle={estado === 'adentro' && inv.ultimoIngreso ? hora(inv.ultimoIngreso) : undefined} /></dd></div>
+          {inv.expiresAt && <div className="flex justify-between gap-4"><dt className="text-ink-soft">Vence</dt><dd className="tabular">{hora(inv.expiresAt)}</dd></div>}
+        </dl>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col items-center gap-6">
