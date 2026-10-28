@@ -23,6 +23,7 @@ import { guardarProveedor, guardarVehiculo } from '../services/padron.js'
 import { db } from '../db/index.js'
 import { zSeguro } from './invitations.js'
 import { AppError } from '../lib/errors.js'
+import { crearPaquete, deshacerPaquete, paquetesDeHoy } from '../services/packages.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
@@ -184,6 +185,21 @@ gateRoutes.get('/agenda', async (req, res) => {
   }).parse(req.query)
 
   res.json(await agendaForDay(req.person!.neighborhoodId, date ?? todayInBuenosAires()))
+})
+
+/** El paquete se avisa a los vecinos a los pocos segundos: hasta entonces se puede deshacer. */
+gateRoutes.post('/packages', async (req, res) => {
+  const body = z.object({ unitId: z.string().uuid(), note: z.string().trim().min(1).max(80).optional() }).parse(req.body)
+  res.status(201).json(await crearPaquete({ ...body, guardId: req.person!.id, neighborhoodId: req.person!.neighborhoodId }))
+})
+
+gateRoutes.post('/packages/:id/cancel', async (req, res) => {
+  await deshacerPaquete(req.params.id, req.person!.neighborhoodId)
+  res.json({ ok: true })
+})
+
+gateRoutes.get('/packages/hoy', async (req, res) => {
+  res.json(await paquetesDeHoy(req.person!.neighborhoodId))
 })
 
 /** Avisos en vivo para la garita: "algo cambió, volvé a pedir". */
