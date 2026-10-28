@@ -1,12 +1,21 @@
+// Apple revoca la suscripción push si un push no muestra nada: en iPhone la
+// notificación del sistema se muestra siempre, aunque la app esté a la vista.
+const esIos = /iPhone|iPad|iPod/.test(self.navigator.userAgent)
+
 self.addEventListener('push', (e) => {
-  const d = e.data ? e.data.json() : {}
+  let d = {}
+  try { d = e.data ? e.data.json() : {} } catch { d = {} }
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ws) => {
     // Con la app a la vista, el aviso en vivo ya se mostró: no duplicar.
-    if (ws.some((w) => w.visibilityState === 'visible')) return
-    return self.registration.showNotification(d.titulo, { body: d.cuerpo, icon: '/icon/192', data: { url: d.url || '/' } })
+    if (!esIos && ws.some((w) => w.visibilityState === 'visible')) return
+    return self.registration.showNotification(d.titulo || 'Pazzit', { body: d.cuerpo, icon: '/icon/192', tag: d.url || '/', data: { url: d.url || '/' } })
   }))
 })
 self.addEventListener('notificationclick', (e) => {
   e.notification.close()
-  e.waitUntil(self.clients.matchAll({ type: 'window' }).then((ws) => ws[0] ? ws[0].focus() : self.clients.openWindow(e.notification.data.url)))
+  const url = e.notification.data.url
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ws) => {
+    if (!ws[0]) return self.clients.openWindow(url)
+    return ws[0].focus().then((c) => c.navigate(url))
+  }))
 })

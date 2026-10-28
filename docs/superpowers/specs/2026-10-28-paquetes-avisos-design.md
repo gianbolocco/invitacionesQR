@@ -115,7 +115,9 @@ avisarPaquete(packageId)
 **Service worker** `web/public/sw.js` (archivo estático, sin librerías):
 
 - `push`: si hay alguna ventana de la app visible (`clients.matchAll`), no
-  muestra la notificación del sistema (el SSE ya mostró el toast). Si no,
+  muestra la notificación del sistema (el SSE ya mostró el toast), salvo en
+  iPhone, donde siempre la muestra (Apple revoca la suscripción si un push no
+  muestra nada). Si no,
   `showNotification` con el ícono del barrio.
 - `notificationclick`: enfoca una ventana abierta o abre `url`.
 - La CSP (`web/src/proxy.ts`) suma `worker-src 'self'`.
