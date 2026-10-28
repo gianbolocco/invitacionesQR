@@ -24,6 +24,7 @@ export function metaDe(r: AgendaRow): string {
     r.unitLabel,
     quienInvita(r.inviterName),
     r.plate,
+    r.kind === 'delivery' && r.expiresAt ? `vence ${hora(r.expiresAt)}` : null,
     r.capacity > 1 && r.enteredCount > 1 ? `${r.enteredCount} ingresos hoy` : null,
   ].filter(Boolean).join(' · ')
 }

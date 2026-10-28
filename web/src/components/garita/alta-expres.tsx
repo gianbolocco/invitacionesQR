@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Campo } from '@/components/dominio/campo'
 import { Chips } from '@/components/dominio/chips'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { APPS_DELIVERY, type Invitation } from '@/lib/invitations'
 import { useRubrosDelBarrio } from '@/lib/queries/invitaciones'
 import { Fila } from '@/components/dominio/fila'
 import { useDemora } from '@/lib/use-demora'
@@ -43,7 +44,10 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const [guestDoc, setGuestDoc] = useState('')
   const [plate, setPlate] = useState('')
   const [nota, setNota] = useState('')
-  const [kind, setKind] = useState<'visita' | 'proveedor'>('visita')
+  const [kind, setKind] = useState<'visita' | 'proveedor' | 'delivery'>('visita')
+  const [app, setApp] = useState<NonNullable<Invitation['deliveryApp']>>('pedidosya')
+  const [otro, setOtro] = useState('')
+  const esDelivery = kind === 'delivery'
   const [rubro, setRubro] = useState('')
   const [intento, setIntento] = useState(false)
   const { data: rubros } = useRubrosDelBarrio()
@@ -87,7 +91,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   if (abierto !== abiertoVisto) {
     setAbiertoVisto(abierto)
     if (!abierto) { setNombreEscaneado(''); setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate(''); setNota('')
-      setKind('visita'); setRubro(''); setIntento(false)
+      setKind('visita'); setRubro(''); setIntento(false); setApp('pedidosya'); setOtro('')
     }
     // "Autorizar igual": todo lo que ya se sabe de la invitación rechazada, lote incluido.
     else if (inicial) {
@@ -115,9 +119,10 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
     setIntento(true)
     if (pideRubro && !rubroActual) return
     const inv = await alta.mutateAsync({
-      unitId: unidad.unitId, guestName, guestDoc: guestDoc || undefined, plate: plate || undefined,
+      unitId: unidad.unitId, guestDoc: guestDoc.trim(), plate: plate || undefined,
       note: nota.trim() || undefined,
       kind,
+      ...(esDelivery ? { app, otro: app === 'otro' ? otro.trim() : undefined } : { guestName }),
       tradeId: pideRubro ? rubro : null,
     })
     cerrar(false)
@@ -136,13 +141,23 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
         <form onSubmit={enviar} className="flex flex-col gap-4 px-4 pb-8">
           <Campo id="tipo-expres" etiqueta="Tipo">
             <Chips etiqueta="Tipo de ingreso" valor={kind}
-              onCambio={(v) => { setKind(v); if (v === 'visita') { setRubro(''); setIntento(false) } }}
-              opciones={[{ valor: 'visita', etiqueta: 'Visita' }, { valor: 'proveedor', etiqueta: 'Proveedor' }]} />
+              onCambio={(v) => { setKind(v); if (v !== 'proveedor') { setRubro(''); setIntento(false) } }}
+              opciones={[{ valor: 'visita', etiqueta: 'Visita' }, { valor: 'proveedor', etiqueta: 'Proveedor' }, { valor: 'delivery', etiqueta: 'Delivery' }]} />
           </Campo>
 
-          <Campo id="nombre-expres" etiqueta="Nombre del invitado">
-            <Input id="nombre-expres" required onKeyDown={teclaNombre} value={guestName} onChange={(e) => setGuestName(e.target.value)} />
-          </Campo>
+          {esDelivery ? (
+            <Campo id="app-expres" etiqueta="App">
+              <Chips etiqueta="App de delivery" rejilla valor={app} onCambio={setApp} opciones={APPS_DELIVERY} />
+              {app === 'otro' && (
+                <Input id="otro-expres" aria-label="De dónde viene el pedido" required maxLength={40} value={otro}
+                  onChange={(e) => setOtro(e.target.value)} placeholder="De dónde viene" />
+              )}
+            </Campo>
+          ) : (
+            <Campo id="nombre-expres" etiqueta="Nombre del invitado">
+              <Input id="nombre-expres" required onKeyDown={teclaNombre} value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+            </Campo>
+          )}
 
           <Campo id="lote-expres" etiqueta="Lote">
             {unidad ? (
@@ -187,12 +202,12 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
             </>
           )}
 
-          <Campo id="doc-expres" etiqueta="Documento">
-            <Input id="doc-expres" onKeyDown={teclaDoc} value={guestDoc} className="tabular" placeholder="30.123.456"
+          <Campo id="doc-expres" etiqueta={esDelivery ? 'Documento del repartidor *' : 'Documento *'}>
+            <Input id="doc-expres" required onKeyDown={teclaDoc} value={guestDoc} className="tabular" placeholder="30.123.456"
               onChange={(e) => setGuestDoc(e.target.value)} />
           </Campo>
 
-          <Campo id="patente-expres" etiqueta="Patente (opcional)">
+          <Campo id="patente-expres" etiqueta={esDelivery ? 'Patente (vacío = a pie o en bici)' : 'Patente (opcional)'}>
             <Input id="patente-expres" onKeyDown={teclaPatente} value={plate} className="uppercase"
               onChange={(e) => setPlate(e.target.value.toUpperCase())} />
           </Campo>
@@ -202,7 +217,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
               onChange={(e) => setNota(e.target.value)} />
           </Campo>
 
-          <Button type="submit" disabled={!unidad || !guestName.trim() || alta.isPending}>
+          <Button type="submit" disabled={!unidad || !guestDoc.trim() || (esDelivery ? app === 'otro' && !otro.trim() : !guestName.trim()) || alta.isPending}>
             {alta.isPending ? 'Creando…' : 'Autorizar ingreso'}
           </Button>
         </form>

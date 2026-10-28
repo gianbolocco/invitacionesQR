@@ -420,7 +420,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           )}
 
           <p className={`mt-8 break-words border-t pt-5 text-3xl font-semibold leading-tight sm:text-4xl lg:text-6xl ${borde}`}>
-            {inv.guestName}
+            {inv.guestName}{inv.kind === 'delivery' && ` → ${inv.unitLabel}`}
           </p>
         </section>
 
@@ -444,7 +444,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               {inv.note && <Dato etiqueta="Nota">{inv.note}</Dato>}
               {editable ? (
                 <>
-                  <dt className="self-start pt-2.5 opacity-80"><label htmlFor="doc-veredicto">Documento</label></dt>
+                  <dt className="self-start pt-2.5 opacity-80"><label htmlFor="doc-veredicto">{inv.kind === 'delivery' ? 'Documento del repartidor' : 'Documento'}</label></dt>
                   <dd className="min-w-0">
                     {/* El campo es claro en los dos temas: el dark:bg-input/30 del Input lo ensuciaría. */}
                     <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
@@ -484,7 +484,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               guardando={corregir.isPending}>
               {editable ? (
                 <>
-                  <dt className="self-start pt-2.5 opacity-80"><label htmlFor="patente-veredicto">Patente</label></dt>
+                  <dt className="max-w-44 self-start pt-2.5 opacity-80"><label htmlFor="patente-veredicto">{inv.kind === 'delivery' ? 'Patente (vacío = a pie o en bici)' : 'Patente'}</label></dt>
                   <dd className="min-w-0">
                     <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
                       className="tabular h-12 border-control bg-card text-xl uppercase" />

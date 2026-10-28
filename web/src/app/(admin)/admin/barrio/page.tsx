@@ -31,6 +31,12 @@ function horasValidas(v: string): number | undefined {
   return /^\d+$/.test(v.trim()) && n >= 1 && n <= 72 ? n : undefined
 }
 
+/** '30' → 30; lo que no es un entero de 5 a 240 → undefined. */
+function minutosValidos(v: string): number | undefined {
+  const n = Number(v)
+  return /^\d+$/.test(v.trim()) && n >= 5 && n <= 240 ? n : undefined
+}
+
 /** '15' → 15; lo que no es un entero de 1 a 90 → undefined. */
 function diasValidos(v: string): number | undefined {
   const n = Number(v)
@@ -76,6 +82,8 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
   const [arrastrando, setArrastrando] = useState(false)
   const [errorLogo, setErrorLogo] = useState<string | null>(null)
   // null = ese tipo no alerta; un string = lo que está tipeado en las horas.
+  // Vacío = el delivery no alerta.
+  const [minDelivery, setMinDelivery] = useState('')
   const [alertas, setAlertas] = useState<Record<TipoAlerta, string | null>>({ visita: null, proveedor: null })
   // Mismo criterio para el seguro: null = no avisa.
   const [diasSeguro, setDiasSeguro] = useState<string | null>(null)
@@ -98,6 +106,7 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
     setMapUrl(barrio.data.mapUrl ?? '')
     setColor(barrio.data.brandColor)
     const h = barrio.data.overstayHours
+    setMinDelivery(barrio.data.overstayMinutes.delivery?.toString() ?? '')
     setAlertas({ visita: h.visita?.toString() ?? null, proveedor: h.proveedor?.toString() ?? null })
     setDiasSeguro(barrio.data.insuranceWarnDays?.toString() ?? null)
     setPideAuto(barrio.data.vehicleInsuranceRequired)
@@ -105,7 +114,8 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
   }
 
   const diasInvalidos = diasSeguro !== null && diasValidos(diasSeguro) === undefined
-  const horasInvalidas = ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
+  const minInvalidos = minDelivery.trim() !== '' && minutosValidos(minDelivery) === undefined
+  const horasInvalidas = minInvalidos || ALERTAS.some(({ tipo }) => alertas[tipo] !== null && horasValidas(alertas[tipo]!) === undefined)
 
   const marcaPreview = { ...marcaReal, nombre: nombre.trim() || marcaReal.nombre, color: color ?? marcaReal.color }
 
@@ -125,7 +135,10 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
     e.preventDefault()
     if (horasInvalidas) return
     const horas = (t: TipoAlerta) => (alertas[t] === null ? null : horasValidas(alertas[t]!)!)
-    guardarGarita.mutate({ overstayHours: { visita: horas('visita'), proveedor: horas('proveedor') } })
+    guardarGarita.mutate({
+      overstayHours: { visita: horas('visita'), proveedor: horas('proveedor') },
+      overstayMinutes: { delivery: minDelivery.trim() === '' ? null : minutosValidos(minDelivery)! },
+    })
   }
 
   function enviarSeguros(e: React.FormEvent) {
@@ -362,6 +375,20 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
                       </div>
                     )
                   })}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-2">
+                      <label htmlFor="minutos-delivery" className="min-w-36 text-sm font-semibold">Delivery</label>
+                      <span className="flex items-center gap-2 text-sm text-ink-soft">
+                        avisar a los
+                        <Input id="minutos-delivery" type="number" inputMode="numeric" min={5} max={240} step={1}
+                          placeholder="Sin alerta" aria-invalid={minInvalidos}
+                          aria-describedby={minInvalidos ? 'minutos-delivery-nota' : undefined}
+                          className="w-28 tabular" value={minDelivery} onChange={(e) => setMinDelivery(e.target.value)} />
+                        minutos adentro
+                      </span>
+                    </div>
+                    {minInvalidos && <p id="minutos-delivery-nota" role="alert" className="text-sm text-alto">Poné entre 5 y 240 minutos, o dejalo vacío para no alertar.</p>}
+                  </div>
                   {guardarGarita.isError && <Nota tono="error">No se pudo guardar. Probá de nuevo.</Nota>}
                   {guardarGarita.isSuccess && <Nota tono="exito">Guardado.</Nota>}
                   <Button type="submit" className="self-start" disabled={guardarGarita.isPending || horasInvalidas}>
