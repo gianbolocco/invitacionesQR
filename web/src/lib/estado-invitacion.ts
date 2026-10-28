@@ -8,12 +8,15 @@ export type EstadoVecino = 'adentro' | 'esperando' | 'salio' | 'anulada' | 'venc
  * pasado; y una frecuente nunca "sale", espera el próximo ingreso.
  */
 export function estadoInvitacion(
-  inv: { kind: string; revokedAt: string | null; validTo: string; usedCount: number; adentro: boolean },
+  inv: { kind: string; revokedAt: string | null; validTo: string; expiresAt?: string | null; usedCount: number; adentro: boolean },
   hoy: string,
+  ahora: Date = new Date(),
 ): EstadoVecino {
   if (inv.revokedAt) return 'anulada'
   if (inv.adentro) return 'adentro'
   if (inv.kind !== 'frecuente' && inv.usedCount > 0) return 'salio'
+  // El delivery vence por instante (2 horas), no por día.
+  if (inv.expiresAt && new Date(inv.expiresAt) < ahora) return 'vencida'
   if (inv.validTo < hoy) return 'vencida'
   return 'esperando'
 }
@@ -27,11 +30,13 @@ export function estadoInvitacion(
  * el que no vino.
  */
 export function estadoEnAgenda(
-  r: { adentro: boolean; enteredCount: number; validTo: string },
+  r: { adentro: boolean; enteredCount: number; validTo: string; expiresAt?: string | null },
   hoy: string,
+  ahora: Date = new Date(),
 ): Extract<EstadoVecino, 'adentro' | 'salio' | 'vencida' | 'esperando'> {
   if (r.adentro) return 'adentro'
   if (r.enteredCount > 0) return 'salio'
+  if (r.expiresAt && new Date(r.expiresAt) < ahora) return 'vencida'
   return r.validTo < hoy ? 'vencida' : 'esperando'
 }
 
@@ -43,6 +48,7 @@ export function estadoEnAgenda(
 export function sePuedeEditar(
   inv: Parameters<typeof estadoInvitacion>[0],
   hoy: string,
+  ahora: Date = new Date(),
 ): boolean {
-  return estadoInvitacion(inv, hoy) === 'esperando' && inv.usedCount === 0
+  return estadoInvitacion(inv, hoy, ahora) === 'esperando' && inv.usedCount === 0
 }

@@ -22,6 +22,7 @@ const AYUDA_TIPO: Record<Kind, string> = {
   visita: 'Una persona, un día.',
   frecuente: 'Entra muchas veces en un período: la empleada, el profesor, la niñera.',
   proveedor: 'Un servicio, un día: el técnico, el delivery, el flete.',
+  delivery: 'Un pedido, una sola entrada.',
 }
 
 export function FormularioInvitacion({ units, inicial, invitacion, contacto, onCambiarContacto, onListo }: {

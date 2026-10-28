@@ -30,4 +30,12 @@ assert.equal(estadoEnAgenda({ ...fila, validTo: '2026-10-10', enteredCount: 1 },
 // Entró ayer con una invitación de ayer y no salió: adentro, no vencida.
 assert.equal(estadoEnAgenda({ ...fila, validTo: '2026-10-10', adentro: true }, HOY), 'adentro')
 
+// Delivery: vence por instante, aunque su día sea hoy.
+const AHORA = new Date('2026-10-11T15:00:00Z')
+const del = { ...base, kind: 'delivery' }
+assert.equal(estadoInvitacion({ ...del, expiresAt: '2026-10-11T14:59:00Z' }, HOY, AHORA), 'vencida')
+assert.equal(estadoInvitacion({ ...del, expiresAt: '2026-10-11T16:00:00Z' }, HOY, AHORA), 'esperando')
+assert.equal(estadoEnAgenda({ ...fila, expiresAt: '2026-10-11T14:59:00Z' }, HOY, AHORA), 'vencida')
+assert.equal(estadoEnAgenda({ ...fila, expiresAt: '2026-10-11T16:00:00Z' }, HOY, AHORA), 'esperando')
+
 console.log('estado-invitacion: ok')

@@ -543,7 +543,7 @@ export type AgendaRow = {
   guestDoc: string | null
   plate: string | null
   note: string | null
-  kind: 'visita' | 'frecuente' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   frequentAs: 'visita' | 'proveedor' | null
   tradeName: string | null
   unitLabel: string
@@ -551,6 +551,8 @@ export type AgendaRow = {
   capacity: number
   /** Para que la garita distinga "no vino todavía" de "ya venció". */
   validTo: string
+  /** Solo en delivery: el instante en que deja de valer. */
+  expiresAt: Date | null
   enteredCount: number
   lastEntryAt: Date | null
   /** Última salida registrada ESE día. */
@@ -601,6 +603,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
       i.valid_to          as "validTo",
+      i.expires_at        as "expiresAt",
       (select count(*) from entry_log e
         where ${eseDia} and e.invitation_id = i.id)::int as "enteredCount",
       (select max(e.entered_at) from entry_log e
@@ -648,6 +651,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
       i.valid_to          as "validTo",
+      i.expires_at        as "expiresAt",
       (select count(*) from entry_log e
         where ${hoy} and e.invitation_id = i.id)::int  as "enteredCount",
       abiertas.desde                                    as "lastEntryAt",
@@ -684,7 +688,7 @@ export type AuditRow = {
   guestName: string
   guestDoc: string | null
   plate: string | null
-  kind: 'visita' | 'frecuente' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   frequentAs: 'visita' | 'proveedor' | null
   tradeName: string | null
   /** El rubro pide seguro Y esta invitación es de quien entra a trabajar. */

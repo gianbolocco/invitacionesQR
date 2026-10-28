@@ -4,7 +4,7 @@ export { hoyISO, fechaCorta } from './fechas'
 
 export type Invitation = {
   id: string
-  kind: 'visita' | 'frecuente' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   /** Solo en las frecuentes: si viene de visita o como proveedor. */
   frequentAs?: 'visita' | 'proveedor' | null
   guestName: string
@@ -32,12 +32,16 @@ export type Invitation = {
   tradeId: string | null
   tradeName: string | null
   requiresInsurance: boolean
+  deliveryApp: 'pedidosya' | 'rappi' | 'mercadolibre' | 'otro' | null
+  /** Solo en delivery: el instante en que deja de valer. */
+  expiresAt: string | null
 }
 
 export const KIND_LABEL: Record<Invitation['kind'], string> = {
   visita: 'Visita',
   frecuente: 'Frecuente',
   proveedor: 'Proveedor',
+  delivery: 'Delivery',
 }
 
 export const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -89,3 +93,10 @@ export function urlVolverAInvitar(inv: Pick<Invitation, 'kind' | 'guestName' | '
   if (inv.plate) p.set('plate', inv.plate)
   return `/invitaciones/nueva?${p}`
 }
+
+export const APPS_DELIVERY: { valor: NonNullable<Invitation['deliveryApp']>; etiqueta: string }[] = [
+  { valor: 'pedidosya', etiqueta: 'PedidosYa' },
+  { valor: 'rappi', etiqueta: 'Rappi' },
+  { valor: 'mercadolibre', etiqueta: 'Mercado Libre' },
+  { valor: 'otro', etiqueta: 'Otro' },
+]

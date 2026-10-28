@@ -245,6 +245,8 @@ const columnas = {
   validTo: invitations.validTo,
   weekdays: invitations.weekdays,
   capacity: invitations.capacity,
+  expiresAt: invitations.expiresAt,
+  deliveryApp: invitations.deliveryApp,
   token: invitations.token,
   revokedAt: invitations.revokedAt,
   revokedReason: invitations.revokedReason,
