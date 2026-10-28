@@ -132,7 +132,7 @@ test('el guardia registra el ingreso y después el egreso del mismo invitado', a
   await guardia.close()
 })
 
-test('el guardia da de alta una invitación exprés y el ingreso exige documento', async ({ page }) => {
+test('el guardia da de alta una invitación exprés y el documento llega al ingreso', async ({ page }) => {
   const nombre = `Exprés E2E ${Date.now()}`
   await entrar(page, 'guardia')
   await page.goto('/garita')
@@ -144,15 +144,14 @@ test('el guardia da de alta una invitación exprés y el ingreso exige documento
   // Acotado al sheet: la agenda de atrás puede tener su propia fila "invita
   // Vecina E2E" de otros tests, y el nombre quedaría ambiguo sin esto.
   await page.getByRole('dialog').getByText('Vecina E2E').click()
+  await page.getByRole('dialog').getByLabel('Documento').fill('30999888')
   await page.getByRole('button', { name: 'Autorizar ingreso' }).click()
 
   await expect(page).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
   await expect(page.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
 
-  // Sin documento, el botón no deja avanzar.
-  await expect(page.getByRole('button', { name: 'Registrar ingreso' })).toBeDisabled()
-
-  await page.getByLabel('Documento').fill('30999888')
+  // El alta exprés ya exige el documento: llega cargado al veredicto.
+  await expect(page.getByLabel('Documento')).toHaveValue('30999888')
   await page.getByRole('button', { name: 'Registrar ingreso' }).click()
   await expect(page.getByRole('heading', { name: 'INGRESO', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /^Siguiente/ })).toBeVisible()
@@ -231,7 +230,7 @@ test('un DNI sin invitación abre el alta exprés con nombre y documento', async
   await leerConLectora(page, dni(doc, `ZZSINVIT${doc}`))
   await expect(page.getByRole('heading', { name: 'Autorizar sin invitación' })).toBeVisible()
   await expect(page.getByLabel('Nombre del invitado')).toHaveValue(`Juan Zzsinvit${doc}`)
-  await expect(page.getByLabel('Documento', { exact: true })).toHaveValue(doc)
+  await expect(page.getByLabel(/^Documento/)).toHaveValue(doc)
 })
 
 test('el Enter de la lectora nunca registra: ni doble (CR+LF) ni tardío', async ({ page, browser }) => {
@@ -318,7 +317,7 @@ test('un NO PASA por cupo se puede autorizar igual, con todo precargado', async 
   await g.getByRole('button', { name: 'Autorizar igual…' }).click()
 
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue(nombre)
-  await expect(g.getByLabel('Documento', { exact: true })).toHaveValue('30111222')
+  await expect(g.getByLabel(/^Documento/)).toHaveValue('30111222')
   await expect(g.getByRole('button', { name: 'Cambiar' })).toBeVisible() // el lote ya está elegido
   await g.getByRole('button', { name: 'Autorizar ingreso' }).click()
 
@@ -363,7 +362,7 @@ test('un DNI leído con el sheet precargado abierto reemplaza el nombre de la in
   const doc = docUnico()
   await leerConLectora(g, dni(doc, 'MEZCLA'))
   await expect(g.getByLabel('Nombre del invitado')).toHaveValue('Juan Mezcla')
-  await expect(g.getByLabel('Documento', { exact: true })).toHaveValue(doc)
+  await expect(g.getByLabel(/^Documento/)).toHaveValue(doc)
 })
 
 test('dos DNI seguidos en el alta exprés no mezclan nombre y documento', async ({ page }) => {
@@ -375,9 +374,9 @@ test('dos DNI seguidos en el alta exprés no mezclan nombre y documento', async 
   await expect(page.getByRole('dialog')).toBeVisible()
   // El sheet autofocusea Nombre; leerConLectora hace blur para que la lectura caiga en el hook de ventana.
   await leerConLectora(page, dni(docA, `ZZAAA${docA}`))
-  await expect(page.getByLabel('Documento', { exact: true })).toHaveValue(docA)
+  await expect(page.getByLabel(/^Documento/)).toHaveValue(docA)
   await leerConLectora(page, dni(docB, `ZZBBB${docB}`))
-  await expect(page.getByLabel('Documento', { exact: true })).toHaveValue(docB)
+  await expect(page.getByLabel(/^Documento/)).toHaveValue(docB)
   await expect(page.getByLabel('Nombre del invitado')).toHaveValue(`Juan Zzbbb${docB}`)
 })
 
@@ -411,6 +410,7 @@ test('la garita autoriza un proveedor sin invitación aunque su rubro esté fuer
     await g.getByRole('dialog').getByText('Vecina E2E').click()
     await g.getByLabel('Rubro').click()
     await g.getByRole('option', { name: rubro }).click()
+    await g.getByRole('dialog').getByLabel('Documento').fill('30777666')
     await g.getByRole('button', { name: 'Autorizar ingreso' }).click()
 
     await expect(g).toHaveURL(/\/garita\/invitacion\/[0-9a-f-]{36}$/)
