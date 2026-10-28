@@ -38,7 +38,7 @@ export function FilaInvitacion({ inv, mostrarUnidad = false, mostrarCreador = fa
     return (
       <Fila titulo={inv.guestName}
         meta={['Delivery', inv.expiresAt ? `vence ${hora(inv.expiresAt)}` : null, mostrarUnidad ? inv.unitLabel : null].filter(Boolean).join(' · ')}
-        extremo={<Button type="button" variant="ghost" size="sm" className="text-alto" disabled={anular.isPending}
+        extremo={<Button type="button" variant="ghost" size="sm" className="min-h-11 text-alto" disabled={anular.isPending}
           aria-label={`Anular el pase de delivery de ${inv.guestName}`}
           onClick={() => anular.mutate(inv)}>Anular</Button>} />
     )

@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Campo } from '@/components/dominio/campo'
 import { Chips } from '@/components/dominio/chips'
 import { APPS_DELIVERY, type Invitation } from '@/lib/invitations'
+import { ApiError } from '@/lib/api'
 import { useCrearDelivery } from '@/lib/queries/invitaciones'
 
 type App = NonNullable<Invitation['deliveryApp']>
@@ -21,6 +22,7 @@ export function EsperoPedido({ abierto, onAbiertoChange, units }: {
   const crear = useCrearDelivery()
   const [app, setApp] = useState<App>('pedidosya')
   const [otro, setOtro] = useState('')
+  const [errorOtro, setErrorOtro] = useState<string | null>(null)
   const [unitId, setUnitId] = useState(units[0]?.id ?? '')
 
   async function avisar() {
@@ -29,7 +31,9 @@ export function EsperoPedido({ abierto, onAbiertoChange, units }: {
       onAbiertoChange(false)
       setApp('pedidosya')
       setOtro('')
-    } catch { /* el aviso al vecino lo da la mutación */ }
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'falta_detalle') setErrorOtro('Contanos de dónde viene el pedido.')
+    }
   }
 
   return (
@@ -40,12 +44,13 @@ export function EsperoPedido({ abierto, onAbiertoChange, units }: {
           <SheetDescription>La garita lo deja pasar las próximas 2 horas.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
-          <Chips rejilla etiqueta="App del pedido" valor={app} onCambio={setApp}
+          <Chips rejilla etiqueta="App del pedido" valor={app} onCambio={(v) => { setApp(v); setErrorOtro(null) }}
             opciones={APPS_DELIVERY.map((a) => ({ valor: a.valor, etiqueta: a.etiqueta }))} />
           {app === 'otro' && (
-            <Campo id="delivery-otro" etiqueta="¿Qué esperás?">
-              <Input id="delivery-otro" value={otro} maxLength={40} autoComplete="off"
-                placeholder="Farmacia, supermercado…" onChange={(e) => setOtro(e.target.value)} />
+            <Campo id="delivery-otro" etiqueta="¿Qué esperás?" error={errorOtro}>
+              <Input id="delivery-otro" value={otro} maxLength={40} autoComplete="off" autoFocus
+                aria-invalid={Boolean(errorOtro) || undefined} aria-describedby="delivery-otro-nota"
+                placeholder="Farmacia, supermercado…" onChange={(e) => { setOtro(e.target.value); setErrorOtro(null) }} />
             </Campo>
           )}
           {units.length > 1 && (
@@ -58,7 +63,7 @@ export function EsperoPedido({ abierto, onAbiertoChange, units }: {
               </Select>
             </Campo>
           )}
-          <Button type="button" size="lg" disabled={crear.isPending} onClick={avisar}>
+          <Button type="button" size="lg" disabled={crear.isPending || (app === 'otro' && !otro.trim())} onClick={avisar}>
             {crear.isPending && <Loader2 className="animate-spin" aria-hidden />}
             Avisar a la garita
           </Button>

@@ -113,9 +113,8 @@ export function useCrearDelivery() {
   return useMutation({
     mutationFn: (d: { unitId: string; app: NonNullable<Invitation['deliveryApp']>; otro?: string }) =>
       api<Invitation>('/invitations/delivery', { method: 'POST', body: JSON.stringify(d) }),
-    onError: (e) => toast.error(e instanceof ApiError && e.code === 'falta_detalle'
-      ? 'Contanos de dónde viene el pedido.'
-      : 'No pudimos avisar. Probá de nuevo.'),
+    // falta_detalle lo muestra la hoja junto al campo; el toast es para lo demás.
+    onError: (e) => !(e instanceof ApiError && e.code === 'falta_detalle') && toast.error('No pudimos avisar. Probá de nuevo.'),
     onSuccess: () => qc.invalidateQueries({ queryKey: claves.todas }),
   })
 }
