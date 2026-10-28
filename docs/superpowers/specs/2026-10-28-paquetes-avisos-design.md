@@ -2,7 +2,7 @@
 
 Estado: diseñado (28/10), sin implementar. Es el spec B; el A (pase de delivery)
 ya está en `dev`. Este spec trae el primer canal para avisarle algo al vecino
-(web push + aviso en vivo + mail opcional) y lo estrena con los paquetes.
+(web push + aviso en vivo con la app abierta) y lo estrena con los paquetes.
 
 ## Problema
 
@@ -19,20 +19,19 @@ vecino no se entera. Pazzit hoy no tiene forma de avisarle nada al vecino: el
 
 ## Decisiones
 
-1. **Canal**: web push + aviso en vivo con la app abierta + mail opcional.
-   WhatsApp queda para después (ver *Fuera de este spec*): el dueño inicia el
-   trámite de Meta en paralelo.
+1. **Canal**: web push + aviso en vivo con la app abierta. Sin mail por ahora
+   (decisión del dueño). WhatsApp queda para después (ver *Fuera de este
+   spec*): el dueño inicia el trámite de Meta en paralelo.
 2. **El guardia carga el lote y una nota opcional** (hasta 80 caracteres).
    Sin empresa (el envoltorio muchas veces no la dice) y sin foto.
 3. **Se avisa a todos los vecinos activos de la unidad**, como las invitaciones.
 4. **No se registra el retiro**: solo el aviso.
 5. **Deshacer por 5 segundos**: el aviso sale a los 5 s de cargarlo. Después
    no se corrige.
-6. **Mail: lo elige cada vecino en su perfil.** Por defecto, solo push.
-7. **Al instante**: con la app abierta, el aviso aparece sin refrescar.
-8. **El vecino ve los paquetes de los últimos 30 días**, en una tarjeta del
-   inicio (no una pestaña nueva).
-9. **El admin prende o apaga la feature** (*Configuración → Garita*). Por
+6. **Al instante**: con la app abierta, el aviso aparece sin refrescar.
+7. **El vecino ve los paquetes de los últimos 30 días**, en una tarjeta del
+   inicio (no una pestaña nueva). Es lo que ve quien no activó el push.
+8. **El admin prende o apaga la feature** (*Configuración → Garita*). Por
    defecto, prendida.
 
 ## Datos
@@ -55,7 +54,6 @@ vecino no se entera. Pazzit hoy no tiene forma de avisarle nada al vecino: el
 
 `person`:
 
-- `email_notices boolean not null default false`.
 - `packages_seen_at timestamptz` null: los paquetes posteriores son "sin ver".
 
 `neighborhood`:
@@ -82,7 +80,6 @@ Vecino (sesión):
   reemplazo por `endpoint` (upsert, y el endpoint pasa a la persona actual).
 - `DELETE /push/subscriptions { endpoint }` → baja.
 - `GET /push/public-key` → la clave VAPID pública.
-- `PATCH /auth/me { emailNotices }` (al lado del `GET /auth/me` que ya existe; `GET` suma `emailNotices`).
 - `GET /events` → SSE con la sesión por cookie. Manda `package` cuando avisa
   un paquete de una unidad de la persona, y un comentario cada 25 s para que
   Caddy no corte la conexión.
@@ -101,7 +98,6 @@ avisarPaquete(packageId)
   → por cada uno, en paralelo:
       SSE: evento 'package' a sus conexiones abiertas
       push: a cada suscripción (404/410 → se borra; otro error → log, sigue)
-      mail: si email_notices y tiene mail
 ```
 
 - **Cuándo**: al crear el paquete se programa `setTimeout(avisarPaquete, 5 s)`.
@@ -111,8 +107,6 @@ avisarPaquete(packageId)
 - **SSE**: un mapa en memoria `personId → conexiones`. Mismo techo que el timer.
 - **Push**: librería `web-push` con claves VAPID. Payload:
   `{ titulo: 'Llegó un paquete', cuerpo: 'Lote 12 · caja grande', url: '/' }`.
-- **Mail**: plantilla nueva en `services/emails.ts`, igual que las existentes
-  (sin `RESEND_API_KEY`, se imprime en el log).
 - Si la feature está apagada no se puede crear un paquete, así que no hay nada
   que avisar. Los ya avisados siguen en la lista del vecino.
 
@@ -144,7 +138,7 @@ avisarPaquete(packageId)
   Agregar a inicio → abrir desde el ícono). Permiso denegado: el banner no
   aparece; Perfil explica cómo habilitarlo en el navegador.
 - *Perfil*: "Notificaciones en este dispositivo" (switch: pide permiso,
-  suscribe/desuscribe) y "Avisarme también por mail" (switch → `emailNotices`).
+  suscribe/desuscribe).
 - La lógica pura (cuándo mostrar el banner, el conteo sin ver) va en
   `web/src/lib/avisos.ts` con su `avisos.check.ts`.
 
@@ -182,8 +176,7 @@ garita avisa al vecino cuando llega un paquete."
 
 - `api`: alta (unidad de otro barrio rebota; nota > 80 rebota; feature apagada
   → 403); cancel antes (no avisa) y después del aviso (409); `avisarPaquete`
-  avisa solo a vecinos activos de la unidad, manda mail solo con
-  `email_notices`, borra la suscripción ante 410 (con `web-push` mockeado);
+  avisa solo a vecinos activos de la unidad, borra la suscripción ante 410 (con `web-push` mockeado);
   arranque con pendientes; `GET /packages` respeta 30 días, deshechos y
   `sinVer`; upsert de suscripción por endpoint.
 - `web`: `avisos.check.ts` (banner según soporte/permiso/standalone/"ahora no";
@@ -195,6 +188,8 @@ garita avisa al vecino cuando llega un paquete."
 
 ## Fuera de este spec
 
+- Mail como canal de aviso (se suma en `services/avisos.ts` con una preferencia
+  por vecino en el perfil).
 - WhatsApp (spec chico cuando Meta apruebe: celular + consentimiento + plantilla).
 - Registro del retiro, foto, empresa, recordatorio de paquetes sin retirar.
 - "Tu visita llegó" y otros avisos: usan este mismo `services/avisos.ts`.
