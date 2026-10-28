@@ -88,7 +88,7 @@ export type CreateExpressInvitationInput = {
  */
 export async function createExpressInvitation(input: CreateExpressInvitationInput) {
   await assertUnitInNeighborhood(input.unitId, input.neighborhoodId)
-  await assertRubro(input.neighborhoodId, input.kind ?? 'visita', null, input.tradeId)
+  await assertRubro(input.neighborhoodId, input.kind ?? 'visita', null, input.kind === 'delivery' ? null : input.tradeId)
 
   const [inv] = await db.insert(invitations)
     .values(valoresDePorteria(input, todayInBuenosAires()))
@@ -113,7 +113,7 @@ export function valoresDePorteria(input: CreateExpressInvitationInput, dia: stri
     capacity: 1,
     token: randomToken(16),
   }
-  return input.kind === 'delivery' ? { ...base, ...valoresDeDelivery(input.app!, input.otro, new Date()) } : base
+  return input.kind === 'delivery' ? { ...base, tradeId: null, ...valoresDeDelivery(input.app!, input.otro, new Date()) } : base
 }
 
 /**

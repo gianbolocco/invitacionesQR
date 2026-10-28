@@ -107,22 +107,6 @@ describe('alta exprés de invitación', () => {
     expect(res.body.guestDoc).toBe('30123456')
   })
 
-  it('sin documento rechaza: visita, proveedor y delivery', async () => {
-    const { cookie, unit142 } = await escenario()
-    for (const extra of [{ guestName: 'Sin doc' }, { guestName: 'Sin doc', kind: 'proveedor' }, { kind: 'delivery', app: 'rappi' }]) {
-      await request(app).post('/gate/invitations').set('Cookie', cookie)
-        .send({ unitId: unit142.id, ...extra }).expect(400)
-    }
-  })
-
-  it('un delivery de portería dura 2 horas y se llama como la app', async () => {
-    const { cookie, unit142 } = await escenario()
-    const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, kind: 'delivery', app: 'rappi', guestDoc: '30123456' }).expect(201)
-    expect(res.body).toMatchObject({ kind: 'delivery', guestName: 'Rappi', guestDoc: '30123456', capacity: 1 })
-    expect(res.body.expiresAt).toBeTruthy()
-  })
-
   it('rechaza una unidad de otro barrio', async () => {
     const { cookie } = await escenario()
     const [otroBarrio] = await db.insert(neighborhoods).values({ name: 'Lejano' }).returning()
@@ -204,7 +188,26 @@ describe('documento obligatorio y delivery en el alta exprés', () => {
     const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
       .send({ unitId: unit142.id, kind: 'delivery', app: 'rappi', guestDoc: '30123456' }).expect(201)
     expect(res.body).toMatchObject({ kind: 'delivery', guestName: 'Rappi', guestDoc: '30123456', capacity: 1 })
-    expect(res.body.expiresAt).toBeTruthy()
+    const dosHoras = Date.now() + 2 * 3600_000
+    expect(Math.abs(new Date(res.body.expiresAt).getTime() - dosHoras)).toBeLessThan(10_000)
+  })
+
+  it('app otro sin detalle: falta_detalle; con detalle, el nombre es el detalle', async () => {
+    const { cookie, unit142 } = await escenario()
+    const base = { unitId: unit142.id, kind: 'delivery', app: 'otro', guestDoc: '30123456' }
+    const mal = await request(app).post('/gate/invitations').set('Cookie', cookie).send(base).expect(400)
+    expect(mal.body.error).toBe('falta_detalle')
+    const ok = await request(app).post('/gate/invitations').set('Cookie', cookie)
+      .send({ ...base, otro: 'Farmacia' }).expect(201)
+    expect(ok.body.guestName).toBe('Farmacia')
+  })
+
+  it('un delivery ignora el rubro: tradeId queda en null', async () => {
+    const { cookie, unit142, neighborhoodId } = await escenario()
+    const [t] = await db.insert(trades).values({ neighborhoodId, name: 'Electricista' }).returning()
+    const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
+      .send({ unitId: unit142.id, kind: 'delivery', app: 'rappi', guestDoc: '30123456', tradeId: t.id }).expect(201)
+    expect(res.body.tradeId).toBeNull()
   })
 })
 
