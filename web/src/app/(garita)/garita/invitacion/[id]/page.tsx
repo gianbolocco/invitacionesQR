@@ -506,7 +506,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               <h2 id="seccion-invitacion" className="text-sm font-bold uppercase tracking-[0.08em] opacity-80">Invitación</h2>
               <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-2.5 text-lg sm:text-xl">
                 <Dato etiqueta="Lote">{inv.unitLabel} · {quienInvita(inv.inviterName)}</Dato>
-                {!esEgreso && <Dato etiqueta="Vigencia">{vigencia(inv)}</Dato>}
+                {!esEgreso && <Dato etiqueta="Vigencia">{inv.kind === 'delivery' && inv.expiresAt ? `hasta ${hora(inv.expiresAt)}` : vigencia(inv)}</Dato>}
                 {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}
                 {inv.capacity > 1 && inv.kind !== 'frecuente' && (
                   <Dato etiqueta="Cupo">{resultado.usedCount} de {inv.capacity} entraron</Dato>

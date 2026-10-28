@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Campo } from '@/components/dominio/campo'
 import { Chips } from '@/components/dominio/chips'
@@ -136,7 +137,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
       <SheetContent onCloseAutoFocus={(e) => { e.preventDefault(); disparador?.focus() }}>
         <SheetHeader>
           <SheetTitle>Autorizar sin invitación</SheetTitle>
-          <SheetDescription>Para cuando el vecino aprobó por teléfono. Vale solo por hoy.</SheetDescription>
+          <SheetDescription>Para cuando el vecino aprobó por teléfono. {esDelivery ? 'Vale por 2 horas.' : 'Vale solo por hoy.'}</SheetDescription>
         </SheetHeader>
         <form onSubmit={enviar} className="flex flex-col gap-4 px-4 pb-8">
           <Campo id="tipo-expres" etiqueta="Tipo">
@@ -149,8 +150,10 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
             <Campo id="app-expres" etiqueta="App">
               <Chips etiqueta="App de delivery" rejilla valor={app} onCambio={setApp} opciones={APPS_DELIVERY} />
               {app === 'otro' && (
-                <Input id="otro-expres" aria-label="De dónde viene el pedido" required maxLength={40} value={otro}
-                  onChange={(e) => setOtro(e.target.value)} placeholder="De dónde viene" />
+                <>
+                  <Label htmlFor="otro-expres" className="mt-2 text-sm font-semibold text-ink">¿De dónde viene?</Label>
+                  <Input id="otro-expres" required maxLength={40} value={otro} onChange={(e) => setOtro(e.target.value)} />
+                </>
               )}
             </Campo>
           ) : (

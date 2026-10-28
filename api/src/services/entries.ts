@@ -737,7 +737,7 @@ export type AuditFilters = {
   to?: string
   unitId?: string
   status?: AuditStatus
-  kind?: 'visita' | 'frecuente' | 'proveedor'
+  kind?: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   /** Texto libre: nombre, documento, patente, unidad o quién invita. */
   q?: string
   /** Solo las que entraron por un alta exprés con algún seguro faltante. */

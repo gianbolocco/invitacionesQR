@@ -56,6 +56,14 @@ describe('auditoría de invitaciones', () => {
     expect(porNombre['No vino']).toBe('esperando')
   })
 
+  it('filtra por tipo delivery', async () => {
+    const ctx = await base()
+    await inv(ctx, { guestName: 'Común' })
+    await inv(ctx, { guestName: 'Rappi', kind: 'delivery', deliveryApp: 'rappi', expiresAt: new Date(Date.now() + 7_200_000) })
+    const res = await request(app).get('/gate/audit?kind=delivery').set('Cookie', ctx.cookie).expect(200)
+    expect(res.body.rows.map((r: { guestName: string }) => r.guestName)).toEqual(['Rappi'])
+  })
+
   it('registra la hora del escaneo y qué guardia lo hizo', async () => {
     const ctx = await base()
     const i = await inv(ctx, { guestName: 'Juan' })

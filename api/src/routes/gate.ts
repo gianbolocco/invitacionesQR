@@ -199,7 +199,7 @@ const auditFilters = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   unitId: z.string().uuid().optional(),
   status: z.enum(['adentro', 'concluida', 'esperando', 'vencida', 'anulada']).optional(),
-  kind: z.enum(['visita', 'frecuente', 'proveedor']).optional(),
+  kind: z.enum(['visita', 'frecuente', 'proveedor', 'delivery']).optional(),
   q: z.string().trim().max(80).optional(),
   // Llega como string desde la query: z.coerce.boolean() daría true con 'false'.
   sinSeguro: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),

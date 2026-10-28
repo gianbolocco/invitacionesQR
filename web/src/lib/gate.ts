@@ -22,6 +22,8 @@ export type Resultado = {
     plate: string | null
     validFrom: string
     validTo: string
+    /** Solo en delivery: el instante en que deja de valer. */
+    expiresAt?: string | null
     capacity: number
     weekdays: number[] | null
     unitId: string
