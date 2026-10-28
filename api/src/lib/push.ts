@@ -1,3 +1,4 @@
+import { parse } from 'node:url'
 import webpush from 'web-push'
 
 export type SuscripcionPush = { endpoint: string; p256dh: string; auth: string }
@@ -21,10 +22,19 @@ if (
  */
 const HOSTS_PUSH = ['fcm.googleapis.com', 'push.apple.com', 'push.services.mozilla.com', 'notify.windows.com']
 
+/*
+ * web-push manda con el url.parse legacy y acá se valida con WHATWG: para
+ * 'https://evil.com;.fcm.googleapis.com/x' discrepan (uno ve evil.com, el otro
+ * ve un host que termina en fcm.googleapis.com). Por eso el hostname se limita
+ * a letras, números, guiones y puntos, y los dos parsers tienen que coincidir.
+ */
 export function endpointPermitido(url: string): boolean {
   let u: URL
   try { u = new URL(url) } catch { return false }
-  return u.protocol === 'https:' && HOSTS_PUSH.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`))
+  if (u.protocol !== 'https:' || u.port !== '' || u.username || u.password) return false
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(u.hostname)) return false
+  if (parse(url).hostname !== u.hostname) return false
+  return HOSTS_PUSH.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`))
 }
 
 /** La clave pública que el navegador necesita para suscribirse; null si no hay. */

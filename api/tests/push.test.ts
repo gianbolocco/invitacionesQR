@@ -81,11 +81,13 @@ describe('push', () => {
     const [n] = await db.insert(neighborhoods).values({ name: 'Los Robles' }).returning()
     await vecino('ana@example.com', n.id)
     const c = await sesion(app, 'ana@example.com')
-    for (const endpoint of ['http://fcm.googleapis.com/x', 'https://api:8080/x', 'https://169.254.169.254/', 'https://fcm.googleapis.com.evil.com/x', 'basura']) {
+    for (const endpoint of ['http://fcm.googleapis.com/x', 'https://api:8080/x', 'https://169.254.169.254/', 'https://fcm.googleapis.com.evil.com/x', 'basura',
+      'https://evil.com;.fcm.googleapis.com/x', 'https://evil.com,.fcm.googleapis.com/x', 'https://fcm.googleapis.com@evil.com/',
+      'https://fcm.googleapis.com./x', 'https://fcm.googleapis.com:444/x']) {
       const r = await request(app).post('/push/subscriptions').set('cookie', c).send({ endpoint, keys: sub.keys }).expect(400)
       expect(r.body.error).toBe('endpoint_invalido')
     }
-    for (const endpoint of ['https://fcm.googleapis.com/fcm/send/abc', 'https://web.push.apple.com/xyz']) {
+    for (const endpoint of ['https://fcm.googleapis.com/fcm/send/abc', 'https://web.push.apple.com/xyz', 'https://FCM.googleapis.com/fcm/send/abc2']) {
       await request(app).post('/push/subscriptions').set('cookie', c).send({ endpoint, keys: sub.keys }).expect(201)
     }
   })
