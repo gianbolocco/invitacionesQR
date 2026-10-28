@@ -78,11 +78,11 @@ Una migración de Drizzle con las tres columnas y los checks.
   Después de la ventana por día: `if (inv.expiresAt && now > inv.expiresAt) → 'expired'`.
   Mismo motivo que la ventana: la garita ya dice "Venció". El orden testeado
   no cambia.
-- Ingreso (`services/entries.ts`): si `kind = 'delivery'` y no llega documento,
-  `AppError(400, 'falta_documento')`. El `FOR UPDATE` queda como está.
+- Ingreso: `POST /gate/entries` ya exige el documento para todos; no cambia.
+  El `FOR UPDATE` queda como está.
 - Alta exprés (`routes/gate.ts`): `kind` acepta `'delivery'` con `app/otro` en vez de
-  `guestName`; el documento pasa a ser obligatorio para los tres tipos
-  (`falta_documento`). El delivery exprés también vence a las 2 h.
+  `guestName`; el documento pasa a ser obligatorio para los tres tipos (zod,
+  como en el ingreso). El delivery exprés también vence a las 2 h.
 - `PATCH /admin/neighborhood`: `overstayMinutes.delivery` (5–240 o null).
 
 ## Vecino (mobile)
@@ -122,7 +122,6 @@ visita y proveedor. Vacío = sin alerta.
 
 | Código | Texto |
 |---|---|
-| `falta_documento` | Cargá el documento para registrar el ingreso. |
 | `falta_detalle` | Contanos de dónde viene el pedido. |
 | `app_invalida` | Elegí de dónde viene el pedido. |
 
