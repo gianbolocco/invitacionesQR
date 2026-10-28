@@ -27,6 +27,24 @@ describe('constraints del schema', () => {
     expect(constraint).toBe('invitation_kind_ck')
   })
 
+  it('rechaza un delivery sin expires_at', async () => {
+    const { unitId, personId } = await seedBasics()
+    const constraint = await violatedConstraint(db.insert(invitations).values({
+      unitId, createdBy: personId, kind: 'delivery', guestName: 'Rappi', deliveryApp: 'rappi',
+      validFrom: '2026-09-10', validTo: '2026-09-10', token: 'del1',
+    }))
+    expect(constraint).toBe('invitation_delivery_ck')
+  })
+
+  it('rechaza una visita con delivery_app', async () => {
+    const { unitId, personId } = await seedBasics()
+    const constraint = await violatedConstraint(db.insert(invitations).values({
+      unitId, createdBy: personId, kind: 'visita', guestName: 'Juan', deliveryApp: 'rappi',
+      validFrom: '2026-09-10', validTo: '2026-09-10', token: 'del2',
+    }))
+    expect(constraint).toBe('invitation_delivery_ck')
+  })
+
   it('rechaza cupo menor a 1', async () => {
     const { unitId, personId } = await seedBasics()
     const constraint = await violatedConstraint(db.insert(invitations).values({

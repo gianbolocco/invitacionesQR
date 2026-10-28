@@ -42,6 +42,7 @@ async function loadForCheck(where: SQL) {
     weekdays: invitations.weekdays,
     capacity: invitations.capacity,
     revokedAt: invitations.revokedAt,
+    expiresAt: invitations.expiresAt,
     unitId: invitations.unitId,
     unitLabel: units.label,
     // Para el veredicto: a quién llamar si hay dudas. Si la creó un guardia
