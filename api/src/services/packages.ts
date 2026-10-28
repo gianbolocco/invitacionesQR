@@ -9,7 +9,7 @@ import { unitsOfPerson } from './units.js'
 import { avisarPaquete } from './avisos.js'
 
 export const DESHACER_SEGUNDOS = 5
-const DIAS_LISTA = 30
+const DIAS_PAQUETES = 30
 
 export async function crearPaquete(input: { unitId: string; note?: string; guardId: string; neighborhoodId: string }) {
   if (!(await getNeighborhood(input.neighborhoodId)).packagesEnabled) throw new AppError(403, 'paquetes_apagados')
@@ -48,7 +48,7 @@ export async function paquetesDe(personId: string) {
     .where(and(
       inArray(packages.unitId, unidades.map((u) => u.id)),
       isNotNull(packages.notifiedAt),
-      gte(packages.notifiedAt, sql`now() - ${DIAS_LISTA} * interval '1 day'`),
+      gte(packages.notifiedAt, sql`now() - ${DIAS_PAQUETES} * interval '1 day'`),
     ))
     .orderBy(desc(packages.notifiedAt))
   return filas.map((f) => ({ ...f, sinVer: !yo?.visto || f.notifiedAt! > yo.visto }))

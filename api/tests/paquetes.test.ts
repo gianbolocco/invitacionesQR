@@ -7,6 +7,7 @@ import { neighborhoods, units, people, unitMembers, packages, pushSubscriptions 
 import { hashPassword } from '../src/lib/crypto.js'
 import * as eventos from '../src/lib/eventos.js'
 import { enviarPush } from '../src/lib/push.js'
+import { todayInBuenosAires } from '../src/lib/dates.js'
 import { avisarPaquete, avisarPendientes } from '../src/services/avisos.js'
 import { resetDb } from './helpers/db.js'
 import { resetRateLimits } from '../src/middleware/rateLimit.js'
@@ -49,8 +50,8 @@ async function escenario() {
 }
 
 describe('paquetes', () => {
-  beforeEach(async () => { await resetDb(); resetRateLimits(); push.mockClear(); push.mockResolvedValue('ok') })
-  afterEach(() => { vi.restoreAllMocks() })
+  beforeEach(async () => { await resetDb(); resetRateLimits(); push.mockClear(); push.mockResolvedValue('ok'); vi.useFakeTimers({ toFake: ['setTimeout'] }) })
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
   it('POST /gate/packages: 201 con notifyAt a 5 s; valida unidad, nota, feature y rol', async () => {
     const { n, u, ana } = await escenario()
@@ -81,7 +82,7 @@ describe('paquetes', () => {
     const { body } = await request(app).post('/gate/packages').set('Cookie', c).send({ unitId: u.id }).expect(201)
     await request(app).post(`/gate/packages/${body.id}/cancel`).set('Cookie', c).expect(200)
     await request(app).post(`/gate/packages/${body.id}/cancel`).set('Cookie', c).expect(200)
-    await avisarPaquete(body.id)
+    await vi.advanceTimersByTimeAsync(5000)
     expect(push).not.toHaveBeenCalled()
 
     const [p2] = await db.insert(packages).values({ unitId: u.id, createdBy: (await db.select().from(people).where(eq(people.role, 'guard')))[0].id, notifyAt: new Date() }).returning()
@@ -90,6 +91,29 @@ describe('paquetes', () => {
     expect(r.body.error).toBe('ya_avisado')
 
     await request(app).post('/gate/packages/00000000-0000-4000-8000-000000000000/cancel').set('Cookie', c).expect(404)
+  })
+
+  it('cancel de un paquete de otro barrio: 404 y no se deshace', async () => {
+    const { guardia } = await escenario()
+    const [otro] = await db.insert(neighborhoods).values({ name: 'Otro' }).returning()
+    const [uAjena] = await db.insert(units).values({ neighborhoodId: otro.id, label: 'X' }).returning()
+    const [p] = await db.insert(packages).values({ unitId: uAjena.id, createdBy: guardia.id, notifyAt: new Date() }).returning()
+    await request(app).post(`/gate/packages/${p.id}/cancel`).set('Cookie', await cookie('garita@example.com')).expect(404)
+    const [f] = await db.select().from(packages).where(eq(packages.id, p.id))
+    expect(f.canceledAt).toBeNull()
+  })
+
+  it('el timer de 5 s avisa el paquete creado por POST', async () => {
+    const { u, ana } = await escenario()
+    await sub(ana.id, 'ana')
+    const r = await request(app).post('/gate/packages').set('Cookie', await cookie('garita@example.com')).send({ unitId: u.id }).expect(201)
+    expect(push).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(5000)
+    await vi.waitFor(async () => {
+      const [f] = await db.select().from(packages).where(eq(packages.id, r.body.id))
+      expect(f.notifiedAt).not.toBeNull()
+    })
+    expect(push).toHaveBeenCalledTimes(1)
   })
 
   it('avisarPaquete: push y SSE solo a vecinos activos de la unidad; marca; no reenvía; borra vencidas', async () => {
@@ -151,6 +175,20 @@ describe('paquetes', () => {
     await request(app).post('/packages/seen').set('Cookie', c).expect(200)
     const r2 = await request(app).get('/packages').set('Cookie', c).expect(200)
     expect(r2.body[0].sinVer).toBe(false)
+  })
+
+  it('GET /gate/packages/hoy: la medianoche es la de Buenos Aires, no la UTC', async () => {
+    const { u, guardia } = await escenario()
+    const hoy = todayInBuenosAires()
+    // Buenos Aires es UTC-3 todo el año: 02:30Z es ayer 23:30 allá y 03:30Z es hoy 00:30.
+    const ayerTarde = new Date(`${hoy}T02:30:00Z`)
+    const hoyTemprano = new Date(`${hoy}T03:30:00Z`)
+    await db.insert(packages).values([
+      { unitId: u.id, note: 'ayer 23:30', createdBy: guardia.id, notifyAt: ayerTarde, notifiedAt: ayerTarde },
+      { unitId: u.id, note: 'hoy 00:30', createdBy: guardia.id, notifyAt: hoyTemprano, notifiedAt: hoyTemprano },
+    ])
+    const r = await request(app).get('/gate/packages/hoy').set('Cookie', await cookie('garita@example.com')).expect(200)
+    expect(r.body.map((x: { note: string }) => x.note)).toEqual(['hoy 00:30'])
   })
 
   it('GET /gate/packages/hoy: los avisados hoy del barrio', async () => {

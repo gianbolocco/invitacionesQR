@@ -32,6 +32,9 @@ export async function avisarPaquete(id: string): Promise<void> {
   const subs = await db.select().from(pushSubscriptions).where(inArray(pushSubscriptions.personId, ids))
   const payload = { titulo: 'Llegó un paquete', cuerpo: [unitLabel, note].filter(Boolean).join(' · '), url: '/' }
   const resultados = await Promise.allSettled(subs.map((s) => enviarPush(s, payload)))
+  resultados.forEach((r, i) => {
+    if (r.status === 'rejected') console.error('No se pudo enviar el push', subs[i].id, r.reason)
+  })
   const vencidas = subs.filter((_, i) => {
     const r = resultados[i]
     return r.status === 'fulfilled' && r.value === 'vencida'
