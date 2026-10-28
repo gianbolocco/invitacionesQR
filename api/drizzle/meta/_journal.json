@@ -176,6 +176,13 @@
       "when": 1793209794521,
       "tag": "0024_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793227314542,
+      "tag": "0025_paquetes",
+      "breakpoints": true
     }
   ]
 }

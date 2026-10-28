@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '../src/db/index.js'
-import { invitations, units, entryLogs, neighborhoods, people } from '../src/db/schema.js'
+import { invitations, units, entryLogs, neighborhoods, people, packages, pushSubscriptions } from '../src/db/schema.js'
 import { randomToken } from '../src/lib/crypto.js'
 import { resetDb, seedBasics } from './helpers/db.js'
 import { violatedConstraint } from './helpers/constraint.js'
@@ -133,5 +133,41 @@ describe('un mail es una sola cuenta, en todo el sistema', () => {
       role: 'guard', status: 'active',
     }))
     expect(constraint).toBe('person_email_uq')
+  })
+
+  describe('paquetes y suscripciones push', () => {
+    const base = () => new Date(Date.now() + 30_000)
+
+    it('rechaza una nota de 81 caracteres', async () => {
+      const { unitId, personId } = await seedBasics()
+      const constraint = await violatedConstraint(db.insert(packages).values({
+        unitId, createdBy: personId, note: 'x'.repeat(81), notifyAt: base(),
+      }))
+      expect(constraint).toBe('package_note_ck')
+    })
+
+    it('rechaza una nota vacía', async () => {
+      const { unitId, personId } = await seedBasics()
+      const constraint = await violatedConstraint(db.insert(packages).values({
+        unitId, createdBy: personId, note: '', notifyAt: base(),
+      }))
+      expect(constraint).toBe('package_note_ck')
+    })
+
+    it('rechaza un paquete avisado y cancelado a la vez', async () => {
+      const { unitId, personId } = await seedBasics()
+      const constraint = await violatedConstraint(db.insert(packages).values({
+        unitId, createdBy: personId, notifyAt: base(), notifiedAt: new Date(), canceledAt: new Date(),
+      }))
+      expect(constraint).toBe('package_estado_ck')
+    })
+
+    it('rechaza dos suscripciones con el mismo endpoint', async () => {
+      const { personId } = await seedBasics()
+      const fila = { personId, endpoint: 'https://push.example/1', p256dh: 'k', auth: 'a' }
+      await db.insert(pushSubscriptions).values(fila)
+      const constraint = await violatedConstraint(db.insert(pushSubscriptions).values(fila))
+      expect(constraint).toBe('push_subscription_endpoint_uq')
+    })
   })
 })

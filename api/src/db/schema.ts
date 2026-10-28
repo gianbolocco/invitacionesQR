@@ -54,6 +54,8 @@ export const neighborhoods = pgTable('neighborhood', {
   vehicleInsuranceRequired: boolean('vehicle_insurance_required').notNull().default(false),
   // Con el pedido prendido: si la portería puede autorizar igual un auto sin seguro.
   vehicleInsuranceOverride: boolean('vehicle_insurance_override').notNull().default(true),
+  // Apagado, la garita no carga paquetes ni el vecino recibe avisos.
+  packagesEnabled: boolean('packages_enabled').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   check('neighborhood_insurance_warn_ck', sql`${t.insuranceWarnDays} between 1 and 90`),
@@ -79,6 +81,7 @@ export const people = pgTable('person', {
   passwordHash: text('password_hash'),
   googleSub: text('google_sub'),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  packagesSeenAt: timestamp('packages_seen_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   // Global, no por barrio. Con (neighborhood_id, email) el mismo mail podía
@@ -306,3 +309,28 @@ export const sessions = pgTable('session', {
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex('session_hash_uq').on(t.tokenHash)])
+
+export const packages = pgTable('package', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  unitId: uuid('unit_id').notNull().references(() => units.id),
+  note: text('note'),
+  createdBy: uuid('created_by').notNull().references(() => people.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Se avisa a esta hora, no al cargar: el guardia tiene unos segundos para deshacer.
+  notifyAt: timestamp('notify_at', { withTimezone: true }).notNull(),
+  notifiedAt: timestamp('notified_at', { withTimezone: true }),
+  canceledAt: timestamp('canceled_at', { withTimezone: true }),
+}, (t) => [
+  index('package_unit_idx').on(t.unitId, t.createdAt),
+  check('package_note_ck', sql`${t.note} is null or char_length(${t.note}) between 1 and 80`),
+  check('package_estado_ck', sql`${t.notifiedAt} is null or ${t.canceledAt} is null`),
+])
+
+export const pushSubscriptions = pgTable('push_subscription', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  personId: uuid('person_id').notNull().references(() => people.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex('push_subscription_endpoint_uq').on(t.endpoint)])
