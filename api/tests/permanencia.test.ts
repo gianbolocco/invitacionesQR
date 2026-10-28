@@ -13,11 +13,13 @@ const PASS = 'una-contrasena-larga'
 const HORA = 3_600_000
 const haceH = (h: number) => new Date(Date.now() - h * HORA)
 
-async function escenario(umbrales: { visita?: number | null; proveedor?: number | null } = {}) {
+async function escenario(umbrales: { visita?: number | null; proveedor?: number | null; delivery?: number | null } = {}) {
   const [n] = await db.insert(neighborhoods).values({
     name: 'Álamo Alto',
     overstayHoursVisita: umbrales.visita ?? null,
     overstayHoursProveedor: umbrales.proveedor ?? null,
+    // undefined deja el default de la base (30); null apaga la alerta.
+    ...(umbrales.delivery !== undefined ? { overstayMinutesDelivery: umbrales.delivery } : {}),
   }).returning()
   const [u] = await db.insert(units).values({ neighborhoodId: n.id, label: 'Lote 142' }).returning()
   const [guardia] = await db.insert(people).values({
@@ -32,13 +34,17 @@ async function escenario(umbrales: { visita?: number | null; proveedor?: number 
     unitId: u.id, createdBy: guardia.id, kind, frequentAs, guestName: `Juan ${kind}`,
     validFrom: hoy, validTo: hoy, capacity, token: randomToken(16),
   }).returning())[0]
+  const delivery = async () => (await db.insert(invitations).values({
+    unitId: u.id, createdBy: guardia.id, kind: 'delivery', deliveryApp: 'pedidosya', guestName: 'Repartidor',
+    validFrom: hoy, validTo: hoy, capacity: 1, token: randomToken(16), expiresAt: new Date(Date.now() + 2 * HORA),
+  }).returning())[0]
   const entro = (invitationId: string, enteredAt: Date) =>
     db.insert(entryLogs).values({ invitationId, unitId: u.id, guardId: guardia.id, enteredAt, guestName: 'Juan' })
   const adentro = async () =>
     (await request(app).get('/gate/adentro').set('Cookie', cookie).expect(200)).body as
       { id: string; alertaDesde: string | null }[]
 
-  return { n, guardia, cookie, inv, entro, adentro }
+  return { n, guardia, cookie, inv, delivery, entro, adentro }
 }
 
 describe('alerta de permanencia', () => {
@@ -91,7 +97,34 @@ describe('alerta de permanencia', () => {
     await expect(inv('visita', 1, 'proveedor')).rejects.toThrow()
   })
 
+  it('un delivery alerta en minutos: ingreso más el umbral del barrio', async () => {
+    const { delivery, entro, adentro } = await escenario()
+    const desde = new Date(Date.now() - 31 * 60_000)
+    await entro((await delivery()).id, desde)
+    const [fila] = await adentro()
+    expect(new Date(fila.alertaDesde!).getTime()).toBe(desde.getTime() + 30 * 60_000)
+  })
 
+  it('con el umbral de delivery en null, no alerta', async () => {
+    const { delivery, entro, adentro } = await escenario({ delivery: null })
+    await entro((await delivery()).id, haceH(3))
+    const [fila] = await adentro()
+    expect(fila.alertaDesde).toBeNull()
+  })
 
+  it('el admin cambia overstayMinutes.delivery; menos de 5 es 400', async () => {
+    const { n } = await escenario()
+    const [admin] = await db.insert(people).values({
+      neighborhoodId: n.id, email: 'admin@example.com', name: 'Admin',
+      role: 'admin', status: 'active', passwordHash: await hashPassword(PASS),
+    }).returning()
+    const login = await request(app).post('/auth/login').send({ email: admin.email, password: PASS })
+    const cookie = login.headers['set-cookie'] as unknown as string[]
+    const patch = (delivery: number | null) =>
+      request(app).patch('/admin/neighborhood').set('Cookie', cookie).send({ overstayMinutes: { delivery } })
 
+    await patch(4).expect(400)
+    expect((await patch(45).expect(200)).body.overstayMinutes).toEqual({ delivery: 45 })
+    expect((await patch(null).expect(200)).body.overstayMinutes).toEqual({ delivery: null })
+  })
 })

@@ -14,16 +14,17 @@ export async function getNeighborhood(id: string) {
     brandColor: neighborhoods.brandColor,
     visita: neighborhoods.overstayHoursVisita,
     proveedor: neighborhoods.overstayHoursProveedor,
+    delivery: neighborhoods.overstayMinutesDelivery,
     providerWindows: neighborhoods.providerWindows,
     insuranceWarnDays: neighborhoods.insuranceWarnDays,
     vehicleInsuranceRequired: neighborhoods.vehicleInsuranceRequired,
     vehicleInsuranceOverride: neighborhoods.vehicleInsuranceOverride,
   }).from(neighborhoods).where(eq(neighborhoods.id, id)).limit(1)
   if (!row) throw new AppError(404, 'not_found')
-  const { visita, proveedor, ...barrio } = row
+  const { visita, proveedor, delivery, ...barrio } = row
   // La paleta viaja con el barrio para que el front no la duplique: si alguna
   // vez cambia, cambia en un solo lado.
-  return { ...barrio, overstayHours: { visita, proveedor }, paleta: PALETA }
+  return { ...barrio, overstayHours: { visita, proveedor }, overstayMinutes: { delivery }, paleta: PALETA }
 }
 
 export async function updateNeighborhood(
@@ -32,6 +33,7 @@ export async function updateNeighborhood(
   data: {
     name?: string; address?: string; mapUrl?: string; brandColor?: string
     overstayHours?: { visita?: number | null; proveedor?: number | null }
+    overstayMinutes?: { delivery?: number | null }
     providerWindows?: Franja[]
     insuranceWarnDays?: number | null
     vehicleInsuranceRequired?: boolean; vehicleInsuranceOverride?: boolean
@@ -60,6 +62,7 @@ export async function updateNeighborhood(
     // Una clave que no viene no se toca; null la apaga.
     ...(data.overstayHours?.visita !== undefined ? { overstayHoursVisita: data.overstayHours.visita } : {}),
     ...(data.overstayHours?.proveedor !== undefined ? { overstayHoursProveedor: data.overstayHours.proveedor } : {}),
+    ...(data.overstayMinutes?.delivery !== undefined ? { overstayMinutesDelivery: data.overstayMinutes.delivery } : {}),
     ...(data.insuranceWarnDays !== undefined ? { insuranceWarnDays: data.insuranceWarnDays } : {}),
     ...(data.vehicleInsuranceRequired !== undefined ? { vehicleInsuranceRequired: data.vehicleInsuranceRequired } : {}),
     ...(data.vehicleInsuranceOverride !== undefined ? { vehicleInsuranceOverride: data.vehicleInsuranceOverride } : {}),

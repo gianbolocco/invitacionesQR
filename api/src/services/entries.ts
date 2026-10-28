@@ -659,6 +659,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       case case when i.kind = 'frecuente' then coalesce(i.frequent_as, 'visita') else i.kind end
         when 'visita'    then abiertas.primero + make_interval(hours => n.overstay_hours_visita)
         when 'proveedor' then abiertas.primero + make_interval(hours => n.overstay_hours_proveedor)
+        when 'delivery'  then abiertas.primero + make_interval(mins => n.overstay_minutes_delivery)
       end                                               as "alertaDesde"
     from (
       -- El reloj de la alerta corre desde el ingreso abierto más viejo: con

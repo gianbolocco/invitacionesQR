@@ -161,6 +161,9 @@ adminRoutes.patch('/neighborhood', async (req, res) => {
       visita: z.number().int().min(1).max(72).nullable().optional(),
       proveedor: z.number().int().min(1).max(72).nullable().optional(),
     }).optional(),
+    overstayMinutes: z.object({
+      delivery: z.number().int().min(5).max(240).nullable().optional(),
+    }).optional(),
     insuranceWarnDays: z.number().int().min(1).max(90).nullable().optional(),
     vehicleInsuranceRequired: z.boolean().optional(),
     vehicleInsuranceOverride: z.boolean().optional(),
