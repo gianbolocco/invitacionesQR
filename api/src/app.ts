@@ -14,6 +14,7 @@ import { insuranceRoutes } from './routes/seguros.js'
 import { brandingRoutes } from './routes/branding.js'
 import { reportRoutes } from './routes/reports.js'
 import { avisarAlEscribir } from './lib/avisos.js'
+import { eventRoutes } from './routes/events.js'
 
 export function buildApp() {
   const app = express()
@@ -47,6 +48,7 @@ export function buildApp() {
   app.use('/insurance', insuranceRoutes)
   app.use('/branding', brandingRoutes)
   app.use('/reports', reportRoutes)
+  app.use('/events', eventRoutes)
 
   // Los errores de zod se traducen a 400 antes del handler genérico.
   app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {

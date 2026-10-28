@@ -1,4 +1,5 @@
 import { buildApp } from './app.js'
+import { cerrarTodo } from './lib/eventos.js'
 
 const port = Number(process.env.PORT ?? 8080)
 const server = buildApp().listen(port, () => console.log(`API escuchando en :${port}`))
@@ -10,6 +11,7 @@ const server = buildApp().listen(port, () => console.log(`API escuchando en :${p
  * registrar) y sale. El tope de 5 s es por si alguna no termina nunca.
  */
 process.on('SIGTERM', () => {
+  cerrarTodo()
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 5000).unref()
 })
