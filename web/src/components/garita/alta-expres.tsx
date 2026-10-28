@@ -21,7 +21,8 @@ import {
 /** Lo que ya se sabe de una invitación rechazada que se autoriza igual. */
 export type InicialAlta = {
   guestName: string; guestDoc: string; plate: string; unidad: UnidadHit
-  kind: 'visita' | 'proveedor'; tradeId: string
+  kind: 'visita' | 'proveedor' | 'delivery'; tradeId: string
+  app: NonNullable<Invitation['deliveryApp']>; otro: string
 }
 
 /**
@@ -98,7 +99,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
     else if (inicial) {
       setGuestName(inicial.guestName); setUnidad(inicial.unidad)
       setGuestDoc(inicial.guestDoc); setPlate(inicial.plate)
-      setKind(inicial.kind); setRubro(inicial.tradeId)
+      setKind(inicial.kind); setRubro(inicial.tradeId); setApp(inicial.app); setOtro(inicial.otro)
     }
   }
 
@@ -107,6 +108,8 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const teclaPatente = useCampoLectora(plate, (l) =>
     l.tipo === 'dni' ? (setPlate(''), aplicarDni(l, false)) : (setPlate(''), onQr(l.token)))
 
+  const teclaOtro = useCampoLectora(otro, (l) =>
+    l.tipo === 'dni' ? (setOtro(''), aplicarDni(l, false)) : (setOtro(''), onQr(l.token)))
   const teclaNota = useCampoLectora(nota, (l) =>
     l.tipo === 'dni' ? (setNota(''), aplicarDni(l, false)) : (setNota(''), onQr(l.token)))
 
@@ -152,7 +155,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
               {app === 'otro' && (
                 <>
                   <Label htmlFor="otro-expres" className="mt-2 text-sm font-semibold text-ink">¿De dónde viene?</Label>
-                  <Input id="otro-expres" required maxLength={40} value={otro} onChange={(e) => setOtro(e.target.value)} />
+                  <Input id="otro-expres" required maxLength={40} onKeyDown={teclaOtro} value={otro} onChange={(e) => setOtro(e.target.value)} />
                 </>
               )}
             </Campo>
@@ -205,7 +208,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
             </>
           )}
 
-          <Campo id="doc-expres" etiqueta={esDelivery ? 'Documento del repartidor *' : 'Documento *'}>
+          <Campo id="doc-expres" etiqueta={<>{esDelivery ? 'Documento del repartidor' : 'Documento'} <span aria-hidden>*</span></>}>
             <Input id="doc-expres" required onKeyDown={teclaDoc} value={guestDoc} className="tabular" placeholder="30.123.456"
               onChange={(e) => setGuestDoc(e.target.value)} />
           </Campo>

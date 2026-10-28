@@ -12,7 +12,7 @@ import { useDemora } from '@/lib/use-demora'
 import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
 import { hoyISO, horaODia, tiempoDesde, fechaCompleta } from '@/lib/fechas'
-import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
+import { APPS_DELIVERY, KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
 import {
   useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
   useVeredictoEnVivo, useCorregirSeguro, fechaPasadaDe,
@@ -621,7 +621,10 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           plate: plate || inv.plate || '',
           unidad: { unitId: inv.unitId, unitLabel: inv.unitLabel, residentName: inv.inviterName },
           // Un rubro que ya no está activo lo descarta el sheet: ahí elige el guardia.
-          kind: inv.kind === 'proveedor' || inv.frequentAs === 'proveedor' ? 'proveedor' : 'visita',
+          kind: inv.kind === 'delivery' ? 'delivery' : inv.kind === 'proveedor' || inv.frequentAs === 'proveedor' ? 'proveedor' : 'visita',
+          // El nombre de un delivery es la app; si no es una de las tres, era un "Otro" y el nombre es el detalle.
+          app: APPS_DELIVERY.find((a) => a.etiqueta === inv.guestName)?.valor ?? 'otro',
+          otro: APPS_DELIVERY.some((a) => a.etiqueta === inv.guestName) ? '' : inv.guestName,
           tradeId: inv.tradeId ?? '',
         }}
         // replace: "Volver" en el veredicto nuevo lleva a donde estaba el guardia antes del rechazo.

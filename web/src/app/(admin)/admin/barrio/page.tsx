@@ -81,9 +81,9 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
   const [color, setColor] = useState<string | null>(null)
   const [arrastrando, setArrastrando] = useState(false)
   const [errorLogo, setErrorLogo] = useState<string | null>(null)
-  // null = ese tipo no alerta; un string = lo que está tipeado en las horas.
   // Vacío = el delivery no alerta.
   const [minDelivery, setMinDelivery] = useState('')
+  // null = ese tipo no alerta; un string = lo que está tipeado en las horas.
   const [alertas, setAlertas] = useState<Record<TipoAlerta, string | null>>({ visita: null, proveedor: null })
   // Mismo criterio para el seguro: null = no avisa.
   const [diasSeguro, setDiasSeguro] = useState<string | null>(null)
