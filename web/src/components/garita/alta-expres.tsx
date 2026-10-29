@@ -8,9 +8,8 @@ import { Chips } from '@/components/dominio/chips'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { APPS_DELIVERY, type Invitation } from '@/lib/invitations'
 import { useRubrosDelBarrio } from '@/lib/queries/invitaciones'
-import { Fila } from '@/components/dominio/fila'
-import { useDemora } from '@/lib/use-demora'
-import { useBuscarUnidades, useAltaExpres } from '@/lib/queries/garita'
+import { BuscadorLote } from '@/components/garita/buscador-lote'
+import { useAltaExpres } from '@/lib/queries/garita'
 import type { UnidadHit } from '@/lib/gate'
 import { useCampoLectora } from '@/lib/use-lectora'
 import type { LecturaDni } from '@/lib/lectora'
@@ -42,7 +41,6 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
 }) {
   const [guestName, setGuestName] = useState('')
   const [unidad, setUnidad] = useState<UnidadHit | null>(null)
-  const [qUnidad, setQUnidad] = useState('')
   const [guestDoc, setGuestDoc] = useState('')
   const [plate, setPlate] = useState('')
   const [nota, setNota] = useState('')
@@ -58,8 +56,6 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const pideRubro = kind === 'proveedor' && listaRubros.length > 0
   const rubroActual = listaRubros.find((t) => t.id === rubro)
   const errorRubro = intento && pideRubro && !rubroActual ? 'Elegí el rubro.' : null
-  const qDemorada = useDemora(qUnidad)
-  const unidades = useBuscarUnidades(unidad ? '' : qDemorada.trim())
   const alta = useAltaExpres()
 
   // El nombre que escribió el último escaneo de DNI.
@@ -92,7 +88,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
   const [abiertoVisto, setAbiertoVisto] = useState(abierto)
   if (abierto !== abiertoVisto) {
     setAbiertoVisto(abierto)
-    if (!abierto) { setNombreEscaneado(''); setGuestName(''); setUnidad(null); setQUnidad(''); setGuestDoc(''); setPlate(''); setNota('')
+    if (!abierto) { setNombreEscaneado(''); setGuestName(''); setUnidad(null); setGuestDoc(''); setPlate(''); setNota('')
       setKind('visita'); setRubro(''); setIntento(false); setApp('pedidosya'); setOtro('')
     }
     // "Autorizar igual": todo lo que ya se sabe de la invitación rechazada, lote incluido.
@@ -103,8 +99,6 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
     }
   }
 
-  const teclaUnidad = useCampoLectora(qUnidad, (l) =>
-    l.tipo === 'dni' ? (setQUnidad(''), aplicarDni(l, false)) : (setQUnidad(''), onQr(l.token)))
   const teclaPatente = useCampoLectora(plate, (l) =>
     l.tipo === 'dni' ? (setPlate(''), aplicarDni(l, false)) : (setPlate(''), onQr(l.token)))
 
@@ -165,30 +159,8 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
             </Campo>
           )}
 
-          <Campo id="lote-expres" etiqueta="Lote">
-            {unidad ? (
-              <div className="flex items-center justify-between gap-2 rounded-md border border-input px-3 py-2">
-                <span className="text-sm font-semibold">{unidad.unitLabel} · {unidad.residentName}</span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setUnidad(null)}>Cambiar</Button>
-              </div>
-            ) : (
-              <>
-                <Input id="lote-expres" onKeyDown={teclaUnidad} value={qUnidad} placeholder="Lote o apellido del vecino"
-                  onChange={(e) => setQUnidad(e.target.value)} />
-                {unidades.data && unidades.data.length > 0 && (
-                  <div className="mt-1 max-h-48 overflow-auto rounded-md border border-border p-2 [&>*:last-child]:border-b-0">
-                    {unidades.data.map((u) => (
-                      <Fila densa key={`${u.unitId}-${u.residentName}`} titulo={u.residentName} meta={u.unitLabel}
-                        onClick={() => { setUnidad(u); setQUnidad('') }} />
-                    ))}
-                  </div>
-                )}
-                {unidades.data?.length === 0 && (
-                  <p className="mt-1 text-sm text-ink-soft">Sin resultados. Probá con el lote o el apellido.</p>
-                )}
-              </>
-            )}
-          </Campo>
+          <BuscadorLote id="lote-expres" unidad={unidad} onUnidad={setUnidad}
+            alLeer={(l) => (l.tipo === 'dni' ? aplicarDni(l, false) : onQr(l.token))} />
 
           {kind === 'proveedor' && (
             <>

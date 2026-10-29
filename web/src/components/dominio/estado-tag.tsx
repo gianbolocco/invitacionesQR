@@ -1,9 +1,9 @@
-import { Ban, CalendarX, Check, Clock, Hourglass, type LucideIcon } from 'lucide-react'
+import { Ban, CalendarX, Check, Clock, Hourglass, Package, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type Estado =
   | 'esperando' | 'adentro' | 'salio' | 'concluida' | 'anulada' | 'vencida'
-  | 'invitado' | 'activo' | 'deshabilitado'
+  | 'invitado' | 'activo' | 'deshabilitado' | 'paquete'
 
 /*
  * Cada estado lleva su palabra y, cuando entra, un ícono: el color ayuda pero
@@ -21,12 +21,13 @@ const LOOK: Record<Estado, { clase: string; icono?: LucideIcon }> = {
   vencida: { clase: 'bg-alto-tint text-alto', icono: CalendarX },
   anulada: { clase: 'bg-alto-tint text-alto', icono: Ban },
   deshabilitado: { clase: 'bg-surface-sunk text-ink-soft' },
+  paquete: { clase: 'bg-azul-tint text-ink [&_svg]:text-azul-text', icono: Package },
 }
 
 const ETIQUETA: Record<Estado, string> = {
   adentro: 'Adentro', activo: 'Activa', esperando: 'Invitado', invitado: 'Sin activar',
   concluida: 'Concluida', salio: 'Salió', vencida: 'Vencida',
-  deshabilitado: 'De baja', anulada: 'Anulada',
+  deshabilitado: 'De baja', anulada: 'Anulada', paquete: 'Paquete',
 }
 
 /**

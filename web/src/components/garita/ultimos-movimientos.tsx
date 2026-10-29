@@ -1,5 +1,5 @@
 'use client'
-import { History, Package } from 'lucide-react'
+import { History } from 'lucide-react'
 import { EstadoTag } from '@/components/dominio/estado-tag'
 import { hora, hoyISO } from '@/lib/fechas'
 import { ultimosMovimientos } from '@/lib/ultimos-movimientos'
@@ -26,11 +26,7 @@ export function UltimosMovimientos() {
           <li key={`${e.invitationId}-${e.tipo}-${e.cuando}`} className="flex items-center gap-2 text-sm">
             {e.tipo === 'ingreso' && <EstadoTag estado="adentro" etiqueta="Ingreso" />}
             {e.tipo === 'egreso' && <EstadoTag estado="salio" etiqueta="Egreso" />}
-            {e.tipo === 'paquete' && (
-              <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm bg-azul-tint px-2.5 py-1 text-[13px] leading-4 font-semibold text-ink">
-                <Package className="size-3.5 shrink-0 text-azul-text" strokeWidth={2.5} aria-hidden />Paquete
-              </span>
-            )}
+            {e.tipo === 'paquete' && <EstadoTag estado="paquete" />}
             <span className="min-w-0 flex-1 truncate font-medium">{e.guestName}</span>
             <span className="shrink-0 text-ink-soft tabular">{hora(e.cuando)}</span>
           </li>

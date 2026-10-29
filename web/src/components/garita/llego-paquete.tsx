@@ -1,18 +1,18 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Campo } from '@/components/dominio/campo'
-import { Fila } from '@/components/dominio/fila'
+import { BuscadorLote } from '@/components/garita/buscador-lote'
+import { useCampoLectora } from '@/lib/use-lectora'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { useDemora } from '@/lib/use-demora'
-import { useBuscarUnidades } from '@/lib/queries/garita'
 import { avisarPaquete, cancelarPaquete, clavePaquetesHoy } from '@/lib/queries/paquetes'
 import { ApiError } from '@/lib/api'
 import type { UnidadHit } from '@/lib/gate'
 
+// Igual a DESHACER_SEGUNDOS de api/src/services/packages.ts: es lo que la API retiene el aviso.
 const ESPERA = 5
 
 function textoDeError(e: unknown) {
@@ -30,17 +30,18 @@ export function LlegoPaquete({ abierto, onAbiertoChange, disparador }: {
 }) {
   const qc = useQueryClient()
   const [unidad, setUnidad] = useState<UnidadHit | null>(null)
-  const [q, setQ] = useState('')
   const [nota, setNota] = useState('')
   const [enviando, setEnviando] = useState(false)
-  const qDemorada = useDemora(q)
-  const unidades = useBuscarUnidades(unidad ? '' : qDemorada.trim())
+  const notaRef = useRef<HTMLInputElement>(null)
+  // Una lectura no tiene nada que ver con un paquete: se borra del campo y se ignora
+  // (si no, un DNI escaneado en la nota viajaría al celular del vecino).
+  const teclaNota = useCampoLectora(nota, () => setNota(''))
 
   // Cualquier cierre deja el formulario limpio.
   const [abiertoVisto, setAbiertoVisto] = useState(abierto)
   if (abierto !== abiertoVisto) {
     setAbiertoVisto(abierto)
-    if (!abierto) { setUnidad(null); setQ(''); setNota('') }
+    if (!abierto) { setUnidad(null); setNota('') }
   }
 
   // El servidor es quien retiene el aviso 5 s; acá solo se cuenta y se ofrece cancelar.
@@ -89,32 +90,11 @@ export function LlegoPaquete({ abierto, onAbiertoChange, disparador }: {
           <SheetDescription>Le avisamos a la casa al instante.</SheetDescription>
         </SheetHeader>
         <form onSubmit={enviar} className="flex flex-col gap-4 px-4 pb-8">
-          <Campo id="lote-paquete" etiqueta="Lote">
-            {unidad ? (
-              <div className="flex items-center justify-between gap-2 rounded-md border border-input px-3 py-2">
-                <span className="text-sm font-semibold">{unidad.unitLabel} · {unidad.residentName}</span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setUnidad(null)}>Cambiar</Button>
-              </div>
-            ) : (
-              <>
-                <Input id="lote-paquete" value={q} placeholder="Lote o apellido del vecino"
-                  onChange={(e) => setQ(e.target.value)} />
-                {unidades.data && unidades.data.length > 0 && (
-                  <div className="mt-1 max-h-48 overflow-auto rounded-md border border-border p-2 [&>*:last-child]:border-b-0">
-                    {unidades.data.map((u) => (
-                      <Fila densa key={`${u.unitId}-${u.residentName}`} titulo={u.residentName} meta={u.unitLabel}
-                        onClick={() => { setUnidad(u); setQ('') }} />
-                    ))}
-                  </div>
-                )}
-                {unidades.data?.length === 0 && (
-                  <p className="mt-1 text-sm text-ink-soft">Sin resultados. Probá con el lote o el apellido.</p>
-                )}
-              </>
-            )}
-          </Campo>
+          {/* Al elegir, el foco pasa a la nota: nunca queda en el body con la hoja abierta. */}
+          <BuscadorLote id="lote-paquete" unidad={unidad} alLeer={() => {}}
+            onUnidad={(u) => { setUnidad(u); if (u) setTimeout(() => notaRef.current?.focus(), 0) }} />
           <Campo id="nota-paquete" etiqueta="Nota (opcional)">
-            <Input id="nota-paquete" value={nota} maxLength={80} onChange={(e) => setNota(e.target.value)} />
+            <Input id="nota-paquete" ref={notaRef} onKeyDown={teclaNota} value={nota} maxLength={80} onChange={(e) => setNota(e.target.value)} />
           </Campo>
           <Button type="submit" disabled={!unidad || enviando}>
             {unidad ? `Avisar al ${unidad.unitLabel}` : 'Avisar'}
