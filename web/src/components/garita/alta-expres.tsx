@@ -185,7 +185,7 @@ export function AltaExpres({ abierto, onAbiertoChange, disparador, onCreada, lec
               onChange={(e) => setGuestDoc(e.target.value)} />
           </Campo>
 
-          <Campo id="patente-expres" etiqueta={esDelivery ? 'Patente (vacío = a pie o en bici)' : 'Patente (opcional)'}>
+          <Campo id="patente-expres" etiqueta="Patente">
             <Input id="patente-expres" onKeyDown={teclaPatente} value={plate} className="uppercase"
               onChange={(e) => setPlate(e.target.value.toUpperCase())} />
           </Campo>
