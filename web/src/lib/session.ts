@@ -1,6 +1,7 @@
 'use client'
 import { useContext } from 'react'
 import { api } from './api'
+import { desactivarPush } from './push-cliente'
 import { SesionContexto } from './sesion-contexto'
 
 export type Me = {
@@ -32,6 +33,8 @@ export function homeFor(role: Me['role']): string {
 }
 
 export async function logout() {
+  // Antes de cerrar la sesión: el DELETE de la suscripción la necesita. Un dispositivo compartido no debe seguir recibiendo los avisos.
+  await desactivarPush().catch(() => {})
   await api('/auth/logout', { method: 'POST' }).catch(() => {})
   // Recarga dura a propósito: tira todo el estado en memoria después del logout.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination

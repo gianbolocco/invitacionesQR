@@ -135,8 +135,9 @@ Sin claves VAPID las notificaciones push no se envían: **se registran en el
 log** (lo demás, incluido el aviso en vivo, anda igual). Se generan con
 `npx web-push generate-vapid-keys`. Con `NODE_ENV=production` la API no arranca
 sin `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` (un `mailto:`).
-En qa, Caddy ya vacía `text/event-stream` solo; si los avisos en vivo llegaran
-con demora, agregar `flush_interval -1` al `reverse_proxy` de `/api/*`.
+No rotes las claves: cambiarlas invalida todas las suscripciones existentes.
+Los dos streams SSE (`/api/gate/eventos` y `/api/events`) quedan fuera de la
+compresión de Caddy: comprimidos, los avisos en vivo llegarían tarde.
 
 ### Instalar un barrio
 

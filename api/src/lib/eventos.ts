@@ -4,7 +4,8 @@ import type { Response } from 'express'
 const conexiones = new Map<string, Set<Response>>()
 
 export function suscribir(personId: string, res: Response) {
-  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' })
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', // no-transform: que ningún proxy lo comprima ni lo retenga para comprimir.
+    'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' })
   // Escribir en un socket reseteado emite 'error'; sin manejador tumbaría el proceso.
   res.on('error', () => {})
   res.write(': hola\n\n')

@@ -123,8 +123,9 @@ export default function GaritaHoy() {
     }
   }
 
-  // Con la hoja de paquetes abierta la lectora no hace nada: un QR no debe sacar al guardia de ahí.
-  useLectora({ onLectura: (texto) => leer(interpretarLectura(texto)), activo: !paqueteAbierto })
+  // Con la hoja de paquetes abierta la lectura se ignora, pero el hook sigue activo: apagado, el Enter
+  // de la lectora apretaría el botón con foco de la hoja.
+  useLectora({ onLectura: (texto) => { if (!paqueteAbierto) leer(interpretarLectura(texto)) } })
 
   // Un DNI leído en el escáner o en un veredicto llega acá para resolverse.
   useEffect(() => {
