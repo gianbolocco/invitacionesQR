@@ -33,9 +33,9 @@ export function SeccionSeguro({
   const texto = estado === 'no_aplica' ? '' : buscando ? 'Buscando…' : textoEstado(estado, guardado?.expiresOn ?? null, hoyISO())
   const mal = estado === 'sin_cargar' || estado === 'vencido'
   return (
-    <section aria-labelledby={`${idBase}-titulo`} className="flex flex-col gap-2.5">
+    <section aria-labelledby={`${idBase}-titulo`} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 id={`${idBase}-titulo`} className="text-sm font-bold uppercase tracking-[0.08em] opacity-80">{titulo}</h2>
+        <h2 id={`${idBase}-titulo`} className="text-xl font-bold tracking-[-0.01em] sm:text-2xl">{titulo}</h2>
         {texto && (
           // El estado lleva palabra y borde, no solo color: se lee igual sobre NO PASA y sobre INGRESO.
           <span className={`rounded-full border px-2.5 py-0.5 text-sm font-semibold ${mal && !buscando ? 'border-current' : 'border-current/40'}`}>
