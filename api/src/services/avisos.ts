@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, lte, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { packages, people, pushSubscriptions, unitMembers, units } from '../db/schema.js'
+import { avisarGaritas } from '../lib/avisos.js'
 import { emitir } from '../lib/eventos.js'
 import { enviarPush } from '../lib/push.js'
 
@@ -19,6 +20,8 @@ export async function avisarPaquete(id: string): Promise<void> {
     return { note: p.note, unitId: p.unitId, unitLabel: u.label, notifiedAt }
   })
   if (!marcado) return
+  // Las otras pantallas de garita ven el paquete como avisado al instante.
+  avisarGaritas()
 
   const { unitLabel, note, notifiedAt } = marcado
   const vecinos = await db.select({ id: unitMembers.personId }).from(unitMembers)

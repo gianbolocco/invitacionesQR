@@ -27,6 +27,7 @@ const HOSTS_PUSH = ['fcm.googleapis.com', 'push.apple.com', 'push.services.mozil
  * 'https://evil.com;.fcm.googleapis.com/x' discrepan (uno ve evil.com, el otro
  * ve un host que termina en fcm.googleapis.com). Por eso el hostname se limita
  * a letras, números, guiones y puntos, y los dos parsers tienen que coincidir.
+ * Revisar al actualizar `web-push`: la validación imita su `url.parse`.
  */
 export function endpointPermitido(url: string): boolean {
   let u: URL

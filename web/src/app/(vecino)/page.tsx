@@ -67,10 +67,10 @@ export default function InicioVecino() {
           </>
         )} />
 
-      {paquetes && sinVer > 0 && <TarjetaPaquete ultimo={paquetes.find((p) => p.sinVer)!} cantidad={sinVer} />}
+      {paquetes && sinVer > 0 && <TarjetaPaquete ultimo={paquetes.find((p) => p.sinVer)!} cantidad={sinVer} variasUnidades={variasUnidades} />}
       {/* Ya vistos, /paquetes no tiene otra entrada: queda un acceso discreto mientras haya algo en los 30 días. */}
       {paquetes && sinVer === 0 && paquetes.length > 0 && (
-        <Link href="/paquetes" className="flex items-center gap-2 text-sm font-semibold text-azul-text">
+        <Link href="/paquetes" className="flex min-h-11 items-center gap-2 text-sm font-semibold text-azul-text">
           <Package className="size-4" aria-hidden />Ver paquetes ({paquetes.length})
         </Link>
       )}

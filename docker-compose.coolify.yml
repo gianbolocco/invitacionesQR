@@ -48,6 +48,7 @@
 #   VAPID_PUBLIC_KEY    obligatorias (avisos push): sin ellas la API no arranca.
 #   VAPID_PRIVATE_KEY   Generarlas con: npx web-push generate-vapid-keys
 #   VAPID_SUBJECT       un mailto:, ej: mailto:admin@tudominio.com
+#                       No rotar las claves: invalida todas las suscripciones.
 #   GOOGLE_CLIENT_ID    opcional
 #   GOOGLE_CLIENT_SECRET opcional
 #
