@@ -286,3 +286,44 @@ describe('deshacer el último movimiento', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('quién está adentro', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('el que entró con una invitación de ayer aparece adentro y se lo encuentra por DNI', async () => {
+    const { inv, cookie, guardia } = await escenario(1, { guestDoc: '30111222' })
+    await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez', guestDoc: '30111222' })
+    // La invitación ya venció: es el día siguiente y nadie le registró la salida.
+    await db.update(invitations).set({ validFrom: '2020-01-01', validTo: '2020-01-02' })
+      .where(eq(invitations.id, inv.id))
+
+    const adentro = await request(app).get('/gate/adentro').set('Cookie', cookie).expect(200)
+    expect(adentro.body.map((r: { id: string }) => r.id)).toEqual([inv.id])
+    expect(adentro.body[0].lastEntryAt).not.toBeNull()
+
+    const porDni = await request(app).post('/gate/search').send({ q: '30111222' }).set('Cookie', cookie).expect(200)
+    expect(porDni.body.map((r: { id: string; adentro: boolean }) => [r.id, r.adentro])).toEqual([[inv.id, true]])
+  })
+
+  it('el que ya salió no figura adentro, y su invitación vencida no aparece en la búsqueda', async () => {
+    const { inv, cookie, guardia } = await escenario(1, { guestDoc: '30111222' })
+    await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez', guestDoc: '30111222' })
+    await registerExit(inv.id, guardia.id)
+    await db.update(invitations).set({ validFrom: '2020-01-01', validTo: '2020-01-02' })
+      .where(eq(invitations.id, inv.id))
+
+    const adentro = await request(app).get('/gate/adentro').set('Cookie', cookie).expect(200)
+    expect(adentro.body).toEqual([])
+    const porDni = await request(app).post('/gate/search').send({ q: '30111222' }).set('Cookie', cookie).expect(200)
+    expect(porDni.body).toEqual([])
+  })
+
+  it('una invitación anulada con alguien adentro sigue figurando adentro', async () => {
+    const { inv, cookie, guardia } = await escenario()
+    await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
+    await db.update(invitations).set({ revokedAt: new Date() }).where(eq(invitations.id, inv.id))
+
+    const adentro = await request(app).get('/gate/adentro').set('Cookie', cookie).expect(200)
+    expect(adentro.body).toHaveLength(1)
+  })
+})

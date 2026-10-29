@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { entrar } from './sesion'
+import { entrar, expect, test } from './sesion'
 
 test('el admin da de alta un vecino desde el sheet', async ({ page }) => {
   await entrar(page, 'admin')
@@ -30,8 +29,8 @@ test('el admin cambia el color del barrio y lo ve sin recargar', async ({ page }
   // para verlo, así que alcanza con que el swatch quede marcado.
   await expect(otro).toHaveAttribute('aria-pressed', 'true')
 
-  await page.getByRole('button', { name: 'Guardar' }).click()
-  await expect(page.getByText('Guardado.')).toBeVisible()
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await expect(page.getByText('Guardado.', { exact: true })).toBeVisible()
 
   // Sin recargar: la banda del propio admin ya tiene que reflejar el color.
   await page.goto('/admin')

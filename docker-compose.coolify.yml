@@ -45,6 +45,10 @@
 #   RESEND_API_KEY      obligatoria: sin ella la API no arranca (los links de
 #                       alta y reset terminarían impresos en el log)
 #   MAIL_FROM           obligatoria, ej: Los Aromos <invitaciones@tudominio.com>
+#   VAPID_PUBLIC_KEY    obligatorias (avisos push): sin ellas la API no arranca.
+#   VAPID_PRIVATE_KEY   Generarlas con: npx web-push generate-vapid-keys
+#   VAPID_SUBJECT       un mailto:, ej: mailto:admin@tudominio.com
+#                       No rotar las claves: invalida todas las suscripciones.
 #   GOOGLE_CLIENT_ID    opcional
 #   GOOGLE_CLIENT_SECRET opcional
 #
@@ -68,17 +72,13 @@ services:
       API_ORIGIN: https://${DOMINIO}/api
       RESEND_API_KEY: ${RESEND_API_KEY:?falta RESEND_API_KEY}
       MAIL_FROM: ${MAIL_FROM:?falta MAIL_FROM}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:?falta VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:?falta VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:?falta VAPID_SUBJECT}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      # El barrio de esta instalación. Se siembra al primer arranque; si la
-      # base ya tiene uno, no se hace nada.
-      BARRIO_NOMBRE: ${BARRIO_NOMBRE:?falta BARRIO_NOMBRE}
-      BARRIO_DIRECCION: ${BARRIO_DIRECCION:-}
-      BARRIO_MAPA: ${BARRIO_MAPA:-}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:?falta ADMIN_EMAIL}
-      ADMIN_NOMBRE: ${ADMIN_NOMBRE:-}
     # /health chequea app y base. node -e con fetch porque node:24-slim no
-    # trae curl ni wget. start_period: al arrancar corre migración y siembra.
+    # trae curl ni wget. start_period: al arrancar corre las migraciones.
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:8080/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
       interval: 10s
@@ -119,6 +119,8 @@ services:
     expose: ['80']
     environment:
       SITIO: ':80'
+      # Solo en qa: NOINDEX=1 para que los buscadores no la indexen.
+      NOINDEX: ${NOINDEX:-}
     depends_on: [web, api]
     # Es el servicio que Coolify expone, así que es el que reporta el estado del
     # recurso. Pega a /api/health A TRAVÉS de Caddy: un solo chequeo cubre el

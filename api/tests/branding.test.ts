@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import request from 'supertest'
+import sharp from 'sharp'
 import { buildApp } from '../src/app.js'
 import { db } from '../src/db/index.js'
 import { neighborhoods, people, unitMembers, units } from '../src/db/schema.js'
@@ -47,11 +48,16 @@ describe('la marca pública', () => {
     expect(res.body.nombre).toBe('Los Aromos')
   })
 
+  it('informa si el barrio tiene paquetes activos', async () => {
+    await barrio({ packagesEnabled: false })
+    expect((await request(app).get('/branding').expect(200)).body.packagesEnabled).toBe(false)
+  })
+
   it('sin color propio devuelve el del producto, ya resuelto', async () => {
     await barrio()
     const res = await request(app).get('/branding').expect(200)
     // Quien lo consume no tiene que saber cuál es el default.
-    expect(res.body.color).toBe('#1e6b47')
+    expect(res.body.color).toBe('#2f5bff')
   })
 
   it('con color propio devuelve ese', async () => {
@@ -74,7 +80,7 @@ describe('la marca pública', () => {
   it('sin barrio en la base no revienta: devuelve los valores del producto', async () => {
     // Pasa entre que levanta la API y corre el seed.
     const res = await request(app).get('/branding').expect(200)
-    expect(res.body.color).toBe('#1e6b47')
+    expect(res.body.color).toBe('#2f5bff')
     expect(res.body.tieneLogo).toBe(false)
   })
 })
@@ -99,6 +105,34 @@ describe('el logo del barrio', () => {
     const res = await request(app).get('/branding/logo').expect(200)
     expect(res.headers['content-type']).toContain('image/png')
     expect(Buffer.from(res.body).subarray(0, 4)).toEqual(PNG.subarray(0, 4))
+  })
+
+  it('recorta el margen blanco del borde y deja el fondo propio del logo', async () => {
+    await barrio()
+    const { cookie } = await admin()
+    // Un logo verde de 200×100 con un margen blanco de 20 px alrededor.
+    const verde = await sharp({ create: { width: 200, height: 100, channels: 3, background: '#1f5d3a' } }).png().toBuffer()
+    const conMargen = await sharp({ create: { width: 240, height: 140, channels: 3, background: '#ffffff' } })
+      .composite([{ input: verde, left: 20, top: 20 }]).png().toBuffer()
+    await subir(cookie, conMargen).expect(200)
+
+    const res = await request(app).get('/branding/logo').expect(200)
+    const meta = await sharp(Buffer.from(res.body)).metadata()
+    expect([meta.width, meta.height]).toEqual([200, 100])
+  })
+
+  it('un logo sin margen blanco queda igual: no se come su propio fondo', async () => {
+    await barrio()
+    const { cookie } = await admin()
+    // Fondo verde con un bloque blanco adentro (como letras blancas).
+    const letras = await sharp({ create: { width: 80, height: 30, channels: 3, background: '#ffffff' } }).png().toBuffer()
+    const logo = await sharp({ create: { width: 200, height: 100, channels: 3, background: '#1f5d3a' } })
+      .composite([{ input: letras, left: 60, top: 35 }]).png().toBuffer()
+    await subir(cookie, logo).expect(200)
+
+    const res = await request(app).get('/branding/logo').expect(200)
+    const meta = await sharp(Buffer.from(res.body)).metadata()
+    expect([meta.width, meta.height]).toEqual([200, 100])
   })
 
   it('sube un JPEG', async () => {

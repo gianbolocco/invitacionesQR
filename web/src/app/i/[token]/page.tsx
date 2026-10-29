@@ -3,13 +3,19 @@ import { use, useState } from 'react'
 import { motion } from 'motion/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, MapPin, SearchX, Sun } from 'lucide-react'
-import { api } from '@/lib/api'
-import { KIND_LABEL, vigencia, type Invitation } from '@/lib/invitations'
-import { hoyISO } from '@/lib/fechas'
+import { api, ApiError } from '@/lib/api'
+import { KIND_LABEL, PORTERIA, vigencia, type Invitation } from '@/lib/invitations'
+import { fechaCompleta, hoyISO } from '@/lib/fechas'
+import { planoUrl, useMarca } from '@/lib/marca-cliente'
+import { loteDeLabel } from '@/lib/plano'
+import { type Franja } from '@/lib/franjas'
+import { HorarioRubro } from '@/components/dominio/horario-rubro'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CamposSeguro, erroresSeguro, estadoSeguroCargado, type ValorSeguro } from '@/components/dominio/campos-seguro'
 import { Campo } from '@/components/dominio/campo'
+import { PlanoBarrio } from '@/components/dominio/plano-barrio'
 import { Marca } from '@/components/dominio/marca'
 import { Nota } from '@/components/dominio/nota'
 import { Pase } from '@/components/dominio/pase'
@@ -28,49 +34,118 @@ type Publica = {
   hasDoc: boolean
   hasPlate: boolean
   frozen: boolean
+  tradeName: string | null
+  franjas: Franja[]
+  requiresInsurance: boolean
+  insuranceState: 'sin_cargar' | 'vigente' | 'vencido'
+  insuranceExpiresOn: string | null
+  insuranceVerified: boolean
 }
 
 /** Pide SOLO lo que falta. Los datos se piden una vez. */
-function FormularioDatos({ token, faltaDoc, faltaPatente }: { token: string; faltaDoc: boolean; faltaPatente: boolean }) {
+function FormularioDatos({ token, faltaDoc, faltaPatente, pideSeguro, estadoSeguro, soloSeguro, venceSeguro, seguroVerificado }: {
+  token: string; faltaDoc: boolean; faltaPatente: boolean; soloSeguro: boolean
+  pideSeguro: boolean; estadoSeguro: Publica['insuranceState']
+  venceSeguro: string | null; seguroVerificado: boolean
+}) {
   const qc = useQueryClient()
   const [doc, setDoc] = useState('')
   const [plate, setPlate] = useState('')
+  const [seguro, setSeguro] = useState<ValorSeguro>({ company: '', policy: '', expiresOn: '' })
+  const [errorSeguro, setErrorSeguro] = useState(false)
+  const [vencido, setVencido] = useState(false)
+  const [faltaDocSeguro, setFaltaDocSeguro] = useState(false)
+  const [verificado, setVerificado] = useState(false)
+  // Con el seguro verificado por la guardia el link no puede tocarlo.
+  const cargaSeguro = pideSeguro && !seguroVerificado
   const guardar = useMutation({
     mutationFn: () => api(`/invitations/public/${token}`, {
       method: 'PATCH',
-      body: JSON.stringify({ guestDoc: doc.trim() || undefined, plate: plate.trim() || undefined }),
+      body: JSON.stringify({ guestDoc: doc.trim() || undefined, plate: plate.trim() || undefined,
+        // Nunca null desde acá: vaciar el seguro lo hace el vecino.
+        insurance: estadoSeguroCargado(seguro) === 'completo'
+          ? { company: seguro.company.trim(), policy: seguro.policy.trim(), expiresOn: seguro.expiresOn } : undefined }),
     }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['publica', token] }),
+    onError: (e) => {
+      setVencido(e instanceof ApiError && e.code === 'seguro_vencido')
+      setFaltaDocSeguro(e instanceof ApiError && e.code === 'doc_required')
+      const yaVerificado = e instanceof ApiError && e.code === 'seguro_verificado'
+      setVerificado(yaVerificado)
+      // La vista de "ya verificado" sale de la pública: hay que volver a pedirla.
+      if (yaVerificado) qc.invalidateQueries({ queryKey: ['publica', token] })
+    },
   })
 
   if (guardar.isSuccess) return <Nota tono="exito">Listo. El guardia ya tiene tus datos.</Nota>
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); if (doc.trim() || plate.trim()) guardar.mutate() }}
-      className="flex flex-col gap-5 rounded-xl border border-line bg-card p-5">
+    <form onSubmit={(e) => {
+      e.preventDefault()
+      const parcial = cargaSeguro && estadoSeguroCargado(seguro) === 'parcial'
+      setErrorSeguro(parcial)
+      if (parcial) return
+      // El seguro queda guardado a nombre del DNI: sin DNI no hay a quién asignarlo.
+      if (cargaSeguro && faltaDoc && estadoSeguroCargado(seguro) === 'completo' && !doc.trim()) {
+        setFaltaDocSeguro(true)
+        return
+      }
+      if (doc.trim() || plate.trim() || (cargaSeguro && estadoSeguroCargado(seguro) === 'completo')) guardar.mutate()
+    }}
+      className="flex flex-col gap-5 rounded-lg border border-line bg-card p-5">
       <div>
         <p className="font-display text-lg font-bold tracking-[-0.01em]">Entrá más rápido</p>
         <p className="mt-0.5 text-sm text-ink-soft">
-          {faltaDoc && faltaPatente
+          {soloSeguro
+            ? 'Renová tu seguro y el guardia no te lo tiene que pedir en la barrera.'
+            : faltaDoc && faltaPatente
             ? 'Cargá tus datos y el guardia no te los tiene que pedir en la barrera.'
-            : faltaDoc
+            : !faltaDoc && !faltaPatente
+              ? 'Cargá tu seguro y el guardia no te lo tiene que pedir en la barrera.'
+              : faltaDoc
               ? 'Cargá tu documento y el guardia no te lo tiene que pedir en la barrera.'
               : 'Si venís en auto, cargá la patente y no te la piden en la barrera.'}
         </p>
       </div>
-      {faltaDoc && (
-        <Campo id="doc" etiqueta="Documento" ayuda="DNI, pasaporte o documento del país que sea.">
+      {/* Un frecuente que ya entró y no tenía DNI lo necesita para el seguro. */}
+      {faltaDoc && (soloSeguro ? pideSeguro : true) && (
+        <Campo id="doc" etiqueta="Documento" ayuda="DNI, pasaporte o documento del país que sea."
+          error={faltaDocSeguro ? 'Para guardar el seguro, cargá tu documento.' : null}>
           <Input id="doc" value={doc} className="tabular" placeholder="30.123.456" aria-describedby="doc-nota"
-            onChange={(e) => setDoc(e.target.value)} />
+            aria-invalid={faltaDocSeguro || undefined}
+            onChange={(e) => { setDoc(e.target.value); setFaltaDocSeguro(false) }} />
         </Campo>
       )}
-      {faltaPatente && (
+      {!soloSeguro && faltaPatente && (
         <Campo id="patente" etiqueta="Patente">
           <Input id="patente" value={plate} className="uppercase tabular" placeholder="AB 123 CD"
             onChange={(e) => setPlate(e.target.value)} />
         </Campo>
       )}
-      {guardar.isError && <Nota tono="error">No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.</Nota>}
+      {pideSeguro && (
+        <div className="flex flex-col gap-3 border-t border-line pt-5">
+          <div>
+            <p className="font-semibold">Tu seguro</p>
+            <p className="text-sm text-ink-soft">Sin un seguro vigente la guardia no te deja pasar.</p>
+          </div>
+          {seguroVerificado && venceSeguro ? (
+            <p className="text-sm font-semibold text-verde">La guardia ya verificó tu seguro: vence el {fechaCompleta(venceSeguro)}.</p>
+          ) : (
+            <>
+              {estadoSeguro === 'vigente' && venceSeguro && (
+                <p className="text-sm font-semibold text-verde">
+                  Tu seguro vence el {fechaCompleta(venceSeguro)}. Cargalo de nuevo solo si lo renovaste.
+                </p>
+              )}
+              {estadoSeguro === 'vencido' && <p className="text-sm font-semibold text-alto">Tu seguro está vencido. Cargá el nuevo.</p>}
+              <CamposSeguro idBase="seguro" min={hoyISO()} valor={seguro} onCambio={(v) => { setSeguro(v); setErrorSeguro(false) }}
+                errores={errorSeguro ? erroresSeguro(seguro) : undefined} />
+            </>
+          )}
+        </div>
+      )}
+      {/* Sin documento el error ya va bajo su campo. */}
+      {guardar.isError && !faltaDocSeguro && <Nota tono="error">{vencido ? 'Esa fecha ya pasó: cargá el vencimiento de la póliza vigente.' : verificado && venceSeguro ? `La guardia ya verificó tu seguro: vence el ${fechaCompleta(venceSeguro)}.` : 'No se pudo guardar. Probá de nuevo o mostrá el QR igual: vas a poder entrar.'}</Nota>}
       <Button type="submit" disabled={guardar.isPending}>
         {guardar.isPending && <Loader2 className="animate-spin" aria-hidden />}
         Guardar
@@ -81,6 +156,7 @@ function FormularioDatos({ token, faltaDoc, faltaPatente }: { token: string; fal
 
 export default function InvitacionPublica({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
+  const marca = useMarca()
   const q = useQuery({
     queryKey: ['publica', token],
     queryFn: ({ signal }) => api<Publica>(`/invitations/public/${token}`, { signal }),
@@ -98,7 +174,7 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
       <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-6">
         {encabezado}
         <Skeleton className="h-5 w-48" />
-        <Skeleton className="h-[34rem] w-full rounded-xl" />
+        <Skeleton className="h-[34rem] w-full rounded-lg" />
       </main>
     )
   }
@@ -119,13 +195,18 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
   const sello = anulada ? 'Anulada' : vencida ? 'Vencida' : undefined
   const url = typeof window === 'undefined' ? '' : window.location.href
   const { address, mapUrl } = inv.neighborhood
+  const lote = loteDeLabel(inv.unitLabel)
+  const pideCarga = inv.requiresInsurance && !inv.insuranceVerified
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-6">
       {encabezado}
 
       <p className="text-ink-soft">
-        Te invita <strong className="text-ink">{inv.inviterName}</strong> · <span className="tabular">{inv.unitLabel}</span>
+        {inv.inviterName === PORTERIA
+          ? <strong className="text-ink">{PORTERIA}</strong>
+          : <>Te invita <strong className="text-ink">{inv.inviterName}</strong></>}
+        {' · '}<span className="tabular">{inv.unitLabel}</span>
       </p>
 
       {sello && <Nota tono="error">Esta invitación está {sello.toLowerCase()}. Pedile una nueva a quien te invitó.</Nota>}
@@ -149,13 +230,23 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
         </p>
       )}
 
-      {!sello && !inv.frozen && (!inv.hasDoc || !inv.hasPlate) && (
-        <FormularioDatos token={token} faltaDoc={!inv.hasDoc} faltaPatente={!inv.hasPlate} />
+      {!sello && inv.tradeName && inv.franjas.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <HorarioRubro titulo={`Horario de ingreso · ${inv.tradeName}`} franjas={inv.franjas} />
+          <p className="text-sm text-ink-soft">Fuera de ese horario la guardia no te deja pasar.</p>
+        </section>
+      )}
+
+      {/* Ya entró: documento y patente quedan congelados, el seguro se puede renovar. */}
+      {!sello && (inv.frozen ? pideCarga : (!inv.hasDoc || !inv.hasPlate || pideCarga)) && (
+        <FormularioDatos token={token} faltaDoc={!inv.hasDoc} faltaPatente={!inv.hasPlate} soloSeguro={inv.frozen}
+          pideSeguro={inv.requiresInsurance} estadoSeguro={inv.insuranceState}
+          venceSeguro={inv.insuranceExpiresOn} seguroVerificado={inv.insuranceVerified} />
       )}
 
       {(address || mapUrl) && (
-        <section className="flex flex-col gap-3 rounded-xl border border-line bg-card p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Cómo llegar</p>
+        <section className="flex flex-col gap-3 rounded-lg border border-line bg-card p-5">
+          <p className="text-[13px] font-semibold text-ink-soft">Cómo llegar</p>
           {address && <p>{address}</p>}
           {mapUrl && (
             <a href={mapUrl} target="_blank" rel="noopener noreferrer"
@@ -165,6 +256,8 @@ export default function InvitacionPublica({ params }: { params: Promise<{ token:
           )}
         </section>
       )}
+
+      {marca.tienePlano && <PlanoBarrio src={planoUrl(marca, lote) ?? ''} lote={lote} />}
     </main>
   )
 }

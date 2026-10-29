@@ -7,9 +7,10 @@
  * Si la API no contesta, devuelve los valores del producto y la página se
  * dibuja igual: el color es decoración y no puede voltear la app.
  */
-export type Marca = { nombre: string; color: string; tieneLogo: boolean; logoVersion: number | null }
+export type Marca = { nombre: string; color: string; tieneLogo: boolean; logoVersion: number | null; tienePlano: boolean; planoVersion: number | null; packagesEnabled: boolean }
 
-export const MARCA_DEFAULT: Marca = { nombre: 'VisitPass', color: '#1e6b47', tieneLogo: false, logoVersion: null }
+// El azul de Pazzit: el color de un barrio que todavía no eligió el suyo.
+export const MARCA_DEFAULT: Marca = { nombre: 'Pazzit', color: '#2f5bff', tieneLogo: false, logoVersion: null, tienePlano: false, planoVersion: null, packagesEnabled: true }
 
 export async function leerMarca(): Promise<Marca> {
   const base = process.env.API_INTERNAL_URL ?? 'http://localhost:8080'

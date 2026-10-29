@@ -141,23 +141,33 @@ describe('garita', () => {
 
   it('la búsqueda manual encuentra por apellido y por UF', async () => {
     const { cookie } = await scenario()
-    const porNombre = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie)
+    const porNombre = await request(app).post('/gate/search').send({ q: 'Pérez' }).set('Cookie', cookie)
     expect(porNombre.body).toHaveLength(1)
 
-    const porUnidad = await request(app).get('/gate/search?q=142').set('Cookie', cookie)
+    const porUnidad = await request(app).post('/gate/search').send({ q: '142' }).set('Cookie', cookie)
     expect(porUnidad.body).toHaveLength(1)
   })
 
   it('encuentra "Perez" sin tilde: en la barrera nadie escribe acentos', async () => {
     const { cookie } = await scenario()
-    const res = await request(app).get('/gate/search?q=perez').set('Cookie', cookie)
+    const res = await request(app).post('/gate/search').send({ q: 'perez' }).set('Cookie', cookie)
     expect(res.body).toHaveLength(1)
     expect(res.body[0].guestName).toBe('Juan Pérez')
   })
 
+  it('cada resultado dice si está anulada y, si es frecuente, qué es', async () => {
+    const { cookie, inv } = await scenario()
+    const antes = await request(app).post('/gate/search').send({ q: 'Pérez' }).set('Cookie', cookie)
+    expect(antes.body[0]).toMatchObject({ anulada: false, kind: 'visita', frequentAs: null })
+
+    await db.update(invitations).set({ revokedAt: new Date() }).where(eq(invitations.id, inv.id))
+    const despues = await request(app).post('/gate/search').send({ q: 'Pérez' }).set('Cookie', cookie)
+    expect(despues.body[0].anulada).toBe(true)
+  })
+
   it('la búsqueda y el QR caen en el mismo resultado', async () => {
     const { cookie, inv } = await scenario()
-    const hit = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie)
+    const hit = await request(app).post('/gate/search').send({ q: 'Pérez' }).set('Cookie', cookie)
     const porId = await request(app).get(`/gate/invitation/${hit.body[0].id}`).set('Cookie', cookie)
     const porToken = await request(app).get(`/gate/check/${inv.token}`).set('Cookie', cookie)
     expect(porId.body.invitation).toEqual(porToken.body.invitation)
@@ -175,6 +185,7 @@ describe('quién dio el ingreso', () => {
       invitationId: inv.id,
       guardId: '00000000-0000-0000-0000-000000000000',
       guestName: 'Juan Pérez',
+      guestDoc: '30123456',
     }).expect(201)
 
     const [fila] = await db.select().from(entryLogs).where(eq(entryLogs.invitationId, inv.id))
@@ -184,7 +195,7 @@ describe('quién dio el ingreso', () => {
   it('la auditoría muestra el nombre de ese guardia', async () => {
     const { cookie, inv } = await scenario()
     await request(app).post('/gate/entries').set('Cookie', cookie)
-      .send({ invitationId: inv.id, guestName: 'Juan Pérez' }).expect(201)
+      .send({ invitationId: inv.id, guestName: 'Juan Pérez', guestDoc: '30123456' }).expect(201)
 
     const res = await request(app).get('/gate/audit').set('Cookie', cookie)
     const fila = res.body.rows.find((r: { guestName: string }) => r.guestName === 'Juan Pérez')
@@ -232,6 +243,12 @@ describe('el check informa si la persona está adentro', () => {
     const res = await request(app).get(`/gate/invitation/${inv.id}`).set('Cookie', cookie).expect(200)
     expect(res.body.adentro.entryId).toBe(segunda.id)
   })
+
+  it('dice quién invita, para saber a quién llamar', async () => {
+    const { inv, cookie } = await scenario()
+    const res = await request(app).get(`/gate/invitation/${inv.id}`).set('Cookie', cookie).expect(200)
+    expect(res.body.invitation.inviterName).toBe('Martín')
+  })
 })
 
 describe('buscar por documento en la garita', () => {
@@ -242,30 +259,53 @@ describe('buscar por documento en la garita', () => {
     await db.update(invitations).set({ guestDoc: '30111222' })
       .where(eq(invitations.id, inv.id))
 
-    const entero = await request(app).get('/gate/search?q=30111222').set('Cookie', cookie).expect(200)
+    const entero = await request(app).post('/gate/search').send({ q: '30111222' }).set('Cookie', cookie).expect(200)
     expect(entero.body).toHaveLength(1)
     expect(entero.body[0].id).toBe(inv.id)
     expect(entero.body[0].guestDoc).toBe('30111222')
 
-    const pedazo = await request(app).get('/gate/search?q=0111').set('Cookie', cookie).expect(200)
+    const pedazo = await request(app).post('/gate/search').send({ q: '0111' }).set('Cookie', cookie).expect(200)
     expect(pedazo.body).toHaveLength(1)
   })
 
   it('cada resultado dice si esa persona está adentro', async () => {
     const { inv, cookie, guardia } = await scenario()
 
-    const antes = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie).expect(200)
+    const antes = await request(app).post('/gate/search').send({ q: 'Pérez' }).set('Cookie', cookie).expect(200)
     expect(antes.body[0].adentro).toBe(false)
 
     await registerEntry(inv.id, guardia.id, { guestName: 'Juan Pérez' })
 
-    const despues = await request(app).get('/gate/search?q=Pérez').set('Cookie', cookie).expect(200)
+    const despues = await request(app).post('/gate/search').send({ q: 'Pérez' }).set('Cookie', cookie).expect(200)
     expect(despues.body[0].adentro).toBe(true)
   })
 
   it('un documento que no existe no devuelve nada', async () => {
     const { cookie } = await scenario()
-    const res = await request(app).get('/gate/search?q=99999999').set('Cookie', cookie).expect(200)
+    const res = await request(app).post('/gate/search').send({ q: '99999999' }).set('Cookie', cookie).expect(200)
     expect(res.body).toHaveLength(0)
+  })
+
+  it('el documento se compara por dígitos: 30111222 encuentra 30.111.222, y al revés', async () => {
+    const { inv, cookie } = await scenario()
+    await db.update(invitations).set({ guestDoc: '30.111.222' }).where(eq(invitations.id, inv.id))
+
+    const sinPuntos = await request(app).post('/gate/search').send({ q: '30111222' }).set('Cookie', cookie).expect(200)
+    expect(sinPuntos.body.map((h: { id: string }) => h.id)).toEqual([inv.id])
+
+    await db.update(invitations).set({ guestDoc: '30111222' }).where(eq(invitations.id, inv.id))
+    const conPuntos = await request(app).post('/gate/search').send({ q: '30.111.222' }).set('Cookie', cookie).expect(200)
+    expect(conPuntos.body).toHaveLength(1)
+  })
+
+  it('una búsqueda con letras no compara dígitos: "Zona 142" no matchea el documento 99.142.000', async () => {
+    const { inv, cookie } = await scenario()
+    await db.update(invitations).set({ guestDoc: '99.142.000' }).where(eq(invitations.id, inv.id))
+
+    const conLetras = await request(app).post('/gate/search').send({ q: 'Zona 142' }).set('Cookie', cookie).expect(200)
+    expect(conLetras.body).toHaveLength(0)
+
+    const soloDigitos = await request(app).post('/gate/search').send({ q: '99142000' }).set('Cookie', cookie).expect(200)
+    expect(soloDigitos.body).toHaveLength(1)
   })
 })

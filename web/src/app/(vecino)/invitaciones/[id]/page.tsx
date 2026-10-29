@@ -7,8 +7,9 @@ import { ArrowLeft, Loader2, SearchX } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import { useAnularInvitacion, useInvitacion, useRestaurarInvitacion } from '@/lib/queries/invitaciones'
 import { estadoInvitacion } from '@/lib/estado-invitacion'
-import { datosPase, urlPublica } from '@/lib/invitations'
-import { cupoTexto, hoyISO } from '@/lib/fechas'
+import { datosPase, KIND_LABEL, urlPublica } from '@/lib/invitations'
+import { cupoTexto, hora, hoyISO } from '@/lib/fechas'
+import { EstadoTag } from '@/components/dominio/estado-tag'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -44,7 +45,7 @@ export default function DetalleInvitacion({ params, searchParams }: {
     return (
       <div className="flex flex-col items-center gap-6">
         {volver}
-        <Skeleton className="h-[34rem] w-full max-w-sm rounded-xl" />
+        <Skeleton className="h-[34rem] w-full max-w-sm rounded-lg" />
       </div>
     )
   }
@@ -70,9 +71,31 @@ export default function DetalleInvitacion({ params, searchParams }: {
   const url = urlPublica(inv.token)
   const cupo = cupoTexto(inv)
 
+  // El delivery no tiene pase ni link: un resumen y nada más (se anula desde la lista).
+  if (inv.kind === 'delivery') {
+    return (
+      <div className="flex flex-col items-center gap-6">
+        {volver}
+        <dl className="flex w-full max-w-sm flex-col gap-3 text-sm">
+          <div className="flex justify-between gap-4"><dt className="text-ink-soft">Tipo</dt><dd>{KIND_LABEL[inv.kind]}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-ink-soft">App</dt><dd className="font-semibold">{inv.guestName}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-ink-soft">Lote</dt><dd>{inv.unitLabel}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-ink-soft">Estado</dt><dd><EstadoTag estado={estado}
+            detalle={estado === 'adentro' && inv.ultimoIngreso ? hora(inv.ultimoIngreso) : undefined} /></dd></div>
+          {inv.expiresAt && <div className="flex justify-between gap-4"><dt className="text-ink-soft">Vence</dt><dd className="tabular">{hora(inv.expiresAt)}</dd></div>}
+        </dl>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col items-center gap-6">
       {volver}
+      {inv.revokedAt && inv.revokedReason !== null && (
+        <Nota tono="info" className="w-full max-w-sm">
+          Anulada por portería{inv.revokedReason ? `: ${inv.revokedReason}` : ''}
+        </Nota>
+      )}
       {creada === '1' && (
         <Nota tono="exito" className="w-full max-w-sm">Listo. Compartila con {inv.guestName}.</Nota>
       )}
@@ -87,6 +110,7 @@ export default function DetalleInvitacion({ params, searchParams }: {
       <p className="max-w-sm text-center text-sm text-ink-soft">
         {cupo ? `${cupo}. ` : ''}Quien lo reciba tiene que subir el brillo para que el lector lo tome.
       </p>
+      {inv.note && <p className="max-w-sm break-words text-center text-sm"><span className="text-ink-soft">Nota para la guardia: </span>{inv.note}</p>}
 
       <AccionesPase inv={inv} url={url}
         onAnular={() => setConfirmando(true)}

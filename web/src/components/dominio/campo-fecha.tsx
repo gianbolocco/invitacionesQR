@@ -5,7 +5,7 @@ import { CalendarDays } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
-import { aFecha, aISO } from '@/lib/fechas'
+import { aFecha, aISO, hoyISO } from '@/lib/fechas'
 
 export function textoFecha(iso: string): string {
   const d = iso ? aFecha(iso) : null
@@ -21,11 +21,14 @@ export function textoFecha(iso: string): string {
  * Reemplaza a `<input type=date>`, que se ve distinto en cada navegador y en
  * algunos celulares no se puede usar con una mano.
  */
-export function CampoFecha({ id, valor, onCambio, min, className }: {
+export function CampoFecha({ id, valor, onCambio, min, max, desplegable, className }: {
   id?: string
+  /** Mes y año en desplegables: para fechas lejanas (un vencimiento a un año son 12 clics de flecha). */
+  desplegable?: boolean
   valor: string
   onCambio: (iso: string) => void
   min?: string
+  max?: string
   className?: string
 }) {
   const [abierto, setAbierto] = useState(false)
@@ -33,8 +36,9 @@ export function CampoFecha({ id, valor, onCambio, min, className }: {
     <Popover open={abierto} onOpenChange={setAbierto}>
       <PopoverTrigger asChild>
         <button id={id} type="button"
-          className={cn('flex h-11 w-full items-center gap-2 rounded-md border border-input bg-card px-3.5 text-left text-base',
-            'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none', className)}>
+          className={cn('flex h-12 w-full items-center gap-2 rounded-sm border-2 border-control bg-card px-3.5 text-left text-base text-ink',
+            'transition-[border-color] duration-(--t-hover) outline-none',
+            'focus-visible:border-azul-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus', className)}>
           <CalendarDays className="size-4 text-ink-soft" aria-hidden />
           <span className="tabular">{textoFecha(valor)}</span>
         </button>
@@ -43,7 +47,14 @@ export function CampoFecha({ id, valor, onCambio, min, className }: {
         <Calendar mode="single" locale={es} weekStartsOn={1}
           selected={valor ? aFecha(valor) : undefined}
           defaultMonth={valor ? aFecha(valor) : undefined}
-          disabled={min ? { before: aFecha(min) } : undefined}
+          {...(desplegable && {
+            captionLayout: 'dropdown' as const,
+            // Sin tope, react-day-picker corta los años en el actual.
+            startMonth: min ? aFecha(min) : undefined,
+            endMonth: aFecha(max ?? `${Number(hoyISO().slice(0, 4)) + 10}-12-31`),
+            formatters: { formatMonthDropdown: (d: Date) => d.toLocaleString('es-AR', { month: 'short' }) },
+          })}
+          disabled={[...(min ? [{ before: aFecha(min) }] : []), ...(max ? [{ after: aFecha(max) }] : [])]}
           onSelect={(d) => { if (d) { onCambio(aISO(d)); setAbierto(false) } }} />
       </PopoverContent>
     </Popover>

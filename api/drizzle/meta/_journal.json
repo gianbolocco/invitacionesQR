@@ -71,6 +71,118 @@
       "when": 1791765750141,
       "tag": "0009_username_guardias",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792116259867,
+      "tag": "0010_carga_manual",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792117114160,
+      "tag": "0011_anulacion_motivo",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792379704761,
+      "tag": "0012_carga_cargada_el",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792449820622,
+      "tag": "0013_alerta_permanencia",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792453683696,
+      "tag": "0014_frecuente_como",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792454678970,
+      "tag": "0015_sin_ya_lo_vi",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792549816700,
+      "tag": "0016_nota_invitacion",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792614421652,
+      "tag": "0017_horarios_proveedores",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792627286474,
+      "tag": "0018_seguro_proveedor",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792631376600,
+      "tag": "0019_plano_barrio",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792889475248,
+      "tag": "0020_padron",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792892243417,
+      "tag": "0021_seguro_al_padron",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792905607605,
+      "tag": "0022_contactos",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792951923670,
+      "tag": "0023_invitacion_contacto",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793209794521,
+      "tag": "0024_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793227314542,
+      "tag": "0025_paquetes",
+      "breakpoints": true
     }
   ]
 }

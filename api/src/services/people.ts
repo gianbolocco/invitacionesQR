@@ -105,9 +105,12 @@ async function issueInviteToken(personId: string): Promise<string> {
   return token
 }
 
+function inviteUrl(token: string): string {
+  return `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/acceso?t=${token}`
+}
+
 export async function sendInviteMail(email: string, name: string, token: string): Promise<void> {
-  const url = `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/acceso?t=${token}`
-  await sendInvitationEmail(email, name, url, INVITE_DAYS)
+  await sendInvitationEmail(email, name, inviteUrl(token), INVITE_DAYS)
 }
 
 /**
@@ -191,13 +194,18 @@ export async function disablePerson(personId: string, actorId: string, neighborh
   })
 }
 
-export async function resendInvite(personId: string, actorId: string, neighborhoodId: string): Promise<void> {
+async function invitable(personId: string) {
   const [person] = await db.select().from(people).where(eq(people.id, personId)).limit(1)
   if (!person) throw new AppError(404, 'not_found')
-  if (!person.email) throw new AppError(409, 'sin_email')
   // A alguien dado de baja primero se lo reactiva: el link no puede ser la
   // puerta trasera de la baja.
   if (person.status === 'disabled') throw new AppError(409, 'deshabilitada')
+  return person
+}
+
+export async function resendInvite(personId: string, actorId: string, neighborhoodId: string): Promise<void> {
+  const person = await invitable(personId)
+  if (!person.email) throw new AppError(409, 'sin_email')
 
   const token = await issueInviteToken(personId)
   // Acá el mail ES la acción: si no salió, el admin lo tiene que saber.
@@ -205,6 +213,18 @@ export async function resendInvite(personId: string, actorId: string, neighborho
     throw new AppError(502, 'mail_no_enviado')
   })
   await audit(actorId, neighborhoodId, 'person.reinvited', 'person', personId)
+}
+
+/**
+ * El mismo link del mail, para que el admin lo mande por WhatsApp. Emite un
+ * token nuevo: los anteriores no se pueden volver a leer (se guardan hasheados)
+ * y siguen valiendo hasta que se use uno o venzan.
+ */
+export async function inviteLink(personId: string, actorId: string, neighborhoodId: string): Promise<string> {
+  await invitable(personId)
+  const token = await issueInviteToken(personId)
+  await audit(actorId, neighborhoodId, 'person.invite_link', 'person', personId)
+  return inviteUrl(token)
 }
 
 export async function setGuardPassword(

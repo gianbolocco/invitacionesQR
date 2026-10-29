@@ -1,26 +1,39 @@
 'use client'
-import { useCallback } from 'react'
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api } from '@/lib/api'
+import { api, apiBase, ApiError } from '@/lib/api'
+import { hoyISO } from '@/lib/fechas'
 import {
-  porId, registrarIngreso, registrarEgreso, deshacer,
-  type Hit, type Resultado,
+  porId, porToken, buscar, registrarIngreso, registrarEgreso, deshacer, buscarUnidades, altaExpres, mensajeAltaExpres,
+  cargarManual, mensajeCargaManual, anularPorPorteria, mensajeAnulacion, veredictoCon, corregirSeguroProveedor,
+  corregirSeguroAuto, MOTIVO, type Resultado,
 } from '@/lib/gate'
+import type { SeguroDatos } from '@/lib/seguro'
+import type { LecturaDni } from '@/lib/lectora'
 
 export type AgendaRow = {
   id: string
   guestName: string
   guestDoc: string | null
   plate: string | null
-  kind: 'visita' | 'frecuente' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
+  /** Solo en las frecuentes: si viene de visita o como proveedor. */
+  frequentAs?: 'visita' | 'proveedor' | null
+  tradeName?: string | null
   unitLabel: string
   inviterName: string
   capacity: number
+  validTo: string
+  expiresAt?: string | null
   enteredCount: number
   lastEntryAt: string | null
   lastExitAt: string | null
   adentro: boolean
+  note: string | null
+  /** Solo en /gate/adentro: cuándo vence su tiempo adentro; null = su tipo no alerta. */
+  alertaDesde?: string | null
 }
 
 /*
@@ -32,20 +45,60 @@ export const claves = {
   agenda: (fecha: string) => ['garita', 'agenda', fecha] as const,
   busqueda: (q: string) => ['garita', 'busqueda', q] as const,
   veredicto: (id: string) => ['garita', 'veredicto', id] as const,
+  adentro: ['garita', 'adentro'] as const,
+}
+
+/*
+ * Respaldo de los avisos en vivo (useAvisosGarita): si la conexión se corta
+ * sin que el navegador se entere —un proxy que la deja colgada—, la garita
+ * igual se pone al día en un minuto. React Query frena el intervalo con la
+ * pestaña oculta y vuelve a pedir al recuperar el foco.
+ */
+const CADA = 60_000
+
+/**
+ * La garita queda abierta todo el turno: la API avisa por Server-Sent Events
+ * cada vez que algo cambia (una invitación nueva, un ingreso de otro guardia)
+ * y acá se vuelve a pedir lo que se muestra. Al (re)conectar también, por lo
+ * que haya pasado mientras estaba cortado. EventSource reintenta solo.
+ */
+export function useAvisosGarita() {
+  const qc = useQueryClient()
+  useEffect(() => {
+    const avisos = new EventSource(`${apiBase}/gate/eventos`, { withCredentials: true })
+    const refrescar = () => invalidarGarita(qc)
+    avisos.onmessage = refrescar
+    avisos.onopen = refrescar
+    return () => avisos.close()
+  }, [qc])
 }
 
 export function useAgenda(fecha: string) {
   return useQuery({
     queryKey: claves.agenda(fecha),
     queryFn: ({ signal }) => api<AgendaRow[]>(`/gate/agenda?date=${fecha}`, { signal }),
+    // Solo hoy: es lo que el guardia tiene abierto durante el turno.
+    refetchInterval: fecha === hoyISO() ? CADA : false,
+  })
+}
+
+/** Quiénes están en el barrio ahora, de cualquier día. Mismas filas que la agenda. */
+export function useAdentro(habilitado: boolean) {
+  return useQuery({
+    queryKey: claves.adentro,
+    queryFn: ({ signal }) => api<AgendaRow[]>('/gate/adentro', { signal }),
+    enabled: habilitado,
+    refetchInterval: CADA,
   })
 }
 
 export function useBusqueda(q: string) {
   return useQuery({
     queryKey: claves.busqueda(q),
-    queryFn: ({ signal }) => api<Hit[]>(`/gate/search?q=${encodeURIComponent(q)}`, { signal }),
+    queryFn: ({ signal }) => buscar(q, signal),
     enabled: q.length > 0,
+    // Mientras llega lo de la letra nueva, queda la lista anterior: no parpadea al tipear.
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -53,6 +106,40 @@ export function useVeredicto(id: string) {
   return useQuery({
     queryKey: claves.veredicto(id),
     queryFn: () => porId(id),
+  })
+}
+
+/**
+ * El veredicto recalculado con el documento y la patente que tiene tipeados el
+ * guardia: el único canEnter vive en la API. `datos` null = todavía son los de
+ * la invitación y alcanza con el veredicto inicial. Mientras llega uno nuevo
+ * queda el anterior: el NO PASA no parpadea con cada tecla.
+ */
+export function useVeredictoEnVivo(id: string, datos: { doc: string; plate: string } | null) {
+  return useQuery({
+    queryKey: [...claves.veredicto(id), 'vivo', datos?.doc ?? '', datos?.plate ?? ''] as const,
+    queryFn: ({ signal }) => veredictoCon(id, datos!, signal),
+    enabled: datos !== null,
+    placeholderData: keepPreviousData,
+    // Un reintento y no tres: con la red caída, "No se pudo recalcular" tiene que aparecer enseguida.
+    retry: 1,
+  })
+}
+
+export type Correccion =
+  | { tipo: 'proveedor'; doc: string; name: string; insurance: SeguroDatos }
+  | { tipo: 'auto'; plate: string; insurance: SeguroDatos }
+
+/** "Corregir" sin registrar: queda en el padrón aunque el guardia apriete Volver. */
+export function useCorregirSeguro() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ tipo, ...datos }: Correccion) => tipo === 'auto'
+      ? corregirSeguroAuto(datos as { plate: string; insurance: SeguroDatos })
+      : corregirSeguroProveedor(datos as { doc: string; name: string; insurance: SeguroDatos }),
+    onSuccess: () => toast.success('Seguro actualizado.'),
+    onError: () => toast.error('No se pudo guardar el seguro. Probá de nuevo.'),
+    onSettled: () => invalidarGarita(qc),
   })
 }
 
@@ -69,15 +156,101 @@ export function usePrecargarVeredicto() {
   return useCallback((id: string, resultado: Resultado) => qc.setQueryData(claves.veredicto(id), resultado), [qc])
 }
 
+/** QR leído (cámara, lectora o campo) → su veredicto, sin pedirlo dos veces. Tira si falla. */
+export function useAbrirQr() {
+  const router = useRouter()
+  const precargar = usePrecargarVeredicto()
+  // `vigente`: si ya no corresponde (llegó una lectura más nueva), no navega.
+  return useCallback(async (token: string, reemplazar = false, vigente: () => boolean = () => true) => {
+    const r = await porToken(token)
+    if (!vigente()) return r
+    precargar(r.invitation.id, r)
+    const url = `/garita/invitacion/${r.invitation.id}`
+    if (reemplazar) router.replace(url)
+    else router.push(url)
+    return r
+  }, [router, precargar])
+}
+
+/*
+ * Lo leído viaja entre pantallas en memoria y no en la URL: en la query string
+ * el DNI y el nombre quedarían en el historial de la compu de la garita.
+ * Fuera de ['garita'] para que invalidarGarita no lo toque.
+ */
+const CLAVE_DNI = ['lectora', 'dni'] as const
+const claveDoc = (id: string) => ['lectora', 'documento', id] as const
+
+/** Un DNI leído fuera de /garita espera acá a que /garita lo resuelva. */
+export function useDniPendiente() {
+  const qc = useQueryClient()
+  return useMemo(() => ({
+    dejar: (l: LecturaDni) => { qc.setQueryData(CLAVE_DNI, l) },
+    tomar: () => {
+      const l = qc.getQueryData<LecturaDni>(CLAVE_DNI)
+      qc.removeQueries({ queryKey: CLAVE_DNI, exact: true })
+      return l
+    },
+  }), [qc])
+}
+
+/** El documento leído para una invitación, para que su veredicto lo traiga cargado. */
+export function useDocumentoLeido() {
+  const qc = useQueryClient()
+  return useMemo(() => ({
+    dejar: (id: string, doc: string) => { qc.setQueryData(claveDoc(id), doc) },
+    ver: (id: string) => qc.getQueryData<string>(claveDoc(id)),
+    borrar: (id: string) => qc.removeQueries({ queryKey: claveDoc(id), exact: true }),
+  }), [qc])
+}
+
+export type UltimaLectura = { descripcion: string; cuando: string }
+const CLAVE_ULTIMA = ['lectora', 'ultima'] as const
+
+/**
+ * La última lectura y qué pasó con ella, para el recuadro "Lectora" de la
+ * garita: la confirmación de que la lectora leyó, que un toast que se va no da.
+ * En memoria (fuera de ['garita']) y sin gc: sobrevive al ir y volver del veredicto.
+ */
+export function useUltimaLectura() {
+  const { data } = useQuery<UltimaLectura | null>({
+    queryKey: CLAVE_ULTIMA,
+    queryFn: () => null,
+    enabled: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+  return data ?? null
+}
+
+export function useAnotarLectura() {
+  const qc = useQueryClient()
+  return useCallback((descripcion: string) => {
+    qc.setQueryData<UltimaLectura>(CLAVE_ULTIMA, { descripcion, cuando: new Date().toISOString() })
+  }, [qc])
+}
+
 function invalidarGarita(qc: QueryClient): Promise<void> {
   return qc.invalidateQueries({ queryKey: ['garita'] })
+}
+
+/** Qué seguro mandado tenía la fecha pasada. Si no se mandó, el rechazo es por el guardado y va como motivo. */
+export function fechaPasadaDe(e: unknown, vars: { insurance?: unknown; vehicleInsurance?: unknown }) {
+  if (!(e instanceof ApiError)) return null
+  if (e.code === 'insurance_expired' && vars.insurance) return 'proveedor'
+  if (e.code === 'vehicle_insurance_expired' && vars.vehicleInsurance) return 'auto'
+  return null
 }
 
 export function useRegistrarIngreso() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: registrarIngreso,
-    onError: () => toast.error('No se pudo registrar. Probá de nuevo.'),
+    onError: (e, vars) => {
+      // La fecha vencida de un seguro recién cargado se avisa bajo su campo, no en un toast.
+      if (fechaPasadaDe(e, vars)) return
+      // Otro 409 (cupo, horario, ya vencida) dice el motivo real: "Probá de nuevo" daría lo mismo.
+      toast.error((e instanceof ApiError && MOTIVO[e.code]) || 'No se pudo registrar. Probá de nuevo.')
+    },
     onSettled: () => invalidarGarita(qc),
   })
 }
@@ -97,5 +270,45 @@ export function useDeshacerMovimiento() {
     mutationFn: (entryId: string) => deshacer(entryId),
     onError: () => toast.error('No se pudo deshacer. Revisalo en la auditoría.'),
     onSettled: () => invalidarGarita(qc),
+  })
+}
+
+export function useBuscarUnidades(q: string) {
+  return useQuery({
+    queryKey: ['garita', 'unidades', q] as const,
+    queryFn: () => buscarUnidades(q),
+    enabled: q.length > 0,
+  })
+}
+
+export function useAltaExpres() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: altaExpres,
+    onError: (e) => toast.error(mensajeAltaExpres(e) ?? 'No se pudo crear la invitación. Probá de nuevo.'),
+    onSuccess: () => invalidarGarita(qc),
+  })
+}
+
+/**
+ * La tanda se guarda entera o no se guarda: el error dice por qué. Si la API
+ * dice qué fila falló, lo muestra la planilla en esa fila y no un toast.
+ */
+export function useCargarManual() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: cargarManual,
+    onError: (e) => { if (!(e instanceof ApiError && e.fila !== undefined)) toast.error(mensajeCargaManual(e)) },
+    // La auditoría también: las filas nuevas aparecen ahí marcadas como manuales.
+    onSuccess: () => Promise.all([invalidarGarita(qc), qc.invalidateQueries({ queryKey: ['auditoria'] })]),
+  })
+}
+
+export function useAnularInvitacion() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: anularPorPorteria,
+    onError: (e) => toast.error(mensajeAnulacion(e)),
+    onSuccess: () => Promise.all([invalidarGarita(qc), qc.invalidateQueries({ queryKey: ['auditoria'] })]),
   })
 }

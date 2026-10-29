@@ -96,6 +96,52 @@ describe('invitaciones', () => {
     expect(hist.body.rows[0].revokedAt).not.toBeNull()
   })
 
+  /** Un guardia logueado, para registrar el ingreso en los tests de abajo. */
+  async function guardiaDeTurno() {
+    const barrio = await neighborhood()
+    await db.insert(people).values({
+      neighborhoodId: barrio.id, email: 'guardia@example.com', name: 'Guardia',
+      role: 'guard', status: 'active', passwordHash: await hashPassword(PASS),
+    }).onConflictDoNothing()
+    const g = await request(app).post('/auth/login')
+      .send({ email: 'guardia@example.com', password: PASS })
+    return g.headers['set-cookie']
+  }
+
+  it('no deja anular con el invitado adentro', async () => {
+    const { cookie, unitId } = await resident('martin@example.com', 'Lote 142')
+    const inv = await request(app).post('/invitations').set('Cookie', cookie).send({
+      unitId, kind: 'visita', guestName: 'Juan', validFrom: DIA, validTo: DIA, capacity: 1,
+    }).expect(201).then((r) => r.body)
+
+    const g = await guardiaDeTurno()
+    await request(app).post('/gate/entries').set('Cookie', g)
+      .send({ invitationId: inv.id, guestName: 'Juan', guestDoc: '30123456' }).expect(201)
+
+    const res = await request(app).post(`/invitations/${inv.id}/revoke`).set('Cookie', cookie)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('guest_inside')
+
+    // Sigue vigente: no quedó anulada a medias.
+    const lista = await request(app).get('/invitations').set('Cookie', cookie).expect(200)
+    expect(lista.body.map((i: { id: string }) => i.id)).toContain(inv.id)
+  })
+
+  it('se puede anular una vez que el invitado salió', async () => {
+    const { cookie, unitId } = await resident('martin@example.com', 'Lote 142')
+    const inv = await request(app).post('/invitations').set('Cookie', cookie).send({
+      unitId, kind: 'visita', guestName: 'Juan', validFrom: DIA, validTo: DIA, capacity: 1,
+    }).expect(201).then((r) => r.body)
+
+    const g = await guardiaDeTurno()
+    await request(app).post('/gate/entries').set('Cookie', g)
+      .send({ invitationId: inv.id, guestName: 'Juan', guestDoc: '30123456' }).expect(201)
+    await request(app).post('/gate/exits').set('Cookie', g)
+      .send({ invitationId: inv.id }).expect(201)
+
+    await request(app).post(`/invitations/${inv.id}/revoke`).set('Cookie', cookie).expect(200)
+  })
+
   it('un vecino de otra UF no puede revocar', async () => {
     const a = await resident('martin@example.com', 'Lote 142')
     const b = await resident('ana@example.com', 'Lote 7')
@@ -141,25 +187,79 @@ describe('invitaciones', () => {
 describe('editar una invitación', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
 
+  const HOY = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+  const MANIANA = new Date(Date.parse(`${HOY}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+
   async function visita(ctx: { cookie: string[]; unitId: string }, over = {}) {
     const res = await request(app).post('/invitations').set('Cookie', ctx.cookie).send({
       unitId: ctx.unitId, kind: 'visita', guestName: 'Juan Pérez',
-      validFrom: '2026-09-20', validTo: '2026-09-20', capacity: 1, ...over,
+      validFrom: HOY, validTo: HOY, capacity: 1, ...over,
     })
     return res.body
   }
 
-  it('cambia nombre, documento y fecha', async () => {
+  it('una frecuente guarda si es visita o proveedor; sin decirlo, visita', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const prov = await visita(ctx, { kind: 'frecuente', frequentAs: 'proveedor', capacity: 999 })
+    const sinDecir = await visita(ctx, { kind: 'frecuente', capacity: 999 })
+    const comun = await visita(ctx, { frequentAs: 'proveedor' })
+    expect(prov.frequentAs).toBe('proveedor')
+    expect(sinDecir.frequentAs).toBe('visita')
+    // Una invitación que no es frecuente no lleva subtipo aunque lo manden.
+    expect(comun.frequentAs).toBeNull()
+  })
+
+  it('una visita frecuente dura hasta un mes; la de proveedor no tiene tope', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const MES = '2027-01-15', MES_Y_UNO = '2027-01-16'
+    const base = { kind: 'frecuente', capacity: 999, validFrom: '2026-12-15' }
+    expect((await visita(ctx, { ...base, validTo: MES })).id).toBeDefined()
+    const larga = await request(app).post('/invitations').set('Cookie', ctx.cookie)
+      .send({ unitId: ctx.unitId, guestName: 'Mucama', ...base, validTo: MES_Y_UNO })
+    expect(larga.status).toBe(400)
+    expect(larga.body.error).toBe('frecuente_mas_de_un_mes')
+    expect((await visita(ctx, { ...base, frequentAs: 'proveedor', validTo: '2027-12-15' })).id).toBeDefined()
+  })
+
+  it('editar una visita frecuente no la estira más de un mes', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const frec = await visita(ctx, { kind: 'frecuente', capacity: 999, validTo: MANIANA })
+    const res = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ validTo: '2099-01-01' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('frecuente_mas_de_un_mes')
+    // Pasarla a proveedor sí la deja larga.
+    await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ frequentAs: 'proveedor', validTo: '2099-01-01' }).expect(200)
+  })
+
+  it('el subtipo de una frecuente se edita; en otra invitación da 400', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const frec = await visita(ctx, { kind: 'frecuente', capacity: 999 })
+    const res = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ frequentAs: 'proveedor' }).expect(200)
+    expect(res.body.frequentAs).toBe('proveedor')
+
+    const comun = await visita(ctx)
+    const mal = await request(app).patch(`/invitations/${comun.id}`).set('Cookie', ctx.cookie)
+      .send({ frequentAs: 'proveedor' })
+    expect(mal.status).toBe(400)
+    expect(mal.body.error).toBe('no_es_frecuente')
+  })
+
+  it('cambia nombre, documento y fecha mientras está pendiente', async () => {
     const ctx = await resident('martin@example.com', 'Lote 142')
     const inv = await visita(ctx)
 
     const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', ctx.cookie)
-      .send({ guestName: 'Juan Carlos Pérez', guestDoc: '30123456', validTo: '2026-09-21' })
+      .send({ guestName: 'Juan Carlos Pérez', guestDoc: '30123456', validTo: MANIANA })
 
     expect(res.status).toBe(200)
     expect(res.body.guestName).toBe('Juan Carlos Pérez')
     expect(res.body.guestDoc).toBe('30123456')
-    expect(res.body.validTo).toBe('2026-09-21')
+    expect(res.body.validTo).toBe(MANIANA)
     // El token no cambia: el invitado ya tiene el link.
     expect(res.body.token).toBe(inv.token)
   })
@@ -176,32 +276,41 @@ describe('editar una invitación', () => {
 
   it('no deja invertir la ventana', async () => {
     const ctx = await resident('martin@example.com', 'Lote 142')
-    const inv = await visita(ctx)
+    const inv = await visita(ctx, { validTo: MANIANA })
 
     const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', ctx.cookie)
-      .send({ validFrom: '2026-09-25', validTo: '2026-09-20' })
+      .send({ validFrom: MANIANA, validTo: HOY })
     expect(res.status).toBe(400)
   })
 
-  it('no deja bajar el cupo por debajo de los que ya entraron', async () => {
+  it('no se edita una invitación usada, ni con el invitado adentro ni después', async () => {
     const ctx = await resident('martin@example.com', 'Lote 142')
-    const hoy = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date())
-    const frec = await visita(ctx, { kind: 'frecuente', capacity: 10, validFrom: hoy, validTo: hoy })
+    const frec = await visita(ctx, { kind: 'frecuente', capacity: 10 })
 
-    const { registerEntry } = await import('../src/services/entries.js')
-    await registerEntry(frec.id, null, { guestName: 'Uno' })
-    await registerEntry(frec.id, null, { guestName: 'Dos' })
+    const { registerEntry, registerExit } = await import('../src/services/entries.js')
+    await registerEntry(frec.id, null, { guestName: 'Juan Pérez' })
 
-    const res = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
-      .send({ capacity: 1 })
+    const adentro = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ guestName: 'Otro' })
+    expect(adentro.status).toBe(409)
+    expect(adentro.body.error).toBe('ya_usada')
+
+    await registerExit(frec.id, null)
+    const salio = await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
+      .send({ validTo: MANIANA })
+    expect(salio.status).toBe(409)
+  })
+
+  it('no se edita una vencida', async () => {
+    const ctx = await resident('martin@example.com', 'Lote 142')
+    const inv = await visita(ctx)
+    await db.update(invitations).set({ validFrom: '2020-01-01', validTo: '2020-01-02' })
+      .where(eq(invitations.id, inv.id))
+
+    const res = await request(app).patch(`/invitations/${inv.id}`).set('Cookie', ctx.cookie)
+      .send({ validTo: MANIANA })
     expect(res.status).toBe(409)
-    expect(res.body.error).toBe('cupo_menor_al_usado')
-
-    // Subirlo sí se puede.
-    await request(app).patch(`/invitations/${frec.id}`).set('Cookie', ctx.cookie)
-      .send({ capacity: 20 }).expect(200)
+    expect(res.body.error).toBe('vencida')
   })
 
   it('no se edita una anulada', async () => {
@@ -213,7 +322,6 @@ describe('editar una invitación', () => {
       .send({ guestName: 'Otro' })
     expect(res.status).toBe(409)
   })
-
 })
 
 describe('historial: buscar, filtrar y paginar', () => {
@@ -365,7 +473,7 @@ describe('la home del vecino pide solo lo vigente', () => {
 
     const g = await guardia()
     await request(app).post('/gate/entries').set('Cookie', g)
-      .send({ invitationId: usada.id, guestName: 'Ya entró' }).expect(201)
+      .send({ invitationId: usada.id, guestName: 'Ya entró', guestDoc: '30123456' }).expect(201)
     await request(app).post('/gate/exits').set('Cookie', g)
       .send({ invitationId: usada.id }).expect(201)
 
@@ -388,7 +496,7 @@ describe('la home del vecino pide solo lo vigente', () => {
 
     const g = await guardia()
     await request(app).post('/gate/entries').set('Cookie', g)
-      .send({ invitationId: inv.id, guestName: 'Adentro' }).expect(201)
+      .send({ invitationId: inv.id, guestName: 'Adentro', guestDoc: '30123456' }).expect(201)
 
     const res = await request(app).get('/invitations').set('Cookie', cookie).expect(200)
     expect(res.body).toHaveLength(1)
@@ -399,8 +507,9 @@ describe('la home del vecino pide solo lo vigente', () => {
 
   it('una frecuente de todo el año sigue vigente aunque haya entrado muchas veces', async () => {
     const { cookie, unitId } = await resident('ana@example.com', 'Lote 7')
+    // De proveedor: la de visita no puede durar más de un mes.
     await request(app).post('/invitations').set('Cookie', cookie).send({
-      unitId, kind: 'frecuente', guestName: 'Mucama',
+      unitId, kind: 'frecuente', frequentAs: 'proveedor', guestName: 'Mucama',
       validFrom: dias(-30), validTo: dias(300), capacity: 999,
     }).expect(201)
 

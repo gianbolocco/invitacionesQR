@@ -2,15 +2,33 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import {
-  createInvitation, listForUnits, revokeInvitation, findPublicByToken,
+  createInvitation, createDeliveryPass, listForUnits, revokeInvitation, findPublicByToken,
   fillGuestDetails, editInvitation, restoreInvitation, searchInvitations, getInvitation,
 } from '../services/invitations.js'
+import { APPS } from '../lib/delivery.js'
+import { listTrades } from '../services/trades.js'
+import { getNeighborhood } from '../services/neighborhoods.js'
 import { unitsOfPerson } from '../services/units.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { AppError } from '../lib/errors.js'
 import { validarUuid } from '../middleware/uuidParam.js'
 
 export const invitationRoutes = Router()
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-MM-DD')
+  // 2026-02-30 pasa el patrón y Postgres lo rechaza con 500: ida y vuelta por Date.
+  // Con mes 13 el Date es inválido y toISOString tira: se mira antes.
+  .refine((v) => {
+    const d = new Date(`${v}T00:00:00Z`)
+    return !isNaN(+d) && d.toISOString().slice(0, 10) === v
+  }, 'Fecha inexistente')
+
+/** Las tres partes o nada (null lo borra): la base también lo exige. */
+export const zSeguro = z.object({
+  company: z.string().trim().min(1).max(80),
+  policy: z.string().trim().min(1).max(40),
+  expiresOn: isoDate,
+}).nullable()
 
 /* ---------- Públicas: sin sesión. Van ANTES del router protegido. ---------- */
 
@@ -33,6 +51,8 @@ invitationRoutes.patch('/public/:token', publicWriteLimit, async (req, res) => {
   const body = z.object({
     guestDoc: z.string().max(40).optional(),
     plate: z.string().max(20).optional(),
+    // Sin null: el link lo tiene cualquiera y no puede borrar el seguro. Renovarlo sí.
+    insurance: zSeguro.unwrap().optional(),
   }).parse(req.body)
 
   await fillGuestDetails(String(req.params.token), body)
@@ -43,23 +63,33 @@ invitationRoutes.patch('/public/:token', publicWriteLimit, async (req, res) => {
 invitationRoutes.use(requireAuth)
 validarUuid(invitationRoutes)
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado YYYY-MM-DD')
 
 const createSchema = z.object({
   unitId: z.string().uuid(),
   kind: z.enum(['visita', 'frecuente', 'proveedor']),
+  frequentAs: z.enum(['visita', 'proveedor']).optional(),
   guestName: z.string().min(1),
   guestDoc: z.string().optional(),
   plate: z.string().optional(),
+  note: z.string().trim().max(140).optional(),
   validFrom: isoDate,
   validTo: isoDate,
   weekdays: z.array(z.number().int().min(0).max(6)).optional(),
   capacity: z.number().int().min(1),
+  tradeId: z.string().uuid().nullable().optional(),
+  contactId: z.string().uuid().optional(),
+  saveContact: z.boolean().optional(),
 }).refine((v) => v.validTo >= v.validFrom, { message: 'La ventana está invertida', path: ['validTo'] })
+  .refine((v) => !(v.contactId && v.saveContact), { message: 'O un contacto o uno nuevo', path: ['saveContact'] })
 
 invitationRoutes.post('/', async (req, res) => {
   const body = createSchema.parse(req.body)
-  res.status(201).json(await createInvitation({ ...body, createdBy: req.person!.id }))
+  res.status(201).json(await createInvitation({ ...body, createdBy: req.person!.id, neighborhoodId: req.person!.neighborhoodId }))
+})
+
+invitationRoutes.post('/delivery', async (req, res) => {
+  const body = z.object({ unitId: z.string().uuid(), app: z.enum(APPS), otro: z.string().trim().max(40).optional() }).parse(req.body)
+  res.status(201).json(await createDeliveryPass({ ...body, createdBy: req.person!.id }))
 })
 
 invitationRoutes.get('/', async (req, res) => {
@@ -69,7 +99,7 @@ invitationRoutes.get('/', async (req, res) => {
 
 const historySchema = z.object({
   q: z.string().trim().max(80).optional(),
-  kind: z.enum(['visita', 'frecuente', 'proveedor']).optional(),
+  kind: z.enum(['visita', 'frecuente', 'proveedor', 'delivery']).optional(),
   estado: z.enum(['entro', 'no_entro', 'anulada']).optional(),
   // Llega como string desde la query. z.coerce.boolean() no sirve acá:
   // Boolean('false') es true.
@@ -88,6 +118,13 @@ invitationRoutes.get('/historial', async (req, res) => {
   }))
 })
 
+/** Rubros activos y franjas del barrio, para el formulario de proveedor. Antes de /:id. */
+invitationRoutes.get('/trades', async (req, res) => {
+  const nid = req.person!.neighborhoodId
+  const [rubros, barrio] = await Promise.all([listTrades(nid), getNeighborhood(nid)])
+  res.json({ trades: rubros.map(({ id, name, requiresInsurance }) => ({ id, name, requiresInsurance })), providerWindows: barrio.providerWindows })
+})
+
 /** El detalle de una invitación, para la pantalla del pase. */
 invitationRoutes.get('/:id', async (req, res) => {
   res.json(await getInvitation(req.params.id, req.person!.id))
@@ -102,14 +139,17 @@ const editSchema = z.object({
   guestName: z.string().min(1).optional(),
   guestDoc: z.string().nullable().optional(),
   plate: z.string().nullable().optional(),
+  note: z.string().trim().max(140).nullable().optional(),
   validFrom: isoDate.optional(),
   validTo: isoDate.optional(),
   weekdays: z.array(z.number().int().min(0).max(6)).nullable().optional(),
   capacity: z.number().int().min(1).optional(),
+  frequentAs: z.enum(['visita', 'proveedor']).optional(),
+  tradeId: z.string().uuid().nullable().optional(),
 })
 
 invitationRoutes.patch('/:id', async (req, res) => {
-  res.json(await editInvitation(req.params.id, req.person!.id, editSchema.parse(req.body)))
+  res.json(await editInvitation(req.params.id, req.person!.id, editSchema.parse(req.body), req.person!.neighborhoodId))
 })
 
 /** Deshacer una anulación. */

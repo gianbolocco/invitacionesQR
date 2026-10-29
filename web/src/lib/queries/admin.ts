@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { api, apiBase, ApiError } from '@/lib/api'
 import { claveMarca } from '@/lib/marca-cliente'
 import type { Person, Unit } from '@/lib/admin'
+import type { Franja } from '@/lib/franjas'
 
 export const claves = {
   personas: ['admin', 'personas'] as const,
@@ -40,6 +41,11 @@ export type Kpis = {
   staleInside: number
   entriesSameDayLastWeek: number
   invitedNeverLoggedIn: number
+  /** Autos y proveedores con el seguro vencido que entraron en el último mes. */
+  segurosVencidos: number
+  segurosPorVencer: number
+  /** Ingresos de los últimos 7 días por un alta exprés con algún seguro faltante. */
+  autorizadosSinSeguro: number
 }
 export type PorDia = { day: string; total: number }
 export type PorHora = { hour: number; total: number }
@@ -106,9 +112,30 @@ export function useReenviarInvitacion() {
   return useMutation({
     mutationFn: (p: Pick<Person, 'id' | 'email' | 'username'>) => api(`/admin/people/${p.id}/resend`, { method: 'POST' }),
     onSuccess: (_d, p) => toast.success(`Reenviamos la invitación a ${p.email ?? p.username ?? 'la persona'}.`),
-    onError: (_e, p) => toast.error(`No pudimos mandarle el mail a ${p.email ?? p.username ?? 'la persona'}. Probá de nuevo en un rato.`),
+    onError: (e, p) => toast.error(e instanceof ApiError && e.status === 429
+      ? 'Ya le reenviamos la invitación hace menos de un minuto. Esperá un poco antes de mandarla de nuevo.'
+      : `No pudimos mandarle el mail a ${p.email ?? p.username ?? 'la persona'}. Probá de nuevo en un rato.`),
     onSettled: () => invalidarPersonas(qc),
   })
+}
+
+/**
+ * Copia el link de alta para mandarlo por WhatsApp. El pedido sale adentro del
+ * ClipboardItem y no antes: Safari solo deja escribir el portapapeles durante
+ * el clic, y un `await` previo lo hace perder.
+ */
+export async function copiarLinkDeAlta(p: Pick<Person, 'id' | 'name'>): Promise<void> {
+  const url = api<{ url: string }>(`/admin/people/${p.id}/invite-link`, { method: 'POST' }).then((r) => r.url)
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ 'text/plain': url.then((u) => new Blob([u], { type: 'text/plain' })) }),
+    ])
+    toast.success(`Copiamos el link de alta de ${p.name}. Mandáselo por donde quieras.`)
+  } catch {
+    const u = await url.catch(() => null)
+    if (u) window.prompt('No pudimos copiarlo solo. Copiá el link desde acá:', u)
+    else toast.error('No pudimos generar el link. Probá de nuevo.')
+  }
 }
 
 export function useReactivarPersona() {
@@ -149,23 +176,29 @@ export function useCambiarContrasenaGuardia() {
   })
 }
 
-export function useAltaUnidad() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (lot: number) => api<Unit>('/admin/units', { method: 'POST', body: JSON.stringify({ lot }) }),
-    onError: () => toast.error('No se pudo crear. Puede que ese lote ya esté cargado.'),
-    onSettled: () => qc.invalidateQueries({ queryKey: claves.unidades }),
-  })
-}
-
 export type Barrio = {
   id: string
   name: string
   address: string | null
   mapUrl: string | null
   brandColor: string | null
+  /** Horas adentro antes de alertar a la garita; null = ese tipo no alerta. */
+  overstayHours: HorasPermanencia
+  /** Minutos adentro antes de alertar un delivery; null = no alerta. */
+  overstayMinutes: { delivery: number | null }
+  /** Días antes del vencimiento del seguro para avisar; null = no avisa. */
+  insuranceWarnDays: number | null
+  /** La garita frena el auto que entra sin seguro vigente cargado. */
+  vehicleInsuranceRequired: boolean
+  /** Si está apagado, ese auto no entra ni con autorización (la persona puede entrar a pie). */
+  vehicleInsuranceOverride: boolean
+  /** La garita puede avisar paquetes. */
+  packagesEnabled: boolean
   paleta: string[]
+  providerWindows: Franja[]
 }
+
+export type HorasPermanencia = { visita: number | null; proveedor: number | null }
 
 export function useBarrio() {
   return useQuery({ queryKey: claves.barrio, queryFn: ({ signal }) => api<Barrio>('/admin/neighborhood', { signal }) })
@@ -174,13 +207,14 @@ export function useBarrio() {
 export function useGuardarBarrio() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (datos: { address: string; mapUrl: string; brandColor?: string }) =>
+    // Todo opcional: cada pestaña de Configuración guarda solo lo suyo.
+    mutationFn: (datos: { name?: string; address?: string; mapUrl?: string; brandColor?: string; overstayHours?: HorasPermanencia; overstayMinutes?: { delivery: number | null }; insuranceWarnDays?: number | null; vehicleInsuranceRequired?: boolean; vehicleInsuranceOverride?: boolean; packagesEnabled?: boolean }) =>
       api<Barrio>('/admin/neighborhood', { method: 'PATCH', body: JSON.stringify(datos) }),
     onSuccess: (b) => {
       qc.setQueryData(claves.barrio, b)
       qc.invalidateQueries({ queryKey: claveMarca })
     },
-    onError: () => toast.error('El link de mapas tiene que empezar con http. Copialo desde Google Maps con "Compartir".'),
+    // Sin toast: cada pestaña de Configuración muestra el error en su propia sección.
   })
 }
 
@@ -204,6 +238,30 @@ export function useQuitarLogo() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => api('/admin/branding/logo', { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
+  })
+}
+
+/** Algunos navegadores no informan el tipo de un SVG arrastrado: se deduce de la extensión. */
+export function tipoDePlano(file: File): string {
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+  return file.type || ({ svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' } as Record<string, string>)[extension] || ''
+}
+
+export function useSubirPlano() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => api('/admin/branding/plano', {
+      method: 'PUT', headers: { 'Content-Type': tipoDePlano(file) }, body: file,
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
+  })
+}
+
+export function useQuitarPlano() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api('/admin/branding/plano', { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: claveMarca }),
   })
 }
@@ -246,3 +304,44 @@ export function useImportarTanda() {
 }
 
 export { ApiError }
+
+export type Rubro = { id: string; name: string; archivedAt: string | null; requiresInsurance: boolean }
+
+const claveRubros = ['admin', 'rubros'] as const
+
+export function useRubros() {
+  return useQuery({ queryKey: claveRubros, queryFn: ({ signal }) => api<Rubro[]>('/admin/trades', { signal }) })
+}
+
+const ERRORES_RUBRO: Record<string, string> = { rubro_duplicado: 'Ya hay un rubro con ese nombre.' }
+
+export function useCrearRubro() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (d: { name: string; requiresInsurance: boolean }) => api<Rubro>('/admin/trades', { method: 'POST', body: JSON.stringify(d) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveRubros }),
+    onError: (e) => toast.error(ERRORES_RUBRO[(e as ApiError).code] ?? 'No se pudo guardar el rubro. Probá de nuevo.'),
+  })
+}
+
+export function useEditarRubro() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...datos }: { id: string; name?: string; archived?: boolean; requiresInsurance?: boolean }) =>
+      api<Rubro>(`/admin/trades/${id}`, { method: 'PATCH', body: JSON.stringify(datos) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claveRubros }),
+    onError: (e) => toast.error(ERRORES_RUBRO[(e as ApiError).code] ?? 'No se pudo guardar el rubro. Probá de nuevo.'),
+  })
+}
+
+export function useGuardarFranjas() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (providerWindows: Franja[]) =>
+      api<Barrio>('/admin/neighborhood', { method: 'PATCH', body: JSON.stringify({ providerWindows }) }),
+    onSuccess: (b) => qc.setQueryData(claves.barrio, b),
+    onError: (e) => toast.error((e as ApiError).code === 'franja_invalida'
+      ? 'Revisá las franjas: cada una necesita al menos un día y un horario de inicio anterior al de fin.'
+      : 'No se pudieron guardar los horarios. Probá de nuevo.'),
+  })
+}
