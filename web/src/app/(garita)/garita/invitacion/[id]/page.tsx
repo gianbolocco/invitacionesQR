@@ -4,7 +4,7 @@ import { useSesion } from '@/lib/sesion-contexto'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, CircleAlert, Loader2 } from 'lucide-react'
 import { MOTIVO, detalleRechazo, hora, inicial, mensajeDeError, rechazoPorAuto, rechazoPorSeguro, type Movimiento } from '@/lib/gate'
 import { estadoDe, textoVence } from '@/lib/seguro'
 import { mismaPatente, normalizarDoc, normalizarPatente } from '@/lib/padron'
@@ -18,6 +18,7 @@ import {
   useVeredictoEnVivo, useCorregirSeguro, fechaPasadaDe,
 } from '@/lib/queries/garita'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { AltaExpres } from '@/components/garita/alta-expres'
 import { AnularInvitacion } from '@/components/garita/anular-invitacion'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
@@ -32,6 +33,25 @@ const SALIDA = [0.2, 0.8, 0.2, 1] as const
 const VACIO: ValorSeguro = { company: '', policy: '', expiresOn: '' }
 
 /** Una fila de la ficha. dt + dd sueltos: los acomoda la grilla de la <dl>. */
+/** Lo que le falta a un campo para poder registrar: con ícono, para leerlo de un vistazo. */
+function Falta({ id, children }: { id: string; children: React.ReactNode }) {
+  return (
+    <p id={id} className="mt-2 flex items-start gap-1.5 text-base font-medium">
+      <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />{children}
+    </p>
+  )
+}
+
+/** Un campo editable: la etiqueta arriba y el campo a todo el ancho, así ninguna se parte en dos líneas. */
+function Campo({ id, etiqueta, children }: { id: string; etiqueta: string; children: React.ReactNode }) {
+  return (
+    <>
+      <dt className="col-span-2 pt-2 text-base font-semibold first:pt-0"><label htmlFor={id}>{etiqueta}</label></dt>
+      <dd className="col-span-2 -mt-1 min-w-0">{children}</dd>
+    </>
+  )
+}
+
 function Dato({ etiqueta, children }: { etiqueta: React.ReactNode; children: React.ReactNode }) {
   return (
     <>
@@ -115,6 +135,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const [doc, setDoc] = useState('')
   const [docLeido, setDocLeido] = useState(false)
   const [plate, setPlate] = useState('')
+  // A pie es una elección, no un campo vacío: el switch dice qué se registra.
+  const [conVehiculo, setConVehiculo] = useState(false)
   const [seguro, setSeguro] = useState<ValorSeguro>(VACIO)
   const [seguroAuto, setSeguroAuto] = useState<ValorSeguro>(VACIO)
   // Qué seguro está corrigiendo el guardia (uno que ya estaba cargado).
@@ -143,6 +165,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     setDoc(leido ?? inicial(q.data).doc)
     setDocLeido(Boolean(leido))
     setPlate(inicial(q.data).plate)
+    setConVehiculo(inicial(q.data).plate !== '')
     setSeguro(VACIO); setSeguroAuto(VACIO); setCorrigiendo({ proveedor: false, auto: false })
   }
 
@@ -317,7 +340,10 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const parcial = (v: ValorSeguro) => estadoSeguroCargado(v) === 'parcial'
   const exigeAuto = cargaSeguro && (rechazoPorAuto(check) || falta(estadoAuto))
   const exigeProv = cargaSeguro && !rechazoPorAuto(check)
-  const listoParaGuardar = (!abiertoProv || (exigeProv ? completoProv : !parcial(seguro)))
+  // Con el switch prendido y sin patente, el ingreso saldría "a pie" sin que nadie lo decida.
+  const faltaPatente = conVehiculo && normalizarPatente(plate) === ''
+  const listoParaGuardar = !faltaPatente
+    && (!abiertoProv || (exigeProv ? completoProv : !parcial(seguro)))
     && (!abiertoAuto || (exigeAuto ? completoAuto : !parcial(seguroAuto)))
   const mandaProv = abiertoProv && completoProv
   const mandaAuto = abiertoAuto && completoAuto
@@ -427,8 +453,9 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
         <section className={`flex min-w-0 flex-col justify-between gap-8 lg:justify-center lg:border-l lg:pl-12 ${borde}`}>
           {/* Lo que el guardia compara con lo que tiene adelante: la persona y el
               auto, cada uno con su seguro. Y la invitación, que en la barrera no cambia. */}
-          <div className="flex flex-col gap-7">
-            <SeccionSeguro titulo={esProveedor ? 'Proveedor' : 'Visitante'} idBase="seguro-proveedor"
+          {/* Las secciones se separan con una línea fina: el título manda, no el espacio. */}
+          <div className="flex flex-col divide-y divide-current/15 [&>section]:py-5 [&>section:first-child]:pt-0 [&>section:last-child]:pb-0">
+            <SeccionSeguro titulo={esProveedor ? 'Proveedor' : inv.kind === 'delivery' ? 'Repartidor' : 'Visitante'} idBase="seguro-proveedor"
               estado={estadoProv} guardado={alDia ? resultado.provider?.insurance ?? null : null} quien={quienProv}
               abierto={abiertoProv} valor={seguro} onCambio={(v) => { setSeguro(v); setFechaPasada(false) }}
               fechaPasada={fechaPasada} requerido={exigeProv} buscando={!alDia}
@@ -443,26 +470,23 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               guardando={corregir.isPending}>
               {inv.note && <Dato etiqueta="Nota">{inv.note}</Dato>}
               {editable ? (
-                <>
-                  <dt className="self-start pt-2.5 opacity-80"><label htmlFor="doc-veredicto">{inv.kind === 'delivery' ? 'Documento del repartidor' : 'Documento'}</label></dt>
-                  <dd className="min-w-0">
-                    {/* El campo es claro en los dos temas: el dark:bg-input/30 del Input lo ensuciaría. */}
-                    <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
-                      aria-describedby={[docLeido && doc.trim() && 'doc-leido', noCoincide && 'doc-no-coincide', !doc.trim() && 'doc-falta'].filter(Boolean).join(' ') || undefined}
-                      onChange={(e) => { setDoc(e.target.value); setDocLeido(false) }}
-                      className="tabular h-12 border-control bg-card text-xl" />
-                    {docLeido && doc.trim() && <p id="doc-leido" className="mt-1 text-sm font-semibold">Leído del DNI</p>}
-                    {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo.
-                        Los dos números lado a lado: comparar es más rápido que leer una frase. */}
-                    {noCoincide && (
-                      <p id="doc-no-coincide" className="mt-1 text-base font-semibold tabular">
-                        No coincide · Invitación {inv.guestDoc} · {docLeido ? 'Leído' : 'Cargado'} {doc}
-                      </p>
-                    )}
-                    {/* Nadie entra sin documento: si la invitación no lo traía, se carga acá. */}
-                    {!doc.trim() && <p id="doc-falta" className="mt-1 text-sm font-semibold opacity-80">Hace falta para registrar el ingreso.</p>}
-                  </dd>
-                </>
+                <Campo id="doc-veredicto" etiqueta="Documento">
+                  {/* El campo es claro en los dos temas: el dark:bg-input/30 del Input lo ensuciaría. */}
+                  <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
+                    aria-describedby={[docLeido && doc.trim() && 'doc-leido', noCoincide && 'doc-no-coincide', !doc.trim() && 'doc-falta'].filter(Boolean).join(' ') || undefined}
+                    onChange={(e) => { setDoc(e.target.value); setDocLeido(false) }}
+                    className="tabular h-13 border-control bg-card text-2xl" />
+                  {docLeido && doc.trim() && <p id="doc-leido" className="mt-2 text-base font-semibold">Leído del DNI</p>}
+                  {/* Spec 3.8: avisa, no bloquea. Por dígitos: 30.123.456 y 30123456 son el mismo.
+                      Los dos números lado a lado: comparar es más rápido que leer una frase. */}
+                  {noCoincide && (
+                    <p id="doc-no-coincide" className="mt-2 text-base font-semibold tabular">
+                      No coincide · Invitación {inv.guestDoc} · {docLeido ? 'Leído' : 'Cargado'} {doc}
+                    </p>
+                  )}
+                  {/* Nadie entra sin documento: si la invitación no lo traía, se carga acá. */}
+                  {!doc.trim() && <Falta id="doc-falta">Hace falta para registrar el ingreso.</Falta>}
+                </Campo>
               ) : (
                 <Dato etiqueta="Documento">{doc || inv.guestDoc || '—'}</Dato>
               )}
@@ -484,26 +508,46 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               guardando={corregir.isPending}>
               {editable ? (
                 <>
-                  <dt className="max-w-44 self-start pt-2.5 opacity-80"><label htmlFor="patente-veredicto">{inv.kind === 'delivery' ? 'Patente (vacío = a pie o en bici)' : 'Patente'}</label></dt>
-                  <dd className="min-w-0">
-                    <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                      className="tabular h-12 border-control bg-card text-xl uppercase" />
-                    {/* Una sugerencia, no un vínculo: sale del último ingreso de este DNI. */}
-                    {resultado.lastPlate && !mismaPatente(resultado.lastPlate, plate) && (
-                      <button type="button" onClick={() => setPlate(resultado.lastPlate!)}
-                        className="mt-1 min-h-11 text-base font-semibold underline underline-offset-4">
-                        Última vez: {resultado.lastPlate}
-                      </button>
-                    )}
+                  <dt className="sr-only">Cómo ingresa</dt>
+                  <dd className="col-span-2">
+                    {/* Toda la fila es el switch: se toca desde la silla sin apuntar al botoncito. */}
+                    <label htmlFor="con-vehiculo"
+                      className="flex min-h-16 cursor-pointer items-center justify-between gap-4 rounded-xl border border-control bg-card px-4 py-3 text-ink">
+                      <span>
+                        <span className="block text-lg font-semibold">Ingresa con vehículo</span>
+                        <span className="block text-sm text-ink-soft">{conVehiculo ? 'Prendido: se registra con patente' : 'Apagado: entra a pie'}</span>
+                      </span>
+                      <Switch id="con-vehiculo" size="lg" checked={conVehiculo}
+                        onCheckedChange={(v) => {
+                          setConVehiculo(v)
+                          // Apagarlo es "viene a pie": la patente y su seguro no viajan.
+                          if (!v) { setPlate(''); setSeguroAuto(VACIO) }
+                        }} />
+                    </label>
                   </dd>
+                  {conVehiculo && (
+                    <Campo id="patente-veredicto" etiqueta="Patente">
+                      <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                        autoFocus={!plate} aria-describedby={faltaPatente ? 'patente-falta' : undefined}
+                        className="tabular h-13 border-control bg-card text-2xl uppercase" />
+                      {faltaPatente && <Falta id="patente-falta">Cargá la patente, o apagá el switch si viene a pie.</Falta>}
+                      {/* Una sugerencia, no un vínculo: sale del último ingreso de este DNI. */}
+                      {resultado.lastPlate && !mismaPatente(resultado.lastPlate, plate) && (
+                        <button type="button" onClick={() => setPlate(resultado.lastPlate!)}
+                          className="mt-1 min-h-11 text-base font-semibold underline underline-offset-4">
+                          Última vez: {resultado.lastPlate}
+                        </button>
+                      )}
+                    </Campo>
+                  )}
                 </>
               ) : (
                 <Dato etiqueta="Patente">{plate || inv.plate || '—'}</Dato>
               )}
             </SeccionSeguro>
 
-            <section aria-labelledby="seccion-invitacion" className="flex flex-col gap-2.5">
-              <h2 id="seccion-invitacion" className="text-sm font-bold uppercase tracking-[0.08em] opacity-80">Invitación</h2>
+            <section aria-labelledby="seccion-invitacion" className="flex flex-col gap-3">
+              <h2 id="seccion-invitacion" className="text-xl font-bold tracking-[-0.01em] sm:text-2xl">Invitación</h2>
               <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-2.5 text-lg sm:text-xl">
                 <Dato etiqueta="Lote">{inv.unitLabel} · {quienInvita(inv.inviterName)}</Dato>
                 {!esEgreso && <Dato etiqueta="Vigencia">{inv.kind === 'delivery' && inv.expiresAt ? `hasta ${hora(inv.expiresAt)}` : vigencia(inv)}</Dato>}
@@ -575,7 +619,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                       </button>
                       {/* También si el rechazo es por el seguro del proveedor y al auto le falta el suyo. */}
                       {(rechazoPorAuto(check) || (pideAuto && falta(estadoAuto))) && (
-                        <button onClick={() => { setPlate(''); setSeguroAuto(VACIO) }}
+                        <button onClick={() => { setPlate(''); setSeguroAuto(VACIO); setConVehiculo(false) }}
                           className="min-h-14 w-full rounded border-2 border-current/40 text-lg font-bold">
                           Viene a pie
                         </button>

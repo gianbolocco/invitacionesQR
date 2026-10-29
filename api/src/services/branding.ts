@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import sharp from 'sharp'
 import { db } from '../db/index.js'
 import { neighborhoods } from '../db/schema.js'
 import { audit } from '../lib/audit.js'
@@ -45,9 +46,30 @@ async function idDelBarrio(): Promise<string> {
   return row.id
 }
 
-export async function guardarLogo(bytes: Buffer, actorId: string) {
-  const mime = tipoDeImagen(bytes)
+/**
+ * El logo va suelto en el header: un margen blanco o transparente alrededor se
+ * ve como un filete. Se recorta solo si la esquina es blanca o transparente;
+ * si es de color, ese color es el fondo del logo y no se toca. Nunca se blanquea
+ * el interior: las letras blancas de un logo sobre fondo verde quedan.
+ * Si la imagen no se puede leer, se guarda tal cual.
+ */
+async function recortarMargen(bytes: Buffer, mime: string): Promise<Buffer> {
+  try {
+    const [r, g, b, a] = await sharp(bytes).ensureAlpha()
+      .extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer()
+    const margenLiso = a < 16 || (r > 240 && g > 240 && b > 240)
+    if (!margenLiso) return bytes
+    const recortada = sharp(bytes).trim({ threshold: 20 })
+    return mime === 'image/png' ? await recortada.png().toBuffer() : await recortada.jpeg({ quality: 92 }).toBuffer()
+  } catch {
+    return bytes
+  }
+}
+
+export async function guardarLogo(original: Buffer, actorId: string) {
+  const mime = tipoDeImagen(original)
   if (!mime) throw new AppError(400, 'formato_no_soportado')
+  const bytes = await recortarMargen(original, mime)
 
   const id = await idDelBarrio()
   await db.update(neighborhoods).set({ logo: bytes, logoMime: mime, logoUpdatedAt: new Date() }).where(eq(neighborhoods.id, id))

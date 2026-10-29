@@ -262,7 +262,7 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
                 {marcaReal.tieneLogo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={logoUrl(marcaReal) ?? ''} alt="Logo del barrio"
-                    className="h-16 w-auto max-w-[16rem] rounded-md bg-white object-contain px-3 py-2 shadow-sm ring-1 ring-black/5" />
+                    className="h-16 w-auto max-w-[16rem] rounded-[4px] object-contain" />
                 ) : (
                   <p className="text-ink-soft">Sin logo, mostramos el nombre del barrio.</p>
                 )}
@@ -281,7 +281,7 @@ export default function ConfiguracionPage({ searchParams }: { searchParams: Prom
                     ${arrastrando ? 'border-azul bg-azul-tint' : 'border-line'} disabled:opacity-50`}>
                   <Upload className="size-5 text-ink-soft" aria-hidden />
                   <span>{subirLogo.isPending ? 'Subiendo…' : 'Arrastrá un PNG o JPG, o tocá para elegirlo'}</span>
-                  <span className="text-xs text-ink-soft">Hasta 500 KB. Se guarda al subirlo. Se muestra sobre una placa blanca, en tema claro y oscuro.</span>
+                  <span className="text-xs text-ink-soft">Hasta 500 KB. Se guarda al subirlo. Se muestra tal cual: mejor con su propio fondo de color que transparente o con fondo blanco.</span>
                 </button>
                 <input ref={inputArchivo} type="file" accept="image/png,image/jpeg" className="sr-only"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(f); e.target.value = '' }} />
