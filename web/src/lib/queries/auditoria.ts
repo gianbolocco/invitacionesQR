@@ -7,7 +7,7 @@ export type AuditRow = {
   guestName: string
   guestDoc: string | null
   plate: string | null
-  kind: 'visita' | 'frecuente' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   /** Solo en las frecuentes: si viene de visita o como proveedor. */
   frequentAs?: 'visita' | 'proveedor' | null
   tradeName?: string | null

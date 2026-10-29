@@ -80,7 +80,7 @@ describe('alta exprés de invitación', () => {
   it('crea con los defaults de una visita de un día', async () => {
     const { cookie, unit142, guardia } = await escenario()
     const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Invitado Exprés' }).expect(201)
+      .send({ unitId: unit142.id, guestName: 'Invitado Exprés', guestDoc: '30123456' }).expect(201)
 
     expect(res.body.kind).toBe('visita')
     expect(res.body.capacity).toBe(1)
@@ -96,11 +96,11 @@ describe('alta exprés de invitación', () => {
   it('acepta la patente opcional', async () => {
     const { cookie, unit142 } = await escenario()
     const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Con patente', plate: 'ab123cd' }).expect(201)
+      .send({ unitId: unit142.id, guestName: 'Con patente', guestDoc: '30123456', plate: 'ab123cd' }).expect(201)
     expect(res.body.plate).toBe('AB123CD')
   })
 
-  it('acepta el documento opcional, si el guardia ya lo tiene', async () => {
+  it('guarda el documento', async () => {
     const { cookie, unit142 } = await escenario()
     const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
       .send({ unitId: unit142.id, guestName: 'Con doc', guestDoc: '30123456' }).expect(201)
@@ -113,13 +113,13 @@ describe('alta exprés de invitación', () => {
     const [unidadAjena] = await db.insert(units).values({ neighborhoodId: otroBarrio.id, label: 'Lote 1' }).returning()
 
     await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unidadAjena.id, guestName: 'Intruso' }).expect(403)
+      .send({ unitId: unidadAjena.id, guestName: 'Intruso', guestDoc: '30123456' }).expect(403)
   })
 
   it('el ingreso recién creado se puede registrar como cualquier otro', async () => {
     const { cookie, unit142 } = await escenario()
     const creada = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Invitado Exprés' }).expect(201).then((r) => r.body)
+      .send({ unitId: unit142.id, guestName: 'Invitado Exprés', guestDoc: '30123456' }).expect(201).then((r) => r.body)
 
     const check = await request(app).get(`/gate/invitation/${creada.id}`).set('Cookie', cookie).expect(200)
     expect(check.body.check).toEqual({ ok: true })
@@ -135,7 +135,7 @@ describe('el documento es obligatorio al ingreso', () => {
   it('rechaza el ingreso sin documento', async () => {
     const { cookie, unit142 } = await escenario()
     const creada = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Sin Doc' }).expect(201).then((r) => r.body)
+      .send({ unitId: unit142.id, guestName: 'Sin Doc', guestDoc: '30123456' }).expect(201).then((r) => r.body)
 
     await request(app).post('/gate/entries').set('Cookie', cookie)
       .send({ invitationId: creada.id, guestName: 'Sin Doc' }).expect(400)
@@ -144,8 +144,9 @@ describe('el documento es obligatorio al ingreso', () => {
   it('si la invitación no tenía documento, el tipeado en la puerta queda guardado en la invitación', async () => {
     const { cookie, unit142 } = await escenario()
     const creada = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Carga en la puerta' }).expect(201).then((r) => r.body)
-    expect(creada.guestDoc).toBeNull()
+      .send({ unitId: unit142.id, guestName: 'Carga en la puerta', guestDoc: '30123456' }).expect(201).then((r) => r.body)
+    // El alta exprés ya exige el documento: una sin él solo existe si la base la trae de antes.
+    await db.update(invitations).set({ guestDoc: null }).where(eq(invitations.id, creada.id))
 
     await request(app).post('/gate/entries').set('Cookie', cookie)
       .send({ invitationId: creada.id, guestName: 'Carga en la puerta', guestDoc: '30777888' }).expect(201)
@@ -157,7 +158,7 @@ describe('el documento es obligatorio al ingreso', () => {
   it('si ya tenía documento, no lo pisa con otro distinto', async () => {
     const { cookie, unit142, guardia } = await escenario()
     const creada = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Con Doc Previo' }).expect(201).then((r) => r.body)
+      .send({ unitId: unit142.id, guestName: 'Con Doc Previo', guestDoc: '30123456' }).expect(201).then((r) => r.body)
 
     await db.update(invitations).set({ guestDoc: '30111111', capacity: 5, kind: 'frecuente' })
       .where(eq(invitations.id, creada.id))
@@ -169,6 +170,47 @@ describe('el documento es obligatorio al ingreso', () => {
   })
 })
 
+describe('documento obligatorio y delivery en el alta exprés', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it.each([
+    { guestName: 'Sin doc' },
+    { guestName: 'Plomero', kind: 'proveedor' },
+    { kind: 'delivery', app: 'rappi' },
+  ])('rechaza el alta sin documento %j', async (extra) => {
+    const { cookie, unit142 } = await escenario()
+    await request(app).post('/gate/invitations').set('Cookie', cookie)
+      .send({ unitId: unit142.id, ...extra }).expect(400)
+  })
+
+  it('un delivery se llama como la app y vence en 2 horas', async () => {
+    const { cookie, unit142 } = await escenario()
+    const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
+      .send({ unitId: unit142.id, kind: 'delivery', app: 'rappi', guestDoc: '30123456' }).expect(201)
+    expect(res.body).toMatchObject({ kind: 'delivery', guestName: 'Rappi', guestDoc: '30123456', capacity: 1 })
+    const dosHoras = Date.now() + 2 * 3600_000
+    expect(Math.abs(new Date(res.body.expiresAt).getTime() - dosHoras)).toBeLessThan(10_000)
+  })
+
+  it('app otro sin detalle: falta_detalle; con detalle, el nombre es el detalle', async () => {
+    const { cookie, unit142 } = await escenario()
+    const base = { unitId: unit142.id, kind: 'delivery', app: 'otro', guestDoc: '30123456' }
+    const mal = await request(app).post('/gate/invitations').set('Cookie', cookie).send(base).expect(400)
+    expect(mal.body.error).toBe('falta_detalle')
+    const ok = await request(app).post('/gate/invitations').set('Cookie', cookie)
+      .send({ ...base, otro: 'Farmacia' }).expect(201)
+    expect(ok.body.guestName).toBe('Farmacia')
+  })
+
+  it('un delivery ignora el rubro: tradeId queda en null', async () => {
+    const { cookie, unit142, neighborhoodId } = await escenario()
+    const [t] = await db.insert(trades).values({ neighborhoodId, name: 'Electricista' }).returning()
+    const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
+      .send({ unitId: unit142.id, kind: 'delivery', app: 'rappi', guestDoc: '30123456', tradeId: t.id }).expect(201)
+    expect(res.body.tradeId).toBeNull()
+  })
+})
+
 describe('a quién se le atribuye una invitación de garita', () => {
   beforeEach(async () => { await resetDb(); resetRateLimits() })
 
@@ -177,7 +219,7 @@ describe('a quién se le atribuye una invitación de garita', () => {
   it('en el historial del vecino', async () => {
     const { cookie, unit142 } = await escenario()
     await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Exprés' }).expect(201)
+      .send({ unitId: unit142.id, guestName: 'Exprés', guestDoc: '30123456' }).expect(201)
 
     // El vecino de la unidad 142 ve su historial.
     await db.update(people).set({ passwordHash: await hashPassword(PASS) })
@@ -193,7 +235,7 @@ describe('a quién se le atribuye una invitación de garita', () => {
   it('en la auditoría del admin', async () => {
     const { cookie, unit142 } = await escenario()
     const creada = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Exprés Auditoría' }).expect(201).then((r) => r.body)
+      .send({ unitId: unit142.id, guestName: 'Exprés Auditoría', guestDoc: '30123456' }).expect(201).then((r) => r.body)
 
     const res = await request(app).get('/gate/audit').set('Cookie', cookie).expect(200)
     const fila = res.body.rows.find((r: { id: string }) => r.id === creada.id)
@@ -203,7 +245,7 @@ describe('a quién se le atribuye una invitación de garita', () => {
   it('en la agenda del día', async () => {
     const { cookie, unit142 } = await escenario()
     await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Exprés Agenda' }).expect(201)
+      .send({ unitId: unit142.id, guestName: 'Exprés Agenda', guestDoc: '30123456' }).expect(201)
 
     const hoy = todayInBuenosAires()
     const res = await request(app).get(`/gate/agenda?date=${hoy}`).set('Cookie', cookie).expect(200)
@@ -214,7 +256,7 @@ describe('a quién se le atribuye una invitación de garita', () => {
   it('en el link público, si alguien lo abre', async () => {
     const { cookie, unit142 } = await escenario()
     const creada = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Exprés Público' }).expect(201).then((r) => r.body)
+      .send({ unitId: unit142.id, guestName: 'Exprés Público', guestDoc: '30123456' }).expect(201).then((r) => r.body)
 
     const res = await request(app).get(`/invitations/public/${creada.token}`).expect(200)
     expect(res.body.inviterName).toBe(ETIQUETA)
@@ -248,7 +290,7 @@ describe('alta exprés de proveedor', () => {
     const { cookie, unit142, neighborhoodId } = await escenario()
     await rubro(neighborhoodId)
     const res = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Plomero', kind: 'proveedor' }).expect(400)
+      .send({ unitId: unit142.id, guestName: 'Plomero', guestDoc: '30123456', kind: 'proveedor' }).expect(400)
     expect(res.body.error).toBe('rubro_requerido')
   })
 
@@ -259,7 +301,7 @@ describe('alta exprés de proveedor', () => {
       providerWindows: [{ days: [0, 1, 2, 3, 4, 5, 6], from: '00:00', to: '00:01', season: null, trades: null }],
     }).where(eq(neighborhoods.id, neighborhoodId))
     const creada = await request(app).post('/gate/invitations').set('Cookie', cookie)
-      .send({ unitId: unit142.id, guestName: 'Plomero', kind: 'proveedor', tradeId: t.id }).expect(201).then((r) => r.body)
+      .send({ unitId: unit142.id, guestName: 'Plomero', guestDoc: '30123456', kind: 'proveedor', tradeId: t.id }).expect(201).then((r) => r.body)
     expect(creada).toMatchObject({ kind: 'proveedor', tradeId: t.id })
 
     const check = await request(app).get(`/gate/invitation/${creada.id}`).set('Cookie', cookie).expect(200)

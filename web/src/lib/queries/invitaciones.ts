@@ -107,6 +107,18 @@ export function useCrearInvitacion() {
   })
 }
 
+/** El pase de delivery: dos toques, sin nombre ni fecha. */
+export function useCrearDelivery() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (d: { unitId: string; app: NonNullable<Invitation['deliveryApp']>; otro?: string }) =>
+      api<Invitation>('/invitations/delivery', { method: 'POST', body: JSON.stringify(d) }),
+    // falta_detalle lo muestra la hoja junto al campo; el toast es para lo demás.
+    onError: (e) => !(e instanceof ApiError && e.code === 'falta_detalle') && toast.error('No pudimos avisar. Probá de nuevo.'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: claves.todas }),
+  })
+}
+
 export function useEditarInvitacion(id: string) {
   const qc = useQueryClient()
   return useMutation({

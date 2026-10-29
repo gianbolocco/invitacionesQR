@@ -30,6 +30,7 @@ const TIPOS: { valor: FiltroTipo; etiqueta: string }[] = [
   { valor: 'visita', etiqueta: 'Visitas' },
   { valor: 'frecuente', etiqueta: 'Frecuentes' },
   { valor: 'proveedor', etiqueta: 'Proveedores' },
+  { valor: 'delivery', etiqueta: 'Delivery' },
 ]
 
 type FiltroAdvertencia = 'todos' | 'con'

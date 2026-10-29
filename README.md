@@ -31,6 +31,23 @@ llegar, carga su documento y su patente si quiere, y se queda con su QR.
 invitación, su QR y su fila en la lista del día, y eso es justamente lo que da
 la trazabilidad de quién entró y quién no.
 
+**Delivery.** El vecino avisa que espera un pedido con dos toques: elige la app
+(PedidosYa, Rappi, Mercado Libre u otra) y listo. Se crea un pase de una sola
+entrada que vale 2 horas y que puede anular. En la garita, el pase se busca por
+lote como cualquier otro y se carga el documento del repartidor al ingreso, más
+la patente si viene en vehículo; el seguro del vehículo se exige como a cualquier
+visita. La alerta de permanencia se mide en minutos (Barrio → Alertas/Garita,
+30 por defecto). El alta exprés también puede ser Delivery y ahora siempre pide
+el documento.
+
+**Paquetes.** Cuando llega un paquete, la garita toca "Llegó un paquete", elige
+el lote y, si quiere, escribe una nota corta (hasta 80 caracteres). El aviso sale
+5 segundos después, y en ese tiempo el guardia puede deshacerlo. Les llega a los
+vecinos de esa casa por notificación push y, con la app abierta, al instante.
+En el inicio ven los paquetes de los últimos 30 días. El admin lo prende o apaga
+en Configuración → Garita. En iPhone la notificación push solo funciona con la
+app instalada en la pantalla de inicio ("Agregar a inicio").
+
 **El guardia** tiene su propia cuenta —cada movimiento queda a nombre de quien
 estaba logueado, que es lo que hace auditable el "¿quién lo dejó pasar?"—, la
 lista del día, el escáner y la auditoría exportable a Excel (cada fila abre su detalle en un panel: proveedor, invitación y movimientos). El buscador de la
@@ -113,6 +130,14 @@ contenedor**. El alta de un vecino y el "olvidé mi contraseña" se prueban
 enteros sin cuenta de mail, copiando el link de `docker compose logs api`.
 Esto vale solo en desarrollo: con `NODE_ENV=production` la API no arranca sin
 `RESEND_API_KEY` y `MAIL_FROM`.
+
+Sin claves VAPID las notificaciones push no se envían: **se registran en el
+log** (lo demás, incluido el aviso en vivo, anda igual). Se generan con
+`npx web-push generate-vapid-keys`. Con `NODE_ENV=production` la API no arranca
+sin `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` (un `mailto:`).
+No rotes las claves: cambiarlas invalida todas las suscripciones existentes.
+Los dos streams SSE (`/api/gate/eventos` y `/api/events`) quedan fuera de la
+compresión de Caddy: comprimidos, los avisos en vivo llegarían tarde.
 
 ### Instalar un barrio
 

@@ -5,6 +5,7 @@ import { randomToken } from '../lib/crypto.js'
 import { audit } from '../lib/audit.js'
 import { todayInBuenosAires, unMesDespues } from '../lib/dates.js'
 import { AppError } from '../lib/errors.js'
+import { valoresDeDelivery, type App } from '../lib/delivery.js'
 import { PORTERIA } from '../lib/porteria.js'
 import { aplicaFranjas, type Franja } from '../lib/franjas.js'
 import { pideSeguro, seguroVigente, type Seguro } from '../lib/seguro.js'
@@ -39,6 +40,16 @@ export async function assertMemberOfUnit(personId: string, unitId: string): Prom
   if (!row) throw new AppError(403, 'not_your_unit')
 }
 
+/** El pase de delivery: lo crea el vecino, dura 2 horas y es para una sola entrada. */
+export async function createDeliveryPass(input: { unitId: string; app: App; otro?: string; createdBy: string }) {
+  await assertMemberOfUnit(input.createdBy, input.unitId)
+  const [inv] = await db.insert(invitations).values({
+    unitId: input.unitId, createdBy: input.createdBy,
+    ...valoresDeDelivery(input.app, input.otro, new Date()), token: randomToken(16),
+  }).returning()
+  return inv
+}
+
 export async function assertUnitInNeighborhood(
   unitId: string,
   neighborhoodId: string,
@@ -52,13 +63,16 @@ export async function assertUnitInNeighborhood(
 
 export type CreateExpressInvitationInput = {
   unitId: string
-  guestName: string
+  /** Obligatorio salvo en delivery, donde el nombre es la app. */
+  guestName?: string
   guestDoc?: string
   plate?: string
   note?: string
   createdBy: string
   neighborhoodId: string
-  kind?: 'visita' | 'proveedor'
+  kind?: 'visita' | 'proveedor' | 'delivery'
+  app?: App
+  otro?: string
   tradeId?: string | null
 }
 
@@ -69,13 +83,12 @@ export type CreateExpressInvitationInput = {
  * mismo barrio.
  *
  * Nada de lo que normalmente se elige: es de hoy, una vez, una persona —
- * los mismos defaults que ya tendría una visita de un solo día. El
- * documento es opcional acá: si no lo carga ahora, el veredicto lo va a
- * exigir igual antes de poder registrar el ingreso.
+ * los mismos defaults que ya tendría una visita de un solo día. La ruta
+ * exige el documento siempre; el delivery, además, dura 2 horas.
  */
 export async function createExpressInvitation(input: CreateExpressInvitationInput) {
   await assertUnitInNeighborhood(input.unitId, input.neighborhoodId)
-  await assertRubro(input.neighborhoodId, input.kind ?? 'visita', null, input.tradeId)
+  await assertRubro(input.neighborhoodId, input.kind ?? 'visita', null, input.kind === 'delivery' ? null : input.tradeId)
 
   const [inv] = await db.insert(invitations)
     .values(valoresDePorteria(input, todayInBuenosAires()))
@@ -86,12 +99,12 @@ export async function createExpressInvitation(input: CreateExpressInvitationInpu
 
 /** Los valores de una invitación de portería: de un día, una vez, una persona. */
 export function valoresDePorteria(input: CreateExpressInvitationInput, dia: string) {
-  return {
+  const base = {
     unitId: input.unitId,
     createdBy: input.createdBy,
     kind: input.kind ?? 'visita',
     tradeId: input.tradeId ?? null,
-    guestName: input.guestName.trim(),
+    guestName: (input.guestName ?? '').trim(),
     guestDoc: input.guestDoc?.trim() || null,
     plate: input.plate?.trim().toUpperCase() || null,
     note: input.note?.trim() || null,
@@ -100,6 +113,7 @@ export function valoresDePorteria(input: CreateExpressInvitationInput, dia: stri
     capacity: 1,
     token: randomToken(16),
   }
+  return input.kind === 'delivery' ? { ...base, tradeId: null, ...valoresDeDelivery(input.app!, input.otro, new Date()) } : base
 }
 
 /**
@@ -231,6 +245,8 @@ const columnas = {
   validTo: invitations.validTo,
   weekdays: invitations.weekdays,
   capacity: invitations.capacity,
+  expiresAt: invitations.expiresAt,
+  deliveryApp: invitations.deliveryApp,
   token: invitations.token,
   revokedAt: invitations.revokedAt,
   revokedReason: invitations.revokedReason,
@@ -283,13 +299,14 @@ export async function listForUnits(unitIds: string[]) {
     // El cupo se mide sobre el count de ingresos, así que va en HAVING. Quien
     // está adentro sigue en la home aunque haya agotado el cupo: es justo lo
     // que el vecino quiere ver ("ya llegó").
-    .having(sql`count(${entryLogs.id}) < ${invitations.capacity} or ${adentroSql}`)
+    // El delivery vencido sin entrar sale de la lista; si sigue adentro, se queda.
+    .having(sql`(count(${entryLogs.id}) < ${invitations.capacity} and (${invitations.expiresAt} is null or ${invitations.expiresAt} > now())) or ${adentroSql}`)
     .orderBy(desc(invitations.createdAt))
 }
 
 export type HistoryFilters = {
   q?: string
-  kind?: 'visita' | 'frecuente' | 'proveedor'
+  kind?: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   estado?: 'entro' | 'no_entro' | 'anulada'
   /** Id del vecino, para el filtro "solo las mías". */
   createdBy?: string
@@ -601,6 +618,7 @@ export async function editInvitation(
   if (!inv) throw new AppError(404, 'not_found')
   await assertMemberOfUnit(personId, inv.unitId)
 
+  if (inv.kind === 'delivery') throw new AppError(409, 'no_editable')
   if (inv.revokedAt) throw new AppError(409, 'revoked')
   if ((await entriesOf(inv.id)) > 0) throw new AppError(409, 'ya_usada')
   if (inv.validTo < todayInBuenosAires()) throw new AppError(409, 'vencida')

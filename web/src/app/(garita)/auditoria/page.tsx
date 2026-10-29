@@ -39,6 +39,7 @@ const TIPOS: { valor: FiltrosAuditoria['tipo']; etiqueta: string }[] = [
   { valor: 'visita', etiqueta: 'Visitas' },
   { valor: 'frecuente', etiqueta: 'Frecuentes' },
   { valor: 'proveedor', etiqueta: 'Proveedores' },
+  { valor: 'delivery', etiqueta: 'Delivery' },
 ]
 
 /** Qué atajo está puesto, o 'otro' si las fechas se tocaron a mano. */

@@ -22,6 +22,7 @@ export async function getBranding() {
     logoUpdatedAt: neighborhoods.logoUpdatedAt,
     mapImageMime: neighborhoods.mapImageMime,
     mapImageUpdatedAt: neighborhoods.mapImageUpdatedAt,
+    packagesEnabled: neighborhoods.packagesEnabled,
   }).from(neighborhoods).limit(1)
 
   return {
@@ -33,6 +34,8 @@ export async function getBranding() {
     logoVersion: row?.logoMime && row.logoUpdatedAt ? row.logoUpdatedAt.getTime() : null,
     tienePlano: Boolean(row?.mapImageMime),
     planoVersion: row?.mapImageMime && row.mapImageUpdatedAt ? row.mapImageUpdatedAt.getTime() : null,
+    // Config pública del barrio: el vecino decide con esto si ofrece los avisos.
+    packagesEnabled: row?.packagesEnabled ?? true,
   }
 }
 

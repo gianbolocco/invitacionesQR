@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
  */
 export function Campo({ id, etiqueta, ayuda, error, accesorio, children }: {
   id: string
-  etiqueta: string
+  etiqueta: ReactNode
   ayuda?: ReactNode
   error?: string | null
   accesorio?: ReactNode

@@ -45,6 +45,10 @@
 #   RESEND_API_KEY      obligatoria: sin ella la API no arranca (los links de
 #                       alta y reset terminarían impresos en el log)
 #   MAIL_FROM           obligatoria, ej: Los Aromos <invitaciones@tudominio.com>
+#   VAPID_PUBLIC_KEY    obligatorias (avisos push): sin ellas la API no arranca.
+#   VAPID_PRIVATE_KEY   Generarlas con: npx web-push generate-vapid-keys
+#   VAPID_SUBJECT       un mailto:, ej: mailto:admin@tudominio.com
+#                       No rotar las claves: invalida todas las suscripciones.
 #   GOOGLE_CLIENT_ID    opcional
 #   GOOGLE_CLIENT_SECRET opcional
 #
@@ -68,6 +72,9 @@ services:
       API_ORIGIN: https://${DOMINIO}/api
       RESEND_API_KEY: ${RESEND_API_KEY:?falta RESEND_API_KEY}
       MAIL_FROM: ${MAIL_FROM:?falta MAIL_FROM}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:?falta VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:?falta VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:?falta VAPID_SUBJECT}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     # /health chequea app y base. node -e con fetch porque node:24-slim no

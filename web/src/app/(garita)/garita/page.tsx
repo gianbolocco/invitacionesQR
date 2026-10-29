@@ -4,12 +4,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ScanLine, UserPlus } from 'lucide-react'
+import { Package, ScanLine, UserPlus } from 'lucide-react'
 import { ChromeGarita } from '@/components/garita/chrome'
 import { AgendaDia } from '@/components/garita/agenda-dia'
 import { BuscarInvitado } from '@/components/garita/buscar-invitado'
 import { UltimosMovimientos } from '@/components/garita/ultimos-movimientos'
 import { AltaExpres } from '@/components/garita/alta-expres'
+import { LlegoPaquete } from '@/components/garita/llego-paquete'
+import { useMarca } from '@/lib/marca-cliente'
 import { EstadoLectora } from '@/components/garita/estado-lectora'
 import {
   claves, useAvisosGarita, useAbrirQr, useAnotarLectura, useDniPendiente, useDocumentoLeido,
@@ -41,6 +43,8 @@ export default function GaritaHoy() {
   const [lecturaAlta, setLecturaAlta] = useState<LecturaDni | null>(null)
   // Estado, no ref leído en el render: así Radix sabe a quién devolverle el
   // foco al cerrar el sheet (mismo patrón que DialogLote/DialogBaja del admin).
+  const { packagesEnabled } = useMarca()
+  const [paqueteAbierto, setPaqueteAbierto] = useState(false)
   const [disparador, setDisparador] = useState<HTMLButtonElement | null>(null)
   useAvisosGarita()
 
@@ -119,7 +123,9 @@ export default function GaritaHoy() {
     }
   }
 
-  useLectora({ onLectura: (texto) => leer(interpretarLectura(texto)) })
+  // Con la hoja de paquetes abierta la lectura se ignora, pero el hook sigue activo: apagado, el Enter
+  // de la lectora apretaría el botón con foco de la hoja.
+  useLectora({ onLectura: (texto) => { if (!paqueteAbierto) leer(interpretarLectura(texto)) } })
 
   // Un DNI leído en el escáner o en un veredicto llega acá para resolverse.
   useEffect(() => {
@@ -136,11 +142,17 @@ export default function GaritaHoy() {
         <div className="flex min-w-0 flex-col gap-6">
           <BuscarInvitado q={q} onQ={(v) => { setQ(v); setDniLista(null) }} onAbrir={abrirDeLista} onLectura={leer}
             onAutorizar={() => setAltaAbierta(true)} />
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             <Button type="button" variant="outline"
               onClick={(e) => { setDisparador(e.currentTarget); setAltaAbierta(true) }}>
               <UserPlus aria-hidden />Autorizar sin invitación
             </Button>
+            {packagesEnabled && (
+              <Button type="button" variant="outline"
+                onClick={(e) => { setDisparador(e.currentTarget); setPaqueteAbierto(true) }}>
+                <Package aria-hidden />Llegó un paquete
+              </Button>
+            )}
             {/* Solo se usa después de un corte de luz: a la vista, pero sin competir con lo de todos los días. */}
             <Link href="/garita/cargar" className="self-end rounded px-1 py-1.5 text-xs text-ink-soft underline underline-offset-4 hover:text-ink">
               Cargar movimientos de un corte
@@ -159,6 +171,7 @@ export default function GaritaHoy() {
         </aside>
       </div>
 
+      <LlegoPaquete abierto={paqueteAbierto} onAbiertoChange={setPaqueteAbierto} disparador={disparador} />
       <AltaExpres abierto={altaAbierta} disparador={disparador} onCreada={abrir}
         onAbiertoChange={cambiarAlta}
         lectura={lecturaAlta} onQr={(token) => leer({ tipo: 'qr', token })} />

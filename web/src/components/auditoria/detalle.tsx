@@ -69,7 +69,7 @@ export function Detalle({ fila: abierta, warnDays, onCerrar }: { fila: AuditRow 
   const fila = abierta ?? ultima
   const tipo = !fila ? '' : fila.kind === 'frecuente'
     ? (fila.frequentAs === 'proveedor' ? 'Frecuente · viene a trabajar' : 'Frecuente')
-    : fila.kind === 'proveedor' ? 'Proveedor' : 'Visita'
+    : fila.kind === 'proveedor' ? 'Proveedor' : fila.kind === 'delivery' ? 'Delivery' : 'Visita'
   return (
     <Sheet open={abierta !== null} onOpenChange={(abierto) => { if (!abierto) onCerrar() }}>
       <SheetContent onCloseAutoFocus={(e) => {

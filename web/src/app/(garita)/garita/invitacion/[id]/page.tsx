@@ -12,7 +12,7 @@ import { useDemora } from '@/lib/use-demora'
 import { NO_RECONOCIDO, type LecturaDni, formatearDni, interpretarLectura, soloDigitos, type Lectura } from '@/lib/lectora'
 import { useCampoLectora, useLectora } from '@/lib/use-lectora'
 import { hoyISO, horaODia, tiempoDesde, fechaCompleta } from '@/lib/fechas'
-import { KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
+import { APPS_DELIVERY, KIND_LABEL, quienInvita, vigencia } from '@/lib/invitations'
 import {
   useAbrirQr, useAnotarLectura, useDeshacerMovimiento, useDniPendiente, useDocumentoLeido, useRegistrarEgreso, useRegistrarIngreso, useVeredicto,
   useVeredictoEnVivo, useCorregirSeguro, fechaPasadaDe,
@@ -420,7 +420,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           )}
 
           <p className={`mt-8 break-words border-t pt-5 text-3xl font-semibold leading-tight sm:text-4xl lg:text-6xl ${borde}`}>
-            {inv.guestName}
+            {inv.guestName}{inv.kind === 'delivery' && ` → ${inv.unitLabel}`}
           </p>
         </section>
 
@@ -444,7 +444,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               {inv.note && <Dato etiqueta="Nota">{inv.note}</Dato>}
               {editable ? (
                 <>
-                  <dt className="self-start pt-2.5 opacity-80"><label htmlFor="doc-veredicto">Documento</label></dt>
+                  <dt className="self-start pt-2.5 opacity-80"><label htmlFor="doc-veredicto">{inv.kind === 'delivery' ? 'Documento del repartidor' : 'Documento'}</label></dt>
                   <dd className="min-w-0">
                     {/* El campo es claro en los dos temas: el dark:bg-input/30 del Input lo ensuciaría. */}
                     <Input id="doc-veredicto" value={doc} onKeyDown={teclaDoc}
@@ -484,7 +484,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               guardando={corregir.isPending}>
               {editable ? (
                 <>
-                  <dt className="self-start pt-2.5 opacity-80"><label htmlFor="patente-veredicto">Patente</label></dt>
+                  <dt className="max-w-44 self-start pt-2.5 opacity-80"><label htmlFor="patente-veredicto">{inv.kind === 'delivery' ? 'Patente (vacío = a pie o en bici)' : 'Patente'}</label></dt>
                   <dd className="min-w-0">
                     <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
                       className="tabular h-12 border-control bg-card text-xl uppercase" />
@@ -506,7 +506,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               <h2 id="seccion-invitacion" className="text-sm font-bold uppercase tracking-[0.08em] opacity-80">Invitación</h2>
               <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-2.5 text-lg sm:text-xl">
                 <Dato etiqueta="Lote">{inv.unitLabel} · {quienInvita(inv.inviterName)}</Dato>
-                {!esEgreso && <Dato etiqueta="Vigencia">{vigencia(inv)}</Dato>}
+                {!esEgreso && <Dato etiqueta="Vigencia">{inv.kind === 'delivery' && inv.expiresAt ? `hasta ${hora(inv.expiresAt)}` : vigencia(inv)}</Dato>}
                 {/* Una frecuente lleva cupo 999 para ser ilimitada: "1 de 999" no le dice nada al guardia. */}
                 {inv.capacity > 1 && inv.kind !== 'frecuente' && (
                   <Dato etiqueta="Cupo">{resultado.usedCount} de {inv.capacity} entraron</Dato>
@@ -621,7 +621,10 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
           plate: plate || inv.plate || '',
           unidad: { unitId: inv.unitId, unitLabel: inv.unitLabel, residentName: inv.inviterName },
           // Un rubro que ya no está activo lo descarta el sheet: ahí elige el guardia.
-          kind: inv.kind === 'proveedor' || inv.frequentAs === 'proveedor' ? 'proveedor' : 'visita',
+          kind: inv.kind === 'delivery' ? 'delivery' : inv.kind === 'proveedor' || inv.frequentAs === 'proveedor' ? 'proveedor' : 'visita',
+          // El nombre de un delivery es la app; si no es una de las tres, era un "Otro" y el nombre es el detalle.
+          app: APPS_DELIVERY.find((a) => a.etiqueta === inv.guestName)?.valor ?? 'otro',
+          otro: APPS_DELIVERY.some((a) => a.etiqueta === inv.guestName) ? '' : inv.guestName,
           tradeId: inv.tradeId ?? '',
         }}
         // replace: "Volver" en el veredicto nuevo lleva a donde estaba el guardia antes del rechazo.

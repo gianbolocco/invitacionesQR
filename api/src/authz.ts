@@ -8,6 +8,8 @@ export type InvitationLike = {
   weekdays: number[] | null
   capacity: number
   revokedAt: Date | null
+  /** Solo un delivery: instante exacto de vencimiento. */
+  expiresAt: Date | null
   kind: string
   frequentAs: string | null
   tradeId: string | null
@@ -45,6 +47,8 @@ export function canEnter(inv: InvitationLike, now: Date, usedCount: number, fran
   const today = todayInBuenosAires(now)
   if (today < inv.validFrom) return { ok: false, reason: 'not_yet' }
   if (today > inv.validTo) return { ok: false, reason: 'expired' }
+  // Un delivery vence por hora, no por día.
+  if (inv.expiresAt && now > inv.expiresAt) return { ok: false, reason: 'expired' }
 
   if (inv.weekdays?.length && !inv.weekdays.includes(weekdayInBuenosAires(now))) {
     return { ok: false, reason: 'wrong_weekday' }

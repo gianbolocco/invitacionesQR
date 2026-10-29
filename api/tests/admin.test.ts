@@ -319,3 +319,18 @@ describe('reenvío y link de alta', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('switch de paquetes', () => {
+  beforeEach(async () => { await resetDb(); resetRateLimits() })
+
+  it('viene prendido y el admin lo apaga', async () => {
+    const { cookie } = await loginAs('admin')
+    const antes = await request(app).get('/admin/neighborhood').set('Cookie', cookie).expect(200)
+    expect(antes.body.packagesEnabled).toBe(true)
+    const r = await request(app).patch('/admin/neighborhood').set('Cookie', cookie)
+      .send({ packagesEnabled: false }).expect(200)
+    expect(r.body.packagesEnabled).toBe(false)
+    const despues = await request(app).get('/admin/neighborhood').set('Cookie', cookie).expect(200)
+    expect(despues.body.packagesEnabled).toBe(false)
+  })
+})

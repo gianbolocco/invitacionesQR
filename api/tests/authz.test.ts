@@ -7,7 +7,7 @@ const base: InvitationLike = {
   weekdays: null, capacity: 1, revokedAt: null,
   kind: 'visita', frequentAs: null, tradeId: null,
   requiresInsurance: false, insuranceComplete: false, insuranceExpiresOn: null,
-  porteria: false,
+  porteria: false, expiresAt: null,
   vehicleRequiresInsurance: false, vehicleInsuranceExpiresOn: null, vehicleOverride: true,
 }
 
@@ -130,4 +130,18 @@ describe('canEnter', () => {
   it('la portería no saltea el seguro del auto si el barrio no lo permite', () =>
     expect(canEnter({ ...enAuto, porteria: true, vehicleOverride: false }, lunes15h, 0))
       .toEqual({ ok: false, reason: 'no_vehicle_insurance' }))
+})
+
+describe('delivery: vence por hora', () => {
+  const del = { ...base, kind: 'delivery', expiresAt: new Date('2026-09-14T19:00:00Z') } // 16:00 BA
+  it('pasa antes de la hora', () => expect(canEnter(del, lunes15h, 0)).toEqual({ ok: true }))
+  it('rebota después', () => expect(canEnter(del, new Date('2026-09-14T19:01:00Z'), 0))
+    .toEqual({ ok: false, reason: 'expired' }))
+  it('cruza la medianoche', () => {
+    const tarde = { ...del, validTo: '2026-09-15', expiresAt: new Date('2026-09-15T04:30:00Z') } // 01:30 BA
+    expect(canEnter(tarde, new Date('2026-09-15T04:00:00Z'), 0)).toEqual({ ok: true })
+  })
+  it('anulada gana sobre vencida', () => expect(canEnter({ ...del, revokedAt: new Date() }, new Date('2026-09-15T00:00:00Z'), 0))
+    .toEqual({ ok: false, reason: 'revoked' }))
+  it('no aplica franjas', () => expect(canEnter(del, lunes15h, 0, solo8a12)).toEqual({ ok: true }))
 })

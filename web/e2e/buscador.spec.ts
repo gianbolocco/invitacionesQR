@@ -8,7 +8,7 @@ test('los resultados del buscador flotan sin mover la pantalla y se eligen con e
   // Dos invitaciones propias: la prueba no depende de lo que haya en la base.
   const [lote] = await (await page.request.get(`${API}/gate/units?q=900`)).json()
   for (const n of ['Uno', 'Dos']) {
-    const r = await page.request.post(`${API}/gate/invitations`, { data: { unitId: lote.unitId, guestName: `Buscado ${n} ${sufijo}` } })
+    const r = await page.request.post(`${API}/gate/invitations`, { data: { unitId: lote.unitId, guestName: `Buscado ${n} ${sufijo}`, guestDoc: '30111222' } })
     expect(r.ok()).toBe(true)
   }
 

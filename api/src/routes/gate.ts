@@ -10,6 +10,7 @@ import {
 import { searchUnits, listUnits } from '../services/units.js'
 import { createExpressInvitation, revokeByGuard } from '../services/invitations.js'
 import { todayInBuenosAires, TZ } from '../lib/dates.js'
+import { APPS } from '../lib/delivery.js'
 import { slug } from '../lib/slug.js'
 import { estadoSeguro, etiquetaClave } from '../lib/seguro.js'
 import { buildWorkbook, diaExcel, fechaExcel, XLSX_MIME } from '../lib/excel.js'
@@ -22,6 +23,7 @@ import { guardarProveedor, guardarVehiculo } from '../services/padron.js'
 import { db } from '../db/index.js'
 import { zSeguro } from './invitations.js'
 import { AppError } from '../lib/errors.js'
+import { crearPaquete, deshacerPaquete, paquetesDeHoy } from '../services/packages.js'
 
 export const gateRoutes = Router()
 gateRoutes.use(requireAuth, requireRole('guard', 'admin'))
@@ -59,17 +61,19 @@ gateRoutes.get('/units', async (req, res) => {
   res.json(await searchUnits(req.person!.neighborhoodId, q))
 })
 
-/** El alta exprés: nombre + lote, el resto fijo. Ver createExpressInvitation. */
+/** El alta exprés: nombre (o app, si es delivery), documento y lote; el resto fijo. Ver createExpressInvitation. */
 gateRoutes.post('/invitations', async (req, res) => {
   const body = z.object({
     unitId: z.string().uuid(),
-    guestName: z.string().min(1),
-    guestDoc: z.string().optional(),
+    guestName: z.string().optional(),
+    guestDoc: z.string().trim().min(1),
     plate: z.string().optional(),
     note: z.string().trim().max(140).optional(),
-    kind: z.enum(['visita', 'proveedor']).optional(),
+    kind: z.enum(['visita', 'proveedor', 'delivery']).optional(),
+    app: z.enum(APPS).optional(),
+    otro: z.string().trim().max(40).optional(),
     tradeId: z.string().uuid().nullable().optional(),
-  }).parse(req.body)
+  }).refine((v) => v.kind === 'delivery' ? !!v.app : !!v.guestName?.trim(), { path: ['guestName'] }).parse(req.body)
 
   res.status(201).json(await createExpressInvitation({
     ...body, createdBy: req.person!.id, neighborhoodId: req.person!.neighborhoodId,
@@ -183,6 +187,21 @@ gateRoutes.get('/agenda', async (req, res) => {
   res.json(await agendaForDay(req.person!.neighborhoodId, date ?? todayInBuenosAires()))
 })
 
+/** El paquete se avisa a los vecinos a los pocos segundos: hasta entonces se puede deshacer. */
+gateRoutes.post('/packages', async (req, res) => {
+  const body = z.object({ unitId: z.string().uuid(), note: z.string().trim().min(1).max(80).optional() }).parse(req.body)
+  res.status(201).json(await crearPaquete({ ...body, guardId: req.person!.id, neighborhoodId: req.person!.neighborhoodId }))
+})
+
+gateRoutes.post('/packages/:id/cancel', async (req, res) => {
+  await deshacerPaquete(req.params.id, req.person!.neighborhoodId)
+  res.json({ ok: true })
+})
+
+gateRoutes.get('/packages/hoy', async (req, res) => {
+  res.json(await paquetesDeHoy(req.person!.neighborhoodId))
+})
+
 /** Avisos en vivo para la garita: "algo cambió, volvé a pedir". */
 gateRoutes.get('/eventos', escucharAvisos)
 
@@ -196,7 +215,7 @@ const auditFilters = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   unitId: z.string().uuid().optional(),
   status: z.enum(['adentro', 'concluida', 'esperando', 'vencida', 'anulada']).optional(),
-  kind: z.enum(['visita', 'frecuente', 'proveedor']).optional(),
+  kind: z.enum(['visita', 'frecuente', 'proveedor', 'delivery']).optional(),
   q: z.string().trim().max(80).optional(),
   // Llega como string desde la query: z.coerce.boolean() daría true con 'false'.
   sinSeguro: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
@@ -221,6 +240,7 @@ const KIND_EXCEL: Record<string, string> = {
   visita: 'Visita',
   frecuente: 'Frecuente',
   proveedor: 'Proveedor',
+  delivery: 'Delivery',
 }
 
 const guardia = (nombre: string | null, manual: boolean) =>

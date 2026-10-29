@@ -43,6 +43,8 @@ export const neighborhoods = pgTable('neighborhood', {
   // alerta. Una frecuente usa la de su subtipo (`invitation.frequent_as`).
   overstayHoursVisita: smallint('overstay_hours_visita'),
   overstayHoursProveedor: smallint('overstay_hours_proveedor'),
+  // Un delivery se mide en minutos, no en horas. NULL = no alerta.
+  overstayMinutesDelivery: smallint('overstay_minutes_delivery').default(30),
   // Franjas de ingreso de proveedores. [] = sin restricción.
   providerWindows: jsonb('provider_windows').$type<Franja[]>().notNull().default([]),
   // Días de anticipación con que se avisa que un seguro está por vencer. NULL = no avisa.
@@ -52,11 +54,14 @@ export const neighborhoods = pgTable('neighborhood', {
   vehicleInsuranceRequired: boolean('vehicle_insurance_required').notNull().default(false),
   // Con el pedido prendido: si la portería puede autorizar igual un auto sin seguro.
   vehicleInsuranceOverride: boolean('vehicle_insurance_override').notNull().default(true),
+  // Apagado, la garita no carga paquetes ni el vecino recibe avisos.
+  packagesEnabled: boolean('packages_enabled').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   check('neighborhood_insurance_warn_ck', sql`${t.insuranceWarnDays} between 1 and 90`),
   check('neighborhood_overstay_visita_ck', sql`${t.overstayHoursVisita} between 1 and 72`),
   check('neighborhood_overstay_proveedor_ck', sql`${t.overstayHoursProveedor} between 1 and 72`),
+  check('neighborhood_overstay_delivery_ck', sql`${t.overstayMinutesDelivery} between 5 and 240`),
 ])
 
 export const units = pgTable('unit', {
@@ -76,6 +81,7 @@ export const people = pgTable('person', {
   passwordHash: text('password_hash'),
   googleSub: text('google_sub'),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  packagesSeenAt: timestamp('packages_seen_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   // Global, no por barrio. Con (neighborhood_id, email) el mismo mail podía
@@ -132,6 +138,9 @@ export const invitations = pgTable('invitation', {
   weekdays: smallint('weekdays').array(),
   capacity: integer('capacity').notNull().default(1),
   token: text('token').notNull(),
+  // Solo en un delivery: de dónde viene y cuándo vence exacto (la ventana por día no alcanza para "2 horas").
+  deliveryApp: text('delivery_app'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   // null = no la anuló la portería (la anuló el vecino, o no está anulada).
   // Distinto de null = la anuló un guardia; '' es "sin motivo", porque el motivo
@@ -143,7 +152,9 @@ export const invitations = pgTable('invitation', {
   index('invitation_unit_idx').on(t.unitId, t.validTo),
   index('invitation_creator_idx').on(t.createdBy, t.createdAt),
   // Sin 'evento': un evento es una invitación por invitado, no un tipo aparte.
-  check('invitation_kind_ck', sql`${t.kind} in ('visita','frecuente','proveedor')`),
+  check('invitation_kind_ck', sql`${t.kind} in ('visita','frecuente','proveedor','delivery')`),
+  check('invitation_delivery_ck', sql`case when ${t.kind} = 'delivery' then ${t.deliveryApp} is not null and ${t.expiresAt} is not null else ${t.deliveryApp} is null and ${t.expiresAt} is null end`),
+  check('invitation_delivery_app_ck', sql`${t.deliveryApp} in ('pedidosya','rappi','mercadolibre','otro')`),
   // Solo una frecuente lo lleva. Una frecuente sin él cuenta como visita: la API
   // siempre lo completa, y así un insert crudo (tests, scripts) no se rompe.
   check('invitation_frequent_as_ck', sql`${t.frequentAs} is null
@@ -298,3 +309,28 @@ export const sessions = pgTable('session', {
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex('session_hash_uq').on(t.tokenHash)])
+
+export const packages = pgTable('package', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  unitId: uuid('unit_id').notNull().references(() => units.id),
+  note: text('note'),
+  createdBy: uuid('created_by').notNull().references(() => people.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Se avisa a esta hora, no al cargar: el guardia tiene unos segundos para deshacer.
+  notifyAt: timestamp('notify_at', { withTimezone: true }).notNull(),
+  notifiedAt: timestamp('notified_at', { withTimezone: true }),
+  canceledAt: timestamp('canceled_at', { withTimezone: true }),
+}, (t) => [
+  index('package_unit_idx').on(t.unitId, t.createdAt),
+  check('package_note_ck', sql`${t.note} is null or char_length(${t.note}) between 1 and 80`),
+  check('package_estado_ck', sql`${t.notifiedAt} is null or ${t.canceledAt} is null`),
+])
+
+export const pushSubscriptions = pgTable('push_subscription', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  personId: uuid('person_id').notNull().references(() => people.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex('push_subscription_endpoint_uq').on(t.endpoint)])

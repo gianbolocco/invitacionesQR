@@ -42,6 +42,7 @@ async function loadForCheck(where: SQL) {
     weekdays: invitations.weekdays,
     capacity: invitations.capacity,
     revokedAt: invitations.revokedAt,
+    expiresAt: invitations.expiresAt,
     unitId: invitations.unitId,
     unitLabel: units.label,
     // Para el veredicto: a quién llamar si hay dudas. Si la creó un guardia
@@ -542,7 +543,7 @@ export type AgendaRow = {
   guestDoc: string | null
   plate: string | null
   note: string | null
-  kind: 'visita' | 'frecuente' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   frequentAs: 'visita' | 'proveedor' | null
   tradeName: string | null
   unitLabel: string
@@ -550,6 +551,8 @@ export type AgendaRow = {
   capacity: number
   /** Para que la garita distinga "no vino todavía" de "ya venció". */
   validTo: string
+  /** Solo en delivery: el instante en que deja de valer. */
+  expiresAt: Date | null
   enteredCount: number
   lastEntryAt: Date | null
   /** Última salida registrada ESE día. */
@@ -600,6 +603,7 @@ export async function agendaForDay(neighborhoodId: string, day: string): Promise
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
       i.valid_to          as "validTo",
+      i.expires_at        as "expiresAt",
       (select count(*) from entry_log e
         where ${eseDia} and e.invitation_id = i.id)::int as "enteredCount",
       (select max(e.entered_at) from entry_log e
@@ -647,6 +651,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       case when p.role = 'guard' then ${PORTERIA} else p.name end as "inviterName",
       i.capacity,
       i.valid_to          as "validTo",
+      i.expires_at        as "expiresAt",
       (select count(*) from entry_log e
         where ${hoy} and e.invitation_id = i.id)::int  as "enteredCount",
       abiertas.desde                                    as "lastEntryAt",
@@ -658,6 +663,7 @@ export async function insideNow(neighborhoodId: string): Promise<AgendaRow[]> {
       case case when i.kind = 'frecuente' then coalesce(i.frequent_as, 'visita') else i.kind end
         when 'visita'    then abiertas.primero + make_interval(hours => n.overstay_hours_visita)
         when 'proveedor' then abiertas.primero + make_interval(hours => n.overstay_hours_proveedor)
+        when 'delivery'  then abiertas.primero + make_interval(mins => n.overstay_minutes_delivery)
       end                                               as "alertaDesde"
     from (
       -- El reloj de la alerta corre desde el ingreso abierto más viejo: con
@@ -682,7 +688,7 @@ export type AuditRow = {
   guestName: string
   guestDoc: string | null
   plate: string | null
-  kind: 'visita' | 'frecuente' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   frequentAs: 'visita' | 'proveedor' | null
   tradeName: string | null
   /** El rubro pide seguro Y esta invitación es de quien entra a trabajar. */
@@ -731,7 +737,7 @@ export type AuditFilters = {
   to?: string
   unitId?: string
   status?: AuditStatus
-  kind?: 'visita' | 'frecuente' | 'proveedor'
+  kind?: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   /** Texto libre: nombre, documento, patente, unidad o quién invita. */
   q?: string
   /** Solo las que entraron por un alta exprés con algún seguro faltante. */

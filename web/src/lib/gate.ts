@@ -14,7 +14,7 @@ export type Adentro = { entryId: string; enteredAt: string; guestDoc: string | n
 export type Resultado = {
   invitation: {
     id: string
-    kind: 'visita' | 'frecuente' | 'proveedor'
+    kind: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
     frequentAs: 'visita' | 'proveedor' | null
     tradeId: string | null
     guestName: string
@@ -22,6 +22,8 @@ export type Resultado = {
     plate: string | null
     validFrom: string
     validTo: string
+    /** Solo en delivery: el instante en que deja de valer. */
+    expiresAt?: string | null
     capacity: number
     weekdays: number[] | null
     unitId: string
@@ -68,7 +70,7 @@ export type Hit = {
   guestDoc: string | null
   unitLabel: string
   plate: string | null
-  kind: 'visita' | 'frecuente' | 'proveedor'
+  kind: 'visita' | 'frecuente' | 'proveedor' | 'delivery'
   frequentAs: 'visita' | 'proveedor' | null
   tradeName: string | null
   anulada: boolean
@@ -179,8 +181,9 @@ export const registrarEgreso = (invitationId: string) =>
 export const buscarUnidades = (q: string) => api<UnidadHit[]>(`/gate/units?q=${encodeURIComponent(q)}`)
 
 export const altaExpres = (datos: {
-  unitId: string; guestName: string; guestDoc?: string; plate?: string; note?: string
-  kind: 'visita' | 'proveedor'; tradeId?: string | null
+  unitId: string; guestName?: string; guestDoc: string; plate?: string; note?: string
+  kind: 'visita' | 'proveedor' | 'delivery'; tradeId?: string | null
+  app?: 'pedidosya' | 'rappi' | 'mercadolibre' | 'otro'; otro?: string
 }) => api<{ id: string }>('/gate/invitations', { method: 'POST', body: JSON.stringify(datos) })
 
 /** Lo que la API le rechaza al alta exprés y el guardia puede corregir; null si es otra cosa. */
@@ -189,6 +192,7 @@ export function mensajeAltaExpres(error: unknown): string | null {
   return ({
     rubro_requerido: 'Elegí el rubro.',
     rubro_invalido: 'Ese rubro ya no está disponible. Elegí otro.',
+    falta_detalle: 'Contá de dónde viene el pedido.',
   } as Record<string, string>)[codigo] ?? null
 }
 
