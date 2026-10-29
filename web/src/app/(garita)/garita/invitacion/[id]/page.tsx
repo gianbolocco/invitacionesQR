@@ -18,6 +18,7 @@ import {
   useVeredictoEnVivo, useCorregirSeguro, fechaPasadaDe,
 } from '@/lib/queries/garita'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { AltaExpres } from '@/components/garita/alta-expres'
 import { AnularInvitacion } from '@/components/garita/anular-invitacion'
 import { ErrorConReintento } from '@/components/dominio/error-con-reintento'
@@ -115,6 +116,8 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const [doc, setDoc] = useState('')
   const [docLeido, setDocLeido] = useState(false)
   const [plate, setPlate] = useState('')
+  // A pie es una elección, no un campo vacío: el switch dice qué se registra.
+  const [conVehiculo, setConVehiculo] = useState(false)
   const [seguro, setSeguro] = useState<ValorSeguro>(VACIO)
   const [seguroAuto, setSeguroAuto] = useState<ValorSeguro>(VACIO)
   // Qué seguro está corrigiendo el guardia (uno que ya estaba cargado).
@@ -143,6 +146,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
     setDoc(leido ?? inicial(q.data).doc)
     setDocLeido(Boolean(leido))
     setPlate(inicial(q.data).plate)
+    setConVehiculo(inicial(q.data).plate !== '')
     setSeguro(VACIO); setSeguroAuto(VACIO); setCorrigiendo({ proveedor: false, auto: false })
   }
 
@@ -317,7 +321,10 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
   const parcial = (v: ValorSeguro) => estadoSeguroCargado(v) === 'parcial'
   const exigeAuto = cargaSeguro && (rechazoPorAuto(check) || falta(estadoAuto))
   const exigeProv = cargaSeguro && !rechazoPorAuto(check)
-  const listoParaGuardar = (!abiertoProv || (exigeProv ? completoProv : !parcial(seguro)))
+  // Con el switch prendido y sin patente, el ingreso saldría "a pie" sin que nadie lo decida.
+  const faltaPatente = conVehiculo && normalizarPatente(plate) === ''
+  const listoParaGuardar = !faltaPatente
+    && (!abiertoProv || (exigeProv ? completoProv : !parcial(seguro)))
     && (!abiertoAuto || (exigeAuto ? completoAuto : !parcial(seguroAuto)))
   const mandaProv = abiertoProv && completoProv
   const mandaAuto = abiertoAuto && completoAuto
@@ -484,18 +491,37 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
               guardando={corregir.isPending}>
               {editable ? (
                 <>
-                  <dt className="max-w-44 self-start pt-2.5 opacity-80"><label htmlFor="patente-veredicto">{inv.kind === 'delivery' ? 'Patente (vacío = a pie o en bici)' : 'Patente'}</label></dt>
-                  <dd className="min-w-0">
-                    <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                      className="tabular h-12 border-control bg-card text-xl uppercase" />
-                    {/* Una sugerencia, no un vínculo: sale del último ingreso de este DNI. */}
-                    {resultado.lastPlate && !mismaPatente(resultado.lastPlate, plate) && (
-                      <button type="button" onClick={() => setPlate(resultado.lastPlate!)}
-                        className="mt-1 min-h-11 text-base font-semibold underline underline-offset-4">
-                        Última vez: {resultado.lastPlate}
-                      </button>
-                    )}
+                  <dt className="max-w-44 self-center opacity-80"><label htmlFor="con-vehiculo">Ingresa con vehículo</label></dt>
+                  <dd className="flex min-h-11 items-center">
+                    <Switch id="con-vehiculo" checked={conVehiculo} className="scale-125"
+                      onCheckedChange={(v) => {
+                        setConVehiculo(v)
+                        // Apagarlo es "viene a pie": la patente y su seguro no viajan.
+                        if (!v) { setPlate(''); setSeguroAuto(VACIO) }
+                      }} />
                   </dd>
+                  {conVehiculo && (
+                    <>
+                      <dt className="max-w-44 self-start pt-2.5 opacity-80"><label htmlFor="patente-veredicto">Patente</label></dt>
+                      <dd className="min-w-0">
+                        <Input id="patente-veredicto" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                          autoFocus={!plate} aria-describedby={faltaPatente ? 'patente-falta' : undefined}
+                          className="tabular h-12 border-control bg-card text-xl uppercase" />
+                        {faltaPatente && (
+                          <p id="patente-falta" className="mt-1 text-sm font-semibold opacity-80">
+                            Cargá la patente, o apagá el switch si viene a pie.
+                          </p>
+                        )}
+                        {/* Una sugerencia, no un vínculo: sale del último ingreso de este DNI. */}
+                        {resultado.lastPlate && !mismaPatente(resultado.lastPlate, plate) && (
+                          <button type="button" onClick={() => setPlate(resultado.lastPlate!)}
+                            className="mt-1 min-h-11 text-base font-semibold underline underline-offset-4">
+                            Última vez: {resultado.lastPlate}
+                          </button>
+                        )}
+                      </dd>
+                    </>
+                  )}
                 </>
               ) : (
                 <Dato etiqueta="Patente">{plate || inv.plate || '—'}</Dato>
@@ -575,7 +601,7 @@ export default function VeredictoPage({ params }: { params: Promise<{ id: string
                       </button>
                       {/* También si el rechazo es por el seguro del proveedor y al auto le falta el suyo. */}
                       {(rechazoPorAuto(check) || (pideAuto && falta(estadoAuto))) && (
-                        <button onClick={() => { setPlate(''); setSeguroAuto(VACIO) }}
+                        <button onClick={() => { setPlate(''); setSeguroAuto(VACIO); setConVehiculo(false) }}
                           className="min-h-14 w-full rounded border-2 border-current/40 text-lg font-bold">
                           Viene a pie
                         </button>
